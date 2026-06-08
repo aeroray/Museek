@@ -291,7 +291,7 @@
         max-width: 720px;
         margin: 0 auto 64px;
       }
-      .section-head .kicker {
+      .kicker {
         color: var(--accent);
         font-size: 14px;
         font-weight: 600;
@@ -423,64 +423,135 @@
         line-height: 1.65;
       }
 
-      /* Statement band */
-      .band {
-        text-align: center;
+      /* Platforms */
+      .platforms {
+        background: var(--bg-soft);
+      }
+      .plat-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 18px;
+        margin-top: 8px;
+      }
+      .plat-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        padding: 48px 18px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--bg-card);
+        overflow: hidden;
+        transition:
+          transform 0.45s var(--ease),
+          border-color 0.45s,
+          background 0.45s;
+      }
+      .plat-card::before {
+        content: "";
+        position: absolute;
+        top: -54px;
+        left: 50%;
+        width: 170px;
+        height: 170px;
+        transform: translateX(-50%);
+        background: radial-gradient(circle, var(--c), transparent 64%);
+        opacity: 0;
+        filter: blur(12px);
+        transition: opacity 0.5s var(--ease);
+        pointer-events: none;
+      }
+      .plat-card:hover {
+        transform: translateY(-8px);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .plat-card:hover::before {
+        opacity: 0.3;
+      }
+      .plat-orb {
+        position: relative;
+        z-index: 1;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
         background:
-          radial-gradient(
-            ellipse at center,
-            rgba(52, 211, 153, 0.12),
-            transparent 70%
-          ),
-          var(--bg);
+          radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.45), transparent 52%),
+          var(--c);
+        box-shadow: 0 8px 22px -4px var(--c);
       }
-      .band h2 {
-        font-size: clamp(30px, 5vw, 56px);
-        letter-spacing: -0.03em;
-        line-height: 1.1;
+      .plat-name {
+        position: relative;
+        z-index: 1;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      /* Download CTA — grand finale */
+      .download-cta {
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+        padding: clamp(130px, 19vw, 240px) 0;
+        background: var(--bg);
+      }
+      .download-cta::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 900px 540px at 50% 50%,
+          rgba(52, 211, 153, 0.2),
+          rgba(34, 211, 238, 0.1) 40%,
+          transparent 72%
+        );
+        pointer-events: none;
+      }
+      .download-cta .wrap {
+        position: relative;
+        z-index: 1;
+      }
+      .dl-badge {
+        width: 78px;
+        height: 78px;
+        border-radius: 22px;
+        margin: 0 auto 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+        box-shadow:
+          0 22px 55px -16px rgba(52, 211, 153, 0.55),
+          0 0 0 1px var(--border);
+      }
+      .dl-badge svg {
+        width: 46px;
+        height: 46px;
+      }
+      .dl-title {
+        font-size: clamp(40px, 7vw, 82px);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
         font-weight: 700;
-        max-width: 880px;
-        margin: 0 auto;
+        margin-bottom: 22px;
       }
-      .band h2 .grad {
+      .dl-title .grad {
         background: var(--accent-grad);
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
       }
-
-      /* Platforms */
-      .platforms {
-        background: var(--bg-soft);
+      .dl-sub {
+        font-size: clamp(16px, 2.2vw, 21px);
+        color: var(--muted);
+        max-width: 600px;
+        margin: 0 auto 40px;
       }
-      .plat-row {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 14px;
-        margin-top: 8px;
-      }
-      .plat {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 980px;
-        padding: 12px 22px;
-        font-size: 16px;
-        font-weight: 500;
-        transition:
-          transform 0.3s var(--ease),
-          border-color 0.3s;
-      }
-      .plat:hover {
-        transform: translateY(-3px);
-      }
-      .plat .pd {
-        width: 9px;
-        height: 9px;
-        border-radius: 50%;
+      .download-cta .cta .btn {
+        padding: 15px 30px;
+        font-size: 17px;
       }
 
       /* Footer */
@@ -549,6 +620,9 @@
         }
         .grid {
           grid-template-columns: 1fr;
+        }
+        .plat-grid {
+          grid-template-columns: repeat(2, 1fr);
         }
         .show-row,
         .show-row.reverse {
@@ -765,41 +839,44 @@
               音源提供。
             </p>
           </div>
-          <div class="plat-row reveal">
-            <span class="plat"
-              ><span class="pd" style="background: var(--wy)"></span
-              >网易云音乐</span
-            >
-            <span class="plat"
-              ><span class="pd" style="background: var(--kw)"></span
-              >酷我音乐</span
-            >
-            <span class="plat"
-              ><span class="pd" style="background: var(--kg)"></span
-              >酷狗音乐</span
-            >
-            <span class="plat"
-              ><span class="pd" style="background: var(--tx)"></span>QQ
-              音乐</span
-            >
-            <span class="plat"
-              ><span class="pd" style="background: var(--mg)"></span
-              >咪咕音乐</span
-            >
+          <div class="plat-grid reveal">
+            <div class="plat-card" style="--c: var(--wy)">
+              <span class="plat-orb"></span><span class="plat-name">网易云音乐</span>
+            </div>
+            <div class="plat-card" style="--c: var(--kw)">
+              <span class="plat-orb"></span><span class="plat-name">酷我音乐</span>
+            </div>
+            <div class="plat-card" style="--c: var(--kg)">
+              <span class="plat-orb"></span><span class="plat-name">酷狗音乐</span>
+            </div>
+            <div class="plat-card" style="--c: var(--tx)">
+              <span class="plat-orb"></span><span class="plat-name">QQ 音乐</span>
+            </div>
+            <div class="plat-card" style="--c: var(--mg)">
+              <span class="plat-orb"></span><span class="plat-name">咪咕音乐</span>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- ===== Download CTA ===== -->
-      <section class="section-pad band" id="download">
+      <section class="download-cta" id="download">
         <div class="wrap reveal">
-          <div class="section-head" style="margin-bottom: 36px">
-            <div class="kicker">即刻开始</div>
-            <h2>下载 Museek，开始拾音</h2>
-            <p>
-              Windows 安装包（.msi / .exe）已就绪。导入一个音源，即可开始播放。
-            </p>
+          <div class="dl-badge">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <g fill="#fff">
+                <rect x="28" y="42" width="7" height="16" rx="3.5" />
+                <rect x="40" y="30" width="7" height="40" rx="3.5" />
+                <rect x="52" y="22" width="7" height="56" rx="3.5" />
+                <rect x="64" y="38" width="7" height="24" rx="3.5" />
+              </g>
+            </svg>
           </div>
+          <div class="kicker">即刻开始</div>
+          <h2 class="dl-title">下载 Museek<br /><span class="grad">开始拾音</span></h2>
+          <p class="dl-sub">
+            Windows（NSIS）与 macOS（Apple Silicon）安装包已就绪；导入一个音源，即可开始畅听。
+          </p>
           <div class="cta">
             <a
               class="btn btn-primary"
@@ -831,6 +908,7 @@
               >查看源码与文档</a
             >
           </div>
+          <p class="note">MIT 开源 · 仅供学习研究 · 不内置任何音源</p>
         </div>
       </section>
     </main>
