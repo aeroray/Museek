@@ -42,6 +42,25 @@ _Every melody, one search._
 - 🎨 **Theming & i18n** — light / dark / system modes, several accent palettes, and a full **English / 简体中文** interface that follows your system by default.
 - 🔄 **Config sync** — export all settings, sources, favorites, history, and appearance to a single JSON file and import it on another device.
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="./docs/screenshots/02-playlists.jpg" width="820" alt="Browse hot playlists across platforms" />
+</p>
+
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="./docs/screenshots/01-search.png" alt="Multi-platform search" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/03-playlist-detail.png" alt="Playlist detail with quality badges" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/04-charts.png" alt="Platform charts" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Multi-platform search</sub></td>
+    <td align="center"><sub>Playlist detail</sub></td>
+    <td align="center"><sub>Charts</sub></td>
+  </tr>
+</table>
+
 ## 🏗️ Tech Stack
 
 - **[Tauri 2](https://tauri.app/)** (Rust) — tiny, secure native shell + plugins (http, fs, dialog, shell, opener, clipboard) and native OS media controls (taskbar / SMTC).
@@ -138,6 +157,25 @@ _万千旋律,一拾即得。_
 - 💾 **本地缓存** —— 音频、歌词与封面图缓存,再次播放更快、可离线;可设上限、按最近最少使用自动清理,也可一键清空。
 - 🎨 **主题与多语言** —— 亮 / 暗 / 跟随系统,多套主题配色,完整的**简体中文 / English**界面(默认跟随系统)。
 - 🔄 **配置同步** —— 把所有设置、音源、收藏、历史、外观导出为一个 JSON 文件,在其他设备导入。
+
+## 📸 截图
+
+<p align="center">
+  <img src="./docs/screenshots/02-playlists.jpg" width="820" alt="浏览各平台热门歌单" />
+</p>
+
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="./docs/screenshots/01-search.png" alt="多平台搜索" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/03-playlist-detail.png" alt="歌单详情" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/04-charts.png" alt="排行榜" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>多平台搜索</sub></td>
+    <td align="center"><sub>歌单详情</sub></td>
+    <td align="center"><sub>排行榜</sub></td>
+  </tr>
+</table>
 
 ## 🏗️ 技术栈
 

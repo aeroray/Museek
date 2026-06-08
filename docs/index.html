@@ -8,7 +8,6 @@
       name="description"
       content="Museek 拾音 是一款跨平台桌面音乐聚合应用：多平台搜索、排行榜、歌单、同步歌词与下载，一站搞定。兼容 lx-music 音源。"
     />
-    <!-- Inline SVG favicon (the black squircle + white waveform logo) -->
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%23000'/%3E%3Cg fill='%23fff'%3E%3Crect x='28' y='42' width='7' height='16' rx='3.5'/%3E%3Crect x='40' y='30' width='7' height='40' rx='3.5'/%3E%3Crect x='52' y='22' width='7' height='56' rx='3.5'/%3E%3Crect x='64' y='38' width='7' height='24' rx='3.5'/%3E%3C/g%3E%3C/svg%3E"
@@ -27,7 +26,6 @@
         --accent-grad: linear-gradient(120deg, #34d399 0%, #22d3ee 100%);
         --radius: 22px;
         --ease: cubic-bezier(0.16, 1, 0.3, 1);
-        /* Brand dots */
         --wy: #e60026;
         --kw: #f5a623;
         --kg: #2d9cdb;
@@ -246,200 +244,30 @@
         color: var(--muted-2);
       }
 
-      /* ---------- App mockup ---------- */
+      /* ---------- Product screenshot (hero) ---------- */
       .mock-stage {
         position: relative;
         z-index: 1;
         margin-top: 64px;
         perspective: 1800px;
       }
-      .mock {
-        width: min(960px, 92vw);
+      .shot {
+        width: min(1000px, 94vw);
         margin: 0 auto;
-        border-radius: 18px;
+        border-radius: 16px;
+        overflow: hidden;
         background: #101014;
         border: 1px solid var(--border);
         box-shadow: 0 50px 120px -40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.03);
-        overflow: hidden;
         transform: rotateX(8deg) scale(0.99);
         transform-origin: center top;
         transition: transform 0.6s var(--ease);
+        line-height: 0;
       }
-      .mock-bar {
-        height: 38px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 14px;
-        background: #16161b;
-        border-bottom: 1px solid var(--border);
-      }
-      .dot {
-        width: 11px;
-        height: 11px;
-        border-radius: 50%;
-      }
-      .dot.r {
-        background: #ff5f57;
-      }
-      .dot.y {
-        background: #febc2e;
-      }
-      .dot.g {
-        background: #28c840;
-      }
-      .mock-search {
-        margin-left: 14px;
-        flex: 1;
-        max-width: 280px;
-        height: 22px;
-        border-radius: 980px;
-        background: rgba(255, 255, 255, 0.06);
-      }
-      .mock-body {
-        display: flex;
-        height: 420px;
-      }
-      .mock-side {
-        width: 140px;
-        border-right: 1px solid var(--border);
-        padding: 16px 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        background: #0d0d11;
-      }
-      .mock-side .si {
-        height: 13px;
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.07);
-      }
-      .mock-side .si.active {
-        background: rgba(52, 211, 153, 0.25);
-      }
-      .mock-side .si:nth-child(1) {
-        width: 70%;
-      }
-      .mock-side .si:nth-child(3) {
-        width: 60%;
-      }
-      .mock-side .si:nth-child(4) {
-        width: 80%;
-      }
-      .mock-side .si:nth-child(5) {
-        width: 50%;
-      }
-      .mock-main {
-        flex: 1;
-        padding: 20px;
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        grid-auto-rows: min-content;
-        gap: 16px;
-        align-content: start;
-        overflow: hidden;
-      }
-      .tile .cover {
-        aspect-ratio: 1;
-        border-radius: 12px;
-        box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.6);
-      }
-      .tile .t1 {
-        height: 9px;
-        width: 85%;
-        border-radius: 4px;
-        background: rgba(255, 255, 255, 0.16);
-        margin-top: 10px;
-      }
-      .tile .t2 {
-        height: 8px;
-        width: 55%;
-        border-radius: 4px;
-        background: rgba(255, 255, 255, 0.08);
-        margin-top: 6px;
-      }
-      .mock-player {
-        height: 60px;
-        border-top: 1px solid var(--border);
-        background: #16161b;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 0 18px;
-      }
-      .mock-player .thumb {
-        width: 38px;
-        height: 38px;
-        border-radius: 8px;
-        background: var(--accent-grad);
-        flex-shrink: 0;
-      }
-      .mock-player .meta {
-        flex: 1;
-        min-width: 0;
-      }
-      .mock-player .meta .m1 {
-        height: 9px;
-        width: 120px;
-        border-radius: 4px;
-        background: rgba(255, 255, 255, 0.2);
-      }
-      .mock-player .meta .m2 {
-        height: 8px;
-        width: 80px;
-        border-radius: 4px;
-        background: rgba(255, 255, 255, 0.1);
-        margin-top: 7px;
-      }
-      .eq {
-        display: flex;
-        align-items: flex-end;
-        gap: 3px;
-        height: 22px;
-      }
-      .eq span {
-        width: 3px;
-        background: var(--accent);
-        border-radius: 2px;
-        animation: eq 1s ease-in-out infinite;
-      }
-      .eq span:nth-child(2) {
-        animation-delay: 0.2s;
-      }
-      .eq span:nth-child(3) {
-        animation-delay: 0.4s;
-      }
-      .eq span:nth-child(4) {
-        animation-delay: 0.1s;
-      }
-      .eq span:nth-child(5) {
-        animation-delay: 0.3s;
-      }
-      @keyframes eq {
-        0%,
-        100% {
-          height: 6px;
-        }
-        50% {
-          height: 22px;
-        }
-      }
-      .play-circle {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: var(--accent-grad);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        box-shadow: 0 6px 18px -6px rgba(52, 211, 153, 0.7);
-      }
-      .play-circle svg {
-        width: 16px;
-        height: 16px;
-        fill: #04130d;
-        margin-left: 2px;
+      .shot img {
+        width: 100%;
+        height: auto;
+        display: block;
       }
 
       /* ---------- Sections ---------- */
@@ -527,11 +355,67 @@
         line-height: 1.6;
       }
 
+      /* Showcase (alternating screenshots) */
+      .showcase {
+        background: var(--bg-soft);
+      }
+      .show-row {
+        display: flex;
+        align-items: center;
+        gap: 56px;
+        margin-bottom: 96px;
+      }
+      .show-row:last-child {
+        margin-bottom: 0;
+      }
+      .show-row.reverse {
+        flex-direction: row-reverse;
+      }
+      .show-frame {
+        flex: 1.35;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        box-shadow: 0 36px 80px -34px rgba(0, 0, 0, 0.85);
+        line-height: 0;
+        transition: transform 0.5s var(--ease);
+      }
+      .show-frame:hover {
+        transform: translateY(-6px);
+      }
+      .show-frame img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .show-txt {
+        flex: 1;
+      }
+      .show-txt .kicker {
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        margin-bottom: 12px;
+      }
+      .show-txt h3 {
+        font-size: clamp(24px, 3vw, 34px);
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        margin-bottom: 14px;
+      }
+      .show-txt p {
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.65;
+      }
+
       /* Statement band */
       .band {
         text-align: center;
         background: radial-gradient(ellipse at center, rgba(52, 211, 153, 0.12), transparent 70%),
-          var(--bg-soft);
+          var(--bg);
       }
       .band h2 {
         font-size: clamp(30px, 5vw, 56px);
@@ -550,7 +434,7 @@
 
       /* Platforms */
       .platforms {
-        background: var(--bg);
+        background: var(--bg-soft);
       }
       .plat-row {
         display: flex;
@@ -573,7 +457,6 @@
       }
       .plat:hover {
         transform: translateY(-3px);
-        border-color: var(--border);
       }
       .plat .pd {
         width: 9px;
@@ -646,14 +529,11 @@
         .grid {
           grid-template-columns: 1fr;
         }
-        .mock-side {
-          display: none;
-        }
-        .mock-main {
-          grid-template-columns: repeat(3, 1fr);
-        }
-        .mock-body {
-          height: 320px;
+        .show-row,
+        .show-row.reverse {
+          flex-direction: column;
+          gap: 24px;
+          margin-bottom: 64px;
         }
       }
       @media (prefers-reduced-motion: reduce) {
@@ -686,9 +566,9 @@
         </a>
         <nav class="nav-links">
           <a class="link" href="#features">功能</a>
+          <a class="link" href="#gallery">界面</a>
           <a class="link" href="#platforms">平台</a>
-          <a class="link" href="#download">下载</a>
-          <a class="btn btn-ghost" id="gh-nav" href="https://github.com/your-username/Museek" target="_blank" rel="noopener">
+          <a class="btn btn-ghost" href="https://github.com/your-username/Museek" target="_blank" rel="noopener">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.8c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
             GitHub
           </a>
@@ -701,46 +581,25 @@
       <section class="hero">
         <div class="wrap">
           <div class="eyebrow">兼容 lx-music 音源 · 跨平台桌面应用</div>
-          <h1>
-            <span class="grad">Museek</span> <span class="cn">· 拾音</span>
-          </h1>
+          <h1><span class="grad">Museek</span> <span class="cn">· 拾音</span></h1>
           <p class="tagline">万千旋律，一拾即得。</p>
           <p class="subtitle">
             搜索、排行榜、歌单、同步歌词与下载 —— 网易云、酷我、酷狗、QQ 音乐、咪咕，多家平台，一站搞定。
           </p>
           <div class="cta">
-            <a class="btn btn-primary" id="dl" href="https://github.com/your-username/Museek/releases/latest" target="_blank" rel="noopener">
+            <a class="btn btn-primary" href="https://github.com/your-username/Museek/releases/latest" target="_blank" rel="noopener">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
               下载 Windows 版
             </a>
-            <a class="btn btn-ghost" id="gh-hero" href="https://github.com/your-username/Museek" target="_blank" rel="noopener">在 GitHub 查看源码</a>
+            <a class="btn btn-ghost" href="https://github.com/your-username/Museek" target="_blank" rel="noopener">在 GitHub 查看源码</a>
           </div>
           <p class="note">基于 Tauri 2 · React 19 构建 · MIT 开源 · 仅供学习研究</p>
         </div>
 
-        <!-- App mockup -->
+        <!-- Real app screenshot -->
         <div class="mock-stage">
-          <div class="mock" id="mock" aria-hidden="true">
-            <div class="mock-bar">
-              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-              <span class="mock-search"></span>
-            </div>
-            <div class="mock-body">
-              <div class="mock-side">
-                <span class="si active"></span>
-                <span class="si"></span>
-                <span class="si"></span>
-                <span class="si"></span>
-                <span class="si"></span>
-              </div>
-              <div class="mock-main" id="mock-grid"></div>
-            </div>
-            <div class="mock-player">
-              <span class="thumb"></span>
-              <div class="meta"><div class="m1"></div><div class="m2"></div></div>
-              <div class="eq"><span></span><span></span><span></span><span></span><span></span></div>
-              <div class="play-circle"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-            </div>
+          <div class="shot" id="mock">
+            <img src="screenshots/02-playlists.jpg" alt="Museek — 浏览各平台热门歌单" width="1600" height="1000" />
           </div>
         </div>
       </section>
@@ -754,6 +613,44 @@
             <p>从搜索到播放，从歌词到下载，流畅、克制、好用。</p>
           </div>
           <div class="grid" id="feature-grid"></div>
+        </div>
+      </section>
+
+      <!-- ===== Gallery / Showcase ===== -->
+      <section class="section-pad showcase" id="gallery">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div class="kicker">界面一览</div>
+            <h2>看得见的精致</h2>
+            <p>真实截图，未经修饰。</p>
+          </div>
+
+          <div class="show-row reveal">
+            <div class="show-frame"><img src="screenshots/01-search.png" alt="搜索界面" width="1600" height="1000" /></div>
+            <div class="show-txt">
+              <div class="kicker">搜索</div>
+              <h3>一次搜索，全网结果</h3>
+              <p>在单曲与歌单之间切换，跨五大平台检索；每首歌都标注可用音质，FLAC、Hi-Res 一目了然。</p>
+            </div>
+          </div>
+
+          <div class="show-row reverse reveal">
+            <div class="show-frame"><img src="screenshots/03-playlist-detail.png" alt="歌单详情界面" width="1600" height="1000" /></div>
+            <div class="show-txt">
+              <div class="kicker">歌单</div>
+              <h3>完整歌单，整张收起</h3>
+              <p>打开任意歌单查看全部曲目，一键播放全部或收藏整个歌单 —— 连你网易云的私人歌单也能拾起。</p>
+            </div>
+          </div>
+
+          <div class="show-row reveal">
+            <div class="show-frame"><img src="screenshots/04-charts.png" alt="排行榜界面" width="1600" height="1000" /></div>
+            <div class="show-txt">
+              <div class="kicker">排行榜</div>
+              <h3>实时榜单，紧跟潮流</h3>
+              <p>飙升、新歌、热歌、原创…… 各平台榜单一处浏览，随时发现正在流行的好音乐。</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -832,16 +729,13 @@
     </footer>
 
     <script>
-      // Year
       document.getElementById("year").textContent = new Date().getFullYear();
 
-      // Sticky-nav border on scroll
       const hdr = document.getElementById("hdr");
       const onScroll = () => hdr.classList.toggle("scrolled", window.scrollY > 8);
       onScroll();
       window.addEventListener("scroll", onScroll, { passive: true });
 
-      // Feature cards
       const features = [
         {
           t: "多平台搜索",
@@ -889,8 +783,7 @@
           p: "M12 3a9 9 0 1 0 0 18 3 3 0 0 0 0-6 3 3 0 0 1 0-6 3 3 0 0 0 0-6zM8 9h.01M16 9h.01M16 14h.01",
         },
       ];
-      const grid = document.getElementById("feature-grid");
-      grid.innerHTML = features
+      document.getElementById("feature-grid").innerHTML = features
         .map(
           (f, i) => `
         <div class="card reveal" style="--d:${(i % 3) * 0.08}s">
@@ -901,22 +794,6 @@
         )
         .join("");
 
-      // Mockup album tiles (gradient covers)
-      const grads = [
-        "linear-gradient(135deg,#f59e0b,#ef4444)",
-        "linear-gradient(135deg,#6366f1,#8b5cf6)",
-        "linear-gradient(135deg,#10b981,#22d3ee)",
-        "linear-gradient(135deg,#ec4899,#f43f5e)",
-        "linear-gradient(135deg,#0ea5e9,#6366f1)",
-        "linear-gradient(135deg,#14b8a6,#84cc16)",
-        "linear-gradient(135deg,#f97316,#eab308)",
-        "linear-gradient(135deg,#a855f7,#ec4899)",
-      ];
-      document.getElementById("mock-grid").innerHTML = grads
-        .map((g) => `<div class="tile"><div class="cover" style="background:${g}"></div><div class="t1"></div><div class="t2"></div></div>`)
-        .join("");
-
-      // Scroll reveal
       const io = new IntersectionObserver(
         (entries) => {
           entries.forEach((e) => {
@@ -930,7 +807,7 @@
       );
       document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
 
-      // Subtle pointer tilt on the hero mockup
+      // Subtle pointer tilt on the hero screenshot
       const mock = document.getElementById("mock");
       const stage = document.querySelector(".mock-stage");
       if (mock && stage && matchMedia("(pointer:fine)").matches) {
