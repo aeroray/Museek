@@ -123,6 +123,24 @@
       .nav-links a.link:hover {
         color: var(--fg);
       }
+      .lang-toggle {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        border-radius: 980px;
+        padding: 6px 13px;
+        font-size: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+      .lang-toggle:hover {
+        color: var(--fg);
+        background: rgba(255, 255, 255, 0.12);
+      }
       .btn {
         display: inline-flex;
         align-items: center;
@@ -404,11 +422,6 @@
         flex: 1;
       }
       .show-txt .kicker {
-        color: var(--accent);
-        font-size: 13px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
         margin-bottom: 12px;
       }
       .show-txt h3 {
@@ -477,7 +490,11 @@
         height: 46px;
         border-radius: 50%;
         background:
-          radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.45), transparent 52%),
+          radial-gradient(
+            circle at 34% 30%,
+            rgba(255, 255, 255, 0.45),
+            transparent 52%
+          ),
           var(--c);
         box-shadow: 0 8px 22px -4px var(--c);
       }
@@ -487,6 +504,7 @@
         font-size: 15px;
         font-weight: 600;
         letter-spacing: -0.01em;
+        text-align: center;
       }
 
       /* Download CTA — grand finale */
@@ -660,9 +678,10 @@
           <span>Museek <span class="cn">拾音</span></span>
         </a>
         <nav class="nav-links">
-          <a class="link" href="#features">功能</a>
-          <a class="link" href="#gallery">界面</a>
-          <a class="link" href="#platforms">平台</a>
+          <a class="link" href="#features" data-i18n="nav.features">功能</a>
+          <a class="link" href="#gallery" data-i18n="nav.gallery">界面</a>
+          <a class="link" href="#platforms" data-i18n="nav.platforms">平台</a>
+          <button class="lang-toggle" id="langToggle" type="button">EN</button>
           <a
             class="btn btn-ghost"
             href="https://github.com/aeroray/Museek"
@@ -690,12 +709,14 @@
     <main id="top">
       <section class="hero">
         <div class="wrap">
-          <div class="eyebrow">兼容 lx-music 音源 · 跨平台桌面应用</div>
+          <div class="eyebrow" data-i18n="hero.eyebrow">
+            兼容 lx-music 音源 · 跨平台桌面应用
+          </div>
           <h1>
             <span class="grad">Museek</span> <span class="cn">· 拾音</span>
           </h1>
-          <p class="tagline">万千旋律，一拾即得。</p>
-          <p class="subtitle">
+          <p class="tagline" data-i18n="hero.tagline">万千旋律，一拾即得。</p>
+          <p class="subtitle" data-i18n="hero.subtitle">
             搜索、排行榜、歌单、同步歌词与下载 —— 网易云、酷我、酷狗、QQ
             音乐、咪咕，多家平台，一站搞定。
           </p>
@@ -720,17 +741,18 @@
                 <path d="M12 3v12m0 0l-4-4m4 4l4-4" />
                 <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
               </svg>
-              下载 Windows 版
+              <span data-i18n="hero.download">下载应用</span>
             </a>
             <a
               class="btn btn-ghost"
               href="https://github.com/aeroray/Museek"
               target="_blank"
               rel="noopener"
+              data-i18n="hero.source"
               >在 GitHub 查看源码</a
             >
           </div>
-          <p class="note">
+          <p class="note" data-i18n="hero.note">
             基于 Tauri 2 · React 19 构建 · MIT 开源 · 仅供学习研究
           </p>
         </div>
@@ -740,6 +762,7 @@
           <div class="shot" id="mock">
             <img
               src="screenshots/02-playlists.webp"
+              data-i18n-alt="hero.shotAlt"
               alt="Museek — 浏览各平台热门歌单"
               width="1600"
               height="1000"
@@ -752,9 +775,9 @@
       <section class="section-pad features" id="features">
         <div class="wrap">
           <div class="section-head reveal">
-            <div class="kicker">一个应用，听遍全网</div>
-            <h2>为热爱音乐的你<br />精心打磨的每个细节</h2>
-            <p>从搜索到播放，从歌词到下载，流畅、克制、好用。</p>
+            <div class="kicker" data-i18n="feat.kicker">一个应用，听遍全网</div>
+            <h2 data-i18n="feat.title">为热爱音乐的你<br />精心打磨的每个细节</h2>
+            <p data-i18n="feat.sub">从搜索到播放，从歌词到下载，流畅、克制、好用。</p>
           </div>
           <div class="grid" id="feature-grid"></div>
         </div>
@@ -764,24 +787,25 @@
       <section class="section-pad showcase" id="gallery">
         <div class="wrap">
           <div class="section-head reveal">
-            <div class="kicker">界面一览</div>
-            <h2>看得见的精致</h2>
-            <p>真实截图，未经修饰。</p>
+            <div class="kicker" data-i18n="gal.kicker">界面一览</div>
+            <h2 data-i18n="gal.title">看得见的精致</h2>
+            <p data-i18n="gal.sub">真实截图，未经修饰。</p>
           </div>
 
           <div class="show-row reveal">
             <div class="show-frame">
               <img
                 src="screenshots/01-search.webp"
+                data-i18n-alt="gal.search.alt"
                 alt="搜索界面"
                 width="1600"
                 height="1000"
               />
             </div>
             <div class="show-txt">
-              <div class="kicker">搜索</div>
-              <h3>一次搜索，全网结果</h3>
-              <p>
+              <div class="kicker" data-i18n="gal.search.k">搜索</div>
+              <h3 data-i18n="gal.search.t">一次搜索，全网结果</h3>
+              <p data-i18n="gal.search.d">
                 在单曲与歌单之间切换，跨五大平台检索；每首歌都标注可用音质，FLAC、Hi-Res
                 一目了然。
               </p>
@@ -792,15 +816,16 @@
             <div class="show-frame">
               <img
                 src="screenshots/03-playlist-detail.webp"
+                data-i18n-alt="gal.pl.alt"
                 alt="歌单详情界面"
                 width="1600"
                 height="1000"
               />
             </div>
             <div class="show-txt">
-              <div class="kicker">歌单</div>
-              <h3>完整歌单，整张收起</h3>
-              <p>
+              <div class="kicker" data-i18n="gal.pl.k">歌单</div>
+              <h3 data-i18n="gal.pl.t">完整歌单，整张收起</h3>
+              <p data-i18n="gal.pl.d">
                 打开任意歌单查看全部曲目，一键播放全部或收藏整个歌单 ——
                 连你网易云的私人歌单也能拾起。
               </p>
@@ -811,15 +836,16 @@
             <div class="show-frame">
               <img
                 src="screenshots/04-charts.webp"
+                data-i18n-alt="gal.ch.alt"
                 alt="排行榜界面"
                 width="1600"
                 height="1000"
               />
             </div>
             <div class="show-txt">
-              <div class="kicker">排行榜</div>
-              <h3>实时榜单，紧跟潮流</h3>
-              <p>
+              <div class="kicker" data-i18n="gal.ch.k">排行榜</div>
+              <h3 data-i18n="gal.ch.t">实时榜单，紧跟潮流</h3>
+              <p data-i18n="gal.ch.d">
                 飙升、新歌、热歌、原创……
                 各平台榜单一处浏览，随时发现正在流行的好音乐。
               </p>
@@ -832,28 +858,33 @@
       <section class="section-pad platforms" id="platforms">
         <div class="wrap">
           <div class="section-head reveal">
-            <div class="kicker">多平台聚合</div>
-            <h2>五大平台，一处畅听</h2>
-            <p>
+            <div class="kicker" data-i18n="plat.kicker">多平台聚合</div>
+            <h2 data-i18n="plat.title">五大平台，一处畅听</h2>
+            <p data-i18n="plat.sub">
               统一的搜索、排行榜与歌单体验；播放链接由你自行导入的 lx-music
               音源提供。
             </p>
           </div>
           <div class="plat-grid reveal">
             <div class="plat-card" style="--c: var(--wy)">
-              <span class="plat-orb"></span><span class="plat-name">网易云音乐</span>
+              <span class="plat-orb"></span
+              ><span class="plat-name" data-i18n="plat.wy">网易云音乐</span>
             </div>
             <div class="plat-card" style="--c: var(--kw)">
-              <span class="plat-orb"></span><span class="plat-name">酷我音乐</span>
+              <span class="plat-orb"></span
+              ><span class="plat-name" data-i18n="plat.kw">酷我音乐</span>
             </div>
             <div class="plat-card" style="--c: var(--kg)">
-              <span class="plat-orb"></span><span class="plat-name">酷狗音乐</span>
+              <span class="plat-orb"></span
+              ><span class="plat-name" data-i18n="plat.kg">酷狗音乐</span>
             </div>
             <div class="plat-card" style="--c: var(--tx)">
-              <span class="plat-orb"></span><span class="plat-name">QQ 音乐</span>
+              <span class="plat-orb"></span
+              ><span class="plat-name" data-i18n="plat.tx">QQ 音乐</span>
             </div>
             <div class="plat-card" style="--c: var(--mg)">
-              <span class="plat-orb"></span><span class="plat-name">咪咕音乐</span>
+              <span class="plat-orb"></span
+              ><span class="plat-name" data-i18n="plat.mg">咪咕音乐</span>
             </div>
           </div>
         </div>
@@ -872,10 +903,17 @@
               </g>
             </svg>
           </div>
-          <div class="kicker">即刻开始</div>
-          <h2 class="dl-title">下载 Museek<br /><span class="grad">开始拾音</span></h2>
-          <p class="dl-sub">
-            Windows（NSIS）与 macOS（Apple Silicon）安装包已就绪；导入一个音源，即可开始畅听。
+          <div class="kicker" data-i18n="dl.kicker">即刻开始</div>
+          <h2 class="dl-title">
+            <span data-i18n="dl.title1">下载 Museek</span><br /><span
+              class="grad"
+              data-i18n="dl.title2"
+              >开始拾音</span
+            >
+          </h2>
+          <p class="dl-sub" data-i18n="dl.sub">
+            Windows（NSIS）与 macOS（Apple
+            Silicon）安装包已就绪；导入一个音源，即可开始畅听。
           </p>
           <div class="cta">
             <a
@@ -898,17 +936,20 @@
                 <path d="M12 3v12m0 0l-4-4m4 4l4-4" />
                 <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
               </svg>
-              前往 Releases 下载
+              <span data-i18n="dl.download">前往 Releases 下载</span>
             </a>
             <a
               class="btn btn-ghost"
               href="https://github.com/aeroray/Museek"
               target="_blank"
               rel="noopener"
+              data-i18n="dl.source"
               >查看源码与文档</a
             >
           </div>
-          <p class="note">MIT 开源 · 仅供学习研究 · 不内置任何音源</p>
+          <p class="note" data-i18n="dl.note">
+            MIT 开源 · 仅供学习研究 · 不内置任何音源
+          </p>
         </div>
       </section>
     </main>
@@ -937,9 +978,11 @@
           </div>
         </div>
         <div class="disclaimer">
-          ⚠️ 本项目仅供个人学习与研究使用。Museek
-          不提供、不存储、不分发任何音乐内容，它只是一个聚合公开平台
-          API、并播放由用户自行导入的音源脚本所返回链接的界面。请勿用于任何商业用途，并遵守各平台的服务条款与版权规定；使用所产生的一切后果由使用者自行承担。
+          <span data-i18n="footer.disclaimer"
+            >⚠️ 本项目仅供个人学习与研究使用。Museek
+            不提供、不存储、不分发任何音乐内容，它只是一个聚合公开平台
+            API、并播放由用户自行导入的音源脚本所返回链接的界面。请勿用于任何商业用途，并遵守各平台的服务条款与版权规定；使用所产生的一切后果由使用者自行承担。</span
+          >
           <div class="copy">
             © <span id="year"></span> Museek · 拾音 — Released under the MIT
             License.
@@ -957,64 +1000,243 @@
       onScroll();
       window.addEventListener("scroll", onScroll, { passive: true });
 
-      const features = [
+      // Feature cards — structure only; text comes from i18n (data-i18n keys).
+      const FEATURES = [
+        { p: "M21 21l-4.3-4.3M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z", k: "f1" },
+        { p: "M4 7h16M4 12h16M4 17h10M16 14l4 3-4 3", k: "f2" },
+        { p: "M9 18V5l12-2v13M9 13l12-2M6 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z", k: "f3" },
         {
-          t: "多平台搜索",
-          d: "搜索单曲、歌单与用户。输入用户名即可打开 TA 的公开歌单 —— 包括你自己的网易云「我喜欢的音乐」。",
-          p: "M21 21l-4.3-4.3M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z",
-        },
-        {
-          t: "兼容 lx-music 音源",
-          d: "通过链接导入音源脚本；开启多个时按顺序自动重试（失败转移），直到取到可播放链接。",
-          p: "M4 7h16M4 12h16M4 17h10M16 14l4 3-4 3",
-        },
-        {
-          t: "沉浸式歌词",
-          d: "覆盖全部五个平台（含加密格式），高度模糊的封面背景、同步滚动、点击跳转、字号调节，有翻译时一并显示。",
-          p: "M9 18V5l12-2v13M9 13l12-2M6 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
-        },
-        {
-          t: "系统媒体控制",
-          d: "在 Windows 上，可通过任务栏缩略图按钮与系统媒体浮窗（SMTC）/ 媒体键直接控制播放。",
           p: "M5 3h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM7 21h10M9 9l5 2.5L9 14V9z",
+          k: "f4",
         },
         {
-          t: "高品质下载",
-          d: "选择音质、自定义目录与命名、并发数（1–5）。设定首选音质，不可用时自动逐级降级并提示。",
           p: "M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2",
+          k: "f5",
         },
         {
-          t: "收藏与歌单",
-          d: "收藏单曲与整个歌单；按时间 / 名称排序、按平台筛选、即时搜索、批量下载与删除、一键播放全部。",
           p: "M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1z",
+          k: "f6",
         },
         {
-          t: "在其他平台搜索",
-          d: "一键把当前播放的歌曲发送到其他平台搜索（自动填好并搜索）—— 当歌曲在原平台为 VIP 时尤其方便。",
           p: "M16 3h5v5M21 3l-7 7M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4",
+          k: "f7",
         },
         {
-          t: "本地缓存",
-          d: "音频、歌词与封面图缓存，再次播放更快、可离线；可设容量上限、按最近最少使用自动清理，也可一键清空。",
           p: "M3 12a9 3 0 0 0 18 0M3 5a9 3 0 0 0 18 0M3 5v14a9 3 0 0 0 18 0V5",
+          k: "f8",
         },
         {
-          t: "主题与多语言",
-          d: "亮 / 暗 / 跟随系统，多套主题配色，完整的简体中文 / English 界面，默认跟随系统。",
           p: "M12 3a9 9 0 1 0 0 18 3 3 0 0 0 0-6 3 3 0 0 1 0-6 3 3 0 0 0 0-6zM8 9h.01M16 9h.01M16 14h.01",
+          k: "f9",
         },
       ];
-      document.getElementById("feature-grid").innerHTML = features
-        .map(
-          (f, i) => `
+      document.getElementById("feature-grid").innerHTML = FEATURES.map(
+        (f, i) => `
         <div class="card reveal" style="--d:${(i % 3) * 0.08}s">
           <div class="ico"><svg viewBox="0 0 24 24"><path d="${f.p}"/></svg></div>
-          <h3>${f.t}</h3>
-          <p>${f.d}</p>
+          <h3 data-i18n="${f.k}.t"></h3>
+          <p data-i18n="${f.k}.d"></p>
         </div>`,
-        )
-        .join("");
+      ).join("");
 
+      // ---------- i18n ----------
+      const I18N = {
+        zh: {
+          title: "Museek · 拾音 —— 万千旋律，一拾即得",
+          desc: "Museek 拾音 是一款跨平台桌面音乐聚合应用：多平台搜索、排行榜、歌单、同步歌词与下载，一站搞定。兼容 lx-music 音源。",
+          "nav.features": "功能",
+          "nav.gallery": "界面",
+          "nav.platforms": "平台",
+          "hero.eyebrow": "兼容 lx-music 音源 · 跨平台桌面应用",
+          "hero.tagline": "万千旋律，一拾即得。",
+          "hero.subtitle":
+            "搜索、排行榜、歌单、同步歌词与下载 —— 网易云、酷我、酷狗、QQ 音乐、咪咕，多家平台，一站搞定。",
+          "hero.download": "下载应用",
+          "hero.source": "在 GitHub 查看源码",
+          "hero.note": "基于 Tauri 2 · React 19 构建 · MIT 开源 · 仅供学习研究",
+          "hero.shotAlt": "Museek — 浏览各平台热门歌单",
+          "feat.kicker": "一个应用，听遍全网",
+          "feat.title": "为热爱音乐的你<br />精心打磨的每个细节",
+          "feat.sub": "从搜索到播放，从歌词到下载，流畅、克制、好用。",
+          "f1.t": "多平台搜索",
+          "f1.d": "搜索单曲、歌单与用户。输入用户名即可打开 TA 的公开歌单 —— 包括你自己的网易云「我喜欢的音乐」。",
+          "f2.t": "兼容 lx-music 音源",
+          "f2.d": "通过链接导入音源脚本；开启多个时按顺序自动重试（失败转移），直到取到可播放链接。",
+          "f3.t": "沉浸式歌词",
+          "f3.d": "覆盖全部五个平台（含加密格式），高度模糊的封面背景、同步滚动、点击跳转、字号调节，有翻译时一并显示。",
+          "f4.t": "系统媒体控制",
+          "f4.d": "在 Windows 上，可通过任务栏缩略图按钮与系统媒体浮窗（SMTC）/ 媒体键直接控制播放。",
+          "f5.t": "高品质下载",
+          "f5.d": "选择音质、自定义目录与命名、并发数（1–5）。设定首选音质，不可用时自动逐级降级并提示。",
+          "f6.t": "收藏与歌单",
+          "f6.d": "收藏单曲与整个歌单；按时间 / 名称排序、按平台筛选、即时搜索、批量下载与删除、一键播放全部。",
+          "f7.t": "在其他平台搜索",
+          "f7.d": "一键把当前播放的歌曲发送到其他平台搜索（自动填好并搜索）—— 当歌曲在原平台为 VIP 时尤其方便。",
+          "f8.t": "本地缓存",
+          "f8.d": "音频、歌词与封面图缓存，再次播放更快、可离线；可设容量上限、按最近最少使用自动清理，也可一键清空。",
+          "f9.t": "主题与多语言",
+          "f9.d": "亮 / 暗 / 跟随系统，多套主题配色，完整的简体中文 / English 界面，默认跟随系统。",
+          "gal.kicker": "界面一览",
+          "gal.title": "看得见的精致",
+          "gal.sub": "真实截图，未经修饰。",
+          "gal.search.k": "搜索",
+          "gal.search.t": "一次搜索，全网结果",
+          "gal.search.d":
+            "在单曲与歌单之间切换，跨五大平台检索；每首歌都标注可用音质，FLAC、Hi-Res 一目了然。",
+          "gal.search.alt": "搜索界面",
+          "gal.pl.k": "歌单",
+          "gal.pl.t": "完整歌单，整张收起",
+          "gal.pl.d":
+            "打开任意歌单查看全部曲目，一键播放全部或收藏整个歌单 —— 连你网易云的私人歌单也能拾起。",
+          "gal.pl.alt": "歌单详情界面",
+          "gal.ch.k": "排行榜",
+          "gal.ch.t": "实时榜单，紧跟潮流",
+          "gal.ch.d":
+            "飙升、新歌、热歌、原创…… 各平台榜单一处浏览，随时发现正在流行的好音乐。",
+          "gal.ch.alt": "排行榜界面",
+          "plat.kicker": "多平台聚合",
+          "plat.title": "五大平台，一处畅听",
+          "plat.sub":
+            "统一的搜索、排行榜与歌单体验；播放链接由你自行导入的 lx-music 音源提供。",
+          "plat.wy": "网易云音乐",
+          "plat.kw": "酷我音乐",
+          "plat.kg": "酷狗音乐",
+          "plat.tx": "QQ 音乐",
+          "plat.mg": "咪咕音乐",
+          "dl.kicker": "即刻开始",
+          "dl.title1": "下载 Museek",
+          "dl.title2": "开始拾音",
+          "dl.sub":
+            "Windows（NSIS）与 macOS（Apple Silicon）安装包已就绪；导入一个音源，即可开始畅听。",
+          "dl.download": "前往 Releases 下载",
+          "dl.source": "查看源码与文档",
+          "dl.note": "MIT 开源 · 仅供学习研究 · 不内置任何音源",
+          "footer.disclaimer":
+            "⚠️ 本项目仅供个人学习与研究使用。Museek 不提供、不存储、不分发任何音乐内容，它只是一个聚合公开平台 API、并播放由用户自行导入的音源脚本所返回链接的界面。请勿用于任何商业用途，并遵守各平台的服务条款与版权规定；使用所产生的一切后果由使用者自行承担。",
+        },
+        en: {
+          title: "Museek · 拾音 — Every melody, one search",
+          desc: "Museek is a cross-platform desktop music aggregator: multi-platform search, charts, playlists, synced lyrics, and downloads — all in one app. lx-music–compatible sources.",
+          "nav.features": "Features",
+          "nav.gallery": "Gallery",
+          "nav.platforms": "Platforms",
+          "hero.eyebrow": "lx-music–compatible sources · cross-platform desktop app",
+          "hero.tagline": "Every melody, one search.",
+          "hero.subtitle":
+            "Search, charts, playlists, synced lyrics, and downloads — across NetEase, KuWo, KuGou, QQ Music, and Migu, all in one app.",
+          "hero.download": "Download",
+          "hero.source": "View source on GitHub",
+          "hero.note": "Built with Tauri 2 · React 19 · MIT licensed · For study & research",
+          "hero.shotAlt": "Museek — browsing hot playlists across platforms",
+          "feat.kicker": "One app, the whole web of music",
+          "feat.title": "Crafted with care<br />for people who love music",
+          "feat.sub":
+            "From search to playback, lyrics to downloads — smooth, restrained, a joy to use.",
+          "f1.t": "Multi-platform search",
+          "f1.d": "Search songs, playlists, and users. Type a username to open their public playlists — including your own NetEase “Liked Music”.",
+          "f2.t": "lx-music–compatible sources",
+          "f2.d": "Import a source script by URL; with several enabled, they're tried in order (failover) until one returns a playable link.",
+          "f3.t": "Immersive lyrics",
+          "f3.d": "All five platforms (including encrypted formats), with a blurred-cover backdrop, synced auto-scroll, click-to-seek, adjustable font size, and translations when available.",
+          "f4.t": "OS media controls",
+          "f4.d": "On Windows, control playback from the taskbar thumbnail buttons and the system media (SMTC) flyout / media keys.",
+          "f5.t": "High-quality downloads",
+          "f5.d": "Choose quality, a custom folder and naming, and concurrency (1–5). Set a preferred quality; it steps down automatically when unavailable and tells you.",
+          "f6.t": "Favorites & playlists",
+          "f6.d": "Collect songs and whole playlists; sort by date / name, filter by platform, instant search, batch download / delete, and play all.",
+          "f7.t": "Search on another platform",
+          "f7.d": "One click sends the now-playing track to another platform's search, pre-filled — handy when a song is VIP-locked on its origin.",
+          "f8.t": "Disk cache",
+          "f8.d": "Audio, lyrics, and cover images are cached for faster replays and offline playback, with a size cap, LRU eviction, and one-click clearing.",
+          "f9.t": "Theming & i18n",
+          "f9.d": "Light / dark / system themes, several accent palettes, and a full English / 简体中文 interface that follows your system by default.",
+          "gal.kicker": "A closer look",
+          "gal.title": "Beauty you can see",
+          "gal.sub": "Real screenshots, untouched.",
+          "gal.search.k": "Search",
+          "gal.search.t": "One search, results everywhere",
+          "gal.search.d":
+            "Toggle between songs and playlists and search across five platforms; every track shows its available quality — FLAC and Hi-Res at a glance.",
+          "gal.search.alt": "Search screen",
+          "gal.pl.k": "Playlists",
+          "gal.pl.t": "Whole playlists, captured",
+          "gal.pl.d":
+            "Open any playlist to see every track, play it all or favorite the whole thing — even your private NetEase playlists.",
+          "gal.pl.alt": "Playlist detail screen",
+          "gal.ch.k": "Charts",
+          "gal.ch.t": "Live charts, always current",
+          "gal.ch.d":
+            "Trending, new, hot, original… browse every platform's charts in one place.",
+          "gal.ch.alt": "Charts screen",
+          "plat.kicker": "Multi-platform",
+          "plat.title": "Five platforms, one place to listen",
+          "plat.sub":
+            "A unified search, charts, and playlist experience; playback links come from the lx-music sources you import.",
+          "plat.wy": "NetEase Cloud Music",
+          "plat.kw": "KuWo",
+          "plat.kg": "KuGou",
+          "plat.tx": "QQ Music",
+          "plat.mg": "Migu",
+          "dl.kicker": "Get started",
+          "dl.title1": "Download Museek",
+          "dl.title2": "Start listening",
+          "dl.sub":
+            "Windows (NSIS) and macOS (Apple Silicon) installers are ready; import a source and start listening.",
+          "dl.download": "Go to Releases",
+          "dl.source": "Source & docs",
+          "dl.note": "MIT licensed · For study & research · No bundled sources",
+          "footer.disclaimer":
+            "⚠️ This project is for personal study and research only. Museek does not provide, store, or distribute any music; it is a UI that aggregates public platform APIs and plays links returned by source scripts you import yourself. Don't use it for any commercial purpose, and respect each platform's terms of service and copyrights; you bear all consequences of use.",
+        },
+      };
+
+      function detectLang() {
+        try {
+          const saved = localStorage.getItem("museek-lang");
+          if (saved === "zh" || saved === "en") return saved;
+        } catch (e) {}
+        return (navigator.language || "").toLowerCase().startsWith("zh")
+          ? "zh"
+          : "en";
+      }
+
+      function applyLang(lang) {
+        const d = I18N[lang] || I18N.zh;
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.title = d.title;
+        const meta = document.querySelector('meta[name="description"]');
+        if (meta) meta.setAttribute("content", d.desc);
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const v = d[el.getAttribute("data-i18n")];
+          if (v != null) el.innerHTML = v;
+        });
+        document.querySelectorAll("[data-i18n-alt]").forEach((el) => {
+          const v = d[el.getAttribute("data-i18n-alt")];
+          if (v != null) el.setAttribute("alt", v);
+        });
+        const t = document.getElementById("langToggle");
+        if (t) {
+          t.textContent = lang === "zh" ? "EN" : "中";
+          t.setAttribute(
+            "aria-label",
+            lang === "zh" ? "Switch to English" : "切换到简体中文",
+          );
+        }
+      }
+
+      let LANG = detectLang();
+      applyLang(LANG);
+      const langToggle = document.getElementById("langToggle");
+      if (langToggle)
+        langToggle.addEventListener("click", () => {
+          LANG = LANG === "zh" ? "en" : "zh";
+          try {
+            localStorage.setItem("museek-lang", LANG);
+          } catch (e) {}
+          applyLang(LANG);
+        });
+
+      // Reveal on scroll
       const io = new IntersectionObserver(
         (entries) => {
           entries.forEach((e) => {
