@@ -80,7 +80,9 @@ jobs:
             - **macOS (Apple Silicon)**：`*_aarch64.dmg`
 
             ⚠️ Museek 不内置任何音源；首次使用请在「设置 → 音源管理」导入兼容 lx-music 的音源脚本后再播放。
-            > macOS 安装包未签名，首次打开请右键「打开」以绕过 Gatekeeper 提示。
+
+            **macOS 提示「“Museek”已损坏，无法打开」？** 这是未签名 / 未公证应用的正常现象（文件并未损坏）。把 Museek.app 拖入「应用程序」，再在「终端」执行下面这行，然后正常打开即可：
+            `xattr -dr com.apple.quarantine /Applications/Museek.app`
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
