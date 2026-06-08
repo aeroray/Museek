@@ -1,0 +1,150 @@
+import { create } from "zustand"
+import { readData, writeData } from "@/lib/db"
+import type { Quality, Source } from "@/types/music"
+
+export type NamingScheme = "singer-name" | "name-singer" | "name"
+export type FavoritesSort = "added" | "name"
+export type FavoritesPlatform = Source | "all"
+
+interface Persisted {
+  playQuality: Quality
+  downloadQuality: Quality
+  // null = default app-data downloads folder; otherwise an absolute directory.
+  downloadDir: string | null
+  maxConcurrent: number
+  fileNaming: NamingScheme
+  // Cache the audio of played songs to disk (faster replays + offline).
+  audioCache: boolean
+  // Disk cache size cap in MB; least-recently-used audio is evicted beyond this.
+  maxCacheMB: number
+  // Favorites list view preferences.
+  favoritesSort: FavoritesSort
+  favoritesPlatform: FavoritesPlatform
+}
+
+interface SettingsState extends Persisted {
+  setPlayQuality: (q: Quality) => void
+  setDownloadQuality: (q: Quality) => void
+  setDownloadDir: (dir: string | null) => void
+  setMaxConcurrent: (n: number) => void
+  setFileNaming: (s: NamingScheme) => void
+  setAudioCache: (v: boolean) => void
+  setMaxCacheMB: (n: number) => void
+  setFavoritesSort: (s: FavoritesSort) => void
+  setFavoritesPlatform: (p: FavoritesPlatform) => void
+  loadFromDisk: () => Promise<void>
+}
+
+const DEFAULTS: Persisted = {
+  playQuality: "320k",
+  downloadQuality: "320k",
+  downloadDir: null,
+  maxConcurrent: 1,
+  fileNaming: "singer-name",
+  audioCache: true,
+  maxCacheMB: 1024,
+  favoritesSort: "added",
+  favoritesPlatform: "all",
+}
+
+const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
+const NAMINGS: NamingScheme[] = ["singer-name", "name-singer", "name"]
+const SORTS: FavoritesSort[] = ["added", "name"]
+const FAV_PLATFORMS: FavoritesPlatform[] = ["all", "kw", "kg", "tx", "wy", "mg"]
+export const CACHE_LIMITS_MB = [512, 1024, 2048, 4096]
+
+export const useSettingsStore = create<SettingsState>((set, get) => {
+  const persist = () => {
+    const {
+      playQuality,
+      downloadQuality,
+      downloadDir,
+      maxConcurrent,
+      fileNaming,
+      audioCache,
+      maxCacheMB,
+      favoritesSort,
+      favoritesPlatform,
+    } = get()
+    writeData("settings.json", {
+      playQuality,
+      downloadQuality,
+      downloadDir,
+      maxConcurrent,
+      fileNaming,
+      audioCache,
+      maxCacheMB,
+      favoritesSort,
+      favoritesPlatform,
+    })
+  }
+
+  return {
+    ...DEFAULTS,
+
+    setPlayQuality(q) {
+      set({ playQuality: q })
+      persist()
+    },
+    setDownloadQuality(q) {
+      set({ downloadQuality: q })
+      persist()
+    },
+    setDownloadDir(dir) {
+      set({ downloadDir: dir })
+      persist()
+    },
+    setMaxConcurrent(n) {
+      set({ maxConcurrent: Math.min(5, Math.max(1, Math.round(n))) })
+      persist()
+    },
+    setFileNaming(s) {
+      set({ fileNaming: s })
+      persist()
+    },
+    setAudioCache(v) {
+      set({ audioCache: v })
+      persist()
+    },
+    setMaxCacheMB(n) {
+      set({ maxCacheMB: n })
+      persist()
+    },
+    setFavoritesSort(s) {
+      set({ favoritesSort: s })
+      persist()
+    },
+    setFavoritesPlatform(p) {
+      set({ favoritesPlatform: p })
+      persist()
+    },
+
+    async loadFromDisk() {
+      const data = await readData<Partial<Persisted>>("settings.json", DEFAULTS)
+      set({
+        playQuality: QUALITIES.includes(data.playQuality as Quality) ? (data.playQuality as Quality) : DEFAULTS.playQuality,
+        downloadQuality: QUALITIES.includes(data.downloadQuality as Quality)
+          ? (data.downloadQuality as Quality)
+          : DEFAULTS.downloadQuality,
+        downloadDir: typeof data.downloadDir === "string" ? data.downloadDir : null,
+        maxConcurrent:
+          typeof data.maxConcurrent === "number"
+            ? Math.min(5, Math.max(1, Math.round(data.maxConcurrent)))
+            : DEFAULTS.maxConcurrent,
+        fileNaming: NAMINGS.includes(data.fileNaming as NamingScheme)
+          ? (data.fileNaming as NamingScheme)
+          : DEFAULTS.fileNaming,
+        audioCache: typeof data.audioCache === "boolean" ? data.audioCache : DEFAULTS.audioCache,
+        maxCacheMB: CACHE_LIMITS_MB.includes(data.maxCacheMB as number)
+          ? (data.maxCacheMB as number)
+          : DEFAULTS.maxCacheMB,
+        favoritesSort: SORTS.includes(data.favoritesSort as FavoritesSort)
+          ? (data.favoritesSort as FavoritesSort)
+          : DEFAULTS.favoritesSort,
+        favoritesPlatform: FAV_PLATFORMS.includes(data.favoritesPlatform as FavoritesPlatform)
+          ? (data.favoritesPlatform as FavoritesPlatform)
+          : DEFAULTS.favoritesPlatform,
+      })
+    },
+  }
+})

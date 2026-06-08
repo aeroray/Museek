@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Museek · 拾音 —— 万千旋律，一拾即得</title>
+    <meta
+      name="description"
+      content="Museek 拾音 是一款跨平台桌面音乐聚合应用：多平台搜索、排行榜、歌单、同步歌词与下载，一站搞定。兼容 lx-music 音源。"
+    />
+    <!-- Inline SVG favicon (the black squircle + white waveform logo) -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%23000'/%3E%3Cg fill='%23fff'%3E%3Crect x='28' y='42' width='7' height='16' rx='3.5'/%3E%3Crect x='40' y='30' width='7' height='40' rx='3.5'/%3E%3Crect x='52' y='22' width='7' height='56' rx='3.5'/%3E%3Crect x='64' y='38' width='7' height='24' rx='3.5'/%3E%3C/g%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        --bg: #07070a;
+        --bg-soft: #0e0e12;
+        --bg-card: rgba(255, 255, 255, 0.04);
+        --border: rgba(255, 255, 255, 0.1);
+        --fg: #f5f5f7;
+        --muted: #a1a1aa;
+        --muted-2: #6b6b75;
+        --accent: #34d399;
+        --accent-2: #22d3ee;
+        --accent-grad: linear-gradient(120deg, #34d399 0%, #22d3ee 100%);
+        --radius: 22px;
+        --ease: cubic-bezier(0.16, 1, 0.3, 1);
+        /* Brand dots */
+        --wy: #e60026;
+        --kw: #f5a623;
+        --kg: #2d9cdb;
+        --tx: #2bc275;
+        --mg: #e54ba0;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC",
+          "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        overflow-x: hidden;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      /* ---------- Nav ---------- */
+      header {
+        position: fixed;
+        inset: 0 0 auto 0;
+        z-index: 100;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        backdrop-filter: saturate(180%) blur(20px);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        background: rgba(7, 7, 10, 0.6);
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.3s, background 0.3s;
+      }
+      header.scrolled {
+        border-bottom-color: var(--border);
+        background: rgba(7, 7, 10, 0.8);
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .brand svg {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+      }
+      .brand .cn {
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        font-size: 14px;
+      }
+      .nav-links a.link {
+        color: var(--muted);
+        transition: color 0.2s;
+      }
+      .nav-links a.link:hover {
+        color: var(--fg);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 980px;
+        padding: 9px 18px;
+        font-size: 14px;
+        font-weight: 500;
+        transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), background 0.25s,
+          opacity 0.25s, border-color 0.25s;
+        white-space: nowrap;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .btn-primary {
+        background: var(--accent-grad);
+        color: #04130d;
+        font-weight: 600;
+        box-shadow: 0 6px 24px -8px rgba(52, 211, 153, 0.6);
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 34px -8px rgba(52, 211, 153, 0.7);
+      }
+      .btn-ghost {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: var(--border);
+        color: var(--fg);
+      }
+      .btn-ghost:hover {
+        background: rgba(255, 255, 255, 0.12);
+        transform: translateY(-2px);
+      }
+      .nav .btn {
+        padding: 7px 16px;
+      }
+
+      /* ---------- Hero ---------- */
+      .hero {
+        position: relative;
+        padding: 150px 0 80px;
+        text-align: center;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: -10%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 1100px;
+        height: 760px;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(52, 211, 153, 0.22) 0%,
+          rgba(34, 211, 238, 0.12) 32%,
+          transparent 68%
+        );
+        filter: blur(20px);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .hero .wrap {
+        position: relative;
+        z-index: 1;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--accent);
+        background: rgba(52, 211, 153, 0.1);
+        border: 1px solid rgba(52, 211, 153, 0.25);
+        padding: 6px 14px;
+        border-radius: 980px;
+        margin-bottom: 28px;
+        font-weight: 500;
+      }
+      .hero h1 {
+        font-size: clamp(48px, 9vw, 104px);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+        font-weight: 700;
+        margin-bottom: 22px;
+      }
+      .hero h1 .grad {
+        background: var(--accent-grad);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .hero h1 .cn {
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .tagline {
+        font-size: clamp(20px, 3.2vw, 30px);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin-bottom: 16px;
+      }
+      .subtitle {
+        font-size: clamp(15px, 2vw, 19px);
+        color: var(--muted);
+        max-width: 620px;
+        margin: 0 auto 36px;
+      }
+      .cta {
+        display: flex;
+        gap: 14px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .cta .btn {
+        padding: 13px 26px;
+        font-size: 16px;
+      }
+      .note {
+        margin-top: 18px;
+        font-size: 13px;
+        color: var(--muted-2);
+      }
+
+      /* ---------- App mockup ---------- */
+      .mock-stage {
+        position: relative;
+        z-index: 1;
+        margin-top: 64px;
+        perspective: 1800px;
+      }
+      .mock {
+        width: min(960px, 92vw);
+        margin: 0 auto;
+        border-radius: 18px;
+        background: #101014;
+        border: 1px solid var(--border);
+        box-shadow: 0 50px 120px -40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.03);
+        overflow: hidden;
+        transform: rotateX(8deg) scale(0.99);
+        transform-origin: center top;
+        transition: transform 0.6s var(--ease);
+      }
+      .mock-bar {
+        height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        background: #16161b;
+        border-bottom: 1px solid var(--border);
+      }
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+      }
+      .dot.r {
+        background: #ff5f57;
+      }
+      .dot.y {
+        background: #febc2e;
+      }
+      .dot.g {
+        background: #28c840;
+      }
+      .mock-search {
+        margin-left: 14px;
+        flex: 1;
+        max-width: 280px;
+        height: 22px;
+        border-radius: 980px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .mock-body {
+        display: flex;
+        height: 420px;
+      }
+      .mock-side {
+        width: 140px;
+        border-right: 1px solid var(--border);
+        padding: 16px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: #0d0d11;
+      }
+      .mock-side .si {
+        height: 13px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.07);
+      }
+      .mock-side .si.active {
+        background: rgba(52, 211, 153, 0.25);
+      }
+      .mock-side .si:nth-child(1) {
+        width: 70%;
+      }
+      .mock-side .si:nth-child(3) {
+        width: 60%;
+      }
+      .mock-side .si:nth-child(4) {
+        width: 80%;
+      }
+      .mock-side .si:nth-child(5) {
+        width: 50%;
+      }
+      .mock-main {
+        flex: 1;
+        padding: 20px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-auto-rows: min-content;
+        gap: 16px;
+        align-content: start;
+        overflow: hidden;
+      }
+      .tile .cover {
+        aspect-ratio: 1;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+      }
+      .tile .t1 {
+        height: 9px;
+        width: 85%;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.16);
+        margin-top: 10px;
+      }
+      .tile .t2 {
+        height: 8px;
+        width: 55%;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        margin-top: 6px;
+      }
+      .mock-player {
+        height: 60px;
+        border-top: 1px solid var(--border);
+        background: #16161b;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+      }
+      .mock-player .thumb {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        background: var(--accent-grad);
+        flex-shrink: 0;
+      }
+      .mock-player .meta {
+        flex: 1;
+        min-width: 0;
+      }
+      .mock-player .meta .m1 {
+        height: 9px;
+        width: 120px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .mock-player .meta .m2 {
+        height: 8px;
+        width: 80px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        margin-top: 7px;
+      }
+      .eq {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 22px;
+      }
+      .eq span {
+        width: 3px;
+        background: var(--accent);
+        border-radius: 2px;
+        animation: eq 1s ease-in-out infinite;
+      }
+      .eq span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .eq span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      .eq span:nth-child(4) {
+        animation-delay: 0.1s;
+      }
+      .eq span:nth-child(5) {
+        animation-delay: 0.3s;
+      }
+      @keyframes eq {
+        0%,
+        100% {
+          height: 6px;
+        }
+        50% {
+          height: 22px;
+        }
+      }
+      .play-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--accent-grad);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 6px 18px -6px rgba(52, 211, 153, 0.7);
+      }
+      .play-circle svg {
+        width: 16px;
+        height: 16px;
+        fill: #04130d;
+        margin-left: 2px;
+      }
+
+      /* ---------- Sections ---------- */
+      section {
+        position: relative;
+      }
+      .section-pad {
+        padding: clamp(80px, 12vw, 140px) 0;
+      }
+      .section-head {
+        text-align: center;
+        max-width: 720px;
+        margin: 0 auto 64px;
+      }
+      .section-head .kicker {
+        color: var(--accent);
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        margin-bottom: 14px;
+      }
+      .section-head h2 {
+        font-size: clamp(32px, 5vw, 52px);
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+        font-weight: 700;
+      }
+      .section-head p {
+        color: var(--muted);
+        font-size: clamp(16px, 2vw, 19px);
+        margin-top: 18px;
+      }
+
+      /* Feature grid */
+      .features {
+        background: linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 30px 28px;
+        transition: transform 0.4s var(--ease), border-color 0.4s, background 0.4s;
+      }
+      .card:hover {
+        transform: translateY(-6px);
+        border-color: rgba(52, 211, 153, 0.4);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .card .ico {
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(52, 211, 153, 0.12);
+        border: 1px solid rgba(52, 211, 153, 0.2);
+        margin-bottom: 20px;
+      }
+      .card .ico svg {
+        width: 22px;
+        height: 22px;
+        stroke: var(--accent);
+        fill: none;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .card h3 {
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin-bottom: 10px;
+      }
+      .card p {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      /* Statement band */
+      .band {
+        text-align: center;
+        background: radial-gradient(ellipse at center, rgba(52, 211, 153, 0.12), transparent 70%),
+          var(--bg-soft);
+      }
+      .band h2 {
+        font-size: clamp(30px, 5vw, 56px);
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+        font-weight: 700;
+        max-width: 880px;
+        margin: 0 auto;
+      }
+      .band h2 .grad {
+        background: var(--accent-grad);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      /* Platforms */
+      .platforms {
+        background: var(--bg);
+      }
+      .plat-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 14px;
+        margin-top: 8px;
+      }
+      .plat {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 980px;
+        padding: 12px 22px;
+        font-size: 16px;
+        font-weight: 500;
+        transition: transform 0.3s var(--ease), border-color 0.3s;
+      }
+      .plat:hover {
+        transform: translateY(-3px);
+        border-color: var(--border);
+      }
+      .plat .pd {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+
+      /* Footer */
+      footer {
+        border-top: 1px solid var(--border);
+        background: var(--bg);
+        padding: 56px 0 40px;
+      }
+      .foot-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin-bottom: 36px;
+      }
+      .foot-top .brand svg {
+        width: 30px;
+        height: 30px;
+      }
+      .badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .badge {
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 5px 11px;
+      }
+      .disclaimer {
+        color: var(--muted-2);
+        font-size: 13px;
+        line-height: 1.7;
+        max-width: 760px;
+        border-top: 1px solid var(--border);
+        padding-top: 28px;
+      }
+      .disclaimer .copy {
+        margin-top: 16px;
+        color: var(--muted);
+      }
+
+      /* Reveal on scroll */
+      .reveal {
+        opacity: 0;
+        transform: translateY(28px);
+        transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
+        will-change: opacity, transform;
+      }
+      .reveal.in {
+        opacity: 1;
+        transform: none;
+      }
+      .grid .card.reveal {
+        transition-delay: var(--d, 0s);
+      }
+
+      @media (max-width: 820px) {
+        .nav-links .link {
+          display: none;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .mock-side {
+          display: none;
+        }
+        .mock-main {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .mock-body {
+          height: 320px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          scroll-behavior: auto;
+        }
+        .reveal {
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ===== Nav ===== -->
+    <header id="hdr">
+      <div class="wrap nav">
+        <a class="brand" href="#top" aria-label="Museek">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <rect width="100" height="100" rx="26" fill="#000" />
+            <g fill="#fff">
+              <rect x="28" y="42" width="7" height="16" rx="3.5" />
+              <rect x="40" y="30" width="7" height="40" rx="3.5" />
+              <rect x="52" y="22" width="7" height="56" rx="3.5" />
+              <rect x="64" y="38" width="7" height="24" rx="3.5" />
+            </g>
+          </svg>
+          <span>Museek <span class="cn">拾音</span></span>
+        </a>
+        <nav class="nav-links">
+          <a class="link" href="#features">功能</a>
+          <a class="link" href="#platforms">平台</a>
+          <a class="link" href="#download">下载</a>
+          <a class="btn btn-ghost" id="gh-nav" href="https://github.com/your-username/Museek" target="_blank" rel="noopener">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.8c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+            GitHub
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- ===== Hero ===== -->
+    <main id="top">
+      <section class="hero">
+        <div class="wrap">
+          <div class="eyebrow">兼容 lx-music 音源 · 跨平台桌面应用</div>
+          <h1>
+            <span class="grad">Museek</span> <span class="cn">· 拾音</span>
+          </h1>
+          <p class="tagline">万千旋律，一拾即得。</p>
+          <p class="subtitle">
+            搜索、排行榜、歌单、同步歌词与下载 —— 网易云、酷我、酷狗、QQ 音乐、咪咕，多家平台，一站搞定。
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" id="dl" href="https://github.com/your-username/Museek/releases/latest" target="_blank" rel="noopener">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              下载 Windows 版
+            </a>
+            <a class="btn btn-ghost" id="gh-hero" href="https://github.com/your-username/Museek" target="_blank" rel="noopener">在 GitHub 查看源码</a>
+          </div>
+          <p class="note">基于 Tauri 2 · React 19 构建 · MIT 开源 · 仅供学习研究</p>
+        </div>
+
+        <!-- App mockup -->
+        <div class="mock-stage">
+          <div class="mock" id="mock" aria-hidden="true">
+            <div class="mock-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="mock-search"></span>
+            </div>
+            <div class="mock-body">
+              <div class="mock-side">
+                <span class="si active"></span>
+                <span class="si"></span>
+                <span class="si"></span>
+                <span class="si"></span>
+                <span class="si"></span>
+              </div>
+              <div class="mock-main" id="mock-grid"></div>
+            </div>
+            <div class="mock-player">
+              <span class="thumb"></span>
+              <div class="meta"><div class="m1"></div><div class="m2"></div></div>
+              <div class="eq"><span></span><span></span><span></span><span></span><span></span></div>
+              <div class="play-circle"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== Features ===== -->
+      <section class="section-pad features" id="features">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div class="kicker">一个应用，听遍全网</div>
+            <h2>为热爱音乐的你<br />精心打磨的每个细节</h2>
+            <p>从搜索到播放，从歌词到下载，流畅、克制、好用。</p>
+          </div>
+          <div class="grid" id="feature-grid"></div>
+        </div>
+      </section>
+
+      <!-- ===== Statement band ===== -->
+      <section class="section-pad band">
+        <div class="wrap reveal">
+          <h2>不止于搜索。<br /><span class="grad">连你的网易云歌单，也一并拾起。</span></h2>
+        </div>
+      </section>
+
+      <!-- ===== Platforms ===== -->
+      <section class="section-pad platforms" id="platforms">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div class="kicker">多平台聚合</div>
+            <h2>五大平台，一处畅听</h2>
+            <p>统一的搜索、排行榜与歌单体验；播放链接由你自行导入的 lx-music 音源提供。</p>
+          </div>
+          <div class="plat-row reveal">
+            <span class="plat"><span class="pd" style="background: var(--wy)"></span>网易云音乐</span>
+            <span class="plat"><span class="pd" style="background: var(--kw)"></span>酷我音乐</span>
+            <span class="plat"><span class="pd" style="background: var(--kg)"></span>酷狗音乐</span>
+            <span class="plat"><span class="pd" style="background: var(--tx)"></span>QQ 音乐</span>
+            <span class="plat"><span class="pd" style="background: var(--mg)"></span>咪咕音乐</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== Download CTA ===== -->
+      <section class="section-pad band" id="download">
+        <div class="wrap reveal">
+          <div class="section-head" style="margin-bottom: 36px">
+            <div class="kicker">即刻开始</div>
+            <h2>下载 Museek，开始拾音</h2>
+            <p>Windows 安装包（.msi / .exe）已就绪。导入一个音源，即可开始播放。</p>
+          </div>
+          <div class="cta">
+            <a class="btn btn-primary" href="https://github.com/your-username/Museek/releases/latest" target="_blank" rel="noopener">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              前往 Releases 下载
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/your-username/Museek" target="_blank" rel="noopener">查看源码与文档</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===== Footer ===== -->
+    <footer>
+      <div class="wrap">
+        <div class="foot-top">
+          <a class="brand" href="#top">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <rect width="100" height="100" rx="26" fill="#000" />
+              <g fill="#fff">
+                <rect x="28" y="42" width="7" height="16" rx="3.5" />
+                <rect x="40" y="30" width="7" height="40" rx="3.5" />
+                <rect x="52" y="22" width="7" height="56" rx="3.5" />
+                <rect x="64" y="38" width="7" height="24" rx="3.5" />
+              </g>
+            </svg>
+            <span>Museek <span class="cn">拾音</span></span>
+          </a>
+          <div class="badges">
+            <span class="badge">Tauri 2</span>
+            <span class="badge">React 19</span>
+            <span class="badge">TypeScript</span>
+            <span class="badge">MIT License</span>
+          </div>
+        </div>
+        <div class="disclaimer">
+          ⚠️ 本项目仅供个人学习与研究使用。Museek 不提供、不存储、不分发任何音乐内容，它只是一个聚合公开平台 API、并播放由用户自行导入的音源脚本所返回链接的界面。请勿用于任何商业用途，并遵守各平台的服务条款与版权规定；使用所产生的一切后果由使用者自行承担。
+          <div class="copy">© <span id="year"></span> Museek · 拾音 — Released under the MIT License.</div>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Year
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      // Sticky-nav border on scroll
+      const hdr = document.getElementById("hdr");
+      const onScroll = () => hdr.classList.toggle("scrolled", window.scrollY > 8);
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+
+      // Feature cards
+      const features = [
+        {
+          t: "多平台搜索",
+          d: "搜索单曲、歌单与用户。输入用户名即可打开 TA 的公开歌单 —— 包括你自己的网易云「我喜欢的音乐」。",
+          p: "M21 21l-4.3-4.3M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z",
+        },
+        {
+          t: "兼容 lx-music 音源",
+          d: "通过链接导入音源脚本；开启多个时按顺序自动重试（失败转移），直到取到可播放链接。",
+          p: "M4 7h16M4 12h16M4 17h10M16 14l4 3-4 3",
+        },
+        {
+          t: "沉浸式歌词",
+          d: "覆盖全部五个平台（含加密格式），高度模糊的封面背景、同步滚动、点击跳转、字号调节，有翻译时一并显示。",
+          p: "M9 18V5l12-2v13M9 13l12-2M6 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
+        },
+        {
+          t: "系统媒体控制",
+          d: "在 Windows 上，可通过任务栏缩略图按钮与系统媒体浮窗（SMTC）/ 媒体键直接控制播放。",
+          p: "M5 3h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM7 21h10M9 9l5 2.5L9 14V9z",
+        },
+        {
+          t: "高品质下载",
+          d: "选择音质、自定义目录与命名、并发数（1–5）。设定首选音质，不可用时自动逐级降级并提示。",
+          p: "M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2",
+        },
+        {
+          t: "收藏与歌单",
+          d: "收藏单曲与整个歌单；按时间 / 名称排序、按平台筛选、即时搜索、批量下载与删除、一键播放全部。",
+          p: "M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1z",
+        },
+        {
+          t: "在其他平台搜索",
+          d: "一键把当前播放的歌曲发送到其他平台搜索（自动填好并搜索）—— 当歌曲在原平台为 VIP 时尤其方便。",
+          p: "M16 3h5v5M21 3l-7 7M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4",
+        },
+        {
+          t: "本地缓存",
+          d: "音频、歌词与封面图缓存，再次播放更快、可离线；可设容量上限、按最近最少使用自动清理，也可一键清空。",
+          p: "M3 12a9 3 0 0 0 18 0M3 5a9 3 0 0 0 18 0M3 5v14a9 3 0 0 0 18 0V5",
+        },
+        {
+          t: "主题与多语言",
+          d: "亮 / 暗 / 跟随系统，多套主题配色，完整的简体中文 / English 界面，默认跟随系统。",
+          p: "M12 3a9 9 0 1 0 0 18 3 3 0 0 0 0-6 3 3 0 0 1 0-6 3 3 0 0 0 0-6zM8 9h.01M16 9h.01M16 14h.01",
+        },
+      ];
+      const grid = document.getElementById("feature-grid");
+      grid.innerHTML = features
+        .map(
+          (f, i) => `
+        <div class="card reveal" style="--d:${(i % 3) * 0.08}s">
+          <div class="ico"><svg viewBox="0 0 24 24"><path d="${f.p}"/></svg></div>
+          <h3>${f.t}</h3>
+          <p>${f.d}</p>
+        </div>`
+        )
+        .join("");
+
+      // Mockup album tiles (gradient covers)
+      const grads = [
+        "linear-gradient(135deg,#f59e0b,#ef4444)",
+        "linear-gradient(135deg,#6366f1,#8b5cf6)",
+        "linear-gradient(135deg,#10b981,#22d3ee)",
+        "linear-gradient(135deg,#ec4899,#f43f5e)",
+        "linear-gradient(135deg,#0ea5e9,#6366f1)",
+        "linear-gradient(135deg,#14b8a6,#84cc16)",
+        "linear-gradient(135deg,#f97316,#eab308)",
+        "linear-gradient(135deg,#a855f7,#ec4899)",
+      ];
+      document.getElementById("mock-grid").innerHTML = grads
+        .map((g) => `<div class="tile"><div class="cover" style="background:${g}"></div><div class="t1"></div><div class="t2"></div></div>`)
+        .join("");
+
+      // Scroll reveal
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add("in");
+              io.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.12 }
+      );
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+      // Subtle pointer tilt on the hero mockup
+      const mock = document.getElementById("mock");
+      const stage = document.querySelector(".mock-stage");
+      if (mock && stage && matchMedia("(pointer:fine)").matches) {
+        stage.addEventListener("mousemove", (e) => {
+          const r = stage.getBoundingClientRect();
+          const rx = ((e.clientY - r.top) / r.height - 0.5) * -6 + 8;
+          const ry = ((e.clientX - r.left) / r.width - 0.5) * 6;
+          mock.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) scale(0.99)`;
+        });
+        stage.addEventListener("mouseleave", () => {
+          mock.style.transform = "rotateX(8deg) scale(0.99)";
+        });
+      }
+    </script>
+  </body>
+</html>
