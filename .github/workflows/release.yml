@@ -1,0 +1,86 @@
+name: Release
+
+# Builds installers and publishes a GitHub Release whenever a version tag is
+# pushed (e.g. `git tag v1.0.0 && git push origin v1.0.0`). Can also be run
+# manually from the Actions tab (pick a tag as the ref).
+#
+# Targets (per request): Windows (NSIS) and macOS Apple Silicon (.dmg).
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# tauri-action needs write access to create the release.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows — NSIS setup .exe only (no MSI)
+          - platform: windows-latest
+            args: "--bundles nsis"
+          # macOS — Apple Silicon (M-series) .dmg only
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin --bundles dmg"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS Apple Silicon target
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app & publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # --- Optional macOS code signing (leave unset to ship unsigned) ---
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Museek ${{ github.ref_name }}"
+          releaseBody: |
+            下载下方对应平台的安装包：
+            - **Windows**：`*_x64-setup.exe`（NSIS 安装包）
+            - **macOS (Apple Silicon)**：`*_aarch64.dmg`
+
+            ⚠️ Museek 不内置任何音源；首次使用请在「设置 → 音源管理」导入兼容 lx-music 的音源脚本后再播放。
+            > macOS 安装包未签名，首次打开请右键「打开」以绕过 Gatekeeper 提示。
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
