@@ -45,14 +45,14 @@ _Every melody, one search._
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="./docs/screenshots/02-playlists.jpg" width="820" alt="Browse hot playlists across platforms" />
+  <img src="./docs/screenshots/02-playlists.webp" width="820" alt="Browse hot playlists across platforms" />
 </p>
 
 <table>
   <tr>
-    <td width="33%" valign="top"><img src="./docs/screenshots/01-search.png" alt="Multi-platform search" /></td>
-    <td width="33%" valign="top"><img src="./docs/screenshots/03-playlist-detail.png" alt="Playlist detail with quality badges" /></td>
-    <td width="33%" valign="top"><img src="./docs/screenshots/04-charts.png" alt="Platform charts" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/01-search.webp" alt="Multi-platform search" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/03-playlist-detail.webp" alt="Playlist detail with quality badges" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/04-charts.webp" alt="Platform charts" /></td>
   </tr>
   <tr>
     <td align="center"><sub>Multi-platform search</sub></td>
@@ -161,14 +161,14 @@ _万千旋律,一拾即得。_
 ## 📸 截图
 
 <p align="center">
-  <img src="./docs/screenshots/02-playlists.jpg" width="820" alt="浏览各平台热门歌单" />
+  <img src="./docs/screenshots/02-playlists.webp" width="820" alt="浏览各平台热门歌单" />
 </p>
 
 <table>
   <tr>
-    <td width="33%" valign="top"><img src="./docs/screenshots/01-search.png" alt="多平台搜索" /></td>
-    <td width="33%" valign="top"><img src="./docs/screenshots/03-playlist-detail.png" alt="歌单详情" /></td>
-    <td width="33%" valign="top"><img src="./docs/screenshots/04-charts.png" alt="排行榜" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/01-search.webp" alt="多平台搜索" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/03-playlist-detail.webp" alt="歌单详情" /></td>
+    <td width="33%" valign="top"><img src="./docs/screenshots/04-charts.webp" alt="排行榜" /></td>
   </tr>
   <tr>
     <td align="center"><sub>多平台搜索</sub></td>
