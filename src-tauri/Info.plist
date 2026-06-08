@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Museek loads album art and audio streams from many music platforms,
+    some of which are served over plain http:// (KuGou, Migu, and some
+    NetEase CDN URLs). macOS WKWebView blocks cleartext http requests via
+    App Transport Security by default, which is why thumbnails/audio show
+    up broken on macOS but work on Windows (WebView2 has no such gate).
+    Allow arbitrary loads so those resources display/play.
+  -->
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+  </dict>
+</dict>
+</plist>
