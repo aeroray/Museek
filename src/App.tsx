@@ -14,6 +14,7 @@ import { useSearchStore } from "@/stores/searchStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { enforceLimit } from "@/lib/mediaCache"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { CloseGuard } from "@/components/CloseGuard"
 
 function AppInit() {
   const { loadFromDisk: loadSources } = useSourceStore()
@@ -37,6 +38,7 @@ function AppInit() {
 export default function App() {
   return (
     <TooltipProvider>
+      <CloseGuard />
       <BrowserRouter>
         <AppInit />
         <Routes>

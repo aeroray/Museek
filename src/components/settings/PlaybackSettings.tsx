@@ -35,6 +35,7 @@ export function PlaybackSettings() {
     audioCache,
     maxCacheMB,
     preventSleepWhilePlaying,
+    closeBehavior,
     setPlayQuality,
     setDownloadQuality,
     setDownloadDir,
@@ -43,6 +44,7 @@ export function PlaybackSettings() {
     setAudioCache,
     setMaxCacheMB,
     setPreventSleepWhilePlaying,
+    setCloseBehavior,
   } = useSettingsStore()
   const t = useT()
   const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -104,6 +106,23 @@ export function PlaybackSettings() {
             onCheckedChange={setPreventSleepWhilePlaying}
             className="shrink-0"
           />
+        </section>
+
+        {/* Close-button behavior */}
+        <section className="space-y-3">
+          <SettingHeader title={t("close.behaviorTitle")} desc={t("close.behaviorDesc")} />
+          <div className="flex flex-wrap gap-2">
+            {(["exit", "tray"] as const).map((b) => (
+              <Button
+                key={b}
+                variant={closeBehavior === b ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCloseBehavior(b)}
+              >
+                {t(`close.opt.${b}`)}
+              </Button>
+            ))}
+          </div>
         </section>
 
         {/* Download quality */}

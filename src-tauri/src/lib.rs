@@ -1,5 +1,7 @@
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 use std::sync::Mutex;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
 // OS media controls (Windows SMTC / macOS Now Playing / Linux MPRIS) — the media
@@ -93,6 +95,14 @@ fn set_prevent_sleep(app: tauri::AppHandle, enabled: bool) {
     let _ = (app, enabled);
 }
 
+// Fully quit the app (used by the "exit" close-behavior / tray Quit). A plain
+// window close can't be relied on to terminate the process while a tray icon is
+// alive, so exit explicitly.
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -146,9 +156,54 @@ pub fn run() {
                 });
                 app.manage(MediaState(Mutex::new(controls)));
             }
+
+            // System tray: lets the "hide to tray" close-behavior keep the app
+            // running with a way back (left-click / menu) plus an explicit Quit.
+            let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let mut tray = TrayIconBuilder::with_id("main-tray")
+                .tooltip("Museek")
+                .menu(&tray_menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            tray.build(app)?;
+
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![media_update, set_prevent_sleep])
+        .invoke_handler(tauri::generate_handler![
+            media_update,
+            set_prevent_sleep,
+            quit_app
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

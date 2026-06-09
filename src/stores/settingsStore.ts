@@ -5,6 +5,8 @@ import type { Quality, Source } from "@/types/music"
 export type NamingScheme = "singer-name" | "name-singer" | "name"
 export type FavoritesSort = "added" | "name"
 export type FavoritesPlatform = Source | "all"
+// Close-button behavior: quit the app outright, or hide to the system tray.
+export type CloseBehavior = "exit" | "tray"
 
 interface Persisted {
   playQuality: Quality
@@ -22,6 +24,8 @@ interface Persisted {
   // Favorites list view preferences.
   favoritesSort: FavoritesSort
   favoritesPlatform: FavoritesPlatform
+  closeBehavior: CloseBehavior
+  closeConfirmDismissed: boolean
 }
 
 interface SettingsState extends Persisted {
@@ -35,6 +39,8 @@ interface SettingsState extends Persisted {
   setPreventSleepWhilePlaying: (v: boolean) => void
   setFavoritesSort: (s: FavoritesSort) => void
   setFavoritesPlatform: (p: FavoritesPlatform) => void
+  setCloseBehavior: (b: CloseBehavior) => void
+  setCloseConfirmDismissed: (v: boolean) => void
   loadFromDisk: () => Promise<void>
 }
 
@@ -49,12 +55,15 @@ const DEFAULTS: Persisted = {
   preventSleepWhilePlaying: true,
   favoritesSort: "added",
   favoritesPlatform: "all",
+  closeBehavior: "exit",
+  closeConfirmDismissed: false,
 }
 
 const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
 const NAMINGS: NamingScheme[] = ["singer-name", "name-singer", "name"]
 const SORTS: FavoritesSort[] = ["added", "name"]
 const FAV_PLATFORMS: FavoritesPlatform[] = ["all", "kw", "kg", "tx", "wy", "mg"]
+const CLOSE_BEHAVIORS: CloseBehavior[] = ["exit", "tray"]
 export const CACHE_LIMITS_MB = [512, 1024, 2048, 4096]
 
 export const useSettingsStore = create<SettingsState>((set, get) => {
@@ -70,6 +79,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       preventSleepWhilePlaying,
       favoritesSort,
       favoritesPlatform,
+      closeBehavior,
+      closeConfirmDismissed,
     } = get()
     writeData("settings.json", {
       playQuality,
@@ -82,6 +93,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       preventSleepWhilePlaying,
       favoritesSort,
       favoritesPlatform,
+      closeBehavior,
+      closeConfirmDismissed,
     })
   }
 
@@ -128,6 +141,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       set({ favoritesPlatform: p })
       persist()
     },
+    setCloseBehavior(b) {
+      set({ closeBehavior: b })
+      persist()
+    },
+    setCloseConfirmDismissed(v) {
+      set({ closeConfirmDismissed: v })
+      persist()
+    },
 
     async loadFromDisk() {
       const data = await readData<Partial<Persisted>>("settings.json", DEFAULTS)
@@ -158,6 +179,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         favoritesPlatform: FAV_PLATFORMS.includes(data.favoritesPlatform as FavoritesPlatform)
           ? (data.favoritesPlatform as FavoritesPlatform)
           : DEFAULTS.favoritesPlatform,
+        closeBehavior: CLOSE_BEHAVIORS.includes(data.closeBehavior as CloseBehavior)
+          ? (data.closeBehavior as CloseBehavior)
+          : DEFAULTS.closeBehavior,
+        closeConfirmDismissed:
+          typeof data.closeConfirmDismissed === "boolean"
+            ? data.closeConfirmDismissed
+            : DEFAULTS.closeConfirmDismissed,
       })
     },
   }
