@@ -6,6 +6,7 @@ import { getBuiltinLyric } from "@/lib/lyric"
 import { httpFetch } from "@/lib/http"
 import { getCachedLyric, putCachedLyric, getCachedAudioUrl, putCachedAudio } from "@/lib/mediaCache"
 import { updateMediaControls, attachMediaControls } from "@/lib/smtc"
+import { setPreventSleep } from "@/lib/power"
 import { useUiStore } from "@/stores/uiStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { t } from "@/lib/i18n"
@@ -291,6 +292,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         status: state.status,
         currentLyricIndex,
       })
+
+      // Keep the system awake only while actually playing (respecting the
+      // setting). setPreventSleep de-dupes, so calling it every tick is cheap.
+      setPreventSleep(state.isPlaying && useSettingsStore.getState().preventSleepWhilePlaying)
 
       // Keep the OS media controls' play/pause state in sync (only on change).
       if (state.isPlaying !== lastMediaPlaying) {

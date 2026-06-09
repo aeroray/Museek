@@ -44,6 +44,55 @@ fn media_update(
     let _ = &app;
 }
 
+// Keep-awake: prevent the system from *sleeping* while music plays, but still let
+// the display turn off / lock. On Windows we set ES_SYSTEM_REQUIRED (deliberately
+// WITHOUT ES_DISPLAY_REQUIRED) on the long-lived main thread, since the flag is
+// per-thread and cleared when that thread exits. On macOS we hold a `caffeinate -i`
+// child (prevents idle *system* sleep, display may still sleep) that also auto-exits
+// when our process does (`-w <pid>`), so a crash can't leak it.
+#[cfg(target_os = "macos")]
+struct KeepAwakeState(Mutex<Option<std::process::Child>>);
+
+#[tauri::command]
+fn set_prevent_sleep(app: tauri::AppHandle, enabled: bool) {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::System::Power::{
+            SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED, EXECUTION_STATE,
+        };
+        let _ = app.run_on_main_thread(move || unsafe {
+            let flags = if enabled {
+                EXECUTION_STATE(ES_CONTINUOUS.0 | ES_SYSTEM_REQUIRED.0)
+            } else {
+                ES_CONTINUOUS
+            };
+            SetThreadExecutionState(flags);
+        });
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let state = app.state::<KeepAwakeState>();
+        if let Ok(mut guard) = state.0.lock() {
+            if enabled {
+                if guard.is_none() {
+                    let pid = std::process::id().to_string();
+                    if let Ok(child) = std::process::Command::new("caffeinate")
+                        .args(["-i", "-w", pid.as_str()])
+                        .spawn()
+                    {
+                        *guard = Some(child);
+                    }
+                }
+            } else if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+                let _ = child.wait(); // reap so repeated toggles don't leak zombies
+            }
+        }
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let _ = (app, enabled);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -54,6 +103,9 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.manage(KeepAwakeState(Mutex::new(None)));
+
             let app_handle = app.handle().clone();
             if let Some(window) = app.get_webview_window("main") {
                 // Windows: add prev / play-pause / next buttons to the taskbar
@@ -96,7 +148,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![media_update])
+        .invoke_handler(tauri::generate_handler![media_update, set_prevent_sleep])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

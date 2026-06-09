@@ -34,6 +34,7 @@ export function PlaybackSettings() {
     fileNaming,
     audioCache,
     maxCacheMB,
+    preventSleepWhilePlaying,
     setPlayQuality,
     setDownloadQuality,
     setDownloadDir,
@@ -41,6 +42,7 @@ export function PlaybackSettings() {
     setFileNaming,
     setAudioCache,
     setMaxCacheMB,
+    setPreventSleepWhilePlaying,
   } = useSettingsStore()
   const t = useT()
   const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -92,6 +94,16 @@ export function PlaybackSettings() {
               </Button>
             ))}
           </div>
+        </section>
+
+        {/* Prevent system sleep while playing */}
+        <section className="flex items-center justify-between gap-3">
+          <SettingHeader title={t("playback.preventSleepTitle")} desc={t("playback.preventSleepDesc")} />
+          <Switch
+            checked={preventSleepWhilePlaying}
+            onCheckedChange={setPreventSleepWhilePlaying}
+            className="shrink-0"
+          />
         </section>
 
         {/* Download quality */}

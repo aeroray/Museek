@@ -17,6 +17,8 @@ interface Persisted {
   audioCache: boolean
   // Disk cache size cap in MB; least-recently-used audio is evicted beyond this.
   maxCacheMB: number
+  // Keep the system awake (but allow display sleep/lock) while music plays.
+  preventSleepWhilePlaying: boolean
   // Favorites list view preferences.
   favoritesSort: FavoritesSort
   favoritesPlatform: FavoritesPlatform
@@ -30,6 +32,7 @@ interface SettingsState extends Persisted {
   setFileNaming: (s: NamingScheme) => void
   setAudioCache: (v: boolean) => void
   setMaxCacheMB: (n: number) => void
+  setPreventSleepWhilePlaying: (v: boolean) => void
   setFavoritesSort: (s: FavoritesSort) => void
   setFavoritesPlatform: (p: FavoritesPlatform) => void
   loadFromDisk: () => Promise<void>
@@ -43,6 +46,7 @@ const DEFAULTS: Persisted = {
   fileNaming: "singer-name",
   audioCache: true,
   maxCacheMB: 1024,
+  preventSleepWhilePlaying: true,
   favoritesSort: "added",
   favoritesPlatform: "all",
 }
@@ -63,6 +67,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       fileNaming,
       audioCache,
       maxCacheMB,
+      preventSleepWhilePlaying,
       favoritesSort,
       favoritesPlatform,
     } = get()
@@ -74,6 +79,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       fileNaming,
       audioCache,
       maxCacheMB,
+      preventSleepWhilePlaying,
       favoritesSort,
       favoritesPlatform,
     })
@@ -110,6 +116,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       set({ maxCacheMB: n })
       persist()
     },
+    setPreventSleepWhilePlaying(v) {
+      set({ preventSleepWhilePlaying: v })
+      persist()
+    },
     setFavoritesSort(s) {
       set({ favoritesSort: s })
       persist()
@@ -138,6 +148,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         maxCacheMB: CACHE_LIMITS_MB.includes(data.maxCacheMB as number)
           ? (data.maxCacheMB as number)
           : DEFAULTS.maxCacheMB,
+        preventSleepWhilePlaying:
+          typeof data.preventSleepWhilePlaying === "boolean"
+            ? data.preventSleepWhilePlaying
+            : DEFAULTS.preventSleepWhilePlaying,
         favoritesSort: SORTS.includes(data.favoritesSort as FavoritesSort)
           ? (data.favoritesSort as FavoritesSort)
           : DEFAULTS.favoritesSort,
