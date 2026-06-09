@@ -1,7 +1,7 @@
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
 // OS media controls (Windows SMTC / macOS Now Playing / Linux MPRIS) — the media
@@ -103,6 +103,57 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+// Bring the main window back from hidden / minimized and focus it.
+fn show_main(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
+    let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+    let mut builder = TrayIconBuilder::with_id("main-tray")
+        .tooltip("Museek")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+    builder.build(app)
+}
+
+// Show/hide the tray icon to match the "hide to tray" close-behavior setting.
+// Tauri tracks the icon by id, so this is idempotent.
+#[tauri::command]
+fn set_tray_visible(app: tauri::AppHandle, visible: bool) {
+    if visible {
+        if app.tray_by_id("main-tray").is_none() {
+            let _ = build_tray(&app);
+        }
+    } else {
+        let _ = app.remove_tray_by_id("main-tray");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -157,52 +208,16 @@ pub fn run() {
                 app.manage(MediaState(Mutex::new(controls)));
             }
 
-            // System tray: lets the "hide to tray" close-behavior keep the app
-            // running with a way back (left-click / menu) plus an explicit Quit.
-            let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-            let mut tray = TrayIconBuilder::with_id("main-tray")
-                .tooltip("Museek")
-                .menu(&tray_menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
-                        }
-                    }
-                    "quit" => app.exit(0),
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
-                        }
-                    }
-                });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
-            }
-            tray.build(app)?;
+            // The system tray is created on demand (only in "hide to tray" close
+            // mode) — the frontend calls set_tray_visible after loading settings.
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             media_update,
             set_prevent_sleep,
-            quit_app
+            quit_app,
+            set_tray_visible
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

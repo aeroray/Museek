@@ -18,3 +18,10 @@ export function setPreventSleep(enabled: boolean): void {
     lastSent = null
   })
 }
+
+// Show or hide the system tray icon. Only shown in "hide to tray" close mode, so
+// users who pick "quit on close" don't get an unexpected tray icon. Idempotent.
+export function setTrayVisible(visible: boolean): void {
+  if (!isTauri) return
+  invoke("set_tray_visible", { visible }).catch(() => {})
+}

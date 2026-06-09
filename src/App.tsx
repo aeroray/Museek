@@ -13,6 +13,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSearchStore } from "@/stores/searchStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { enforceLimit } from "@/lib/mediaCache"
+import { setTrayVisible } from "@/lib/power"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
 
@@ -28,7 +29,10 @@ function AppInit() {
     loadHistory()
     // After settings load, trim the cache in case the limit was lowered.
     loadSettings().then(() => {
-      enforceLimit(useSettingsStore.getState().maxCacheMB * 1024 * 1024)
+      const s = useSettingsStore.getState()
+      enforceLimit(s.maxCacheMB * 1024 * 1024)
+      // Show the tray icon only if the saved close-behavior is "hide to tray".
+      setTrayVisible(s.closeBehavior === "tray")
     })
   }, [loadSources, loadPlaylists, loadHistory, loadSettings])
 

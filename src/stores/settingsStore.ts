@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { readData, writeData } from "@/lib/db"
+import { setTrayVisible } from "@/lib/power"
 import type { Quality, Source } from "@/types/music"
 
 export type NamingScheme = "singer-name" | "name-singer" | "name"
@@ -144,6 +145,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     setCloseBehavior(b) {
       set({ closeBehavior: b })
       persist()
+      setTrayVisible(b === "tray")
     },
     setCloseConfirmDismissed(v) {
       set({ closeConfirmDismissed: v })
