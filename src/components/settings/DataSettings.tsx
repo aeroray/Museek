@@ -12,8 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { SettingHeader } from "@/components/settings/SettingHeader"
-import { gatherConfig, applyConfig, saveConfigFile, pickConfigFile, isValidConfig, type MuseekConfig } from "@/lib/configIO"
-import { encryptConfig, decryptConfig, writeSyncFile, readSyncFile, WrongPassphraseError } from "@/lib/sync"
+import { gatherConfig, saveConfigFile, pickConfigFile, isValidConfig, type MuseekConfig } from "@/lib/configIO"
+import { backupToFolder, decryptConfig, readSyncFile, applyConfigAndReload, WrongPassphraseError } from "@/lib/sync"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
@@ -22,9 +22,16 @@ export function DataSettings() {
   const t = useT()
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<MuseekConfig | null>(null)
-  const { syncFolder, setSyncFolder } = useSettingsStore()
-  const [passphrase, setPassphrase] = useState("")
+  const {
+    syncFolder,
+    setSyncFolder,
+    syncPassphrase,
+    setSyncPassphrase,
+    autoBackupOnExit,
+    setAutoBackupOnExit,
+  } = useSettingsStore()
   const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+  const canSync = !!syncFolder && !!syncPassphrase
 
   const chooseSyncFolder = async () => {
     try {
@@ -37,11 +44,10 @@ export function DataSettings() {
   }
 
   const doBackup = async () => {
-    if (!syncFolder || !passphrase) return
+    if (!canSync) return
     setBusy(true)
     try {
-      const blob = await encryptConfig(passphrase)
-      await writeSyncFile(syncFolder, blob)
+      await backupToFolder()
       useUiStore.getState().notify({ message: t("sync.backupDone"), variant: "success" })
     } catch (e) {
       useUiStore.getState().notify({ message: t("data.failed", { msg: String(e) }), variant: "error" })
@@ -51,7 +57,7 @@ export function DataSettings() {
   }
 
   const doRestore = async () => {
-    if (!syncFolder || !passphrase) return
+    if (!canSync || !syncFolder || !syncPassphrase) return
     setBusy(true)
     try {
       const blob = await readSyncFile(syncFolder)
@@ -60,7 +66,7 @@ export function DataSettings() {
         return
       }
       // Decrypt + validate, then reuse the import confirmation dialog below.
-      setPending(await decryptConfig(blob, passphrase))
+      setPending(await decryptConfig(blob, syncPassphrase))
     } catch (e) {
       const msg = e instanceof WrongPassphraseError ? t("sync.wrongPass") : t("data.failed", { msg: String(e) })
       useUiStore.getState().notify({ message: msg, variant: "error" })
@@ -102,9 +108,8 @@ export function DataSettings() {
 
   const confirmImport = async () => {
     if (!pending) return
-    await applyConfig(pending)
-    // Reload so every store re-initializes from the imported data.
-    location.reload()
+    // Apply, mark as the synced baseline, and reload so every store re-initializes.
+    await applyConfigAndReload(pending)
   }
 
   return (
@@ -144,18 +149,28 @@ export function DataSettings() {
 
           <Input
             type="password"
-            value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
+            value={syncPassphrase ?? ""}
+            onChange={(e) => setSyncPassphrase(e.target.value)}
             placeholder={t("sync.passphrasePlaceholder")}
             autoComplete="new-password"
           />
 
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoBackupOnExit}
+              onChange={(e) => setAutoBackupOnExit(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]"
+            />
+            {t("sync.autoBackupOnExit")}
+          </label>
+
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={doBackup} disabled={busy || !isTauri || !syncFolder || !passphrase}>
+            <Button variant="outline" onClick={doBackup} disabled={busy || !isTauri || !canSync}>
               {busy ? <Loader2 size={15} className="mr-2 animate-spin" /> : <Upload size={15} className="mr-2" />}
               {t("sync.backup")}
             </Button>
-            <Button variant="outline" onClick={doRestore} disabled={busy || !isTauri || !syncFolder || !passphrase}>
+            <Button variant="outline" onClick={doRestore} disabled={busy || !isTauri || !canSync}>
               <Download size={15} className="mr-2" />
               {t("sync.restore")}
             </Button>

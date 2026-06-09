@@ -14,6 +14,7 @@ import { useSearchStore } from "@/stores/searchStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { enforceLimit } from "@/lib/mediaCache"
 import { setTrayVisible } from "@/lib/power"
+import { maybeAutoImport } from "@/lib/sync"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
 
@@ -24,17 +25,23 @@ function AppInit() {
   const { loadFromDisk: loadSettings } = useSettingsStore()
 
   useEffect(() => {
-    loadSources()
-    loadPlaylists()
-    loadHistory()
-    // After settings load, trim the cache in case the limit was lowered.
-    loadSettings().then(() => {
-      const s = useSettingsStore.getState()
-      enforceLimit(s.maxCacheMB * 1024 * 1024)
-      // Show the tray icon only if the saved close-behavior is "hide to tray".
-      setTrayVisible(s.closeBehavior === "tray")
+    // First: silent sync-folder import. If a newer config is found it applies it
+    // and reloads, so skip the rest of init in that case.
+    maybeAutoImport().then((reloading) => {
+      if (reloading) return
+      loadSources()
+      loadPlaylists()
+      loadHistory()
+      // After settings load, trim the cache in case the limit was lowered.
+      loadSettings().then(() => {
+        const s = useSettingsStore.getState()
+        enforceLimit(s.maxCacheMB * 1024 * 1024)
+        // Show the tray icon only if the saved close-behavior is "hide to tray".
+        setTrayVisible(s.closeBehavior === "tray")
+      })
     })
-  }, [loadSources, loadPlaylists, loadHistory, loadSettings])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return null
 }

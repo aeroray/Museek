@@ -122,7 +122,11 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main(app),
-            "quit" => app.exit(0),
+            // Route quit through the frontend so it can back up to the sync folder
+            // first; the frontend then calls the quit_app command.
+            "quit" => {
+                let _ = app.emit("quit-requested", ());
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

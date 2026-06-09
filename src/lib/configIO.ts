@@ -25,6 +25,11 @@ const LS_KEYS = [
   "museek.lyricFontScale",
 ] as const
 
+// Settings specific to THIS device that must never travel via sync: the sync
+// folder path, the stored passphrase, the auto-backup flag, and the last-synced
+// timestamp. Stripped on export; preserved (not overwritten) on import.
+const DEVICE_LOCAL_SETTINGS = ["syncFolder", "syncPassphrase", "autoBackupOnExit", "syncLastAt"]
+
 export interface MuseekConfig {
   app: "museek"
   version: number
@@ -46,7 +51,14 @@ export async function gatherConfig(): Promise<MuseekConfig> {
   const data: Record<string, unknown> = {}
   for (const f of DB_FILES) {
     const v = await readData<unknown>(f, null)
-    if (v !== null && v !== undefined) data[f] = v
+    if (v === null || v === undefined) continue
+    if (f === "settings.json" && typeof v === "object") {
+      const clone = { ...(v as Record<string, unknown>) }
+      for (const k of DEVICE_LOCAL_SETTINGS) delete clone[k]
+      data[f] = clone
+    } else {
+      data[f] = v
+    }
   }
   const prefs: Record<string, string> = {}
   for (const k of LS_KEYS) {
@@ -60,7 +72,20 @@ export async function gatherConfig(): Promise<MuseekConfig> {
 // every store re-initializes from the new data.
 export async function applyConfig(config: MuseekConfig): Promise<void> {
   for (const f of DB_FILES) {
-    if (f in config.data) await writeData(f, config.data[f])
+    if (!(f in config.data)) continue
+    if (f === "settings.json") {
+      // Merge: take the incoming settings but keep THIS device's sync-local keys
+      // so a restore never adopts the source device's folder/passphrase/timestamp.
+      const incoming = (config.data[f] ?? {}) as Record<string, unknown>
+      const current = (await readData<Record<string, unknown>>("settings.json", {})) ?? {}
+      const merged: Record<string, unknown> = { ...incoming }
+      for (const k of DEVICE_LOCAL_SETTINGS) {
+        if (k in current) merged[k] = current[k]
+      }
+      await writeData(f, merged)
+    } else {
+      await writeData(f, config.data[f])
+    }
   }
   if (config.prefs && typeof config.prefs === "object") {
     for (const k of LS_KEYS) {

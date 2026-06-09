@@ -29,6 +29,13 @@ interface Persisted {
   closeConfirmDismissed: boolean
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
   syncFolder: string | null
+  // Stored so auto-sync can run silently; the cloud file stays encrypted regardless.
+  syncPassphrase: string | null
+  // Silently back up to the sync folder on quit (vs. ask each time).
+  autoBackupOnExit: boolean
+  // exportedAt of the last config this device synced — guards startup auto-import
+  // against reload loops and against reverting newer local data.
+  syncLastAt: string | null
 }
 
 interface SettingsState extends Persisted {
@@ -45,6 +52,9 @@ interface SettingsState extends Persisted {
   setCloseBehavior: (b: CloseBehavior) => void
   setCloseConfirmDismissed: (v: boolean) => void
   setSyncFolder: (dir: string | null) => void
+  setSyncPassphrase: (p: string | null) => void
+  setAutoBackupOnExit: (v: boolean) => void
+  setSyncLastAt: (iso: string | null) => void
   loadFromDisk: () => Promise<void>
 }
 
@@ -62,6 +72,9 @@ const DEFAULTS: Persisted = {
   closeBehavior: "exit",
   closeConfirmDismissed: false,
   syncFolder: null,
+  syncPassphrase: null,
+  autoBackupOnExit: true,
+  syncLastAt: null,
 }
 
 const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
@@ -87,6 +100,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       closeBehavior,
       closeConfirmDismissed,
       syncFolder,
+      syncPassphrase,
+      autoBackupOnExit,
+      syncLastAt,
     } = get()
     writeData("settings.json", {
       playQuality,
@@ -102,6 +118,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       closeBehavior,
       closeConfirmDismissed,
       syncFolder,
+      syncPassphrase,
+      autoBackupOnExit,
+      syncLastAt,
     })
   }
 
@@ -161,6 +180,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       set({ syncFolder: dir })
       persist()
     },
+    setSyncPassphrase(p) {
+      set({ syncPassphrase: p })
+      persist()
+    },
+    setAutoBackupOnExit(v) {
+      set({ autoBackupOnExit: v })
+      persist()
+    },
+    setSyncLastAt(iso) {
+      set({ syncLastAt: iso })
+      persist()
+    },
 
     async loadFromDisk() {
       const data = await readData<Partial<Persisted>>("settings.json", DEFAULTS)
@@ -199,6 +230,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
             ? data.closeConfirmDismissed
             : DEFAULTS.closeConfirmDismissed,
         syncFolder: typeof data.syncFolder === "string" ? data.syncFolder : null,
+        syncPassphrase: typeof data.syncPassphrase === "string" ? data.syncPassphrase : null,
+        autoBackupOnExit:
+          typeof data.autoBackupOnExit === "boolean" ? data.autoBackupOnExit : DEFAULTS.autoBackupOnExit,
+        syncLastAt: typeof data.syncLastAt === "string" ? data.syncLastAt : null,
       })
     },
   }
