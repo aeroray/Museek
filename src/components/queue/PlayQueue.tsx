@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { PlatformBadge, QualityBadge } from "@/components/MetaBadges"
+import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"

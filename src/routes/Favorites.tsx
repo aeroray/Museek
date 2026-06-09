@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { PlaylistCard } from "@/components/PlaylistCard"
+import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { playPlaylist } from "@/lib/playlists/play"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { usePlayerStore } from "@/stores/playerStore"

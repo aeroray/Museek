@@ -11,8 +11,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { PlatformBadge, QualityBadge, PLATFORM_BRAND } from "@/components/MetaBadges"
-import { PLATFORM_ORDER } from "@/components/PlatformTabs"
+import { PlatformBadge, QualityBadge, PLATFORM_BRAND } from "@/components/common/MetaBadges"
+import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
