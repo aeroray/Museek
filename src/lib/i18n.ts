@@ -260,6 +260,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.err.noEnabled": "没有已启用的音源",
     "sources.err.allFailed": "所有音源均失败 → {errors}",
     "sources.err.invalidUrl": "{name}：返回无效链接",
+    "sources.err.tooSmall": "{name}：返回的疑似试听/受限片段（体积过小）",
     "sources.err.sourceMsg": "{name}：{msg}",
 
     // Theme settings
@@ -519,6 +520,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.err.noEnabled": "No enabled sources",
     "sources.err.allFailed": "All sources failed → {errors}",
     "sources.err.invalidUrl": "{name}: returned an invalid link",
+    "sources.err.tooSmall": "{name}: returned a likely trial/restricted clip (too small)",
     "sources.err.sourceMsg": "{name}: {msg}",
 
     // Theme settings
