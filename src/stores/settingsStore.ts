@@ -27,6 +27,8 @@ interface Persisted {
   favoritesPlatform: FavoritesPlatform
   closeBehavior: CloseBehavior
   closeConfirmDismissed: boolean
+  // Folder-based sync target (absolute path to a cloud-synced folder), or null.
+  syncFolder: string | null
 }
 
 interface SettingsState extends Persisted {
@@ -42,6 +44,7 @@ interface SettingsState extends Persisted {
   setFavoritesPlatform: (p: FavoritesPlatform) => void
   setCloseBehavior: (b: CloseBehavior) => void
   setCloseConfirmDismissed: (v: boolean) => void
+  setSyncFolder: (dir: string | null) => void
   loadFromDisk: () => Promise<void>
 }
 
@@ -58,6 +61,7 @@ const DEFAULTS: Persisted = {
   favoritesPlatform: "all",
   closeBehavior: "exit",
   closeConfirmDismissed: false,
+  syncFolder: null,
 }
 
 const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
@@ -82,6 +86,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       favoritesPlatform,
       closeBehavior,
       closeConfirmDismissed,
+      syncFolder,
     } = get()
     writeData("settings.json", {
       playQuality,
@@ -96,6 +101,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       favoritesPlatform,
       closeBehavior,
       closeConfirmDismissed,
+      syncFolder,
     })
   }
 
@@ -151,6 +157,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       set({ closeConfirmDismissed: v })
       persist()
     },
+    setSyncFolder(dir) {
+      set({ syncFolder: dir })
+      persist()
+    },
 
     async loadFromDisk() {
       const data = await readData<Partial<Persisted>>("settings.json", DEFAULTS)
@@ -188,6 +198,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.closeConfirmDismissed === "boolean"
             ? data.closeConfirmDismissed
             : DEFAULTS.closeConfirmDismissed,
+        syncFolder: typeof data.syncFolder === "string" ? data.syncFolder : null,
       })
     },
   }
