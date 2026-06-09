@@ -120,13 +120,18 @@ export function LyricsPanel() {
           )}
           <div
             className={cn(
-              "relative w-60 h-60 rounded-2xl shadow-2xl shrink-0",
+              "relative w-60 h-60 rounded-2xl overflow-hidden shadow-2xl shrink-0",
               isPlaying && "lyric-cover-float"
             )}
           >
-            {/* Theme-color glow that slowly orbits the cover edge while playing. */}
-            {isPlaying && <span className="lyric-cover-glow" aria-hidden="true" />}
-            <div className="relative z-[1] w-full h-full rounded-2xl bg-muted overflow-hidden">
+            {/* A theme-color light that flows around the border while playing. */}
+            {isPlaying && <span className="lyric-cover-beam" aria-hidden="true" />}
+            <div
+              className={cn(
+                "absolute z-[1] overflow-hidden bg-muted",
+                isPlaying ? "inset-[2px] rounded-[14px]" : "inset-0 rounded-2xl"
+              )}
+            >
               {currentPicUrl ? (
                 <img src={currentPicUrl} alt="album" className="w-full h-full object-cover" />
               ) : (

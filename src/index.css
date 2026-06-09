@@ -127,30 +127,31 @@
   animation: lyricCoverFloat 6s ease-in-out infinite;
 }
 
-/* Lyrics-page cover: a single soft theme-color arc that slowly orbits the cover
-   edge while playing — a subtle marquee-style glow, deliberately understated.
-   Sits behind the (opaque, rounded) cover, so only the part spilling past the
-   edge shows; the heavy blur turns it into a gentle travelling halo. */
-@keyframes lyricCoverGlow {
+/* Lyrics-page cover: a thin theme-color light that flows around the cover's
+   border while playing. A conic-gradient larger than the cover rotates BEHIND
+   it; the cover sits on top inset by the border width, so only a glowing ring
+   shows. The cover wrapper clips this, so nothing ever spills past the cover. */
+@keyframes lyricCoverBeam {
   to {
     transform: rotate(360deg);
   }
 }
-.lyric-cover-glow {
+.lyric-cover-beam {
   position: absolute;
-  inset: -6px;
-  border-radius: 1.4rem;
+  /* Oversized + centered so the spinning gradient always covers the corners. */
+  width: 150%;
+  height: 150%;
+  left: -25%;
+  top: -25%;
   background: conic-gradient(
     from 0deg,
-    hsl(var(--primary) / 0) 0deg,
-    hsl(var(--primary) / 0) 55deg,
-    hsl(var(--primary) / 0.85) 90deg,
-    hsl(var(--primary) / 0) 125deg,
-    hsl(var(--primary) / 0) 360deg
+    hsl(var(--primary) / 0.12) 0deg,
+    hsl(var(--primary) / 0.12) 40deg,
+    hsl(var(--primary)) 90deg,
+    hsl(var(--primary) / 0.12) 140deg,
+    hsl(var(--primary) / 0.12) 360deg
   );
-  filter: blur(8px);
-  opacity: 0.7;
   pointer-events: none;
   will-change: transform;
-  animation: lyricCoverGlow 6s linear infinite;
+  animation: lyricCoverBeam 4s linear infinite;
 }
