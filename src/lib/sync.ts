@@ -21,6 +21,12 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 export const SYNC_FILE_NAME = "museek-config.enc.json"
 const PBKDF2_ITER = 210000
 
+// Built-in key so sync needs zero user input — you only pick a folder. The file
+// is encrypted (never plaintext in the cloud), but since the key ships in the app
+// this is obfuscation rather than true secrecy; real privacy comes from your own
+// cloud account's access control over that folder.
+const DEFAULT_PASSPHRASE = "Museek::folder-sync::v1$built-in-key"
+
 interface SyncEnvelope {
   app: "museek-sync"
   v: 1
@@ -131,10 +137,9 @@ export async function readSyncFile(folder: string): Promise<string | null> {
   return readTextFile(path)
 }
 
-/** Both a sync folder and a passphrase are set → automatic sync can run. */
+/** A sync folder is set → automatic sync can run (the key is built in). */
 export function isSyncConfigured(): boolean {
-  const { syncFolder, syncPassphrase } = useSettingsStore.getState()
-  return !!syncFolder && !!syncPassphrase
+  return !!useSettingsStore.getState().syncFolder
 }
 
 // Record the timestamp of the config this device now holds. Direct settings.json
@@ -156,14 +161,23 @@ export async function applyConfigAndReload(config: MuseekConfig): Promise<void> 
 }
 
 /** Encrypt the current config and write it to the sync folder (advancing the
- *  synced-baseline timestamp). Throws if sync isn't configured. */
+ *  synced-baseline timestamp). Throws if no sync folder is set. */
 export async function backupToFolder(): Promise<void> {
-  const { syncFolder, syncPassphrase } = useSettingsStore.getState()
-  if (!syncFolder || !syncPassphrase) throw new Error("not-configured")
+  const { syncFolder } = useSettingsStore.getState()
+  if (!syncFolder) throw new Error("not-configured")
   const config = await gatherConfig()
-  const blob = await encryptConfigObject(config, syncPassphrase)
+  const blob = await encryptConfigObject(config, DEFAULT_PASSPHRASE)
   await writeSyncFile(syncFolder, blob)
   await markSynced(config.exportedAt)
+}
+
+/** Read + decrypt the sync folder's backup for a manual restore (null if none). */
+export async function restoreFromFolder(): Promise<MuseekConfig | null> {
+  const { syncFolder } = useSettingsStore.getState()
+  if (!syncFolder) return null
+  const blob = await readSyncFile(syncFolder)
+  if (!blob) return null
+  return decryptConfig(blob, DEFAULT_PASSPHRASE)
 }
 
 /** On startup: if the sync folder holds a config strictly newer than what this
@@ -176,12 +190,11 @@ export async function maybeAutoImport(): Promise<boolean> {
   try {
     const s = (await readData<Record<string, unknown>>("settings.json", {})) ?? {}
     const folder = typeof s.syncFolder === "string" ? s.syncFolder : null
-    const passphrase = typeof s.syncPassphrase === "string" ? s.syncPassphrase : null
     const lastAt = typeof s.syncLastAt === "string" ? s.syncLastAt : null
-    if (!folder || !passphrase) return false
+    if (!folder) return false
     const blob = await readSyncFile(folder)
     if (!blob) return false
-    const config = await decryptConfig(blob, passphrase)
+    const config = await decryptConfig(blob, DEFAULT_PASSPHRASE)
     // Only import when the cloud copy is strictly newer than our last sync — this
     // prevents a reload loop and avoids reverting newer local data.
     if (lastAt && config.exportedAt <= lastAt) return false

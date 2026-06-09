@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Download, Upload, Loader2, Folder } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { SettingHeader } from "@/components/settings/SettingHeader"
 import { gatherConfig, saveConfigFile, pickConfigFile, isValidConfig, type MuseekConfig } from "@/lib/configIO"
-import { backupToFolder, decryptConfig, readSyncFile, applyConfigAndReload, WrongPassphraseError } from "@/lib/sync"
+import { backupToFolder, restoreFromFolder, applyConfigAndReload, WrongPassphraseError } from "@/lib/sync"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
@@ -22,16 +22,9 @@ export function DataSettings() {
   const t = useT()
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<MuseekConfig | null>(null)
-  const {
-    syncFolder,
-    setSyncFolder,
-    syncPassphrase,
-    setSyncPassphrase,
-    autoBackupOnExit,
-    setAutoBackupOnExit,
-  } = useSettingsStore()
+  const { syncFolder, setSyncFolder, autoBackupOnExit, setAutoBackupOnExit } = useSettingsStore()
   const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
-  const canSync = !!syncFolder && !!syncPassphrase
+  const canSync = !!syncFolder
 
   const chooseSyncFolder = async () => {
     try {
@@ -57,16 +50,16 @@ export function DataSettings() {
   }
 
   const doRestore = async () => {
-    if (!canSync || !syncFolder || !syncPassphrase) return
+    if (!canSync) return
     setBusy(true)
     try {
-      const blob = await readSyncFile(syncFolder)
-      if (!blob) {
+      const config = await restoreFromFolder()
+      if (!config) {
         useUiStore.getState().notify({ message: t("sync.noBackup"), variant: "error" })
         return
       }
-      // Decrypt + validate, then reuse the import confirmation dialog below.
-      setPending(await decryptConfig(blob, syncPassphrase))
+      // Reuse the import confirmation dialog below.
+      setPending(config)
     } catch (e) {
       const msg = e instanceof WrongPassphraseError ? t("sync.wrongPass") : t("data.failed", { msg: String(e) })
       useUiStore.getState().notify({ message: msg, variant: "error" })
@@ -130,7 +123,7 @@ export function DataSettings() {
 
         <p className="text-xs text-muted-foreground">{t("data.note")}</p>
 
-        {/* Folder-based, end-to-end-encrypted cross-device sync */}
+        {/* Folder-based, encrypted cross-device sync */}
         <section className="space-y-3 border-t border-border pt-5">
           <SettingHeader title={t("sync.title")} desc={t("sync.desc")} />
 
@@ -147,21 +140,8 @@ export function DataSettings() {
             </Button>
           </div>
 
-          <Input
-            type="password"
-            value={syncPassphrase ?? ""}
-            onChange={(e) => setSyncPassphrase(e.target.value)}
-            placeholder={t("sync.passphrasePlaceholder")}
-            autoComplete="new-password"
-          />
-
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={autoBackupOnExit}
-              onChange={(e) => setAutoBackupOnExit(e.target.checked)}
-              className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]"
-            />
+            <Checkbox checked={autoBackupOnExit} onCheckedChange={(v) => setAutoBackupOnExit(v === true)} />
             {t("sync.autoBackupOnExit")}
           </label>
 

@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { backupToFolder } from "@/lib/sync"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useT } from "@/lib/i18n"
@@ -47,7 +48,7 @@ export function CloseGuard() {
   // the window close button (vs. the tray Quit item).
   const handleQuit = async (fromClose: boolean) => {
     const st = useSettingsStore.getState()
-    const canSync = !!st.syncFolder && !!st.syncPassphrase
+    const canSync = !!st.syncFolder
 
     if (fromClose && st.closeBehavior === "tray") {
       await winRef.current?.hide()
@@ -73,7 +74,7 @@ export function CloseGuard() {
   const onConfirmQuit = async () => {
     const st = useSettingsStore.getState()
     setDialogOpen(false)
-    if (st.syncFolder && st.syncPassphrase) {
+    if (st.syncFolder) {
       if (st.autoBackupOnExit || (showBackupChoice && backupChecked)) await safeBackup()
     }
     if (showDontRemind && dontRemind) st.setCloseConfirmDismissed(true)
@@ -122,24 +123,14 @@ export function CloseGuard() {
 
         {showBackupChoice && (
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={backupChecked}
-              onChange={(e) => setBackupChecked(e.target.checked)}
-              className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]"
-            />
+            <Checkbox checked={backupChecked} onCheckedChange={(v) => setBackupChecked(v === true)} />
             {t("sync.backupBeforeQuit")}
           </label>
         )}
 
         {showDontRemind && (
           <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={dontRemind}
-              onChange={(e) => setDontRemind(e.target.checked)}
-              className="h-4 w-4 rounded border-border accent-[hsl(var(--primary))]"
-            />
+            <Checkbox checked={dontRemind} onCheckedChange={(v) => setDontRemind(v === true)} />
             {t("close.dontRemind")}
           </label>
         )}
