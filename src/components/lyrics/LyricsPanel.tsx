@@ -120,17 +120,21 @@ export function LyricsPanel() {
           )}
           <div
             className={cn(
-              "w-60 h-60 rounded-2xl bg-muted overflow-hidden shadow-2xl shrink-0",
+              "relative w-60 h-60 rounded-2xl shadow-2xl shrink-0",
               isPlaying && "lyric-cover-float"
             )}
           >
-            {currentPicUrl ? (
-              <img src={currentPicUrl} alt="album" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                {t("lyrics.noCover")}
-              </div>
-            )}
+            {/* Theme-color glow that slowly orbits the cover edge while playing. */}
+            {isPlaying && <span className="lyric-cover-glow" aria-hidden="true" />}
+            <div className="relative z-[1] w-full h-full rounded-2xl bg-muted overflow-hidden">
+              {currentPicUrl ? (
+                <img src={currentPicUrl} alt="album" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  {t("lyrics.noCover")}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

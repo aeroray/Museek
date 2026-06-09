@@ -126,3 +126,31 @@
 .lyric-cover-float {
   animation: lyricCoverFloat 6s ease-in-out infinite;
 }
+
+/* Lyrics-page cover: a single soft theme-color arc that slowly orbits the cover
+   edge while playing — a subtle marquee-style glow, deliberately understated.
+   Sits behind the (opaque, rounded) cover, so only the part spilling past the
+   edge shows; the heavy blur turns it into a gentle travelling halo. */
+@keyframes lyricCoverGlow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lyric-cover-glow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 1.4rem;
+  background: conic-gradient(
+    from 0deg,
+    hsl(var(--primary) / 0) 0deg,
+    hsl(var(--primary) / 0) 55deg,
+    hsl(var(--primary) / 0.85) 90deg,
+    hsl(var(--primary) / 0) 125deg,
+    hsl(var(--primary) / 0) 360deg
+  );
+  filter: blur(8px);
+  opacity: 0.7;
+  pointer-events: none;
+  will-change: transform;
+  animation: lyricCoverGlow 6s linear infinite;
+}
