@@ -15,6 +15,7 @@ import { useSettingsStore } from "@/stores/settingsStore"
 import { enforceLimit } from "@/lib/mediaCache"
 import { setTrayVisible } from "@/lib/power"
 import { maybeAutoImport } from "@/lib/sync"
+import { useGlobalShortcuts } from "@/lib/shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
 
@@ -23,6 +24,9 @@ function AppInit() {
   const { loadFromDisk: loadPlaylists } = usePlaylistStore()
   const { loadHistory } = useSearchStore()
   const { loadFromDisk: loadSettings } = useSettingsStore()
+
+  // Global media keyboard shortcuts (space / arrows / M / L), gated by settings.
+  useGlobalShortcuts()
 
   useEffect(() => {
     // First: silent sync-folder import. If a newer config is found it applies it
