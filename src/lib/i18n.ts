@@ -181,7 +181,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.tab.appearance": "外观",
     "settings.tab.data": "数据",
     "settings.tab.about": "关于",
-    "settings.about.version": "版本 1.0.0",
+    "settings.about.version": "版本 {version}",
     "settings.about.description": "多平台音乐聚合软件",
 
     // Quality labels
@@ -463,7 +463,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.tab.appearance": "Appearance",
     "settings.tab.data": "Data",
     "settings.tab.about": "About",
-    "settings.about.version": "Version 1.0.0",
+    "settings.about.version": "Version {version}",
     "settings.about.description": "A cross-platform music aggregator",
 
     // Quality labels

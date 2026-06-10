@@ -1,9 +1,18 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { readFileSync } from "node:fs";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+
+// App version baked into the bundle from package.json — the single source of
+// truth. The About page reads `__APP_VERSION__` (typed in src/globals.d.ts) so
+// it can never drift from the real version. tauri.conf.json reads the same
+// package.json, so bumping it alone updates the whole app's version.
+const appVersion = JSON.parse(
+  readFileSync(path.resolve(__dirname, "package.json"), "utf-8"),
+).version as string;
 
 // Dev-only CORS proxy: lets the browser preview (which has no Tauri IPC bridge)
 // reach the music APIs by forwarding requests server-side. The client hits
@@ -56,6 +65,9 @@ function devCorsProxy(): Plugin {
 
 export default defineConfig(async () => ({
   plugins: [react(), devCorsProxy()],
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -43,7 +43,7 @@ export function Settings() {
           <TabsContent value="about" className="mt-4 overflow-auto">
             <div className="space-y-2 text-sm">
               <p className="font-semibold text-base">{t("app.name")}</p>
-              <p className="text-muted-foreground">{t("settings.about.version")}</p>
+              <p className="text-muted-foreground">{t("settings.about.version", { version: __APP_VERSION__ })}</p>
               <p className="text-muted-foreground">{t("settings.about.description")}</p>
               <p className="text-muted-foreground mt-4">
                 {t("app.tagline")}
