@@ -74,21 +74,22 @@ fn set_prevent_sleep(app: tauri::AppHandle, enabled: bool) {
     #[cfg(target_os = "macos")]
     {
         let state = app.state::<KeepAwakeState>();
-        if let Ok(mut guard) = state.0.lock() {
-            if enabled {
-                if guard.is_none() {
-                    let pid = std::process::id().to_string();
-                    if let Ok(child) = std::process::Command::new("caffeinate")
-                        .args(["-i", "-w", pid.as_str()])
-                        .spawn()
-                    {
-                        *guard = Some(child);
-                    }
+        // Bind the guard to a local (not an `if let` temporary) so it doesn't
+        // outlive `state`; recover from poisoning rather than panicking.
+        let mut guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
+        if enabled {
+            if guard.is_none() {
+                let pid = std::process::id().to_string();
+                if let Ok(child) = std::process::Command::new("caffeinate")
+                    .args(["-i", "-w", pid.as_str()])
+                    .spawn()
+                {
+                    *guard = Some(child);
                 }
-            } else if let Some(mut child) = guard.take() {
-                let _ = child.kill();
-                let _ = child.wait(); // reap so repeated toggles don't leak zombies
             }
+        } else if let Some(mut child) = guard.take() {
+            let _ = child.kill();
+            let _ = child.wait(); // reap so repeated toggles don't leak zombies
         }
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
@@ -184,6 +185,9 @@ pub fn run() {
                 let hwnd = window.hwnd().ok().map(|h| h.0 as *mut std::ffi::c_void);
                 #[cfg(not(target_os = "windows"))]
                 let hwnd = None;
+                // `window` is only read on Windows (hwnd); mark it used elsewhere.
+                #[cfg(not(target_os = "windows"))]
+                let _ = &window;
 
                 let config = PlatformConfig {
                     dbus_name: "museek",
