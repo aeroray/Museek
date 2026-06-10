@@ -4,6 +4,7 @@ import { X, AArrowUp, AArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { usePlayerStore } from "@/stores/playerStore"
+import { hiResCover } from "@/lib/cover"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -148,7 +149,11 @@ export function LyricsPanel() {
               )}
             >
               {currentPicUrl ? (
-                <img src={currentPicUrl} alt="album" className="w-full h-full object-cover" />
+                <img
+                  src={hiResCover(currentPicUrl, currentSong?.source) ?? currentPicUrl}
+                  alt="album"
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                   {t("lyrics.noCover")}
