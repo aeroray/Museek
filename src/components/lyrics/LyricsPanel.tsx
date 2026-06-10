@@ -71,12 +71,16 @@ export function LyricsPanel() {
       {currentPicUrl ? (
         <div
           className="absolute inset-0 scale-125 bg-cover bg-center"
-          style={{ backgroundImage: `url(${currentPicUrl})`, filter: "blur(64px) saturate(1.5)" }}
+          style={{ backgroundImage: `url(${currentPicUrl})`, filter: "blur(80px) saturate(1.5)" }}
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background to-secondary/30" />
       )}
-      <div className="absolute inset-0 bg-background/55 backdrop-blur-2xl" />
+      {/* Scrim tint for legibility. We deliberately DON'T use backdrop-blur here:
+          on macOS WKWebView a viewport-sized backdrop-filter can leave an
+          unblurred strip at the bottom edge. The backdrop layer above already
+          carries a reliable filter blur, so the tint alone is enough. */}
+      <div className="absolute inset-0 bg-background/65" />
 
       {/* Top-right controls: font size + close */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-1">
