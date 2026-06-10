@@ -18,7 +18,7 @@ import type { MusicInfo } from "@/types/music"
 
 export function HotPlaylists() {
   const t = useT()
-  const { play, addToQueue, clearQueue } = usePlayerStore()
+  const { playAll } = usePlayerStore()
   const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
   const addFavoritePlaylist = usePlaylistStore((s) => s.addFavoritePlaylist)
   const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)
@@ -86,14 +86,6 @@ export function HotPlaylists() {
     else loadList()
   }
 
-  // Replace the queue with the open playlist's songs and start from the top.
-  const playAll = () => {
-    if (songs.length === 0) return
-    clearQueue()
-    addToQueue(songs)
-    play(songs[0])
-  }
-
   const isPlFav = (pl: Playlist) => favoritePlaylists.some((p) => p.source === pl.source && p.id === pl.id)
   const toggleFavFor = (pl: Playlist) => {
     if (isPlFav(pl)) removeFavoritePlaylist(pl.source, pl.id)
@@ -155,7 +147,7 @@ export function HotPlaylists() {
                 {t(playlistFav ? "hotPlaylists.favorited" : "hotPlaylists.favorite")}
               </Button>
               {songs.length > 0 && !detailLoading && !detailError && (
-                <Button variant="secondary" size="sm" className="h-8 shrink-0" onClick={playAll}>
+                <Button variant="secondary" size="sm" className="h-8 shrink-0" onClick={() => playAll(songs)}>
                   <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
                   {t("common.playAll")}
                 </Button>

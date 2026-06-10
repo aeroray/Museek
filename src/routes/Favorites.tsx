@@ -27,7 +27,7 @@ const SORTS = ["added", "name"] as const
 
 export function Favorites() {
   const { favorites, removeFromFavorites, favoritePlaylists, removeFavoritePlaylist } = usePlaylistStore()
-  const { play, addToQueue, clearQueue } = usePlayerStore()
+  const { play, playAll } = usePlayerStore()
   const { addTask } = useDownloadStore()
   const { favoritesSort, favoritesPlatform, setFavoritesSort, setFavoritesPlatform } = useSettingsStore()
   const tab = useUiStore((s) => s.favoritesTab)
@@ -93,13 +93,6 @@ export function Favorites() {
     }
     exitEdit()
   }
-  const playAll = () => {
-    if (displayedSongs.length === 0) return
-    clearQueue()
-    addToQueue(displayedSongs)
-    play(displayedSongs[0])
-  }
-
   return (
     <div className="flex flex-col h-full">
       {/* Header: title + count summary + play-all (songs) + tabs */}
@@ -113,7 +106,7 @@ export function Favorites() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           {isSongs && favorites.length > 0 && !editing && (
-            <Button variant="secondary" size="sm" className="h-8" onClick={playAll}>
+            <Button variant="secondary" size="sm" className="h-8" onClick={() => playAll(displayedSongs)}>
               <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
               {t("favorites.playAll")}
             </Button>

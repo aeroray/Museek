@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 
 export function Library() {
   const t = useT()
-  const { play, addToQueue, clearQueue } = usePlayerStore()
+  const { playAll } = usePlayerStore()
   // Platform + board live in the UI store so the choice survives leaving and
   // returning to this page. An empty stored board falls back to the platform's first.
   const source = useUiStore((s) => s.chartSource)
@@ -66,14 +66,6 @@ export function Library() {
 
   const retry = () => setNonce((n) => n + 1)
 
-  // Replace the queue with the whole board and start from the top.
-  const playAll = () => {
-    if (songs.length === 0) return
-    clearQueue()
-    addToQueue(songs)
-    play(songs[0])
-  }
-
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border space-y-3">
@@ -81,7 +73,7 @@ export function Library() {
           <TrendingUp size={20} />
           <h2 className="text-lg font-semibold">{t("library.title")}</h2>
           {songs.length > 0 && !loading && !error && (
-            <Button variant="secondary" size="sm" className="h-8 ml-auto" onClick={playAll}>
+            <Button variant="secondary" size="sm" className="h-8 ml-auto" onClick={() => playAll(songs)}>
               <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
               {t("common.playAll")}
             </Button>

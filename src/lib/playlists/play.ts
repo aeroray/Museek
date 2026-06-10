@@ -16,10 +16,7 @@ export async function playPlaylist(pl: Playlist): Promise<void> {
       ui.notify({ message: t("hotPlaylists.playlistEmpty"), variant: "info" })
       return
     }
-    const player = usePlayerStore.getState()
-    player.clearQueue()
-    player.addToQueue(songs)
-    player.play(songs[0])
+    usePlayerStore.getState().playAll(songs)
   } catch (e) {
     ui.notify({ message: t("hotPlaylists.playFailed", { msg: (e as Error).message }), variant: "error" })
   }

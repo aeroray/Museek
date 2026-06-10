@@ -72,6 +72,7 @@ interface PlayerState {
   play: (song: MusicInfo, quality?: Quality) => Promise<void>
   playFromQueue: (index: number) => Promise<void>
   addToQueue: (songs: MusicInfo[]) => void
+  playAll: (songs: MusicInfo[]) => void
   clearQueue: () => void
   next: () => Promise<void>
   prev: () => Promise<void>
@@ -224,6 +225,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     clearQueue() {
       set({ queue: [], queueIndex: -1 })
+    },
+
+    // Replace the queue with `songs` and start playing. In shuffle mode it starts
+    // from a RANDOM track — otherwise "play all" always begins at track 1 and
+    // only shuffles from the second song onward.
+    playAll(songs) {
+      if (!songs.length) return
+      get().clearQueue()
+      get().addToQueue(songs)
+      const startIdx = get().playMode === "shuffle" ? Math.floor(Math.random() * songs.length) : 0
+      get().play(songs[startIdx])
     },
 
     async next() {
