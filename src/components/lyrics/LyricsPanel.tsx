@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { X, AArrowUp, AArrowDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -22,28 +23,38 @@ export function LyricsPanel() {
     return Number.isFinite(v) ? Math.min(FONT_MAX, Math.max(FONT_MIN, v)) : 1
   })
   const lineRefs = useRef<(HTMLDivElement | null)[]>([])
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Center the active lyric line by scrolling ONLY the lyric viewport — never via
+  // element.scrollIntoView(), which also scrolls scrollable ancestors and the
+  // window. In the Tauri webview that window-scroll dragged the whole (fixed)
+  // panel up at the last line, leaking an unblurred strip at the bottom.
+  const centerActiveLine = useCallback((behavior: ScrollBehavior) => {
+    const idx = usePlayerStore.getState().currentLyricIndex
+    const line = lineRefs.current[idx]
+    const root = scrollRef.current
+    if (idx < 0 || !line || !root) return
+    const viewport = root.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]")
+    if (!viewport) return
+    const vp = viewport.getBoundingClientRect()
+    const lr = line.getBoundingClientRect()
+    const delta = lr.top + lr.height / 2 - (vp.top + vp.height / 2)
+    viewport.scrollTo({ top: viewport.scrollTop + delta, behavior })
+  }, [])
 
   // Keep the active line centered as playback progresses.
   useEffect(() => {
-    if (currentLyricIndex >= 0) {
-      lineRefs.current[currentLyricIndex]?.scrollIntoView({ behavior: "smooth", block: "center" })
-    }
-  }, [currentLyricIndex])
+    if (currentLyricIndex >= 0) centerActiveLine("smooth")
+  }, [currentLyricIndex, centerActiveLine])
 
   // The panel stays mounted (it only toggles visibility), so opening it mid-song
   // wouldn't re-trigger the scroll above. Jump straight to the current line when
-  // the panel opens — instantly, not a slow scroll from the top. rAF waits for
-  // the lyric list to lay out; read the index fresh in case it advanced.
+  // the panel opens. rAF waits for the lyric list to lay out.
   useEffect(() => {
     if (!showLyrics) return
-    const id = requestAnimationFrame(() => {
-      const idx = usePlayerStore.getState().currentLyricIndex
-      if (idx >= 0) {
-        lineRefs.current[idx]?.scrollIntoView({ behavior: "auto", block: "center" })
-      }
-    })
+    const id = requestAnimationFrame(() => centerActiveLine("auto"))
     return () => cancelAnimationFrame(id)
-  }, [showLyrics])
+  }, [showLyrics, centerActiveLine])
 
   // Close the panel with Esc.
   useEffect(() => {
@@ -64,7 +75,7 @@ export function LyricsPanel() {
   const dec = () => setScale(Math.max(FONT_MIN, +(fontScale - FONT_STEP).toFixed(2)))
   const inc = () => setScale(Math.min(FONT_MAX, +(fontScale + FONT_STEP).toFixed(2)))
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-background">
       {/* Heavily-blurred album cover as the backdrop (premium look); the gradient
           is the fallback when the track has no cover. A scrim keeps text legible. */}
@@ -149,7 +160,7 @@ export function LyricsPanel() {
 
         {/* Right: centered lyrics with a top/bottom fade */}
         <div className="flex-1 min-h-0" style={{ maskImage: FADE, WebkitMaskImage: FADE }}>
-          <ScrollArea className="h-full">
+          <ScrollArea ref={scrollRef} className="h-full">
             {lyricLines.length === 0 ? (
               <div className="flex items-center justify-center h-full min-h-[60vh] text-muted-foreground">
                 {currentSong ? t("lyrics.empty") : t("lyrics.selectSong")}
@@ -187,6 +198,7 @@ export function LyricsPanel() {
           </ScrollArea>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
