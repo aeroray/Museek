@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Download, Upload, Loader2, Folder } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -140,10 +141,10 @@ export function DataSettings() {
             </Button>
           </div>
 
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <Label className="flex items-center gap-2 text-sm font-normal cursor-pointer select-none">
             <Checkbox checked={autoBackupOnExit} onCheckedChange={(v) => setAutoBackupOnExit(v === true)} />
             {t("sync.autoBackupOnExit")}
-          </label>
+          </Label>
 
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={doBackup} disabled={busy || !isTauri || !canSync}>

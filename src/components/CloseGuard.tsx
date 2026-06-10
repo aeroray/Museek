@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { backupToFolder } from "@/lib/sync"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useT } from "@/lib/i18n"
@@ -122,17 +123,17 @@ export function CloseGuard() {
         </DialogHeader>
 
         {showBackupChoice && (
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <Label className="flex items-center gap-2 text-sm font-normal cursor-pointer select-none">
             <Checkbox checked={backupChecked} onCheckedChange={(v) => setBackupChecked(v === true)} />
             {t("sync.backupBeforeQuit")}
-          </label>
+          </Label>
         )}
 
         {showDontRemind && (
-          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          <Label className="flex items-center gap-2 text-sm font-normal text-muted-foreground cursor-pointer select-none">
             <Checkbox checked={dontRemind} onCheckedChange={(v) => setDontRemind(v === true)} />
             {t("close.dontRemind")}
-          </label>
+          </Label>
         )}
 
         <DialogFooter>
