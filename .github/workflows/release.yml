@@ -56,6 +56,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # Bumped from the default "v0-rust" to start a fresh cache namespace.
+          # The v1.3.0 build failed while *restoring* the old cache (corrupt /
+          # incomplete); a new prefix means a clean cache miss + fresh build,
+          # then a healthy cache is saved under v1. Bump again if this recurs.
+          prefix-key: "v1-rust"
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
