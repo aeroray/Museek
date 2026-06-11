@@ -15,12 +15,6 @@ on:
 permissions:
   contents: write
 
-# Run the JavaScript actions (checkout / setup-node / pnpm) on Node 24 so the
-# "Node.js 20 actions are deprecated" warning goes away until they ship Node 24
-# majors. This is GitHub's documented opt-in.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   release:
     strategy:
@@ -38,15 +32,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
