@@ -64,8 +64,8 @@ export function AboutSettings() {
   }
 
   const donateCodes = [
-    { src: "/donate/wechat.svg", label: t("about.wechat") },
-    { src: "/donate/alipay.svg", label: t("about.alipay") },
+    { src: "/donate/wechat.jpg", label: t("about.wechat") },
+    { src: "/donate/alipay.jpg", label: t("about.alipay") },
   ]
 
   return (
