@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220">
+  <rect width="220" height="220" rx="14" fill="#f1f5f9"/>
+  <rect x="10" y="10" width="200" height="200" rx="10" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="7 7"/>
+  <circle cx="110" cy="92" r="26" fill="none" stroke="#1677ff" stroke-width="3"/>
+  <path d="M99 92l8 8 15-16" fill="none" stroke="#1677ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="110" y="146" text-anchor="middle" font-family="system-ui, sans-serif" font-size="17" fill="#475569">支付宝收款码</text>
+  <text x="110" y="170" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">占位图 · 请替换</text>
+</svg>

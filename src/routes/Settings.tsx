@@ -4,6 +4,8 @@ import { SourceManager } from "@/components/settings/SourceManager"
 import { PlaybackSettings } from "@/components/settings/PlaybackSettings"
 import { ThemeSettings } from "@/components/settings/ThemeSettings"
 import { DataSettings } from "@/components/settings/DataSettings"
+import { ShortcutsSettings } from "@/components/settings/ShortcutsSettings"
+import { AboutSettings } from "@/components/settings/AboutSettings"
 import { useT } from "@/lib/i18n"
 
 export function Settings() {
@@ -19,6 +21,7 @@ export function Settings() {
           <TabsList className="shrink-0 self-start">
             <TabsTrigger value="sources">{t("settings.tab.sources")}</TabsTrigger>
             <TabsTrigger value="playback">{t("settings.tab.playback")}</TabsTrigger>
+            <TabsTrigger value="shortcuts">{t("settings.tab.shortcuts")}</TabsTrigger>
             <TabsTrigger value="appearance">{t("settings.tab.appearance")}</TabsTrigger>
             <TabsTrigger value="data">{t("settings.tab.data")}</TabsTrigger>
             <TabsTrigger value="about">{t("settings.tab.about")}</TabsTrigger>
@@ -32,6 +35,10 @@ export function Settings() {
             <PlaybackSettings />
           </TabsContent>
 
+          <TabsContent value="shortcuts" className="mt-4 flex-1 min-h-0">
+            <ShortcutsSettings />
+          </TabsContent>
+
           <TabsContent value="appearance" className="mt-4 overflow-auto">
             <ThemeSettings />
           </TabsContent>
@@ -40,15 +47,8 @@ export function Settings() {
             <DataSettings />
           </TabsContent>
 
-          <TabsContent value="about" className="mt-4 overflow-auto">
-            <div className="space-y-2 text-sm">
-              <p className="font-semibold text-base">{t("app.name")}</p>
-              <p className="text-muted-foreground">{t("settings.about.version", { version: __APP_VERSION__ })}</p>
-              <p className="text-muted-foreground">{t("settings.about.description")}</p>
-              <p className="text-muted-foreground mt-4">
-                {t("app.tagline")}
-              </p>
-            </div>
+          <TabsContent value="about" className="mt-4 flex-1 min-h-0">
+            <AboutSettings />
           </TabsContent>
         </Tabs>
       </div>
