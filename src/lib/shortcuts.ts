@@ -29,44 +29,47 @@ export function useGlobalShortcuts(): void {
       if (e.altKey || isTypingTarget(e.target)) return
       const p = usePlayerStore.getState()
       const mod = e.ctrlKey || e.metaKey
+      let handled = true
       switch (e.key) {
         case " ":
-          if (!p.currentSong) return
-          e.preventDefault()
-          p.togglePlay()
+          if (p.currentSong) p.togglePlay()
+          else handled = false
           break
         case "ArrowLeft":
-          e.preventDefault()
           if (mod) void p.prev()
           else p.seek(p.currentTime - SEEK_STEP)
           break
         case "ArrowRight":
-          e.preventDefault()
           if (mod) void p.next()
           else p.seek(p.currentTime + SEEK_STEP)
           break
         case "ArrowUp":
-          e.preventDefault()
           if (p.muted) p.setMuted(false)
           p.setVolume(Math.min(1, p.volume + VOL_STEP))
           break
         case "ArrowDown":
-          e.preventDefault()
           if (p.muted) p.setMuted(false)
           p.setVolume(Math.max(0, p.volume - VOL_STEP))
           break
         case "m":
         case "M":
-          e.preventDefault()
           p.setMuted(!p.muted)
           break
         case "l":
         case "L":
-          if (!p.currentSong) return
-          e.preventDefault()
-          p.setShowLyrics(!p.showLyrics)
+          if (p.currentSong) p.setShowLyrics(!p.showLyrics)
+          else handled = false
           break
+        default:
+          handled = false
       }
+      if (!handled) return
+      e.preventDefault()
+      // Drop focus from any control so the same keypress can't also activate it
+      // or leave a focus-visible ring (e.g. Space right after clicking a button
+      // or a playlist card's "play all").
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active !== document.body) active.blur()
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)

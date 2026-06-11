@@ -47,7 +47,11 @@ export function PlaylistCard({
         tabIndex={0}
         onClick={() => activate?.()}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
+          // Only the card itself (when focused) should activate — not Space/Enter
+          // bubbling up from an inner action button (play-all / favorite / remove),
+          // which previously navigated into the playlist when you pressed Space
+          // after clicking "play all".
+          if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
             e.preventDefault()
             activate?.()
           }
