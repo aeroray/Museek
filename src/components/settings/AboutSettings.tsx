@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { httpFetch } from "@/lib/http"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
@@ -70,24 +71,41 @@ export function AboutSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-4 pr-3 pb-4 text-sm">
-        <div className="space-y-1.5">
-          <p className="font-semibold text-base">{t("app.name")}</p>
-          <p className="text-muted-foreground">{t("settings.about.version", { version: __APP_VERSION__ })}</p>
-          <p className="text-muted-foreground">{t("settings.about.description")}</p>
-          <p className="text-muted-foreground pt-2">{t("app.tagline")}</p>
-        </div>
+      <div className="max-w-2xl pr-3 pb-4">
+        <SettingsCard>
+          <SettingRow>
+            <div className="space-y-1.5 text-sm">
+              <p className="text-base font-semibold">{t("app.name")}</p>
+              <p className="text-muted-foreground">{t("settings.about.version", { version: __APP_VERSION__ })}</p>
+              <p className="text-muted-foreground">{t("settings.about.description")}</p>
+              <p className="pt-2 text-muted-foreground">{t("app.tagline")}</p>
+            </div>
+          </SettingRow>
 
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={checkUpdate} disabled={checking}>
-            {checking ? <Loader2 size={15} className="mr-2 animate-spin" /> : <RefreshCw size={15} className="mr-2" />}
-            {t("about.checkUpdate")}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setDonateOpen(true)}>
-            <Heart size={15} className="mr-2 text-red-500" />
-            {t("about.donate")}
-          </Button>
-        </div>
+          <SettingRow
+            title={t("about.checkUpdate")}
+            control={
+              <Button variant="outline" size="sm" onClick={checkUpdate} disabled={checking}>
+                {checking ? (
+                  <Loader2 size={15} className="mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw size={15} className="mr-2" />
+                )}
+                {t("about.checkUpdate")}
+              </Button>
+            }
+          />
+
+          <SettingRow
+            title={t("about.donate")}
+            control={
+              <Button variant="outline" size="sm" onClick={() => setDonateOpen(true)}>
+                <Heart size={15} className="mr-2 text-red-500" />
+                {t("about.donate")}
+              </Button>
+            }
+          />
+        </SettingsCard>
       </div>
 
       {/* Update available */}
@@ -124,7 +142,11 @@ export function AboutSettings() {
           <div className="flex justify-center gap-6 py-2">
             {donateCodes.map((q) => (
               <div key={q.label} className="flex flex-col items-center gap-2">
-                <img src={q.src} alt={q.label} className="h-44 w-44 rounded-lg border border-border object-contain bg-white" />
+                <img
+                  src={q.src}
+                  alt={q.label}
+                  className="h-44 w-44 rounded-lg border border-border object-contain bg-white"
+                />
                 <span className="text-sm text-muted-foreground">{q.label}</span>
               </div>
             ))}

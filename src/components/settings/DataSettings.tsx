@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { SettingHeader } from "@/components/settings/SettingHeader"
+import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { gatherConfig, saveConfigFile, pickConfigFile, isValidConfig, type MuseekConfig } from "@/lib/configIO"
 import { backupToFolder, restoreFromFolder, applyConfigAndReload, WrongPassphraseError } from "@/lib/sync"
 import { useSettingsStore } from "@/stores/settingsStore"
@@ -108,57 +108,60 @@ export function DataSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-4 pr-3 pb-4">
-        <SettingHeader title={t("data.title")} desc={t("data.desc")} />
-
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={doExport} disabled={busy}>
-            {busy ? <Loader2 size={15} className="mr-2 animate-spin" /> : <Download size={15} className="mr-2" />}
-            {t("data.export")}
-          </Button>
-          <Button variant="outline" onClick={doPickImport} disabled={busy}>
-            <Upload size={15} className="mr-2" />
-            {t("data.import")}
-          </Button>
-        </div>
-
-        <p className="text-xs text-muted-foreground">{t("data.note")}</p>
-
-        {/* Folder-based, encrypted cross-device sync */}
-        <section className="space-y-3 border-t border-border pt-5">
-          <SettingHeader title={t("sync.title")} desc={t("sync.desc")} />
-
-          <div className="flex items-center gap-2">
-            <div
-              className="flex-1 min-w-0 text-sm px-3 py-2 rounded-md border bg-muted/40 truncate"
-              title={syncFolder ?? undefined}
-            >
-              {syncFolder || t("sync.noFolder")}
+      <div className="max-w-2xl pr-3 pb-4">
+        <SettingsCard>
+          <SettingRow title={t("data.title")} desc={t("data.desc")}>
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={doExport} disabled={busy}>
+                  {busy ? <Loader2 size={15} className="mr-2 animate-spin" /> : <Download size={15} className="mr-2" />}
+                  {t("data.export")}
+                </Button>
+                <Button variant="outline" onClick={doPickImport} disabled={busy}>
+                  <Upload size={15} className="mr-2" />
+                  {t("data.import")}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{t("data.note")}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={chooseSyncFolder} disabled={!isTauri} className="shrink-0">
-              <Folder size={15} className="mr-2" />
-              {t("sync.choose")}
-            </Button>
-          </div>
+          </SettingRow>
 
-          <Label className="flex items-center gap-2 text-sm font-normal cursor-pointer select-none">
-            <Checkbox checked={autoBackupOnExit} onCheckedChange={(v) => setAutoBackupOnExit(v === true)} />
-            {t("sync.autoBackupOnExit")}
-          </Label>
+          {/* Folder-based, encrypted cross-device sync */}
+          <SettingRow title={t("sync.title")} desc={t("sync.desc")}>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex-1 min-w-0 text-sm px-3 py-2 rounded-md border bg-muted/40 truncate"
+                  title={syncFolder ?? undefined}
+                >
+                  {syncFolder || t("sync.noFolder")}
+                </div>
+                <Button variant="outline" size="sm" onClick={chooseSyncFolder} disabled={!isTauri} className="shrink-0">
+                  <Folder size={15} className="mr-2" />
+                  {t("sync.choose")}
+                </Button>
+              </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={doBackup} disabled={busy || !isTauri || !canSync}>
-              {busy ? <Loader2 size={15} className="mr-2 animate-spin" /> : <Upload size={15} className="mr-2" />}
-              {t("sync.backup")}
-            </Button>
-            <Button variant="outline" onClick={doRestore} disabled={busy || !isTauri || !canSync}>
-              <Download size={15} className="mr-2" />
-              {t("sync.restore")}
-            </Button>
-          </div>
+              <Label className="flex items-center gap-2 text-sm font-normal cursor-pointer select-none">
+                <Checkbox checked={autoBackupOnExit} onCheckedChange={(v) => setAutoBackupOnExit(v === true)} />
+                {t("sync.autoBackupOnExit")}
+              </Label>
 
-          <p className="text-xs text-muted-foreground">{t("sync.note")}</p>
-        </section>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={doBackup} disabled={busy || !isTauri || !canSync}>
+                  {busy ? <Loader2 size={15} className="mr-2 animate-spin" /> : <Upload size={15} className="mr-2" />}
+                  {t("sync.backup")}
+                </Button>
+                <Button variant="outline" onClick={doRestore} disabled={busy || !isTauri || !canSync}>
+                  <Download size={15} className="mr-2" />
+                  {t("sync.restore")}
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">{t("sync.note")}</p>
+            </div>
+          </SettingRow>
+        </SettingsCard>
       </div>
 
       <Dialog open={!!pending} onOpenChange={(o) => !o && setPending(null)}>

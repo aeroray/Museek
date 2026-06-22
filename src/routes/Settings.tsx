@@ -61,7 +61,7 @@ export function Settings() {
             <ShortcutsSettings />
           </TabsContent>
 
-          <TabsContent value="appearance" className="mt-4 overflow-auto">
+          <TabsContent value="appearance" className="mt-4 flex-1 min-h-0">
             <ThemeSettings />
           </TabsContent>
 

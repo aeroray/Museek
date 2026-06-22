@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { SettingHeader } from "@/components/settings/SettingHeader"
+import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useT } from "@/lib/i18n"
 import type { Quality } from "@/types/music"
@@ -21,46 +21,44 @@ export function PlaybackSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-6 pr-3 pb-4">
-        {/* Playback quality */}
-        <section className="space-y-3">
-          <SettingHeader title={t("playback.playQualityTitle")} desc={t("playback.playQualityDesc")} />
-          <div className="flex flex-wrap gap-2">
-            {QUALITIES.map((q) => (
-              <Button
-                key={q}
-                variant={playQuality === q ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPlayQuality(q)}
-              >
-                {t(`quality.${q}`)}
-              </Button>
-            ))}
-          </div>
-        </section>
+      <div className="max-w-2xl pr-3 pb-4">
+        <SettingsCard>
+          <SettingRow title={t("playback.playQualityTitle")} desc={t("playback.playQualityDesc")}>
+            <div className="flex flex-wrap gap-2">
+              {QUALITIES.map((q) => (
+                <Button
+                  key={q}
+                  variant={playQuality === q ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPlayQuality(q)}
+                >
+                  {t(`quality.${q}`)}
+                </Button>
+              ))}
+            </div>
+          </SettingRow>
 
-        {/* Prevent system sleep while playing */}
-        <section className="space-y-2.5">
-          <SettingHeader title={t("playback.preventSleepTitle")} desc={t("playback.preventSleepDesc")} />
-          <Switch checked={preventSleepWhilePlaying} onCheckedChange={setPreventSleepWhilePlaying} />
-        </section>
+          <SettingRow
+            title={t("playback.preventSleepTitle")}
+            desc={t("playback.preventSleepDesc")}
+            control={<Switch checked={preventSleepWhilePlaying} onCheckedChange={setPreventSleepWhilePlaying} />}
+          />
 
-        {/* Close-button behavior */}
-        <section className="space-y-3">
-          <SettingHeader title={t("close.behaviorTitle")} desc={t("close.behaviorDesc")} />
-          <div className="flex flex-wrap gap-2">
-            {(["exit", "tray"] as const).map((b) => (
-              <Button
-                key={b}
-                variant={closeBehavior === b ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCloseBehavior(b)}
-              >
-                {t(`close.opt.${b}`)}
-              </Button>
-            ))}
-          </div>
-        </section>
+          <SettingRow title={t("close.behaviorTitle")} desc={t("close.behaviorDesc")}>
+            <div className="flex flex-wrap gap-2">
+              {(["exit", "tray"] as const).map((b) => (
+                <Button
+                  key={b}
+                  variant={closeBehavior === b ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCloseBehavior(b)}
+                >
+                  {t(`close.opt.${b}`)}
+                </Button>
+              ))}
+            </div>
+          </SettingRow>
+        </SettingsCard>
       </div>
     </ScrollArea>
   )
