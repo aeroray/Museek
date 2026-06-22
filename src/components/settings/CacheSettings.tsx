@@ -67,7 +67,7 @@ export function CacheSettings() {
                   </Button>
                 ))}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-muted-foreground">
                   {t("cache.current", { size: formatBytes(cacheSize) })}
                 </span>
