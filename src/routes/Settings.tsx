@@ -3,13 +3,14 @@ import { useSearchParams } from "react-router-dom"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SourceManager } from "@/components/settings/SourceManager"
 import { PlaybackSettings } from "@/components/settings/PlaybackSettings"
+import { DownloadSettings } from "@/components/settings/DownloadSettings"
 import { ThemeSettings } from "@/components/settings/ThemeSettings"
 import { DataSettings } from "@/components/settings/DataSettings"
 import { ShortcutsSettings } from "@/components/settings/ShortcutsSettings"
 import { AboutSettings } from "@/components/settings/AboutSettings"
 import { useT } from "@/lib/i18n"
 
-const TAB_VALUES = ["sources", "playback", "shortcuts", "appearance", "data", "about"]
+const TAB_VALUES = ["sources", "playback", "download", "shortcuts", "appearance", "data", "about"]
 
 export function Settings() {
   const t = useT()
@@ -31,6 +32,7 @@ export function Settings() {
           <TabsList className="shrink-0 self-start">
             <TabsTrigger value="sources">{t("settings.tab.sources")}</TabsTrigger>
             <TabsTrigger value="playback">{t("settings.tab.playback")}</TabsTrigger>
+            <TabsTrigger value="download">{t("settings.tab.download")}</TabsTrigger>
             <TabsTrigger value="shortcuts">{t("settings.tab.shortcuts")}</TabsTrigger>
             <TabsTrigger value="appearance">{t("settings.tab.appearance")}</TabsTrigger>
             <TabsTrigger value="data">{t("settings.tab.data")}</TabsTrigger>
@@ -43,6 +45,10 @@ export function Settings() {
 
           <TabsContent value="playback" className="mt-4 flex-1 min-h-0">
             <PlaybackSettings />
+          </TabsContent>
+
+          <TabsContent value="download" className="mt-4 flex-1 min-h-0">
+            <DownloadSettings />
           </TabsContent>
 
           <TabsContent value="shortcuts" className="mt-4 flex-1 min-h-0">

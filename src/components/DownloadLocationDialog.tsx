@@ -34,7 +34,7 @@ export function DownloadLocationDialog() {
           <Button
             onClick={() => {
               setOpen(false)
-              navigate("/settings?tab=playback")
+              navigate("/settings?tab=download")
             }}
           >
             <FolderOpen size={15} className="mr-2" />
