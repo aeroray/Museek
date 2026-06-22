@@ -1,6 +1,5 @@
 import { useEffect } from "react"
 import { usePlayerStore } from "@/stores/playerStore"
-import { useSettingsStore } from "@/stores/settingsStore"
 
 const SEEK_STEP = 5 // seconds
 const VOL_STEP = 0.05
@@ -11,9 +10,9 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 /**
- * Global media keyboard shortcuts, registered once at the app root. Active only
- * when enabled in Settings and when focus isn't in a text field (so typing in
- * the search box never triggers playback). Modifier = Ctrl (Windows) / ⌘ (mac).
+ * Global media keyboard shortcuts, registered once at the app root. Always
+ * active, except while focus is in a text field (so typing in the search box
+ * never triggers playback). Modifier = Ctrl (Windows) / ⌘ (mac).
  *
  *  Space            play / pause
  *  ← / →            seek −/+ 5s
@@ -25,7 +24,6 @@ function isTypingTarget(el: EventTarget | null): boolean {
 export function useGlobalShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!useSettingsStore.getState().shortcutsEnabled) return
       if (e.altKey || isTypingTarget(e.target)) return
       const p = usePlayerStore.getState()
       const mod = e.ctrlKey || e.metaKey

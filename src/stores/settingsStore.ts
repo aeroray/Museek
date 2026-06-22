@@ -24,8 +24,6 @@ interface Persisted {
   maxCacheMB: number
   // Keep the system awake (but allow display sleep/lock) while music plays.
   preventSleepWhilePlaying: boolean
-  // Enable global media keyboard shortcuts (space / arrows / M / L).
-  shortcutsEnabled: boolean
   // Favorites list view preferences.
   favoritesSort: FavoritesSort
   favoritesPlatform: FavoritesPlatform
@@ -51,7 +49,6 @@ interface SettingsState extends Persisted {
   setAudioCache: (v: boolean) => void
   setMaxCacheMB: (n: number) => void
   setPreventSleepWhilePlaying: (v: boolean) => void
-  setShortcutsEnabled: (v: boolean) => void
   setFavoritesSort: (s: FavoritesSort) => void
   setFavoritesPlatform: (p: FavoritesPlatform) => void
   setCloseBehavior: (b: CloseBehavior) => void
@@ -72,7 +69,6 @@ const DEFAULTS: Persisted = {
   audioCache: true,
   maxCacheMB: 1024,
   preventSleepWhilePlaying: true,
-  shortcutsEnabled: true,
   favoritesSort: "added",
   favoritesPlatform: "all",
   closeBehavior: "exit",
@@ -101,7 +97,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
-      shortcutsEnabled,
       favoritesSort,
       favoritesPlatform,
       closeBehavior,
@@ -120,7 +115,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
-      shortcutsEnabled,
       favoritesSort,
       favoritesPlatform,
       closeBehavior,
@@ -165,10 +159,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setPreventSleepWhilePlaying(v) {
       set({ preventSleepWhilePlaying: v })
-      persist()
-    },
-    setShortcutsEnabled(v) {
-      set({ shortcutsEnabled: v })
       persist()
     },
     setFavoritesSort(s) {
@@ -232,8 +222,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.preventSleepWhilePlaying === "boolean"
             ? data.preventSleepWhilePlaying
             : DEFAULTS.preventSleepWhilePlaying,
-        shortcutsEnabled:
-          typeof data.shortcutsEnabled === "boolean" ? data.shortcutsEnabled : DEFAULTS.shortcutsEnabled,
         favoritesSort: SORTS.includes(data.favoritesSort as FavoritesSort)
           ? (data.favoritesSort as FavoritesSort)
           : DEFAULTS.favoritesSort,
