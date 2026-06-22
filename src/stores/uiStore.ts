@@ -16,6 +16,9 @@ interface UiState {
   toast: Toast | null
   notify: (toast: Omit<Toast, "id">) => void
   clearToast: () => void
+  // Modal shown when a download is attempted with no download location set yet.
+  downloadLocationPromptOpen: boolean
+  setDownloadLocationPrompt: (open: boolean) => void
   sidebarCollapsed: boolean
   toggleSidebar: () => void
   // Selected platform per page, kept in memory so switching tabs and coming back
@@ -36,6 +39,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   toast: null,
   notify: (toast) => set({ toast: { ...toast, id: Date.now() } }),
   clearToast: () => set({ toast: null }),
+  downloadLocationPromptOpen: false,
+  setDownloadLocationPrompt: (open) => set({ downloadLocationPromptOpen: open }),
   sidebarCollapsed: localStorage.getItem(SIDEBAR_KEY) === "1",
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed

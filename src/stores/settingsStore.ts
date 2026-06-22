@@ -12,7 +12,9 @@ export type CloseBehavior = "exit" | "tray"
 interface Persisted {
   playQuality: Quality
   downloadQuality: Quality
-  // null = default app-data downloads folder; otherwise an absolute directory.
+  // null = not set → the user is prompted to choose on first download; otherwise an
+  // absolute directory. Device-local: deliberately excluded from cross-device sync
+  // (Windows/macOS paths differ), see DEVICE_LOCAL_SETTINGS in configIO.ts.
   downloadDir: string | null
   maxConcurrent: number
   fileNaming: NamingScheme
@@ -205,12 +207,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
 
     async loadFromDisk() {
       const data = await readData<Partial<Persisted>>("settings.json", DEFAULTS)
+      // Download location is now device-local and no longer synced. On the first
+      // load after this change, drop any value that rode in via the old cross-device
+      // sync so the user re-picks it per device (one-time, tracked in localStorage).
+      const dlLocalized = localStorage.getItem("museek.downloadDir.localized") === "1"
       set({
         playQuality: QUALITIES.includes(data.playQuality as Quality) ? (data.playQuality as Quality) : DEFAULTS.playQuality,
         downloadQuality: QUALITIES.includes(data.downloadQuality as Quality)
           ? (data.downloadQuality as Quality)
           : DEFAULTS.downloadQuality,
-        downloadDir: typeof data.downloadDir === "string" ? data.downloadDir : null,
+        downloadDir: dlLocalized && typeof data.downloadDir === "string" ? data.downloadDir : null,
         maxConcurrent:
           typeof data.maxConcurrent === "number"
             ? Math.min(5, Math.max(1, Math.round(data.maxConcurrent)))
@@ -247,6 +253,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.autoBackupOnExit === "boolean" ? data.autoBackupOnExit : DEFAULTS.autoBackupOnExit,
         syncLastAt: typeof data.syncLastAt === "string" ? data.syncLastAt : null,
       })
+      // Persist the one-time download-location reset so it doesn't repeat next launch.
+      if (!dlLocalized) {
+        localStorage.setItem("museek.downloadDir.localized", "1")
+        persist()
+      }
     },
   }
 })

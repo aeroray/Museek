@@ -1,4 +1,5 @@
 import { Settings as SettingsIcon } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SourceManager } from "@/components/settings/SourceManager"
 import { PlaybackSettings } from "@/components/settings/PlaybackSettings"
@@ -8,8 +9,17 @@ import { ShortcutsSettings } from "@/components/settings/ShortcutsSettings"
 import { AboutSettings } from "@/components/settings/AboutSettings"
 import { useT } from "@/lib/i18n"
 
+const TAB_VALUES = ["sources", "playback", "shortcuts", "appearance", "data", "about"]
+
 export function Settings() {
   const t = useT()
+  // Tab is driven by ?tab= so it can be deep-linked (e.g. the "go to settings"
+  // shortcut in the download-location prompt) and stays correct even when Settings
+  // is already mounted. Normal tab clicks update the query (replace, no history spam).
+  const [params, setParams] = useSearchParams()
+  const requested = params.get("tab")
+  const tab = requested && TAB_VALUES.includes(requested) ? requested : "sources"
+  const setTab = (v: string) => setParams(v === "sources" ? {} : { tab: v }, { replace: true })
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border flex items-center gap-2">
@@ -17,7 +27,7 @@ export function Settings() {
         <h2 className="text-lg font-semibold">{t("settings.title")}</h2>
       </div>
       <div className="flex-1 min-h-0 p-4">
-        <Tabs defaultValue="sources" className="flex flex-col h-full">
+        <Tabs value={tab} onValueChange={setTab} className="flex flex-col h-full">
           <TabsList className="shrink-0 self-start">
             <TabsTrigger value="sources">{t("settings.tab.sources")}</TabsTrigger>
             <TabsTrigger value="playback">{t("settings.tab.playback")}</TabsTrigger>

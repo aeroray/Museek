@@ -26,9 +26,10 @@ const LS_KEYS = [
 ] as const
 
 // Settings specific to THIS device that must never travel via sync: the sync
-// folder path, the stored passphrase, the auto-backup flag, and the last-synced
-// timestamp. Stripped on export; preserved (not overwritten) on import.
-const DEVICE_LOCAL_SETTINGS = ["syncFolder", "syncPassphrase", "autoBackupOnExit", "syncLastAt"]
+// folder path, the stored passphrase, the auto-backup flag, the last-synced
+// timestamp, and the download location (Windows/macOS paths differ, so it's
+// per-device). Stripped on export; preserved (not overwritten) on import.
+const DEVICE_LOCAL_SETTINGS = ["syncFolder", "syncPassphrase", "autoBackupOnExit", "syncLastAt", "downloadDir"]
 
 export interface MuseekConfig {
   app: "museek"

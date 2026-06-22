@@ -20,9 +20,9 @@ export function ShortcutsSettings() {
   return (
     <ScrollArea className="h-full">
       <div className="space-y-3 pr-3 pb-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="space-y-2.5">
           <SettingHeader title={t("shortcuts.title")} desc={t("shortcuts.desc")} />
-          <Switch checked={shortcutsEnabled} onCheckedChange={setShortcutsEnabled} className="shrink-0" />
+          <Switch checked={shortcutsEnabled} onCheckedChange={setShortcutsEnabled} />
         </div>
         <div className={cn("rounded-lg border border-border divide-y divide-border", !shortcutsEnabled && "opacity-50")}>
           {rows.map((r) => (

@@ -5,6 +5,7 @@ import { PlayerBar } from "@/components/player/PlayerBar"
 import { PlayQueue } from "@/components/queue/PlayQueue"
 import { LyricsPanel } from "@/components/lyrics/LyricsPanel"
 import { Toaster } from "@/components/ui/toaster"
+import { DownloadLocationDialog } from "@/components/DownloadLocationDialog"
 
 export function RootLayout() {
   return (
@@ -22,6 +23,7 @@ export function RootLayout() {
       <PlayQueue />
       <LyricsPanel />
       <Toaster />
+      <DownloadLocationDialog />
     </div>
   )
 }

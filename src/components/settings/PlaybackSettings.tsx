@@ -15,6 +15,7 @@ import { SettingHeader } from "@/components/settings/SettingHeader"
 import { useSettingsStore, type NamingScheme, CACHE_LIMITS_MB } from "@/stores/settingsStore"
 import { getCacheBytes, clearCache, enforceLimit, formatBytes } from "@/lib/mediaCache"
 import { useT } from "@/lib/i18n"
+import { cn } from "@/lib/utils"
 import type { Quality } from "@/types/music"
 
 const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
@@ -99,13 +100,9 @@ export function PlaybackSettings() {
         </section>
 
         {/* Prevent system sleep while playing */}
-        <section className="flex items-center justify-between gap-3">
+        <section className="space-y-2.5">
           <SettingHeader title={t("playback.preventSleepTitle")} desc={t("playback.preventSleepDesc")} />
-          <Switch
-            checked={preventSleepWhilePlaying}
-            onCheckedChange={setPreventSleepWhilePlaying}
-            className="shrink-0"
-          />
+          <Switch checked={preventSleepWhilePlaying} onCheckedChange={setPreventSleepWhilePlaying} />
         </section>
 
         {/* Close-button behavior */}
@@ -146,8 +143,14 @@ export function PlaybackSettings() {
         <section className="space-y-3">
           <SettingHeader title={t("download.locationTitle")} desc={t("download.locationDesc")} />
           <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0 text-sm px-3 py-2 rounded-md border bg-muted/40 truncate" title={downloadDir ?? undefined}>
-              {downloadDir || t("download.defaultLocation")}
+            <div
+              className={cn(
+                "flex-1 min-w-0 text-sm px-3 py-2 rounded-md border bg-muted/40 truncate",
+                !downloadDir && "text-muted-foreground"
+              )}
+              title={downloadDir ?? undefined}
+            >
+              {downloadDir || t("download.notSet")}
             </div>
             <Button variant="outline" size="sm" onClick={chooseFolder} disabled={!isTauri} className="shrink-0">
               <Folder size={15} className="mr-2" />
@@ -159,7 +162,7 @@ export function PlaybackSettings() {
                 size="icon"
                 className="h-9 w-9 shrink-0 text-muted-foreground"
                 onClick={() => setDownloadDir(null)}
-                title={t("download.reset")}
+                title={t("download.clearLocation")}
               >
                 <RotateCcw size={15} />
               </Button>
@@ -206,8 +209,8 @@ export function PlaybackSettings() {
         <section className="space-y-3 border-t border-border pt-5">
           <SettingHeader title={t("cache.title")} desc={t("cache.desc")} />
 
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm">{t("cache.audioTitle")}</span>
+          <div className="space-y-2.5">
+            <span className="block text-sm">{t("cache.audioTitle")}</span>
             <Switch checked={audioCache} onCheckedChange={setAudioCache} />
           </div>
 

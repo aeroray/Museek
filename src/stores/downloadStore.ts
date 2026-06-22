@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { httpFetch as tauriFetch } from "@/lib/http"
-import { BaseDirectory, writeFile, mkdir } from "@tauri-apps/plugin-fs"
+import { writeFile } from "@tauri-apps/plugin-fs"
 import type { MusicInfo, Quality } from "@/types/music"
 import { sourceRunner } from "@/lib/sourceRunner"
 import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore"
@@ -56,6 +56,12 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
   tasks: [],
 
   addTask(song, quality) {
+    // No download location set yet → prompt the user (with a shortcut to Settings)
+    // instead of silently saving somewhere. downloadDir is a device-local setting.
+    if (!useSettingsStore.getState().downloadDir) {
+      useUiStore.getState().setDownloadLocationPrompt(true)
+      return
+    }
     const q = quality ?? useSettingsStore.getState().downloadQuality
     const task: DownloadTask = {
       id: `dl_${Date.now()}_${song.id}`,
@@ -147,17 +153,11 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
       const ext = actual === "flac" || actual === "flac24bit" ? "flac" : "mp3"
       const { downloadDir, fileNaming } = useSettingsStore.getState()
+      // Guarded at addTask, but a queued task could outlive the user clearing it.
+      if (!downloadDir) throw new Error(t("download.noLocationError"))
       const filename = buildFilename(task.song, fileNaming, ext)
-
-      if (downloadDir) {
-        // User-chosen absolute directory.
-        const dir = downloadDir.replace(/[/\\]+$/, "")
-        await writeFile(`${dir}/${filename}`, merged)
-      } else {
-        // Default: app-data downloads folder.
-        await mkdir("museek/downloads", { baseDir: BaseDirectory.AppData, recursive: true })
-        await writeFile(`museek/downloads/${filename}`, merged, { baseDir: BaseDirectory.AppData })
-      }
+      const dir = downloadDir.replace(/[/\\]+$/, "")
+      await writeFile(`${dir}/${filename}`, merged)
 
       get().updateStatus(id, "completed")
       get().updateProgress(id, 100)
