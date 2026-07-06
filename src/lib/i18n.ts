@@ -192,11 +192,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "about.updateTitle": "发现新版本",
     "about.updateDesc": "有新版本 v{version} 可用，点击前往 GitHub 下载安装包。",
     "about.download": "前往下载",
-    "about.donate": "赞赏支持",
-    "about.donateTitle": "赞赏支持",
-    "about.donateDesc": "如果拾音对你有帮助，欢迎请作者喝杯咖啡 ☕",
-    "about.wechat": "微信",
-    "about.alipay": "支付宝",
 
     // Quality labels
     "quality.128k": "标准 128k",
@@ -503,11 +498,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "about.updateTitle": "Update available",
     "about.updateDesc": "Version v{version} is available. Click to download the installer from GitHub.",
     "about.download": "Download",
-    "about.donate": "Donate",
-    "about.donateTitle": "Support the project",
-    "about.donateDesc": "If Museek helps you, feel free to buy the author a coffee ☕",
-    "about.wechat": "WeChat",
-    "about.alipay": "Alipay",
 
     // Quality labels
     "quality.128k": "Standard 128k",

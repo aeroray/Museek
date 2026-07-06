@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { RefreshCw, Heart, Loader2, Download } from "lucide-react"
+import { RefreshCw, Loader2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
+import { SettingsCard } from "@/components/settings/SettingsCard"
 import { httpFetch } from "@/lib/http"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
@@ -41,7 +41,6 @@ export function AboutSettings() {
   const t = useT()
   const [checking, setChecking] = useState(false)
   const [update, setUpdate] = useState<{ version: string; url: string } | null>(null)
-  const [donateOpen, setDonateOpen] = useState(false)
 
   const checkUpdate = async () => {
     setChecking(true)
@@ -64,47 +63,26 @@ export function AboutSettings() {
     }
   }
 
-  const donateCodes = [
-    { src: "/donate/wechat.jpg", label: t("about.wechat") },
-    { src: "/donate/alipay.jpg", label: t("about.alipay") },
-  ]
-
   return (
     <ScrollArea className="h-full">
       <div className="max-w-2xl pr-3 pb-4">
         <SettingsCard>
-          <SettingRow>
+          <div className="flex items-start justify-between gap-4 p-4">
             <div className="space-y-1.5 text-sm">
               <p className="text-base font-semibold">{t("app.name")}</p>
               <p className="text-muted-foreground">{t("settings.about.version", { version: __APP_VERSION__ })}</p>
               <p className="text-muted-foreground">{t("settings.about.description")}</p>
               <p className="pt-2 text-muted-foreground">{t("app.tagline")}</p>
             </div>
-          </SettingRow>
-
-          <SettingRow
-            title={t("about.checkUpdate")}
-            control={
-              <Button variant="outline" size="sm" onClick={checkUpdate} disabled={checking}>
-                {checking ? (
-                  <Loader2 size={15} className="mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw size={15} className="mr-2" />
-                )}
-                {t("about.checkUpdate")}
-              </Button>
-            }
-          />
-
-          <SettingRow
-            title={t("about.donate")}
-            control={
-              <Button variant="outline" size="sm" onClick={() => setDonateOpen(true)}>
-                <Heart size={15} className="mr-2 text-red-500" />
-                {t("about.donate")}
-              </Button>
-            }
-          />
+            <Button variant="outline" size="sm" onClick={checkUpdate} disabled={checking} className="shrink-0">
+              {checking ? (
+                <Loader2 size={15} className="mr-2 animate-spin" />
+              ) : (
+                <RefreshCw size={15} className="mr-2" />
+              )}
+              {t("about.checkUpdate")}
+            </Button>
+          </div>
         </SettingsCard>
       </div>
 
@@ -129,28 +107,6 @@ export function AboutSettings() {
               {t("about.download")}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Donate */}
-      <Dialog open={donateOpen} onOpenChange={setDonateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("about.donateTitle")}</DialogTitle>
-            <DialogDescription>{t("about.donateDesc")}</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center gap-6 py-2">
-            {donateCodes.map((q) => (
-              <div key={q.label} className="flex flex-col items-center gap-2">
-                <img
-                  src={q.src}
-                  alt={q.label}
-                  className="h-44 w-44 rounded-lg border border-border object-contain bg-white"
-                />
-                <span className="text-sm text-muted-foreground">{q.label}</span>
-              </div>
-            ))}
-          </div>
         </DialogContent>
       </Dialog>
     </ScrollArea>
