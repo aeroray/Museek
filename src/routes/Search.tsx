@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { TrackRow } from "@/components/common/TrackRow"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
+import { HotSearchCloud } from "@/components/search/HotSearchCloud"
 import { playPlaylist } from "@/lib/playlists/play"
 import { useSearchStore } from "@/stores/searchStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
@@ -24,7 +25,7 @@ export function Search() {
   const [expanded, setExpanded] = useState(false)
   const {
     results, playlistResults, isLoading, error, page, allPage, search, searchHistory,
-    platform, setPlatform, scope, setScope, searchOnPlatform, removeHistoryItem, clearHistory,
+    platform, setPlatform, scope, setScope, searchOnPlatform, removeHistoryItem, clearHistory, clearResults,
   } = useSearchStore()
   const navSearch = (useLocation().state as { searchSong?: { platform: Source; query: string } } | null)?.searchSong
   const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
@@ -81,13 +82,22 @@ export function Search() {
   const HISTORY_COLLAPSED = 15
   const shownHistory = expanded ? searchHistory : searchHistory.slice(0, HISTORY_COLLAPSED)
 
+  // Landing state (nothing typed) → show the hot-search word cloud in the middle
+  // instead of the empty placeholder. Hides as soon as the user types.
+  const nothingSearched = !inputValue.trim()
+  const showHotCloud =
+    nothingSearched &&
+    !isLoading &&
+    !error &&
+    (scope === "song" ? results.length === 0 : playlistResults.length === 0)
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border">
         <div className="relative">
           <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
           <Input
-            className="pl-9"
+            className="pl-9 pr-9"
             placeholder={t(scope === "song" ? "search.placeholder" : "search.placeholderPlaylist")}
             value={inputValue}
             onChange={(e) => handleChange(e.target.value)}
@@ -106,6 +116,21 @@ export function Search() {
               }
             }}
           />
+          {inputValue && (
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                setInputValue("")
+                clearResults()
+                setFocused(false)
+              }}
+              title={t("search.clear")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X size={15} />
+            </button>
+          )}
 
           {focused && searchHistory.length > 0 && (
             <div className="absolute z-20 left-0 right-0 mt-1.5 rounded-xl border border-border bg-popover shadow-lg p-2.5">
@@ -180,7 +205,17 @@ export function Search() {
         </div>
       </div>
 
-      {scope === "playlist" ? (
+      {showHotCloud ? (
+        <HotSearchCloud
+          platform={platform}
+          platformLabel={t(`platform.${platform}`)}
+          onSelect={(kw) => {
+            setInputValue(kw)
+            setFocused(false)
+            runSearch(kw)
+          }}
+        />
+      ) : scope === "playlist" ? (
         playlistResults.length === 0 && !isLoading && !error ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
             <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">

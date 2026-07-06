@@ -121,7 +121,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   },
 
   clearResults() {
-    set({ results: [], total: 0, page: 1, allPage: 1, query: "" })
+    set({ results: [], playlistResults: [], total: 0, page: 1, allPage: 1, query: "", error: null })
   },
 
   addToHistory(query) {
