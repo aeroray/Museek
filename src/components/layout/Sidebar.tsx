@@ -35,8 +35,12 @@ export function Sidebar() {
         collapsed ? "w-16" : "w-52"
       )}
     >
-      {/* Header: logo + brand. The collapse/expand toggle lives in the TopBar. */}
-      <div className={cn("p-3 flex items-center gap-2.5", collapsed && "justify-center")}>
+      {/* Header: logo + brand — also a window drag handle (frameless window). The
+          children are pointer-events-none so the whole strip drags. */}
+      <div
+        data-tauri-drag-region
+        className={cn("p-3 flex items-center gap-2.5 [&>*]:pointer-events-none", collapsed && "justify-center")}
+      >
         <div className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-sm">
           <AudioLines size={20} />
         </div>
