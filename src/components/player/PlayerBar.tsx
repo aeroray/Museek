@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 import type { Source } from "@/types/music"
 
 export function PlayerBar() {
-  const { currentSong, currentQuality, currentPicUrl, showQueue, showLyrics, setShowQueue, setShowLyrics } =
+  const { currentSong, currentQuality, currentPicUrl, queue, showQueue, showLyrics, setShowQueue, setShowLyrics } =
     usePlayerStore()
   const t = useT()
   const navigate = useNavigate()
@@ -114,6 +114,7 @@ export function PlayerBar() {
             size="icon"
             className={cn("h-8 w-8 shrink-0", showQueue && "text-primary")}
             onClick={() => setShowQueue(!showQueue)}
+            disabled={queue.length === 0}
             title={t("player.queue")}
           >
             <ListMusic size={16} />
