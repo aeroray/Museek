@@ -1,0 +1,39 @@
+# mise — https://mise.jdx.dev
+# Pins the JS toolchain (matches CI: Node 22, pnpm 9) and provides task
+# shortcuts. First time: `mise trust && mise install`, then run tasks with
+# `mise run <task>` (e.g. `mise run dev`). `mise tasks` lists them.
+#
+# Rust is intentionally NOT managed here — Tauri relies on a rustup toolchain
+# (with platform targets like aarch64-apple-darwin), so keep using rustup for it.
+
+[tools]
+node = "22"
+pnpm = "9"
+
+[tasks.install]
+description = "Install frontend dependencies"
+run = "pnpm install"
+
+[tasks.dev]
+description = "Start the Vite dev server"
+run = "pnpm dev"
+
+[tasks.build]
+description = "Type-check and build the web assets"
+run = "pnpm build"
+
+[tasks.check]
+description = "Type-check only (no emit)"
+run = "pnpm exec tsc --noEmit"
+
+[tasks.preview]
+description = "Preview the production web build"
+run = "pnpm preview"
+
+[tasks.tauri-dev]
+description = "Run the desktop app in dev mode"
+run = "pnpm tauri dev"
+
+[tasks.tauri-build]
+description = "Build the desktop app installers"
+run = "pnpm tauri build"
