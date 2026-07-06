@@ -67,6 +67,14 @@ class AudioPlayer {
     this.audio.pause()
   }
 
+  // Fully stop: pause, drop the source, and reset the element to an idle state.
+  // Used when the queue finishes so nothing is left loaded/paused.
+  stop() {
+    this.audio.pause()
+    this.audio.removeAttribute("src")
+    this.audio.load()
+  }
+
   seek(time: number) {
     if (isFinite(this.audio.duration)) {
       this.audio.currentTime = Math.max(0, Math.min(time, this.audio.duration))

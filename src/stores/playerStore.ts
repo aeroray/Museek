@@ -334,7 +334,38 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       }
       // Sequential mode stops at the end of the queue; list-loop wraps; shuffle
       // keeps picking. (next() itself wraps, so guard the end here.)
-      if (playMode === "sequence" && queueIndex >= queue.length - 1) return
+      if (playMode === "sequence" && queueIndex >= queue.length - 1) {
+        // Reached the end → clear the now-playing state so the player returns to
+        // idle instead of leaving the finished song sitting there looking paused.
+        const finished = get().currentSong
+        audioPlayer.stop()
+        if (currentObjectUrl) {
+          URL.revokeObjectURL(currentObjectUrl)
+          currentObjectUrl = null
+        }
+        lastMediaPlaying = false
+        if (finished) {
+          updateMediaControls(
+            finished.name,
+            finished.singer,
+            finished.albumName ?? "",
+            get().currentPicUrl ?? finished.meta.picUrl ?? null,
+            false,
+          )
+        }
+        set({
+          currentSong: null,
+          queueIndex: -1,
+          isPlaying: false,
+          status: "idle",
+          currentTime: 0,
+          duration: 0,
+          lyricLines: [],
+          currentLyricIndex: -1,
+          currentPicUrl: null,
+        })
+        return
+      }
       get().next()
     },
 
