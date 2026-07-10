@@ -1,4 +1,4 @@
-import { Music, ListMusic, MicVocal, Search } from "lucide-react"
+import { Music, ListMusic, MicVocal, Search, Maximize2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Controls } from "./Controls"
 import { ProgressSlider } from "./ProgressSlider"
@@ -40,13 +40,23 @@ export function PlayerBar() {
       <div className="flex items-center px-4 pb-3 gap-4">
         {/* Left: Song info */}
         <div className="flex items-center gap-4 w-72 shrink-0">
-          <div className="h-12 w-12 rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
-            {currentPicUrl ? (
+          {currentPicUrl ? (
+            <button
+              type="button"
+              onClick={() => setShowLyrics(true)}
+              title={t("player.lyrics")}
+              className="group relative h-12 w-12 rounded-md overflow-hidden shrink-0"
+            >
               <img src={currentPicUrl} alt="album art" className="h-full w-full object-cover" />
-            ) : (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
+                <Maximize2 size={16} className="text-white" />
+              </span>
+            </button>
+          ) : (
+            <div className="h-12 w-12 rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
               <Music size={20} className="text-muted-foreground" />
-            )}
-          </div>
+            </div>
+          )}
           {currentSong ? (
             <div className="min-w-0 space-y-1.5">
               <div className="flex items-center gap-2.5 min-w-0">
