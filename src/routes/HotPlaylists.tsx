@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { ListMusic, Play, ChevronLeft, RotateCw, Heart } from "lucide-react"
+import { ListMusic, Play, ChevronLeft, RotateCw, Heart, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TrackRow } from "@/components/common/TrackRow"
@@ -43,12 +44,14 @@ export function HotPlaylists() {
   const [detailLoading, setDetailLoading] = useState(!!openFromNav)
   const [detailError, setDetailError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [filter, setFilter] = useState("")
 
   // Reset scroll to the top when drilling into a playlist or going back, so the
   // new view doesn't inherit the previous list's scroll offset.
   useEffect(() => {
     const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
     if (vp) vp.scrollTop = 0
+    setFilter("")
   }, [selected])
 
   // Load the platform's hot playlists. Extracted so the retry button can re-run it.
@@ -104,6 +107,12 @@ export function HotPlaylists() {
     if (playlistFav) removeFavoritePlaylist(selected.source, selected.id)
     else addFavoritePlaylist(selected)
   }
+
+  // Filter the opened playlist's tracks (keeping each track's original rank).
+  const q = filter.trim().toLowerCase()
+  const shownSongs = songs
+    .map((song, i) => ({ song, rank: i + 1 }))
+    .filter(({ song }) => !q || `${song.name} ${song.singer}`.toLowerCase().includes(q))
 
   return (
     <div className="flex flex-col h-full">
@@ -162,6 +171,27 @@ export function HotPlaylists() {
         </div>
 
         {!selected && <PlatformTabs value={source} onChange={setSource} />}
+
+        {selected && !detailLoading && !detailError && songs.length > 0 && (
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9 pr-9 h-9"
+              placeholder={t("hotPlaylists.searchInList")}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+            {filter && (
+              <button
+                onClick={() => setFilter("")}
+                title={t("search.clear")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <ScrollArea ref={scrollRef} className="flex-1">
@@ -192,9 +222,13 @@ export function HotPlaylists() {
             <div className="text-center py-16 text-muted-foreground">{t("library.empty")}</div>
           ) : (
             <div className="px-2 py-2">
-              {songs.map((song, i) => (
-                <TrackRow key={song.id} song={song} rank={i + 1} fallbackImg={selected?.img} />
-              ))}
+              {shownSongs.length === 0 ? (
+                <div className="text-center py-16 text-sm text-muted-foreground">{t("hotPlaylists.noMatch")}</div>
+              ) : (
+                shownSongs.map(({ song, rank }) => (
+                  <TrackRow key={song.id} song={song} rank={rank} fallbackImg={selected?.img} />
+                ))
+              )}
             </div>
           )
         ) : // --- Hot-playlist grid ---
