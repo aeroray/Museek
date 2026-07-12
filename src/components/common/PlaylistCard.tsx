@@ -1,4 +1,5 @@
 import { Play, Music, X, Heart, User, Headphones, Check } from "lucide-react"
+import { CoverImage } from "@/components/common/CoverImage"
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
 import type { Playlist } from "@/lib/playlists"
@@ -65,12 +66,9 @@ export function PlaylistCard({
           )}
         >
           {playlist.img ? (
-            <img
-              src={playlist.img}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
+            <div className="h-full w-full transition-transform duration-300 group-hover:scale-105">
+              <CoverImage src={playlist.img} />
+            </div>
           ) : (
             <div className="h-full w-full flex items-center justify-center text-muted-foreground">
               <Music size={28} />

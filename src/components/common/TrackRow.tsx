@@ -1,5 +1,6 @@
 import { Play, Plus, Heart, Download, Music } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { CoverImage } from "@/components/common/CoverImage"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,7 +51,7 @@ export function TrackRow({
 
       <div className="relative h-10 w-10 shrink-0 rounded overflow-hidden bg-muted">
         {thumb ? (
-          <img src={thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <CoverImage src={thumb} />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground">
             <Music size={16} />
