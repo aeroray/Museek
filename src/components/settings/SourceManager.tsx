@@ -6,7 +6,6 @@ import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useSourceStore } from "@/stores/sourceStore"
 import { useUiStore } from "@/stores/uiStore"
-import { SettingHeader } from "@/components/settings/SettingHeader"
 import { useDragSort } from "@/hooks/useDragSort"
 import { useFlip } from "@/hooks/useFlip"
 import { useT } from "@/lib/i18n"
@@ -77,13 +76,16 @@ export function SourceManager() {
   return (
     <div className="flex flex-col h-full space-y-4">
       <div className="space-y-3 shrink-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <SettingHeader title={t("sources.title")} desc={t("sources.hint")} />
-          {scripts.length > 0 && (
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {t("sources.count", { total: scripts.length, enabled: enabledCount })}
-            </span>
-          )}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-base font-medium">{t("sources.title")}</h3>
+            {scripts.length > 0 && (
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {t("sources.count", { total: scripts.length, enabled: enabledCount })}
+              </span>
+            )}
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-line">{t("sources.hint")}</p>
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
