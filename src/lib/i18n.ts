@@ -296,14 +296,17 @@ const dict: Record<Lang, Record<string, string>> = {
     // Source manager
     "sources.title": "音源管理",
     "sources.hint":
-      "粘贴 lx-music 兼容音源的链接导入（.js）。\n开启多个音源后，播放时按列表顺序（从上到下）依次自动重试，直到某个成功。",
+      "开启多个音源后，播放时按列表顺序（从上到下）依次自动重试，直到某个成功。",
     "sources.urlPlaceholder":
       "粘贴音源链接（.js），每行一个，可一次导入多个：\n例：https://ghproxy.net/raw.githubusercontent.com/.../latest.js",
     "sources.paste": "从剪贴板粘贴",
     "sources.import": "导入",
+    "sources.getSources": "获取音源",
     "sources.importOk": "成功导入 {count} 个音源",
     "sources.importPartial": "成功 {ok} 个，失败 {fail} 个",
     "sources.empty": "未导入音源",
+    "sources.gzhTitle": "关注公众号，获取全部音源",
+    "sources.gzhHint": "扫码关注公众号后，发送「音源」即可获得全部音源链接，复制后粘贴到上方输入框导入。",
     "sources.emptyHint": "导入后，Museek 将通过音源脚本获取播放链接",
     "sources.author": "作者：{name}",
     "sources.platforms": "平台：{list}",
@@ -612,14 +615,17 @@ const dict: Record<Lang, Record<string, string>> = {
     // Source manager
     "sources.title": "Source management",
     "sources.hint":
-      "Paste the link to an lx-music compatible source (.js) to import it.\nWith several sources enabled, playback retries them in list order (top to bottom) until one succeeds.",
+      "With several sources enabled, playback retries them in list order (top to bottom) until one succeeds.",
     "sources.urlPlaceholder":
       "Paste source links (.js), one per line — import several at once:\ne.g. https://ghproxy.net/raw.githubusercontent.com/.../latest.js",
     "sources.paste": "Paste from clipboard",
     "sources.import": "Import",
+    "sources.getSources": "Get sources",
     "sources.importOk": "Imported {count} source(s)",
     "sources.importPartial": "{ok} imported, {fail} failed",
     "sources.empty": "No sources imported",
+    "sources.gzhTitle": "Follow our WeChat account for all sources",
+    "sources.gzhHint": "Scan to follow, then send the keyword 音源 to get every source link — copy and paste them above to import.",
     "sources.emptyHint":
       "Once imported, Museek uses the source script to fetch playback links",
     "sources.author": "Author: {name}",

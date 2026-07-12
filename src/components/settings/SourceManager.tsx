@@ -1,15 +1,35 @@
 import { useState, useRef } from "react"
-import { Upload, Trash2, AlertCircle, Loader2, ClipboardPaste, GripVertical, X } from "lucide-react"
+import { Upload, Trash2, AlertCircle, Loader2, ClipboardPaste, GripVertical, X, QrCode } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useSourceStore } from "@/stores/sourceStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useDragSort } from "@/hooks/useDragSort"
 import { useFlip } from "@/hooks/useFlip"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+
+// The "follow our WeChat account for sources" guide — shown in the empty state
+// and in the "get sources" dialog (identical content in both).
+function GzhGuide() {
+  const t = useT()
+  return (
+    <div className="flex flex-col items-center gap-4 text-center">
+      <img
+        src="/gzh/qrcode.webp"
+        alt={t("sources.gzhTitle")}
+        className="h-44 w-44 rounded-xl bg-white object-contain"
+      />
+      <div className="space-y-1.5">
+        <p className="text-sm font-semibold">{t("sources.gzhTitle")}</p>
+        <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">{t("sources.gzhHint")}</p>
+      </div>
+    </div>
+  )
+}
 
 export function SourceManager() {
   const { scripts, isLoading, error, importScriptFromUrl, removeScript, toggleEnabled, reorderScripts, clearError } =
@@ -18,6 +38,7 @@ export function SourceManager() {
   const enabledCount = scripts.filter((s) => s.enabled).length
   const [url, setUrl] = useState("")
   const [importing, setImporting] = useState(false)
+  const [getOpen, setGetOpen] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const drag = useDragSort(reorderScripts)
   const flipRef = useFlip(scripts.map((s) => s.id).join(","))
@@ -108,10 +129,16 @@ export function SourceManager() {
               <ClipboardPaste size={14} />
             </Button>
           </div>
-          <Button onClick={handleImport} disabled={importing || !url.trim()} className="h-20 shrink-0">
-            {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
-            {t("sources.import")}
-          </Button>
+          <div className="flex w-32 shrink-0 flex-col gap-2">
+            <Button variant="outline" onClick={() => setGetOpen(true)} className="h-9">
+              <QrCode size={16} className="mr-2" />
+              {t("sources.getSources")}
+            </Button>
+            <Button onClick={handleImport} disabled={importing || !url.trim()} className="h-9">
+              {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
+              {t("sources.import")}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -130,9 +157,8 @@ export function SourceManager() {
       )}
 
       {scripts.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <p>{t("sources.empty")}</p>
-          <p className="text-sm mt-1">{t("sources.emptyHint")}</p>
+        <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
+          <GzhGuide />
         </div>
       ) : (
         <ScrollArea className="flex-1 min-h-0">
@@ -194,6 +220,15 @@ export function SourceManager() {
           </div>
         </ScrollArea>
       )}
+
+      <Dialog open={getOpen} onOpenChange={setGetOpen}>
+        <DialogContent>
+          <DialogTitle className="sr-only">{t("sources.gzhTitle")}</DialogTitle>
+          <div className="py-2">
+            <GzhGuide />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
