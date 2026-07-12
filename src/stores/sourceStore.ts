@@ -18,6 +18,7 @@ interface SourceState {
   reorderScripts: (from: number, to: number) => void
   setScriptSources: (id: string, sources: unknown) => void
   loadFromDisk: () => Promise<void>
+  clearError: () => void
 }
 
 function generateId(): string {
@@ -28,6 +29,8 @@ export const useSourceStore = create<SourceState>((set, get) => ({
   scripts: [],
   isLoading: false,
   error: null,
+
+  clearError: () => set({ error: null }),
 
   async importScript(rawScript, url) {
     const meta = parseScriptMeta(rawScript)

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react"
-import { Upload, Trash2, AlertCircle, Loader2, ClipboardPaste, GripVertical } from "lucide-react"
+import { Upload, Trash2, AlertCircle, Loader2, ClipboardPaste, GripVertical, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
@@ -13,7 +13,7 @@ import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export function SourceManager() {
-  const { scripts, isLoading, error, importScriptFromUrl, removeScript, toggleEnabled, reorderScripts } =
+  const { scripts, isLoading, error, importScriptFromUrl, removeScript, toggleEnabled, reorderScripts, clearError } =
     useSourceStore()
   const t = useT()
   const enabledCount = scripts.filter((s) => s.enabled).length
@@ -85,7 +85,7 @@ export function SourceManager() {
             </span>
           )}
         </div>
-        <div className="flex items-stretch gap-2">
+        <div className="flex gap-2">
           <div className="relative flex-1">
             <textarea
               ref={inputRef}
@@ -93,8 +93,7 @@ export function SourceManager() {
               onChange={(e) => setUrl(e.target.value)}
               placeholder={t("sources.urlPlaceholder")}
               disabled={importing}
-              rows={3}
-              className="w-full min-h-[4.5rem] resize-none rounded-md border border-input bg-transparent px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-20 w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
             <Button
               variant="outline"
@@ -107,7 +106,7 @@ export function SourceManager() {
               <ClipboardPaste size={14} />
             </Button>
           </div>
-          <Button onClick={handleImport} disabled={importing || !url.trim()} className="h-auto shrink-0">
+          <Button onClick={handleImport} disabled={importing || !url.trim()} className="h-20 shrink-0">
             {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
             {t("sources.import")}
           </Button>
@@ -115,9 +114,16 @@ export function SourceManager() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-md p-3 shrink-0">
-          <AlertCircle size={16} />
-          {error}
+        <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-md p-3 shrink-0">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span className="flex-1 min-w-0 break-words">{error}</span>
+          <button
+            onClick={clearError}
+            title={t("window.close")}
+            className="shrink-0 text-destructive/70 hover:text-destructive transition-colors"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
