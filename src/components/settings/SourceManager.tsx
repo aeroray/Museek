@@ -85,8 +85,8 @@ export function SourceManager() {
             </span>
           )}
         </div>
-        <div className="space-y-2">
-          <div className="relative">
+        <div className="flex items-stretch gap-2">
+          <div className="relative flex-1">
             <textarea
               ref={inputRef}
               value={url}
@@ -94,7 +94,7 @@ export function SourceManager() {
               placeholder={t("sources.urlPlaceholder")}
               disabled={importing}
               rows={3}
-              className="w-full min-h-[4.5rem] resize-y rounded-md border border-input bg-transparent px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full min-h-[4.5rem] resize-none rounded-md border border-input bg-transparent px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
             <Button
               variant="outline"
@@ -107,12 +107,10 @@ export function SourceManager() {
               <ClipboardPaste size={14} />
             </Button>
           </div>
-          <div className="flex justify-end">
-            <Button onClick={handleImport} disabled={importing || !url.trim()}>
-              {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
-              {t("sources.import")}
-            </Button>
-          </div>
+          <Button onClick={handleImport} disabled={importing || !url.trim()} className="h-auto shrink-0">
+            {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
+            {t("sources.import")}
+          </Button>
         </div>
       </div>
 
