@@ -1,11 +1,11 @@
 import { useState, useRef } from "react"
 import { Upload, Trash2, AlertCircle, Loader2, ClipboardPaste, GripVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useSourceStore } from "@/stores/sourceStore"
+import { useUiStore } from "@/stores/uiStore"
 import { SettingHeader } from "@/components/settings/SettingHeader"
 import { useDragSort } from "@/hooks/useDragSort"
 import { useFlip } from "@/hooks/useFlip"
@@ -19,21 +19,36 @@ export function SourceManager() {
   const enabledCount = scripts.filter((s) => s.enabled).length
   const [url, setUrl] = useState("")
   const [importing, setImporting] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const drag = useDragSort(reorderScripts)
   const flipRef = useFlip(scripts.map((s) => s.id).join(","))
 
   async function handleImport() {
-    const trimmed = url.trim()
-    if (!trimmed) return
+    // Multiple links may be pasted — one per line. Import each; keep the lines
+    // that failed in the box so the user can fix / retry just those.
+    const urls = url
+      .split(/\r?\n/)
+      .map((u) => u.trim())
+      .filter(Boolean)
+    if (!urls.length) return
     setImporting(true)
-    try {
-      await importScriptFromUrl(trimmed)
-      setUrl("")
-    } catch {
-      // failure is surfaced once via the store's `error` state
-    } finally {
-      setImporting(false)
+    const failed: string[] = []
+    for (const u of urls) {
+      try {
+        await importScriptFromUrl(u)
+      } catch {
+        failed.push(u)
+      }
+    }
+    setImporting(false)
+    setUrl(failed.join("\n"))
+    const ok = urls.length - failed.length
+    if (failed.length === 0) {
+      useUiStore.getState().notify({ message: t("sources.importOk", { count: ok }), variant: "success" })
+    } else {
+      useUiStore
+        .getState()
+        .notify({ message: t("sources.importPartial", { ok, fail: failed.length }), variant: ok ? "info" : "error" })
     }
   }
 
@@ -70,23 +85,21 @@ export function SourceManager() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Input
+        <div className="space-y-2">
+          <div className="relative">
+            <textarea
               ref={inputRef}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleImport()
-              }}
               placeholder={t("sources.urlPlaceholder")}
               disabled={importing}
-              className="pr-9"
+              rows={3}
+              className="w-full min-h-[4.5rem] resize-y rounded-md border border-input bg-transparent px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
             <Button
               variant="outline"
               size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+              className="absolute right-2 top-2 h-7 w-7 text-muted-foreground"
               onClick={handlePaste}
               disabled={importing}
               title={t("sources.paste")}
@@ -94,10 +107,12 @@ export function SourceManager() {
               <ClipboardPaste size={14} />
             </Button>
           </div>
-          <Button onClick={handleImport} disabled={importing || !url.trim()}>
-            {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
-            {t("sources.import")}
-          </Button>
+          <div className="flex justify-end">
+            <Button onClick={handleImport} disabled={importing || !url.trim()}>
+              {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
+              {t("sources.import")}
+            </Button>
+          </div>
         </div>
       </div>
 

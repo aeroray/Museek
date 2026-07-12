@@ -298,9 +298,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.hint":
       "粘贴 lx-music 兼容音源的链接导入（.js）。\n开启多个音源后，播放时按列表顺序（从上到下）依次自动重试，直到某个成功。",
     "sources.urlPlaceholder":
-      "例：https://ghproxy.net/raw.githubusercontent.com/.../latest.js",
+      "粘贴音源链接（.js），每行一个，可一次导入多个：\n例：https://ghproxy.net/raw.githubusercontent.com/.../latest.js",
     "sources.paste": "从剪贴板粘贴",
     "sources.import": "导入",
+    "sources.importOk": "成功导入 {count} 个音源",
+    "sources.importPartial": "成功 {ok} 个，失败 {fail} 个",
     "sources.empty": "未导入音源",
     "sources.emptyHint": "导入后，Museek 将通过音源脚本获取播放链接",
     "sources.author": "作者：{name}",
@@ -612,9 +614,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.hint":
       "Paste the link to an lx-music compatible source (.js) to import it.\nWith several sources enabled, playback retries them in list order (top to bottom) until one succeeds.",
     "sources.urlPlaceholder":
-      "e.g. https://ghproxy.net/raw.githubusercontent.com/.../latest.js",
+      "Paste source links (.js), one per line — import several at once:\ne.g. https://ghproxy.net/raw.githubusercontent.com/.../latest.js",
     "sources.paste": "Paste from clipboard",
     "sources.import": "Import",
+    "sources.importOk": "Imported {count} source(s)",
+    "sources.importPartial": "{ok} imported, {fail} failed",
     "sources.empty": "No sources imported",
     "sources.emptyHint":
       "Once imported, Museek uses the source script to fetch playback links",
