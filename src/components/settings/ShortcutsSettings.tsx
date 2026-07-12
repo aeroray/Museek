@@ -15,7 +15,7 @@ export function ShortcutsSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="max-w-2xl space-y-3 pr-3 pb-4">
+      <div className="space-y-3 pr-3 pb-4">
         <p className="text-sm text-muted-foreground">{t("shortcuts.desc")}</p>
         <SettingsCard>
           {rows.map((r) => (

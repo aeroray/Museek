@@ -75,7 +75,7 @@ export function SourceManager() {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-2xl space-y-4">
+    <div className="flex flex-col h-full space-y-4">
       <div className="space-y-3 shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
           <SettingHeader title={t("sources.title")} desc={t("sources.hint")} />

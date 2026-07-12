@@ -25,7 +25,7 @@ export function ThemeSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="max-w-2xl pr-3 pb-4">
+      <div className="pr-3 pb-4">
         <SettingsCard>
           <SettingRow title={t("theme.modeTitle")} desc={t("theme.modeDesc")}>
             <div className="flex gap-2">

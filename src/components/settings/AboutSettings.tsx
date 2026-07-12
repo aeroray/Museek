@@ -65,7 +65,7 @@ export function AboutSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="max-w-2xl pr-3 pb-4">
+      <div className="pr-3 pb-4">
         <SettingsCard>
           <div className="flex items-start justify-between gap-4 p-4">
             <div className="space-y-1.5 text-sm">

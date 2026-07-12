@@ -37,7 +37,7 @@ export function DownloadSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="max-w-2xl pr-3 pb-4">
+      <div className="pr-3 pb-4">
         <SettingsCard>
           <SettingRow title={t("playback.downloadQualityTitle")} desc={t("playback.downloadQualityDesc")}>
             <div className="flex flex-wrap gap-2">
