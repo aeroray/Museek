@@ -29,47 +29,47 @@ export function Settings() {
         <h2 className="text-lg font-semibold">{t("settings.title")}</h2>
       </div>
       <div className="flex-1 min-h-0 p-4">
-        <Tabs value={tab} onValueChange={setTab} className="flex flex-col h-full">
-          <TabsList className="shrink-0 self-start">
-            <TabsTrigger value="sources">{t("settings.tab.sources")}</TabsTrigger>
-            <TabsTrigger value="playback">{t("settings.tab.playback")}</TabsTrigger>
-            <TabsTrigger value="download">{t("settings.tab.download")}</TabsTrigger>
-            <TabsTrigger value="cache">{t("settings.tab.cache")}</TabsTrigger>
-            <TabsTrigger value="shortcuts">{t("settings.tab.shortcuts")}</TabsTrigger>
-            <TabsTrigger value="appearance">{t("settings.tab.appearance")}</TabsTrigger>
-            <TabsTrigger value="data">{t("settings.tab.data")}</TabsTrigger>
-            <TabsTrigger value="about">{t("settings.tab.about")}</TabsTrigger>
+        <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="flex gap-4 h-full">
+          <TabsList className="flex-col h-auto w-36 shrink-0 items-stretch justify-start gap-0.5 bg-muted/60 p-1.5">
+            <TabsTrigger value="sources" className="w-full justify-start">{t("settings.tab.sources")}</TabsTrigger>
+            <TabsTrigger value="playback" className="w-full justify-start">{t("settings.tab.playback")}</TabsTrigger>
+            <TabsTrigger value="download" className="w-full justify-start">{t("settings.tab.download")}</TabsTrigger>
+            <TabsTrigger value="cache" className="w-full justify-start">{t("settings.tab.cache")}</TabsTrigger>
+            <TabsTrigger value="shortcuts" className="w-full justify-start">{t("settings.tab.shortcuts")}</TabsTrigger>
+            <TabsTrigger value="appearance" className="w-full justify-start">{t("settings.tab.appearance")}</TabsTrigger>
+            <TabsTrigger value="data" className="w-full justify-start">{t("settings.tab.data")}</TabsTrigger>
+            <TabsTrigger value="about" className="w-full justify-start">{t("settings.tab.about")}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="sources" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="sources" className="mt-0 flex-1 min-h-0">
             <SourceManager />
           </TabsContent>
 
-          <TabsContent value="playback" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="playback" className="mt-0 flex-1 min-h-0">
             <PlaybackSettings />
           </TabsContent>
 
-          <TabsContent value="download" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="download" className="mt-0 flex-1 min-h-0">
             <DownloadSettings />
           </TabsContent>
 
-          <TabsContent value="cache" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="cache" className="mt-0 flex-1 min-h-0">
             <CacheSettings />
           </TabsContent>
 
-          <TabsContent value="shortcuts" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="shortcuts" className="mt-0 flex-1 min-h-0">
             <ShortcutsSettings />
           </TabsContent>
 
-          <TabsContent value="appearance" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="appearance" className="mt-0 flex-1 min-h-0">
             <ThemeSettings />
           </TabsContent>
 
-          <TabsContent value="data" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="data" className="mt-0 flex-1 min-h-0">
             <DataSettings />
           </TabsContent>
 
-          <TabsContent value="about" className="mt-4 flex-1 min-h-0">
+          <TabsContent value="about" className="mt-0 flex-1 min-h-0">
             <AboutSettings />
           </TabsContent>
         </Tabs>
