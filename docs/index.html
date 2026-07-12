@@ -12,18 +12,31 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%23000'/%3E%3Cg fill='%23fff'%3E%3Crect x='16' y='45.5' width='7' height='9' rx='3.5'/%3E%3Crect x='28' y='33' width='7' height='34' rx='3.5'/%3E%3Crect x='40' y='22' width='7' height='56' rx='3.5'/%3E%3Crect x='52' y='39' width='7' height='22' rx='3.5'/%3E%3Crect x='64' y='30' width='7' height='40' rx='3.5'/%3E%3Crect x='76' y='45.5' width='7' height='9' rx='3.5'/%3E%3C/g%3E%3C/svg%3E"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Righteous&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        --bg: #07070a;
-        --bg-soft: #0e0e12;
-        --bg-card: rgba(255, 255, 255, 0.04);
-        --border: rgba(255, 255, 255, 0.1);
-        --fg: #f5f5f7;
-        --muted: #a1a1aa;
-        --muted-2: #6b6b75;
-        --accent: #34d399;
-        --accent-2: #22d3ee;
-        --accent-grad: linear-gradient(120deg, #34d399 0%, #22d3ee 100%);
+        --bg: #07070f;
+        --bg-soft: #0b0b17;
+        --bg-card: rgba(255, 255, 255, 0.035);
+        --border: rgba(255, 255, 255, 0.09);
+        --fg: #f4f4f8;
+        --muted: #a6a6bb;
+        --muted-2: #6a6a80;
+
+        /* Spotify-style "play" green — the brand action color */
+        --green: #1fdd7a;
+        --green-2: #12c268;
+        --accent: var(--green);
+        --accent-grad: linear-gradient(118deg, #2bed8b 0%, #12d0a0 100%);
+        /* Night atmosphere — violet/indigo aurora */
+        --violet: #8b5cff;
+        --indigo: #5468ff;
+
         --radius: 22px;
         --ease: cubic-bezier(0.16, 1, 0.3, 1);
         --wy: #e60026;
@@ -31,6 +44,9 @@
         --kg: #2d9cdb;
         --tx: #2bc275;
         --mg: #e54ba0;
+
+        --display: "Righteous", "PingFang SC", "Microsoft YaHei", system-ui,
+          sans-serif;
       }
 
       * {
@@ -46,11 +62,12 @@
 
       body {
         font-family:
-          -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-          "PingFang SC", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+          "Poppins", -apple-system, BlinkMacSystemFont, "PingFang SC",
+          "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
         background: var(--bg);
         color: var(--fg);
-        line-height: 1.5;
+        line-height: 1.55;
+        font-weight: 400;
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
         overflow-x: hidden;
@@ -68,17 +85,74 @@
         padding: 0 24px;
       }
 
+      /* ---------- Animated equalizer (signature motif) ---------- */
+      .eq rect {
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .eq.live rect {
+        animation: eqbar 1.05s var(--ease) infinite;
+      }
+      .eq.live rect:nth-of-type(1) {
+        animation-delay: -0.9s;
+      }
+      .eq.live rect:nth-of-type(2) {
+        animation-delay: -0.2s;
+      }
+      .eq.live rect:nth-of-type(3) {
+        animation-delay: -0.55s;
+      }
+      .eq.live rect:nth-of-type(4) {
+        animation-delay: -0.75s;
+      }
+      .eq.live rect:nth-of-type(5) {
+        animation-delay: -0.35s;
+      }
+      .eq.live rect:nth-of-type(6) {
+        animation-delay: -0.65s;
+      }
+      .brand:hover .eq rect {
+        animation: eqbar 1.05s var(--ease) infinite;
+      }
+      .brand:hover .eq rect:nth-of-type(1) {
+        animation-delay: -0.9s;
+      }
+      .brand:hover .eq rect:nth-of-type(2) {
+        animation-delay: -0.2s;
+      }
+      .brand:hover .eq rect:nth-of-type(3) {
+        animation-delay: -0.55s;
+      }
+      .brand:hover .eq rect:nth-of-type(4) {
+        animation-delay: -0.75s;
+      }
+      .brand:hover .eq rect:nth-of-type(5) {
+        animation-delay: -0.35s;
+      }
+      .brand:hover .eq rect:nth-of-type(6) {
+        animation-delay: -0.65s;
+      }
+      @keyframes eqbar {
+        0%,
+        100% {
+          transform: scaleY(0.32);
+        }
+        50% {
+          transform: scaleY(1);
+        }
+      }
+
       /* ---------- Nav ---------- */
       header {
         position: fixed;
         inset: 0 0 auto 0;
         z-index: 100;
-        height: 56px;
+        height: 60px;
         display: flex;
         align-items: center;
         backdrop-filter: saturate(180%) blur(20px);
         -webkit-backdrop-filter: saturate(180%) blur(20px);
-        background: rgba(7, 7, 10, 0.6);
+        background: rgba(7, 7, 15, 0.55);
         border-bottom: 1px solid transparent;
         transition:
           border-color 0.3s,
@@ -86,7 +160,7 @@
       }
       header.scrolled {
         border-bottom-color: var(--border);
-        background: rgba(7, 7, 10, 0.8);
+        background: rgba(7, 7, 15, 0.82);
       }
       .nav {
         display: flex;
@@ -97,18 +171,21 @@
       .brand {
         display: flex;
         align-items: center;
-        gap: 10px;
-        font-weight: 600;
-        letter-spacing: -0.01em;
+        gap: 11px;
+        font-family: var(--display);
+        font-size: 20px;
+        letter-spacing: 0.01em;
       }
       .brand svg {
-        width: 26px;
-        height: 26px;
+        width: 28px;
+        height: 28px;
         border-radius: 8px;
       }
       .brand .cn {
+        font-family: "Poppins", "PingFang SC", "Microsoft YaHei", sans-serif;
         color: var(--muted);
         font-weight: 500;
+        font-size: 15px;
       }
       .nav-links {
         display: flex;
@@ -118,6 +195,7 @@
       }
       .nav-links a.link {
         color: var(--muted);
+        font-weight: 500;
         transition: color 0.2s;
       }
       .nav-links a.link:hover {
@@ -148,7 +226,7 @@
         border-radius: 980px;
         padding: 9px 18px;
         font-size: 14px;
-        font-weight: 500;
+        font-weight: 600;
         transition:
           transform 0.25s var(--ease),
           box-shadow 0.25s var(--ease),
@@ -161,21 +239,20 @@
       }
       .btn-primary {
         background: var(--accent-grad);
-        color: #04130d;
-        font-weight: 600;
-        box-shadow: 0 6px 24px -8px rgba(52, 211, 153, 0.6);
+        color: #04160c;
+        box-shadow: 0 6px 26px -8px rgba(31, 221, 122, 0.65);
       }
       .btn-primary:hover {
         transform: translateY(-2px);
-        box-shadow: 0 12px 34px -8px rgba(52, 211, 153, 0.7);
+        box-shadow: 0 14px 38px -8px rgba(31, 221, 122, 0.75);
       }
       .btn-ghost {
-        background: rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.05);
         border-color: var(--border);
         color: var(--fg);
       }
       .btn-ghost:hover {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.11);
         transform: translateY(-2px);
       }
       .nav .btn {
@@ -185,27 +262,47 @@
       /* ---------- Hero ---------- */
       .hero {
         position: relative;
-        padding: 150px 0 80px;
+        padding: 158px 0 80px;
         text-align: center;
         overflow: hidden;
       }
+      /* Aurora atmosphere */
       .hero::before {
         content: "";
         position: absolute;
-        top: -10%;
+        top: -14%;
         left: 50%;
         transform: translateX(-50%);
-        width: 1100px;
-        height: 760px;
-        background: radial-gradient(
-          ellipse at center,
-          rgba(52, 211, 153, 0.22) 0%,
-          rgba(34, 211, 238, 0.12) 32%,
-          transparent 68%
-        );
-        filter: blur(20px);
+        width: 1200px;
+        height: 820px;
+        background:
+          radial-gradient(
+            ellipse 46% 60% at 38% 32%,
+            rgba(139, 92, 255, 0.28),
+            transparent 62%
+          ),
+          radial-gradient(
+            ellipse 44% 58% at 66% 40%,
+            rgba(31, 221, 122, 0.22),
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 50% 46% at 50% 8%,
+            rgba(84, 104, 255, 0.2),
+            transparent 66%
+          );
+        filter: blur(26px);
         pointer-events: none;
         z-index: 0;
+        animation: drift 16s ease-in-out infinite alternate;
+      }
+      @keyframes drift {
+        0% {
+          transform: translateX(-50%) translateY(0) scale(1);
+        }
+        100% {
+          transform: translateX(-50%) translateY(22px) scale(1.06);
+        }
       }
       .hero .wrap {
         position: relative;
@@ -214,35 +311,47 @@
       .eyebrow {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 9px;
         font-size: 13px;
         color: var(--accent);
-        background: rgba(52, 211, 153, 0.1);
-        border: 1px solid rgba(52, 211, 153, 0.25);
-        padding: 6px 14px;
+        background: rgba(31, 221, 122, 0.09);
+        border: 1px solid rgba(31, 221, 122, 0.24);
+        padding: 6px 15px 6px 11px;
         border-radius: 980px;
-        margin-bottom: 28px;
+        margin-bottom: 30px;
         font-weight: 500;
       }
+      .eyebrow .eq {
+        width: 15px;
+        height: 13px;
+      }
+      .eyebrow .eq rect {
+        fill: var(--accent);
+      }
       .hero h1 {
-        font-size: clamp(48px, 9vw, 104px);
-        line-height: 0.98;
-        letter-spacing: -0.04em;
-        font-weight: 700;
-        margin-bottom: 22px;
+        font-family: var(--display);
+        font-size: clamp(56px, 11vw, 130px);
+        line-height: 0.96;
+        letter-spacing: 0.005em;
+        font-weight: 400;
+        margin-bottom: 20px;
       }
       .hero h1 .grad {
         background: var(--accent-grad);
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
+        filter: drop-shadow(0 0 34px rgba(31, 221, 122, 0.35));
       }
       .hero h1 .cn {
+        font-family: "Poppins", "PingFang SC", "Microsoft YaHei", sans-serif;
         font-weight: 600;
+        font-size: clamp(30px, 6vw, 66px);
         letter-spacing: -0.02em;
+        color: var(--fg);
       }
       .tagline {
-        font-size: clamp(20px, 3.2vw, 30px);
+        font-size: clamp(21px, 3.2vw, 32px);
         font-weight: 600;
         letter-spacing: -0.02em;
         margin-bottom: 16px;
@@ -250,8 +359,9 @@
       .subtitle {
         font-size: clamp(15px, 2vw, 19px);
         color: var(--muted);
-        max-width: 620px;
-        margin: 0 auto 36px;
+        font-weight: 300;
+        max-width: 640px;
+        margin: 0 auto 38px;
       }
       .cta {
         display: flex;
@@ -260,20 +370,21 @@
         flex-wrap: wrap;
       }
       .cta .btn {
-        padding: 13px 26px;
+        padding: 14px 28px;
         font-size: 16px;
       }
       .note {
-        margin-top: 18px;
+        margin-top: 20px;
         font-size: 13px;
         color: var(--muted-2);
+        font-weight: 300;
       }
 
       /* ---------- Product screenshot (hero) ---------- */
       .mock-stage {
         position: relative;
         z-index: 1;
-        margin-top: 64px;
+        margin-top: 66px;
         perspective: 1800px;
       }
       .shot {
@@ -281,10 +392,11 @@
         margin: 0 auto;
         border-radius: 16px;
         overflow: hidden;
-        background: #101014;
+        background: #0d0d18;
         border: 1px solid var(--border);
         box-shadow:
-          0 50px 120px -40px rgba(0, 0, 0, 0.9),
+          0 50px 130px -40px rgba(0, 0, 0, 0.92),
+          0 0 80px -30px rgba(139, 92, 255, 0.35),
           0 0 0 1px rgba(255, 255, 255, 0.03);
         transform: rotateX(8deg) scale(0.99);
         transform-origin: center top;
@@ -302,7 +414,7 @@
         position: relative;
       }
       .section-pad {
-        padding: clamp(80px, 12vw, 140px) 0;
+        padding: clamp(84px, 12vw, 144px) 0;
       }
       .section-head {
         text-align: center;
@@ -310,22 +422,34 @@
         margin: 0 auto 64px;
       }
       .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
         color: var(--accent);
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 600;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        margin-bottom: 14px;
+        margin-bottom: 16px;
+      }
+      .kicker::before {
+        content: "";
+        width: 18px;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--accent);
+        opacity: 0.7;
       }
       .section-head h2 {
-        font-size: clamp(32px, 5vw, 52px);
+        font-size: clamp(33px, 5vw, 54px);
         letter-spacing: -0.03em;
-        line-height: 1.05;
+        line-height: 1.06;
         font-weight: 700;
       }
       .section-head p {
         color: var(--muted);
         font-size: clamp(16px, 2vw, 19px);
+        font-weight: 300;
         margin-top: 18px;
       }
 
@@ -339,19 +463,38 @@
         gap: 18px;
       }
       .card {
+        position: relative;
         background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: var(--radius);
         padding: 30px 28px;
+        overflow: hidden;
         transition:
           transform 0.4s var(--ease),
           border-color 0.4s,
           background 0.4s;
       }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(31, 221, 122, 0.55),
+          transparent
+        );
+        opacity: 0;
+        transition: opacity 0.4s var(--ease);
+      }
       .card:hover {
         transform: translateY(-6px);
-        border-color: rgba(52, 211, 153, 0.4);
-        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(31, 221, 122, 0.4);
+        background: rgba(255, 255, 255, 0.055);
+      }
+      .card:hover::before {
+        opacity: 1;
       }
       .card .ico {
         width: 46px;
@@ -360,8 +503,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(52, 211, 153, 0.12);
-        border: 1px solid rgba(52, 211, 153, 0.2);
+        background: rgba(31, 221, 122, 0.12);
+        border: 1px solid rgba(31, 221, 122, 0.2);
         margin-bottom: 20px;
       }
       .card .ico svg {
@@ -382,7 +525,8 @@
       .card p {
         color: var(--muted);
         font-size: 15px;
-        line-height: 1.6;
+        font-weight: 300;
+        line-height: 1.65;
       }
 
       /* Showcase (alternating screenshots) */
@@ -406,12 +550,17 @@
         border-radius: 14px;
         overflow: hidden;
         border: 1px solid var(--border);
-        box-shadow: 0 36px 80px -34px rgba(0, 0, 0, 0.85);
+        box-shadow: 0 36px 90px -34px rgba(0, 0, 0, 0.85);
         line-height: 0;
-        transition: transform 0.5s var(--ease);
+        transition:
+          transform 0.5s var(--ease),
+          box-shadow 0.5s var(--ease);
       }
       .show-frame:hover {
         transform: translateY(-6px);
+        box-shadow:
+          0 44px 100px -34px rgba(0, 0, 0, 0.9),
+          0 0 60px -26px rgba(139, 92, 255, 0.4);
       }
       .show-frame img {
         width: 100%;
@@ -426,14 +575,16 @@
       }
       .show-txt h3 {
         font-size: clamp(24px, 3vw, 34px);
+        font-weight: 700;
         letter-spacing: -0.02em;
-        line-height: 1.1;
+        line-height: 1.12;
         margin-bottom: 14px;
       }
       .show-txt p {
         color: var(--muted);
         font-size: 17px;
-        line-height: 1.65;
+        font-weight: 300;
+        line-height: 1.7;
       }
 
       /* Platforms */
@@ -478,10 +629,10 @@
       }
       .plat-card:hover {
         transform: translateY(-8px);
-        background: rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.055);
       }
       .plat-card:hover::before {
-        opacity: 0.3;
+        opacity: 0.32;
       }
       .plat-orb {
         position: relative;
@@ -519,12 +670,17 @@
         content: "";
         position: absolute;
         inset: 0;
-        background: radial-gradient(
-          ellipse 900px 540px at 50% 50%,
-          rgba(52, 211, 153, 0.2),
-          rgba(34, 211, 238, 0.1) 40%,
-          transparent 72%
-        );
+        background:
+          radial-gradient(
+            ellipse 720px 460px at 38% 44%,
+            rgba(139, 92, 255, 0.22),
+            transparent 66%
+          ),
+          radial-gradient(
+            ellipse 760px 480px at 64% 56%,
+            rgba(31, 221, 122, 0.2),
+            transparent 66%
+          );
         pointer-events: none;
       }
       .download-cta .wrap {
@@ -532,27 +688,28 @@
         z-index: 1;
       }
       .dl-badge {
-        width: 78px;
-        height: 78px;
+        width: 80px;
+        height: 80px;
         border-radius: 22px;
-        margin: 0 auto 32px;
+        margin: 0 auto 30px;
         display: flex;
         align-items: center;
         justify-content: center;
         background: #000;
         box-shadow:
-          0 22px 55px -16px rgba(52, 211, 153, 0.55),
+          0 22px 60px -16px rgba(31, 221, 122, 0.55),
           0 0 0 1px var(--border);
       }
       .dl-badge svg {
-        width: 46px;
-        height: 46px;
+        width: 48px;
+        height: 48px;
       }
       .dl-title {
-        font-size: clamp(40px, 7vw, 82px);
+        font-family: var(--display);
+        font-size: clamp(44px, 7.5vw, 92px);
         line-height: 1.02;
-        letter-spacing: -0.04em;
-        font-weight: 700;
+        letter-spacing: 0.005em;
+        font-weight: 400;
         margin-bottom: 22px;
       }
       .dl-title .grad {
@@ -560,15 +717,17 @@
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
+        filter: drop-shadow(0 0 30px rgba(31, 221, 122, 0.3));
       }
       .dl-sub {
         font-size: clamp(16px, 2.2vw, 21px);
         color: var(--muted);
-        max-width: 600px;
+        font-weight: 300;
+        max-width: 610px;
         margin: 0 auto 40px;
       }
       .download-cta .cta .btn {
-        padding: 15px 30px;
+        padding: 16px 32px;
         font-size: 17px;
       }
 
@@ -605,7 +764,8 @@
       .disclaimer {
         color: var(--muted-2);
         font-size: 13px;
-        line-height: 1.7;
+        font-weight: 300;
+        line-height: 1.75;
         max-width: 760px;
         border-top: 1px solid var(--border);
         padding-top: 28px;
@@ -668,7 +828,7 @@
         <a class="brand" href="#top" aria-label="Museek">
           <svg viewBox="0 0 100 100" aria-hidden="true">
             <rect width="100" height="100" rx="26" fill="#000" />
-            <g fill="#fff">
+            <g class="eq" fill="#fff">
               <rect x="16" y="45.5" width="7" height="9" rx="3.5" />
               <rect x="28" y="33" width="7" height="34" rx="3.5" />
               <rect x="40" y="22" width="7" height="56" rx="3.5" />
@@ -711,8 +871,17 @@
     <main id="top">
       <section class="hero">
         <div class="wrap">
-          <div class="eyebrow" data-i18n="hero.eyebrow">
-            兼容 lx-music 音源 · 跨平台桌面应用
+          <div class="eyebrow">
+            <svg class="eq live" viewBox="0 0 100 80" aria-hidden="true">
+              <rect x="8" y="20" width="12" height="40" rx="6" />
+              <rect x="28" y="20" width="12" height="40" rx="6" />
+              <rect x="48" y="20" width="12" height="40" rx="6" />
+              <rect x="68" y="20" width="12" height="40" rx="6" />
+              <rect x="88" y="20" width="12" height="40" rx="6" />
+            </svg>
+            <span data-i18n="hero.eyebrow"
+              >兼容 lx-music 音源 · 跨平台桌面应用</span
+            >
           </div>
           <h1>
             <span class="grad">Museek</span> <span class="cn">· 拾音</span>
@@ -897,7 +1066,7 @@
         <div class="wrap reveal">
           <div class="dl-badge">
             <svg viewBox="0 0 100 100" aria-hidden="true">
-              <g fill="#fff">
+              <g class="eq live" fill="#fff">
                 <rect x="16" y="45.5" width="7" height="9" rx="3.5" />
                 <rect x="28" y="33" width="7" height="34" rx="3.5" />
                 <rect x="40" y="22" width="7" height="56" rx="3.5" />
@@ -965,7 +1134,7 @@
           <a class="brand" href="#top">
             <svg viewBox="0 0 100 100" aria-hidden="true">
               <rect width="100" height="100" rx="26" fill="#000" />
-              <g fill="#fff">
+              <g class="eq" fill="#fff">
                 <rect x="16" y="45.5" width="7" height="9" rx="3.5" />
                 <rect x="28" y="33" width="7" height="34" rx="3.5" />
                 <rect x="40" y="22" width="7" height="56" rx="3.5" />
