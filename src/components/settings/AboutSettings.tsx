@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { RefreshCw, Loader2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -11,22 +12,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { SettingsCard } from "@/components/settings/SettingsCard"
-import { httpFetch } from "@/lib/http"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
-
-const REPO = "aeroray/Museek"
-const RELEASES_URL = `https://github.com/${REPO}/releases/latest`
-
-// Compare dotted versions (x.y.z); true when `latest` is strictly newer.
-function isNewer(latest: string, current: string): boolean {
-  const a = latest.split(".").map((n) => parseInt(n, 10) || 0)
-  const b = current.split(".").map((n) => parseInt(n, 10) || 0)
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0)
-  }
-  return false
-}
+import {
+  checkForAppUpdate,
+  installAppUpdate,
+  RELEASES_URL,
+  type DownloadProgress,
+  type UpdateInfo,
+} from "@/lib/updater"
 
 async function openExternal(url: string): Promise<void> {
   try {
@@ -40,26 +34,40 @@ async function openExternal(url: string): Promise<void> {
 export function AboutSettings() {
   const t = useT()
   const [checking, setChecking] = useState(false)
-  const [update, setUpdate] = useState<{ version: string; url: string } | null>(null)
+  const [update, setUpdate] = useState<UpdateInfo | null>(null)
+  const [installing, setInstalling] = useState(false)
+  const [progress, setProgress] = useState<DownloadProgress | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const checkUpdate = async () => {
     setChecking(true)
+    setError(null)
     try {
-      const res = await httpFetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-        headers: { Accept: "application/vnd.github+json", "User-Agent": "Museek" },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      const tag = String(data.tag_name || "").replace(/^v/, "")
-      if (tag && isNewer(tag, __APP_VERSION__)) {
-        setUpdate({ version: tag, url: data.html_url || RELEASES_URL })
+      const info = await checkForAppUpdate()
+      if (info) {
+        setUpdate(info)
       } else {
         useUiStore.getState().notify({ message: t("about.upToDate"), variant: "success" })
       }
     } catch (e) {
-      useUiStore.getState().notify({ message: t("about.checkFailed", { msg: String(e) }), variant: "error" })
+      useUiStore.getState().notify({
+        message: t("about.checkFailed", { msg: String(e) }),
+        variant: "error",
+      })
     } finally {
       setChecking(false)
+    }
+  }
+
+  const onInstall = async () => {
+    setInstalling(true)
+    setError(null)
+    setProgress({ percent: null, downloaded: 0, total: null })
+    try {
+      await installAppUpdate(setProgress)
+    } catch (e) {
+      setError(String(e))
+      setInstalling(false)
     }
   }
 
@@ -74,7 +82,7 @@ export function AboutSettings() {
               <p className="text-muted-foreground">{t("settings.about.description")}</p>
               <p className="pt-2 text-muted-foreground">{t("app.tagline")}</p>
             </div>
-            <Button variant="outline" size="sm" onClick={checkUpdate} disabled={checking} className="shrink-0">
+            <Button variant="outline" size="sm" onClick={() => void checkUpdate()} disabled={checking} className="shrink-0">
               {checking ? (
                 <Loader2 size={15} className="mr-2 animate-spin" />
               ) : (
@@ -100,26 +108,56 @@ export function AboutSettings() {
         </SettingsCard>
       </div>
 
-      {/* Update available */}
-      <Dialog open={!!update} onOpenChange={(o) => !o && setUpdate(null)}>
+      <Dialog
+        open={!!update}
+        onOpenChange={(o) => {
+          if (installing) return
+          if (!o) {
+            setUpdate(null)
+            setError(null)
+            setProgress(null)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("about.updateTitle")}</DialogTitle>
-            <DialogDescription>{t("about.updateDesc", { version: update?.version ?? "" })}</DialogDescription>
+            <DialogDescription>
+              {t("about.updateDescInstall", { version: update?.version ?? "" })}
+            </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUpdate(null)}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              onClick={() => {
-                if (update) void openExternal(update.url)
-                setUpdate(null)
-              }}
-            >
-              <Download size={15} className="mr-2" />
-              {t("about.download")}
-            </Button>
+          {installing && (
+            <div className="space-y-2">
+              <Progress value={progress?.percent ?? undefined} className="h-2" />
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {progress?.percent != null
+                  ? t("about.updatingPercent", { percent: progress.percent })
+                  : t("about.updating")}
+              </p>
+            </div>
+          )}
+          {error && <p className="text-sm text-destructive">{t("about.updateFailed", { msg: error })}</p>}
+          <DialogFooter className="gap-2 sm:gap-0">
+            {!installing && (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => void openExternal(RELEASES_URL)}>
+                  {t("about.openReleases")}
+                </Button>
+                <Button variant="outline" onClick={() => setUpdate(null)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button onClick={() => void onInstall()}>
+                  <Download size={15} className="mr-2" />
+                  {t("about.installNow")}
+                </Button>
+              </>
+            )}
+            {installing && (
+              <Button disabled>
+                <Loader2 size={15} className="mr-2 animate-spin" />
+                {t("about.updating")}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

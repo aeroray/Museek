@@ -162,6 +162,8 @@ fn set_tray_visible(app: tauri::AppHandle, visible: bool) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -249,7 +251,7 @@ mod taskbar {
     };
     use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
     use windows::Win32::UI::Shell::{
-        DefSubclassProc, SetWindowSubclass, ITaskbarList3, TaskbarList, THBF_ENABLED, THB_FLAGS,
+        DefSubclassProc, ITaskbarList3, SetWindowSubclass, TaskbarList, THBF_ENABLED, THB_FLAGS,
         THB_ICON, THB_TOOLTIP, THUMBBUTTON,
     };
     use windows::Win32::UI::WindowsAndMessaging::{

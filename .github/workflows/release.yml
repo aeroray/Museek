@@ -69,6 +69,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater signatures (required for in-app auto-update). Set both secrets
+          # in the repo: private key contents + optional password.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # --- Optional macOS code signing (leave unset to ship unsigned) ---
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -84,6 +88,8 @@ jobs:
             - **Windows**：`*_x64-setup.exe`（NSIS 安装包）
             - **macOS (Apple Silicon)**：`*_aarch64.dmg`
 
+            已安装用户可在应用内「设置 → 关于 → 检查更新」直接升级（需本 Release 含 `latest.json` 与 `.sig`）。
+
             ⚠️ Museek 不内置任何音源；首次使用请在「设置 → 音源管理」导入兼容 lx-music 的音源脚本后再播放。
 
             **macOS 提示「“Museek”已损坏，无法打开」？** 这是未签名 / 未公证应用的正常现象（文件并未损坏）。把 Museek.app 拖入「应用程序」，再在「终端」执行下面这行，然后正常打开即可：
@@ -91,4 +97,5 @@ jobs:
             （若提示 `-r` 无法识别，说明 PATH 里有其它 xattr，可改用：`find /Applications/Museek.app -exec /usr/bin/xattr -c {} \;`）
           releaseDraft: true
           prerelease: false
+          includeUpdaterJson: true
           args: ${{ matrix.args }}

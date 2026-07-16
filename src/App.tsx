@@ -20,6 +20,7 @@ import { maybeAutoImport } from "@/lib/sync"
 import { useGlobalShortcuts } from "@/lib/shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
+import { useUpdateStore } from "@/stores/updateStore"
 
 // Wire domain toast port once — stores/lib call notify() without importing uiStore.
 bindNotify((payload) => useUiStore.getState().notify(payload))
@@ -49,6 +50,12 @@ function AppInit() {
         setTrayVisible(s.closeBehavior === "tray")
       })
     })
+
+    // Defer update check so first paint stays snappy; result drives the sidebar card.
+    const timer = window.setTimeout(() => {
+      void useUpdateStore.getState().checkInBackground()
+    }, 2500)
+    return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

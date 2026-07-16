@@ -30,3 +30,8 @@ dist-ssr
 # Build artifacts that may appear at the repo root on Windows
 src-tauri/target/
 *.exe.bak
+
+# Updater signing private keys (never commit)
+*.key
+!*.key.pub
+.tauri/

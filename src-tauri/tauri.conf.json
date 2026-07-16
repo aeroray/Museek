@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg"],
+    "createUpdaterArtifacts": true,
     "category": "Music",
     "shortDescription": "Museek — multi-platform desktop music aggregator",
     "longDescription": "Museek (拾音) is a cross-platform desktop music aggregator with multi-source search, charts, playlists, synced lyrics, and downloads. Compatible with lx-music sources.",
@@ -50,7 +51,6 @@
     "macOS": {
       "minimumSystemVersion": "11.0",
       "hardenedRuntime": true,
-      "license": "../LICENSE",
       "dmg": {
         "appPosition": { "x": 180, "y": 170 },
         "applicationFolderPosition": { "x": 480, "y": 170 },
@@ -58,5 +58,12 @@
       }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVFRjAyMTFEOTYwRTlERTYKUldUbW5RNldIU0h3WGthRGI5cVRseTF4KzFmcnd2V0FPOXJJdE01aG8zcFhHMHdRNkNmOVU2SFgK",
+      "endpoints": [
+        "https://github.com/aeroray/Museek/releases/latest/download/latest.json"
+      ]
+    }
+  }
 }

@@ -94,14 +94,43 @@ pnpm tauri dev
 
 ```bash
 # Windows → NSIS setup.exe（随系统语言自动中/英文安装界面）
+# Requires updater signing key in the environment (see Auto-update below).
 pnpm tauri build
 
 # macOS Apple Silicon → DMG（需在 Apple Silicon Mac 上构建）
 pnpm tauri build -- --target aarch64-apple-darwin
 ```
 
-Installers land in `src-tauri/target/*/release/bundle/` (Windows: NSIS `setup.exe`; macOS: `.dmg`).  
-打包产物位于 `src-tauri/target/*/release/bundle/`（Windows：NSIS `setup.exe`；macOS：`.dmg`）。
+Installers land in `src-tauri/target/*/release/bundle/` (Windows: NSIS `setup.exe`; macOS: `.dmg`), plus updater `.sig` artifacts when signing is configured.  
+打包产物位于 `src-tauri/target/*/release/bundle/`（Windows：NSIS `setup.exe`；macOS：`.dmg`）；配置签名后还会生成 updater 用的 `.sig`。
+
+### Auto-update · 应用内更新
+
+In-app updates use [`tauri-plugin-updater`](https://v2.tauri.app/plugin/updater/) against  
+`https://github.com/aeroray/Museek/releases/latest/download/latest.json`.
+
+**Signing keys（私钥勿提交仓库）**
+
+```bash
+# Already generated locally for this machine (example path):
+#   %USERPROFILE%\.tauri\museek.key      — private
+#   %USERPROFILE%\.tauri\museek.key.pub  — public (also in tauri.conf.json)
+
+# Local signed build:
+set TAURI_SIGNING_PRIVATE_KEY_PATH=%USERPROFILE%\.tauri\museek.key
+pnpm tauri build
+```
+
+**GitHub Actions secrets**
+
+| Secret | Value |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `museek.key` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password if the key has one (omit / empty if none) |
+
+Tag a release (`git tag vX.Y.Z && git push origin vX.Y.Z`). The Release workflow uploads installers, `.sig` files, and `latest.json` (`includeUpdaterJson: true`). Publish the draft release so clients can see it.
+
+应用内更新走官方 updater，清单为 GitHub Releases 上的 `latest.json`。发版前设置上述 Secret；打 `v*` 标签后由 CI 生成签名产物并写入 `latest.json`。
 
 ### First play · 第一次播放
 

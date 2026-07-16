@@ -3,6 +3,7 @@ import { Search, ListMusic, TrendingUp, Heart, Download, Settings, AudioLines } 
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
 import { useUiStore } from "@/stores/uiStore"
+import { SidebarUpdateCard } from "@/components/layout/SidebarUpdateCard"
 
 // Settings is rendered separately at the bottom; these fill the main nav.
 const navItems = [
@@ -62,8 +63,9 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom: Settings */}
-      <div className="p-2">
+      {/* Bottom: update teaser + Settings */}
+      <div className="flex flex-col gap-0.5 p-2 pt-0">
+        <SidebarUpdateCard />
         <NavLink
           to="/settings"
           title={collapsed ? t("nav.settings") : undefined}
