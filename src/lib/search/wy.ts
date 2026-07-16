@@ -2,6 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import * as md5Lib from "js-md5"
 import * as aesjs from "aes-js"
 import type { MusicInfo, MusicQuality, Quality, SearchResult } from "@/types/music"
+import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/wy/musicSearch.js
@@ -135,8 +136,7 @@ function normalizeWySong(item: WySimpleSongRaw): MusicInfo {
     .map((t) => byType.get(t)!)
     .reverse()
 
-  const _qualitys: MusicInfo["meta"]["_qualitys"] = {}
-  for (const q of ordered) _qualitys[q.type] = { size: q.size }
+  const _qualitys = indexQualitySizes(ordered)
 
   const songId = String(item.id)
 

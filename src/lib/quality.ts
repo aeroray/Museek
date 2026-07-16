@@ -1,4 +1,4 @@
-import type { Quality, MusicInfo } from "@/types/music"
+import type { Quality, MusicInfo, MusicQuality, MusicInfoMeta } from "@/types/music"
 
 // Quality from best to worst. Auto-downgrade walks down this ladder.
 export const QUALITY_LADDER: Quality[] = ["flac24bit", "flac", "320k", "128k"]
@@ -33,4 +33,11 @@ export function qualityCandidates(preferred: Quality): Quality[] {
 export function bestQuality(song: MusicInfo): Quality | null {
   const available = new Set(song.meta.qualitys.map((q) => q.type))
   return QUALITY_LADDER.find((q) => available.has(q)) ?? null
+}
+
+/** Build the `_qualitys` size map used by lx-music scripts and VIP size probes. */
+export function indexQualitySizes(qualitys: MusicQuality[]): MusicInfoMeta["_qualitys"] {
+  const _qualitys: MusicInfoMeta["_qualitys"] = {}
+  for (const q of qualitys) _qualitys[q.type] = { size: q.size }
+  return _qualitys
 }

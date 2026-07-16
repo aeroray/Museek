@@ -1,5 +1,6 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
+import { indexQualitySizes } from "@/lib/quality"
 import type { ChartBoard } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/mg/leaderboard.js
@@ -99,8 +100,7 @@ function normalizeMgObjectInfo(raw: MgObjectInfoRaw): MusicInfo {
   }
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
 
-  const _qualitys: MusicInfo["meta"]["_qualitys"] = {}
-  for (const q of qualitys) _qualitys[q.type] = { size: q.size }
+  const _qualitys = indexQualitySizes(qualitys)
 
   const lengthMatch = raw.length ? raw.length.match(intervalRx) : null
   const interval = lengthMatch ? lengthMatch[1] : "0:00"

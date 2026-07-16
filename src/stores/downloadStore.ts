@@ -2,7 +2,8 @@ import { create } from "zustand"
 import { httpFetch as tauriFetch } from "@/lib/http"
 import { writeFile } from "@tauri-apps/plugin-fs"
 import type { MusicInfo, Quality } from "@/types/music"
-import { sourceRunner } from "@/lib/sourceRunner"
+import { resolveAdaptiveUrl } from "@/lib/playback"
+import { notify } from "@/lib/notify"
 import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
 import { t } from "@/lib/i18n"
@@ -71,7 +72,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       progress: 0,
     }
     set((s) => ({ tasks: [...s.tasks, task] }))
-    useUiStore.getState().notify({ message: t("download.added", { name: song.name }), variant: "success" })
+    notify({ message: t("download.added", { name: song.name }), variant: "success" })
     get()._pump()
   },
 
@@ -115,10 +116,10 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     get().updateProgress(id, 0)
     try {
       // Resolve URL with auto-downgrade; tell the user if the quality stepped down.
-      const { url, quality: actual } = await sourceRunner.getMusicUrlAdaptive(task.song, task.quality)
+      const { url, quality: actual } = await resolveAdaptiveUrl(task.song, task.quality)
       if (actual !== task.quality) {
         set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, quality: actual } : t)) }))
-        useUiStore.getState().notify({
+        notify({
           message: t("download.qualityDowngraded", { name: task.song.name, quality: t(`quality.${actual}`) }),
           variant: "info",
         })
@@ -161,7 +162,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
       get().updateStatus(id, "completed")
       get().updateProgress(id, 100)
-      useUiStore.getState().notify({ message: t("download.complete", { name: task.song.name }), variant: "success" })
+      notify({ message: t("download.complete", { name: task.song.name }), variant: "success" })
     } catch (err) {
       get().updateStatus(id, "error", (err as Error).message)
     } finally {

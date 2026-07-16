@@ -1,54 +1,24 @@
 import { create } from "zustand"
 import { audioPlayer } from "@/lib/audio"
 import { sourceRunner } from "@/lib/sourceRunner"
-import { parseLrc } from "@/lib/lyrics/parser"
-import { getBuiltinLyric } from "@/lib/lyric"
-import { httpFetch } from "@/lib/http"
-import { getCachedLyric, putCachedLyric, getCachedAudioUrl, putCachedAudio } from "@/lib/mediaCache"
+import { loadLyric } from "@/lib/lyric/loadLyric"
+import {
+  applyAudioSource,
+  beginPlayGeneration,
+  isPlayGenerationCurrent,
+  resolvePlayableSrc,
+  revokeCurrentObjectUrl,
+} from "@/lib/playback"
+import { notify } from "@/lib/notify"
 import { updateMediaControls, attachMediaControls } from "@/lib/smtc"
 import { setPreventSleep } from "@/lib/power"
-import { useUiStore } from "@/stores/uiStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { t } from "@/lib/i18n"
 import type { MusicInfo, LyricLine, Quality } from "@/types/music"
 import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player"
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
-
-// Track the object URL of cache-backed playback so it can be revoked on switch.
-let currentObjectUrl: string | null = null
 // Last play-state pushed to the OS media controls (avoids redundant updates).
 let lastMediaPlaying = false
-
-function applyAudioSource(src: string) {
-  if (currentObjectUrl) {
-    URL.revokeObjectURL(currentObjectUrl)
-    currentObjectUrl = null
-  }
-  if (src.startsWith("blob:")) currentObjectUrl = src
-  audioPlayer.setSource(src)
-}
-
-// Resolve a playable source for a song, preferring the on-disk audio cache.
-// Cache hit → play the local file instantly (also works offline). Cache miss →
-// fetch once, cache it, play from the in-memory blob. Any error falls back to
-// streaming the remote URL directly, so playback never breaks because of caching.
-async function resolvePlayableSrc(song: MusicInfo, quality: Quality, url: string): Promise<string> {
-  if (!isTauri || !useSettingsStore.getState().audioCache) return url
-  const cached = await getCachedAudioUrl(song.source, song.meta.songId, quality)
-  if (cached) return cached
-  try {
-    const res = await httpFetch(url, { method: "GET" })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const bytes = new Uint8Array(await res.arrayBuffer())
-    const ext = quality === "flac" || quality === "flac24bit" ? "flac" : "mp3"
-    const maxBytes = useSettingsStore.getState().maxCacheMB * 1024 * 1024
-    await putCachedAudio(song.source, song.meta.songId, quality, bytes, ext, maxBytes)
-    return URL.createObjectURL(new Blob([bytes], { type: ext === "flac" ? "audio/flac" : "audio/mpeg" }))
-  } catch {
-    return url
-  }
-}
 
 interface PlayerState {
   currentSong: MusicInfo | null
@@ -134,11 +104,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     async play(song, quality) {
       const preferred = quality ?? useSettingsStore.getState().playQuality
+      const gen = beginPlayGeneration()
 
       // No source loaded → can't resolve a playback URL. Prompt to import instead
       // of silently failing.
       if (!sourceRunner.isReady()) {
-        useUiStore.getState().notify({
+        notify({
           message: t("player.noSource"),
           variant: "error",
           actionLabel: t("player.goImport"),
@@ -181,6 +152,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       try {
         // Try the preferred quality, auto-downgrading until a source delivers a URL.
         const { url, quality: actual } = await sourceRunner.getMusicUrlAdaptive(song, preferred)
+        if (!isPlayGenerationCurrent(gen)) return
+
         // Record the real quality on the now-playing queue item so its badge
         // reflects what actually played (and stays put when it's no longer active).
         set((s) => {
@@ -189,18 +162,27 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           return { currentQuality: actual, queue: q }
         })
         if (actual !== preferred) {
-          useUiStore.getState().notify({
+          notify({
             message: t("player.qualityDowngraded", { quality: t(`quality.${actual}`) }),
             variant: "info",
           })
         }
-        const src = await resolvePlayableSrc(song, actual, url)
+        const settings = useSettingsStore.getState()
+        const src = await resolvePlayableSrc(song, actual, url, {
+          audioCache: settings.audioCache,
+          maxCacheMB: settings.maxCacheMB,
+        })
+        if (!isPlayGenerationCurrent(gen)) return
+
         applyAudioSource(src)
         await audioPlayer.play()
+        if (!isPlayGenerationCurrent(gen)) return
+
         // Publish to the OS media controls (taskbar / media flyout).
         lastMediaPlaying = true
         updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
       } catch (err) {
+        if (!isPlayGenerationCurrent(gen)) return
         const raw = (err as Error).message || t("player.err.unknown")
         // Transport-level failures from the source's HTTP request (DNS/TLS/connection)
         // surface as cryptic reqwest strings — give a clearer hint that it's a
@@ -209,7 +191,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(raw)
         const message = isNetwork ? t("player.err.network", { msg: raw }) : t("player.failedDetail", { msg: raw })
         set({ status: "error", error: message, lyricsLoading: false })
-        useUiStore.getState().notify({ message, variant: "error" })
+        notify({ message, variant: "error" })
         return
       }
 
@@ -366,10 +348,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         // idle instead of leaving the finished song sitting there looking paused.
         const finished = get().currentSong
         audioPlayer.stop()
-        if (currentObjectUrl) {
-          URL.revokeObjectURL(currentObjectUrl)
-          currentObjectUrl = null
-        }
+        revokeCurrentObjectUrl()
         lastMediaPlaying = false
         if (finished) {
           updateMediaControls(
@@ -402,27 +381,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     async _loadLyric(song) {
-      // Disk cache first (avoids re-fetching + re-decrypting on replay), then
-      // built-in per-platform lyric APIs, then a source script.
       const songId = song.id
       set({ lyricsLoading: true })
       try {
-        let lyricInfo = await getCachedLyric(song.source, song.meta.songId)
-        if (!lyricInfo?.lyric) {
-          lyricInfo = await getBuiltinLyric(song)
-          if (!lyricInfo?.lyric) {
-            lyricInfo = await sourceRunner.getLyric({ source: song.source, action: "lyric", info: song })
-          }
-          if (lyricInfo?.lyric) putCachedLyric(song.source, song.meta.songId, lyricInfo)
-        }
-        // Stale result after a quick track change — don't clobber the new song.
+        const lines = await loadLyric(song)
         if (get().currentSong?.id !== songId) return
-        if (lyricInfo?.lyric) {
-          const lines = parseLrc(lyricInfo.lyric, lyricInfo.tlyric ?? undefined)
-          set({ lyricLines: lines, lyricsLoading: false })
-        } else {
-          set({ lyricLines: [], lyricsLoading: false })
-        }
+        set({ lyricLines: lines, lyricsLoading: false })
       } catch {
         if (get().currentSong?.id !== songId) return
         set({ lyricLines: [], lyricsLoading: false })

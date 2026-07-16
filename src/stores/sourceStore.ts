@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { httpFetch as tauriFetch } from "@/lib/http"
 import { parseScriptMeta } from "@/lib/lxApi"
-import { sourceRunner } from "@/lib/sourceRunner"
+import { sourceRunner, bindSourceRegistry } from "@/lib/sourceRunner"
 import { readData, writeData } from "@/lib/db"
 import { t } from "@/lib/i18n"
 import type { SourceScript } from "@/types/source"
@@ -166,3 +166,9 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     }
   },
 }))
+
+// Break the sourceStore ↔ sourceRunner cycle: runner reads scripts via this port.
+bindSourceRegistry({
+  getScripts: () => useSourceStore.getState().scripts,
+  setScriptSources: (id, sources) => useSourceStore.getState().setScriptSources(id, sources),
+})

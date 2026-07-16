@@ -12,12 +12,17 @@ import { useSourceStore } from "@/stores/sourceStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSearchStore } from "@/stores/searchStore"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { useUiStore } from "@/stores/uiStore"
+import { bindNotify } from "@/lib/notify"
 import { enforceLimit } from "@/lib/mediaCache"
 import { setTrayVisible } from "@/lib/power"
 import { maybeAutoImport } from "@/lib/sync"
 import { useGlobalShortcuts } from "@/lib/shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
+
+// Wire domain toast port once — stores/lib call notify() without importing uiStore.
+bindNotify((payload) => useUiStore.getState().notify(payload))
 
 function AppInit() {
   const { loadFromDisk: loadSources } = useSourceStore()

@@ -1,5 +1,6 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality, SearchResult } from "@/types/music"
+import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
 
 interface KwSongRaw {
@@ -50,8 +51,7 @@ function decodeKwName(name: string): string {
 function normalizeKwSong(raw: KwSongRaw): MusicInfo {
   const songId = raw.MUSICRID.replace("MUSIC_", "")
   const qualitys = raw.N_MINFO ? parseNMinfo(raw.N_MINFO) : [{ type: "128k" as Quality, size: null }]
-  const _qualitys: MusicInfo["meta"]["_qualitys"] = {}
-  for (const q of qualitys) _qualitys[q.type] = { size: q.size }
+  const _qualitys = indexQualitySizes(qualitys)
 
   const duration = parseInt(raw.DURATION)
   return {

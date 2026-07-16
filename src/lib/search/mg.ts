@@ -1,6 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import * as md5Lib from "js-md5"
 import type { MusicInfo, MusicQuality, Quality, SearchResult } from "@/types/music"
+import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/mg/musicSearch.js
@@ -87,8 +88,7 @@ function normalizeMgSong(raw: MgSongRaw): MusicInfo {
   }
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
 
-  const _qualitys: MusicInfo["meta"]["_qualitys"] = {}
-  for (const q of qualitys) _qualitys[q.type] = { size: q.size }
+  const _qualitys = indexQualitySizes(qualitys)
 
   let img = raw.img3 || raw.img2 || raw.img1 || null
   if (img && !/^https?:/.test(img)) img = "http://d.musicapp.migu.cn" + img

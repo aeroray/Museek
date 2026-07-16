@@ -1,6 +1,6 @@
 import { getPlaylistDetail, type Playlist } from "./index"
 import { usePlayerStore } from "@/stores/playerStore"
-import { useUiStore } from "@/stores/uiStore"
+import { notify } from "@/lib/notify"
 import { t } from "@/lib/i18n"
 
 /**
@@ -9,15 +9,14 @@ import { t } from "@/lib/i18n"
  * Favorites) so "play whole list" is one click without opening the detail.
  */
 export async function playPlaylist(pl: Playlist): Promise<void> {
-  const ui = useUiStore.getState()
   try {
     const songs = await getPlaylistDetail(pl.source, pl.id)
     if (!songs.length) {
-      ui.notify({ message: t("hotPlaylists.playlistEmpty"), variant: "info" })
+      notify({ message: t("hotPlaylists.playlistEmpty"), variant: "info" })
       return
     }
     usePlayerStore.getState().playAll(songs)
   } catch (e) {
-    ui.notify({ message: t("hotPlaylists.playFailed", { msg: (e as Error).message }), variant: "error" })
+    notify({ message: t("hotPlaylists.playFailed", { msg: (e as Error).message }), variant: "error" })
   }
 }

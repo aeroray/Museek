@@ -1,5 +1,6 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
+import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
 import type { Playlist } from "./index"
 
@@ -142,8 +143,7 @@ function normalizeKgGatewaySong(raw: KgGatewaySong): MusicInfo | null {
     qualitys.push({ type: "flac24bit", size: sizeFormate(parseInt(audio.filesize_high)) })
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
 
-  const _qualitys: MusicInfo["meta"]["_qualitys"] = {}
-  for (const q of qualitys) _qualitys[q.type] = { size: q.size }
+  const _qualitys = indexQualitySizes(qualitys)
 
   // songId is the album_audio_id (audio_id); hash is the standard FileHash.
   const songId = String(audio.audio_id)
