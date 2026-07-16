@@ -36,6 +36,7 @@ export function CoverImage({
       onError={() => setLoaded(true)}
       className={cn(
         "h-full w-full object-cover transition-[opacity,filter] duration-700 ease-out",
+        "outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
         loaded ? "opacity-100 blur-0" : "opacity-0 blur-md",
         className,
       )}

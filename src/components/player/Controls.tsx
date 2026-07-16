@@ -5,6 +5,9 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
+const iconSwap =
+  "absolute inset-0 flex items-center justify-center transition-[opacity,filter,transform] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+
 export function Controls() {
   const { isPlaying, playMode, status, currentSong, togglePlay, next, prev, setPlayMode } = usePlayerStore()
   const favorites = usePlaylistStore((s) => s.favorites)
@@ -33,7 +36,7 @@ export function Controls() {
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 text-muted-foreground"
+        className="h-9 w-9 text-muted-foreground"
         onClick={cyclePlayMode}
         title={t(`playMode.${playMode}`)}
       >
@@ -48,7 +51,7 @@ export function Controls() {
         )}
       </Button>
 
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prev} disabled={!canPlay}>
+      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={prev} disabled={!canPlay || loading}>
         <SkipBack size={18} />
       </Button>
 
@@ -57,25 +60,43 @@ export function Controls() {
         size="icon"
         className="h-10 w-10 rounded-full"
         onClick={togglePlay}
-        disabled={!canPlay}
+        disabled={!canPlay || loading}
       >
         {loading ? (
           <Loader2 size={18} className="animate-spin" />
-        ) : isPlaying ? (
-          <Pause size={19} fill="currentColor" strokeWidth={0} />
         ) : (
-          <Play size={19} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+          <span className="relative block size-[19px]">
+            <span
+              className={cn(
+                iconSwap,
+                isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
+              )}
+              aria-hidden={!isPlaying}
+            >
+              <Pause size={19} fill="currentColor" strokeWidth={0} />
+            </span>
+            <span
+              className={cn(
+                iconSwap,
+                !isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
+              )}
+              aria-hidden={isPlaying}
+            >
+              {/* Optical shift: play triangles read left-heavy when geometrically centered. */}
+              <Play size={19} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+            </span>
+          </span>
         )}
       </Button>
 
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={next} disabled={!canPlay}>
+      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={next} disabled={!canPlay || loading}>
         <SkipForward size={18} />
       </Button>
 
       <Button
         variant="ghost"
         size="icon"
-        className={cn("h-8 w-8", fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground")}
+        className={cn("h-9 w-9", fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground")}
         onClick={toggleFav}
         disabled={!currentSong}
         title={t("common.favorite")}

@@ -75,13 +75,13 @@ export function PlaylistCard({
             </div>
           )}
           {/* gentle darken on hover — affordance that the cover is clickable */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+          <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/10" />
 
           {/* Selection checkbox (batch edit) */}
           {selectable && (
             <span
               className={cn(
-                "absolute top-2 left-2 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-colors",
+                "absolute top-2 left-2 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-colors duration-150",
                 selected ? "bg-primary border-primary text-primary-foreground" : "border-white/80 bg-black/35 text-transparent"
               )}
             >
@@ -98,7 +98,7 @@ export function PlaylistCard({
               }}
               title={t(favorited ? "hotPlaylists.favorited" : "hotPlaylists.favorite")}
               className={cn(
-                "absolute top-2 left-2 h-7 w-7 rounded-full flex items-center justify-center transition-all bg-black/45 text-white hover:bg-black/65",
+                "absolute top-2 left-2 h-8 w-8 rounded-full flex items-center justify-center transition-[opacity,background-color,transform] duration-150 ease-out bg-black/45 text-white hover:bg-black/65 active:scale-[0.96]",
                 favorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
               )}
             >
@@ -113,7 +113,7 @@ export function PlaylistCard({
                 onRemove()
               }}
               title={t("hotPlaylists.removeFavorite")}
-              className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/55 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/75"
+              className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/55 text-white flex items-center justify-center opacity-0 transition-[opacity,background-color,transform] duration-150 ease-out group-hover:opacity-100 hover:bg-black/75 active:scale-[0.96]"
             >
               <X size={14} />
             </button>
@@ -126,14 +126,14 @@ export function PlaylistCard({
                 onPlay()
               }}
               title={t("common.playAll")}
-              className="absolute bottom-2 right-2 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center opacity-0 translate-y-1.5 group-hover:opacity-100 group-hover:translate-y-0 transition-all hover:scale-105"
+              className="absolute bottom-2 right-2 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center opacity-0 translate-y-1.5 transition-[opacity,transform] duration-200 ease-out group-hover:opacity-100 group-hover:translate-y-0 active:scale-[0.96]"
             >
               <Play size={18} className="ml-0.5" fill="currentColor" strokeWidth={0} />
             </button>
           )}
         </div>
 
-        <p className="text-sm mt-2 leading-snug line-clamp-2 min-h-[2.5rem]" title={playlist.name}>
+        <p className="text-sm mt-2 leading-snug line-clamp-2 min-h-[2.5rem] text-pretty" title={playlist.name}>
           {playlist.name}
         </p>
         {(playlist.author || playlist.playCount) && (

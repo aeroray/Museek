@@ -12,6 +12,16 @@ import { useFlip } from "@/hooks/useFlip"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
+/** True when the line looks like an http(s) URL (lx-music source scripts are fetched by URL). */
+function isHttpUrl(line: string): boolean {
+  try {
+    const u = new URL(line)
+    return u.protocol === "http:" || u.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 // The "follow our WeChat account for sources" guide — shown in the empty state
 // and in the "get sources" dialog (identical content in both).
 function GzhGuide() {
@@ -21,7 +31,7 @@ function GzhGuide() {
       <img
         src="/gzh/qrcode.webp"
         alt={t("sources.gzhTitle")}
-        className="h-44 w-44 rounded-xl bg-white object-contain"
+        className="h-44 w-44 rounded-xl bg-white object-contain outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
       />
       <div className="space-y-1.5">
         <p className="text-sm font-semibold">{t("sources.gzhTitle")}</p>
@@ -51,6 +61,21 @@ export function SourceManager() {
       .map((u) => u.trim())
       .filter(Boolean)
     if (!urls.length) return
+
+    const invalid = urls.filter((u) => !isHttpUrl(u))
+    if (invalid.length) {
+      useUiStore.getState().notify({
+        message:
+          invalid.length === urls.length
+            ? t("sources.invalidUrl")
+            : t("sources.invalidUrlLines", {
+                lines: invalid.map((l) => (l.length > 48 ? `${l.slice(0, 48)}…` : l)).join(" · "),
+              }),
+        variant: "error",
+      })
+      return
+    }
+
     setImporting(true)
     const failed: string[] = []
     for (const u of urls) {
@@ -118,16 +143,30 @@ export function SourceManager() {
               disabled={importing}
               className="h-20 w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <Button
-              variant="outline"
-              size="icon"
-              className="absolute right-2 top-2 h-7 w-7 text-muted-foreground"
-              onClick={handlePaste}
-              disabled={importing}
-              title={t("sources.paste")}
-            >
-              <ClipboardPaste size={14} />
-            </Button>
+            <div className="absolute right-2 top-2 flex flex-col gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={handlePaste}
+                disabled={importing}
+                title={t("sources.paste")}
+              >
+                <ClipboardPaste size={14} />
+              </Button>
+              {url.trim() ? (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground"
+                  onClick={() => setUrl("")}
+                  disabled={importing}
+                  title={t("sources.clear")}
+                >
+                  <X size={14} />
+                </Button>
+              ) : null}
+            </div>
           </div>
           <div className="flex w-32 shrink-0 flex-col gap-2">
             <Button variant="outline" onClick={() => setGetOpen(true)} className="h-9">
@@ -169,7 +208,7 @@ export function SourceManager() {
                 data-drag-index={index}
                 data-flip-id={script.id}
                 className={cn(
-                  "flex items-center gap-3 p-4 rounded-lg border bg-card transition-all",
+                  "flex items-center gap-3 p-4 rounded-lg border bg-card transition-[opacity,border-color,background-color] duration-150",
                   drag.dragIndex === index && "opacity-40",
                   drag.overIndex === index && drag.dragIndex !== index && "border-primary"
                 )}

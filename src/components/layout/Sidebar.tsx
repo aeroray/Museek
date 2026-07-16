@@ -46,7 +46,7 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1 flex flex-col justify-center">
-            <h1 className="text-base font-bold leading-none truncate">{t("app.name")}</h1>
+            <h1 className="text-base font-bold leading-none truncate text-balance">{t("app.name")}</h1>
             <p className="text-[11px] text-muted-foreground leading-none mt-2 truncate">{t("app.tagline")}</p>
           </div>
         )}

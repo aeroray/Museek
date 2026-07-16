@@ -182,7 +182,7 @@ export function LyricsPanel() {
                       }}
                       onClick={() => seek(line.time)}
                       className={cn(
-                        "py-2.5 cursor-pointer transition-all duration-300",
+                        "py-2.5 cursor-pointer transition-[color,font-size] duration-300 ease-out",
                         active
                           ? "text-primary font-semibold"
                           : "text-muted-foreground/50 hover:text-muted-foreground"

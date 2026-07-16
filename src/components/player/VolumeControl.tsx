@@ -18,7 +18,7 @@ export function VolumeControl() {
 
   return (
     <div className="flex items-center gap-2">
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMuted(!muted)}>
+      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setMuted(!muted)}>
         <VolumeIcon size={16} />
       </Button>
       <div className="group relative flex items-center">

@@ -49,7 +49,7 @@ export function TrackRow({
         <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0">{rank}</span>
       )}
 
-      <div className="relative h-10 w-10 shrink-0 rounded overflow-hidden bg-muted">
+      <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden bg-muted">
         {thumb ? (
           <CoverImage src={thumb} />
         ) : (
@@ -59,9 +59,9 @@ export function TrackRow({
         )}
         <button
           onClick={() => play(song)}
-          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
         >
-          <Play size={16} className="text-white" />
+          <Play size={16} className="ml-0.5 text-white" fill="currentColor" strokeWidth={0} />
         </button>
       </div>
 
@@ -78,24 +78,24 @@ export function TrackRow({
 
       <span className="text-xs text-muted-foreground w-12 text-right shrink-0 tabular-nums">{song.interval}</span>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-0.5 shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 opacity-0 group-hover:opacity-100"
+          className="h-8 w-8 opacity-0 group-hover:opacity-100"
           onClick={(e) => {
             e.stopPropagation()
             addToQueue([song])
           }}
           title={t("common.addToQueue")}
         >
-          <Plus size={13} />
+          <Plus size={14} />
         </Button>
 
         <Button
           variant="ghost"
           size="icon"
-          className={cn("h-7 w-7 transition-opacity", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
+          className={cn("h-8 w-8 transition-opacity duration-150", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
           onClick={(e) => {
             e.stopPropagation()
             if (fav) removeFromFavorites(song.id)
@@ -103,7 +103,7 @@ export function TrackRow({
           }}
           title={t(fav ? "common.unfavorite" : "common.favorite")}
         >
-          <Heart size={13} className={fav ? "fill-red-500 text-red-500" : ""} />
+          <Heart size={14} className={fav ? "fill-red-500 text-red-500" : ""} />
         </Button>
 
         <DropdownMenu>
@@ -111,11 +111,11 @@ export function TrackRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+              className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
               onClick={(e) => e.stopPropagation()}
               title={t("common.download")}
             >
-              <Download size={13} />
+              <Download size={14} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[11rem]">

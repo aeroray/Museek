@@ -90,7 +90,7 @@ export function AboutSettings() {
             <img
               src="/gzh/qrcode.webp"
               alt={t("about.gzhTitle")}
-              className="h-40 w-40 rounded-xl bg-white object-contain"
+              className="h-40 w-40 rounded-xl bg-white object-contain outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
             />
             <div className="space-y-1">
               <p className="text-sm font-semibold">{t("about.gzhTitle")}</p>

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
  */
 export function SettingsCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card/50 divide-y divide-border", className)}>
+    <div className={cn("rounded-xl bg-card/50 divide-y divide-border shadow-[var(--shadow-border)]", className)}>
       {children}
     </div>
   )

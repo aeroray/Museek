@@ -148,7 +148,19 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       // let the old song keep playing while the new URL is being resolved.
       audioPlayer.pause()
 
-      set({ currentSong: song, currentQuality: preferred, status: "loading", error: null, lyricLines: [], currentPicUrl: null })
+      // status:"loading" must survive audio pause/timeupdate sync (see _syncFromAudio).
+      // Clear progress so the bar reads as inactive while the new URL resolves.
+      set({
+        currentSong: song,
+        currentQuality: preferred,
+        status: "loading",
+        error: null,
+        lyricLines: [],
+        currentPicUrl: null,
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+      })
 
       // Add to queue if not already there
       const { queue } = get()
@@ -285,7 +297,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     _syncFromAudio() {
       const state = audioPlayer.getState()
-      const { lyricLines } = get()
+      const { lyricLines, status: storeStatus } = get()
 
       let currentLyricIndex = -1
       if (lyricLines.length) {
@@ -297,11 +309,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         }
       }
 
+      // While resolving a playback URL, pause()/timeupdate would otherwise report
+      // "paused" and wipe the intentional loading UI (play spinner + disabled seek).
+      // Accept audio status only once playback actually starts (or buffers).
+      const status =
+        storeStatus === "loading" && state.status !== "playing" && state.status !== "loading"
+          ? "loading"
+          : storeStatus === "error"
+            ? "error"
+            : state.status
+
       set({
-        isPlaying: state.isPlaying,
-        currentTime: state.currentTime,
-        duration: state.duration,
-        status: state.status,
+        isPlaying: storeStatus === "loading" ? false : state.isPlaying,
+        currentTime: storeStatus === "loading" ? 0 : state.currentTime,
+        duration: storeStatus === "loading" ? 0 : state.duration,
+        status,
         currentLyricIndex,
       })
 

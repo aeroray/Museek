@@ -1,4 +1,4 @@
-import { Music, ListMusic, MicVocal, Search, Maximize2 } from "lucide-react"
+import { Music, ListMusic, MicVocal, Search, Maximize2, Loader2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Controls } from "./Controls"
 import { ProgressSlider } from "./ProgressSlider"
@@ -19,10 +19,24 @@ import { cn } from "@/lib/utils"
 import type { Source } from "@/types/music"
 
 export function PlayerBar() {
-  const { currentSong, currentQuality, currentPicUrl, queue, showQueue, showLyrics, setShowQueue, setShowLyrics } =
-    usePlayerStore()
+  const {
+    currentSong,
+    currentQuality,
+    currentPicUrl,
+    queue,
+    showQueue,
+    showLyrics,
+    status,
+    setShowQueue,
+    setShowLyrics,
+  } = usePlayerStore()
   const t = useT()
   const navigate = useNavigate()
+
+  const loading = status === "loading"
+  // Prefer the resolved cover; while loading fall back to the song's own pic so
+  // the art doesn't blank out — the spinner overlay still signals resolving.
+  const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null
 
   // Jump to the search page pre-filled with this song on another platform — handy
   // when the current platform's copy is VIP/unavailable.
@@ -40,21 +54,39 @@ export function PlayerBar() {
       <div className="flex items-center px-4 pb-3 gap-4">
         {/* Left: Song info */}
         <div className="flex items-center gap-4 w-72 shrink-0">
-          {currentPicUrl ? (
+          {coverSrc ? (
             <button
               type="button"
-              onClick={() => setShowLyrics(true)}
+              onClick={() => !loading && setShowLyrics(true)}
               title={t("player.lyrics")}
-              className="group relative h-12 w-12 rounded-md overflow-hidden shrink-0"
+              disabled={loading}
+              className="group relative h-12 w-12 rounded-md overflow-hidden shrink-0 transition-transform duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none"
             >
-              <img src={currentPicUrl} alt="album art" className="h-full w-full object-cover" />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
-                <Maximize2 size={16} className="text-white" />
-              </span>
+              <img
+                src={coverSrc}
+                alt="album art"
+                className={cn(
+                  "h-full w-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10 transition-[opacity,filter] duration-200",
+                  loading && "opacity-60 blur-[1px]"
+                )}
+              />
+              {loading ? (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45">
+                  <Loader2 size={18} className="animate-spin text-white" />
+                </span>
+              ) : (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                  <Maximize2 size={16} className="text-white" />
+                </span>
+              )}
             </button>
           ) : (
-            <div className="h-12 w-12 rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
-              <Music size={20} className="text-muted-foreground" />
+            <div className="relative h-12 w-12 rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
+              {loading ? (
+                <Loader2 size={18} className="animate-spin text-muted-foreground" />
+              ) : (
+                <Music size={20} className="text-muted-foreground" />
+              )}
             </div>
           )}
           {currentSong ? (
@@ -90,7 +122,7 @@ export function PlayerBar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0"
+                className="h-9 w-9 shrink-0"
                 disabled={!currentSong}
                 title={t("player.searchOther")}
               >
@@ -112,7 +144,7 @@ export function PlayerBar() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-8 w-8 shrink-0", showLyrics && "text-primary")}
+            className={cn("h-9 w-9 shrink-0", showLyrics && "text-primary")}
             onClick={() => setShowLyrics(!showLyrics)}
             disabled={!currentSong}
             title={t("player.lyrics")}
@@ -122,7 +154,7 @@ export function PlayerBar() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-8 w-8 shrink-0", showQueue && "text-primary")}
+            className={cn("h-9 w-9 shrink-0", showQueue && "text-primary")}
             onClick={() => setShowQueue(!showQueue)}
             disabled={queue.length === 0}
             title={t("player.queue")}

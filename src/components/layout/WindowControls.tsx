@@ -16,7 +16,8 @@ export function WindowControls() {
   const t = useT()
   if (!isTauri) return null
 
-  const base = "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors"
+  const base =
+    "relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.96]"
 
   return (
     <div className="flex items-center">

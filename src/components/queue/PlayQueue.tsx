@@ -62,7 +62,12 @@ export function PlayQueue() {
                   >
                     <div className="relative h-11 w-11 shrink-0 rounded-lg overflow-hidden bg-muted">
                       {item.music.meta.picUrl ? (
-                        <img src={item.music.meta.picUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                        <img
+                          src={item.music.meta.picUrl}
+                          alt=""
+                          className="h-full w-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+                          loading="lazy"
+                        />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                           <Music size={16} />
@@ -91,13 +96,13 @@ export function PlayQueue() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 shrink-0 text-muted-foreground hover:text-destructive"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 shrink-0 text-muted-foreground hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation()
                         removeAt(i)
                       }}
                     >
-                      <X size={13} />
+                      <X size={14} />
                     </Button>
                   </div>
                 )
