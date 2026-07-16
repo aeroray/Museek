@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" role="img" aria-labelledby="title desc">
+  <title id="title">Museek</title>
+  <desc id="desc">Cross-platform desktop music aggregator: search, play, lyrics, and download across five platforms with your own lx-music sources.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A0A0C"/>
+      <stop offset="55%" stop-color="#101014"/>
+      <stop offset="100%" stop-color="#0C1210"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1A1A1F"/>
+      <stop offset="100%" stop-color="#121216"/>
+    </linearGradient>
+    <linearGradient id="play" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2BED8B"/>
+      <stop offset="100%" stop-color="#12C268"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="380" rx="28" fill="url(#bg)"/>
+  <g opacity="0.07" fill="#FFFFFF">
+    <rect x="820" y="90" width="18" height="40" rx="9"/>
+    <rect x="850" y="60" width="18" height="100" rx="9"/>
+    <rect x="880" y="30" width="18" height="160" rx="9"/>
+    <rect x="910" y="70" width="18" height="80" rx="9"/>
+    <rect x="940" y="45" width="18" height="130" rx="9"/>
+    <rect x="970" y="90" width="18" height="40" rx="9"/>
+  </g>
+  <g transform="translate(56 48)">
+    <rect width="56" height="56" rx="16" fill="#000000" stroke="#2A2A30" stroke-width="1"/>
+    <g fill="#FFFFFF">
+      <rect x="10" y="23" width="5" height="10" rx="2.5"/>
+      <rect x="18" y="14" width="5" height="28" rx="2.5"/>
+      <rect x="26" y="8" width="5" height="40" rx="2.5"/>
+      <rect x="34" y="18" width="5" height="20" rx="2.5"/>
+      <rect x="42" y="12" width="5" height="32" rx="2.5"/>
+    </g>
+  </g>
+  <text x="128" y="72" fill="#7A7A86" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15" font-weight="600" letter-spacing="2.4">DESKTOP MUSIC AGGREGATOR</text>
+  <text x="56" y="148" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="68" font-weight="750">Museek</text>
+  <text x="56" y="198" fill="#C8C8D0" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="22" font-weight="500">Every melody, one search.</text>
+  <text x="56" y="230" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="17">Search · charts · playlists · synced lyrics · downloads</text>
+  <g transform="translate(56 268)" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13" font-weight="600">
+    <rect width="88" height="30" rx="15" fill="#1C1C22" stroke="#2E2E36"/>
+    <circle cx="16" cy="15" r="4" fill="#E60026"/>
+    <text x="28" y="19" fill="#E8E8EE">NetEase</text>
+    <rect x="100" width="72" height="30" rx="15" fill="#1C1C22" stroke="#2E2E36"/>
+    <circle cx="116" cy="15" r="4" fill="#F5A623"/>
+    <text x="128" y="19" fill="#E8E8EE">KuWo</text>
+    <rect x="184" width="76" height="30" rx="15" fill="#1C1C22" stroke="#2E2E36"/>
+    <circle cx="200" cy="15" r="4" fill="#2D9CDB"/>
+    <text x="212" y="19" fill="#E8E8EE">KuGou</text>
+    <rect x="272" width="100" height="30" rx="15" fill="#1C1C22" stroke="#2E2E36"/>
+    <circle cx="288" cy="15" r="4" fill="#2BC275"/>
+    <text x="300" y="19" fill="#E8E8EE">QQ Music</text>
+    <rect x="384" width="68" height="30" rx="15" fill="#1C1C22" stroke="#2E2E36"/>
+    <circle cx="400" cy="15" r="4" fill="#E54BA0"/>
+    <text x="412" y="19" fill="#E8E8EE">Migu</text>
+  </g>
+  <text x="56" y="340" fill="#5C5C68" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">Tauri 2 · React 19 · lx-music sources · MIT</text>
+  <g transform="translate(720 56)">
+    <rect width="424" height="268" rx="22" fill="url(#panel)" stroke="#2A2A32" stroke-width="1"/>
+    <text x="24" y="36" fill="#7A7A86" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" letter-spacing="1.2">NOW PLAYING</text>
+    <text x="24" y="68" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="22" font-weight="700">Import source → Play</text>
+    <text x="24" y="96" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">Your scripts resolve URLs · public APIs discover music</text>
+    <g transform="translate(24 128)" fill="#FFFFFF">
+      <rect x="0" y="36" width="14" height="28" rx="7" opacity="0.45"/>
+      <rect x="24" y="18" width="14" height="64" rx="7" opacity="0.7"/>
+      <rect x="48" y="4" width="14" height="92" rx="7"/>
+      <rect x="72" y="24" width="14" height="52" rx="7" opacity="0.85"/>
+      <rect x="96" y="12" width="14" height="76" rx="7" opacity="0.95"/>
+      <rect x="120" y="36" width="14" height="28" rx="7" opacity="0.45"/>
+    </g>
+    <g transform="translate(200 132)">
+      <circle cx="40" cy="40" r="40" fill="url(#play)"/>
+      <path d="M34 24 L60 40 L34 56 Z" fill="#06140C"/>
+    </g>
+    <g transform="translate(24 220)" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="12" font-weight="600">
+      <rect width="110" height="28" rx="8" fill="#222228"/>
+      <text x="14" y="18" fill="#C8C8D0">Search API</text>
+      <path d="M118 14 H138" stroke="#3A3A44" stroke-width="2"/>
+      <rect x="138" width="110" height="28" rx="8" fill="#222228"/>
+      <text x="152" y="18" fill="#C8C8D0">Source script</text>
+      <path d="M256 14 H276" stroke="#3A3A44" stroke-width="2"/>
+      <rect x="276" width="110" height="28" rx="8" fill="#143D28" stroke="#1FDD7A" stroke-width="1"/>
+      <text x="304" y="18" fill="#2BED8B">Audio URL</text>
+    </g>
+  </g>
+</svg>

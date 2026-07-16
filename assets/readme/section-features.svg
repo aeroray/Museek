@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="132" viewBox="0 0 1200 132" role="img" aria-labelledby="title desc">
+  <title id="title">Features</title>
+  <desc id="desc">Section banner for Museek product capabilities.</desc>
+  <rect width="1200" height="132" rx="24" fill="#0A0A0C"/>
+  <g fill="#FFFFFF" opacity="0.9" transform="translate(56 42)">
+    <rect x="0" y="22" width="8" height="16" rx="4"/>
+    <rect x="14" y="12" width="8" height="36" rx="4"/>
+    <rect x="28" y="4" width="8" height="52" rx="4"/>
+    <rect x="42" y="16" width="8" height="28" rx="4"/>
+    <rect x="56" y="8" width="8" height="44" rx="4"/>
+    <rect x="70" y="22" width="8" height="16" rx="4"/>
+  </g>
+  <text x="156" y="58" fill="#7A7A86" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" letter-spacing="2.4">CAPABILITIES</text>
+  <text x="156" y="98" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="36" font-weight="700">What you can do</text>
+</svg>
