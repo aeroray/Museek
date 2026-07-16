@@ -8,8 +8,12 @@ export type UpdateInfo = {
   body?: string
   /** True when tauri-plugin-updater can download + install in-app. */
   canInstall: boolean
-  /** Prefer this when GitHub is blocked (often a CN mirror of the installer). */
+  /** Installer URL from the probe that won (same mirror as the successful check). */
   downloadUrl?: string
+  /** Winner first, then other mirrors wrapping the same asset (for “try another”). */
+  downloadUrls?: string[]
+  /** Host label of the winning probe, e.g. "gh-proxy.com" or "github.com". */
+  sourceLabel?: string
 }
 
 export type DownloadProgress = {
@@ -24,11 +28,17 @@ const GITHUB_LATEST_JSON =
   `https://github.com/${REPO}/releases/latest/download/latest.json`
 const GITHUB_API_LATEST = `https://api.github.com/repos/${REPO}/releases/latest`
 
-/** Prefixes that often work when github.com is unreachable from mainland China. */
+/**
+ * URL-prefix proxies for when github.com is unreachable from mainland China.
+ * Order is for alternate-download cycling only — check probes race in parallel.
+ * ghfast.top kept last as a weak fallback (often blocked by some ISPs).
+ */
 const GH_MIRRORS = [
-  "https://ghfast.top/",
   "https://gh-proxy.com/",
+  "https://ghproxy.net/",
   "https://mirror.ghproxy.com/",
+  "https://gh.llkk.cc/",
+  "https://ghfast.top/",
 ]
 
 /** Per-request budget — concurrent probes, so keep this tight. */
@@ -66,6 +76,48 @@ function withMirror(url: string, mirror: string): string {
   return `${mirror}${url}`
 }
 
+function mirrorLabel(mirrorPrefix: string): string {
+  if (!mirrorPrefix) return "github.com"
+  try {
+    return new URL(mirrorPrefix).host
+  } catch {
+    return mirrorPrefix.replace(/^https?:\/\//, "").replace(/\/$/, "") || "mirror"
+  }
+}
+
+/** Winner first, then every other mirror wrapping the same GitHub asset URL. */
+function buildDownloadUrls(assetUrl: string, winnerPrefix: string): string[] {
+  const primary = withMirror(assetUrl, winnerPrefix)
+  const rest = GH_MIRRORS.filter((m) => m !== winnerPrefix).map((m) => withMirror(assetUrl, m))
+  // Direct GitHub as last resort when winner was a mirror
+  const direct = winnerPrefix ? assetUrl : null
+  const ordered = [primary, ...rest, ...(direct && direct !== primary ? [direct] : [])]
+  return [...new Set(ordered)]
+}
+
+function attachDownloads(
+  base: Omit<UpdateInfo, "downloadUrl" | "downloadUrls" | "sourceLabel">,
+  assetUrl: string | undefined,
+  mirrorPrefix: string,
+  fallback?: string,
+): UpdateInfo {
+  if (!assetUrl) {
+    return {
+      ...base,
+      downloadUrl: fallback || RELEASES_URL,
+      downloadUrls: fallback ? [fallback] : [RELEASES_URL],
+      sourceLabel: mirrorLabel(mirrorPrefix),
+    }
+  }
+  const downloadUrls = buildDownloadUrls(assetUrl, mirrorPrefix)
+  return {
+    ...base,
+    downloadUrl: downloadUrls[0],
+    downloadUrls,
+    sourceLabel: mirrorLabel(mirrorPrefix),
+  }
+}
+
 function detectOs(): "windows" | "macos" | "other" {
   const ua = navigator.userAgent.toLowerCase()
   if (ua.includes("windows")) return "windows"
@@ -96,10 +148,6 @@ function pickAssetUrl(
     )
   }
   return names[0]?.url
-}
-
-function firstMirrored(url: string): string {
-  return withMirror(url, GH_MIRRORS[0])
 }
 
 type LatestJson = {
@@ -137,7 +185,7 @@ function timeoutSignal(ms: number, parent?: AbortSignal): AbortSignal {
   return ctrl.signal
 }
 
-function manifestToInfo(data: LatestJson): UpdateInfo | null {
+function manifestToInfo(data: LatestJson, mirrorPrefix: string): UpdateInfo | null {
   if (!data?.version) throw new Error("invalid manifest")
   const version = String(data.version).replace(/^v/, "")
   if (!isNewer(version, __APP_VERSION__)) return null
@@ -147,32 +195,42 @@ function manifestToInfo(data: LatestJson): UpdateInfo | null {
     os === "windows" ? "windows-x86_64" : os === "macos" ? "darwin-aarch64" : ""
   const platformUrl = platformKey ? data.platforms?.[platformKey]?.url : undefined
 
-  return {
-    version,
-    currentVersion: __APP_VERSION__,
-    body: data.notes,
-    canInstall: false,
-    downloadUrl: platformUrl ? firstMirrored(platformUrl) : RELEASES_URL,
-  }
+  return attachDownloads(
+    {
+      version,
+      currentVersion: __APP_VERSION__,
+      body: data.notes,
+      canInstall: false,
+    },
+    platformUrl,
+    mirrorPrefix,
+  )
 }
 
-function apiToInfo(data: {
-  tag_name?: string
-  body?: string
-  html_url?: string
-  assets?: { name?: string; browser_download_url?: string }[]
-}): UpdateInfo | null {
+function apiToInfo(
+  data: {
+    tag_name?: string
+    body?: string
+    html_url?: string
+    assets?: { name?: string; browser_download_url?: string }[]
+  },
+  mirrorPrefix: string,
+): UpdateInfo | null {
   const tag = String(data.tag_name || "").replace(/^v/, "")
   if (!tag) throw new Error("invalid api payload")
   if (!isNewer(tag, __APP_VERSION__)) return null
   const asset = pickAssetUrl(data.assets ?? [])
-  return {
-    version: tag,
-    currentVersion: __APP_VERSION__,
-    body: data.body,
-    canInstall: false,
-    downloadUrl: asset ? firstMirrored(asset) : data.html_url || RELEASES_URL,
-  }
+  return attachDownloads(
+    {
+      version: tag,
+      currentVersion: __APP_VERSION__,
+      body: data.body,
+      canInstall: false,
+    },
+    asset,
+    mirrorPrefix,
+    data.html_url || RELEASES_URL,
+  )
 }
 
 /**
@@ -227,40 +285,51 @@ function clearCachedUpdate() {
   })
 }
 
+type ManifestProbe = { url: string; mirrorPrefix: string }
+
 /**
  * Concurrent update check: official updater + latest.json mirrors + GitHub API
- * mirrors all fire at once; the first successful answer wins.
+ * mirrors all fire at once; the first successful answer wins — and its mirror
+ * prefix is reused for the installer download URL.
  */
 export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
   if (!isTauri()) return null
   clearCachedUpdate()
 
-  const manifestUrls = [
-    GITHUB_LATEST_JSON,
-    ...GH_MIRRORS.map((m) => withMirror(GITHUB_LATEST_JSON, m)),
+  const manifestProbes: ManifestProbe[] = [
+    { url: GITHUB_LATEST_JSON, mirrorPrefix: "" },
+    ...GH_MIRRORS.map((m) => ({ url: withMirror(GITHUB_LATEST_JSON, m), mirrorPrefix: m })),
   ]
-  const apiUrls = [GITHUB_API_LATEST, ...GH_MIRRORS.map((m) => withMirror(GITHUB_API_LATEST, m))]
+  const apiProbes: ManifestProbe[] = [
+    { url: GITHUB_API_LATEST, mirrorPrefix: "" },
+    ...GH_MIRRORS.map((m) => ({ url: withMirror(GITHUB_API_LATEST, m), mirrorPrefix: m })),
+  ]
 
   const probes: ((signal: AbortSignal) => Promise<ProbeOk>)[] = [
-    // Plugin path — enables in-app install when GitHub is reachable.
+    // Plugin path — enables in-app install when an endpoint (incl. mirrors) works.
     async () => {
       const update = await check({ timeout: PROBE_TIMEOUT_MS })
       if (!update) return { info: null }
-      return { info: toInfo(update), update }
+      return {
+        info: toInfo(update, { sourceLabel: "updater", downloadUrl: RELEASES_URL, downloadUrls: [RELEASES_URL] }),
+        update,
+      }
     },
-    ...manifestUrls.map(
-      (url) => async (signal: AbortSignal) => {
-        const data = (await fetchJson(url, timeoutSignal(PROBE_TIMEOUT_MS, signal))) as LatestJson
-        return { info: manifestToInfo(data) }
-      },
+    ...manifestProbes.map(
+      ({ url, mirrorPrefix }) =>
+        async (signal: AbortSignal) => {
+          const data = (await fetchJson(url, timeoutSignal(PROBE_TIMEOUT_MS, signal))) as LatestJson
+          return { info: manifestToInfo(data, mirrorPrefix) }
+        },
     ),
-    ...apiUrls.map(
-      (url) => async (signal: AbortSignal) => {
-        const data = (await fetchJson(url, timeoutSignal(PROBE_TIMEOUT_MS, signal))) as Parameters<
-          typeof apiToInfo
-        >[0]
-        return { info: apiToInfo(data) }
-      },
+    ...apiProbes.map(
+      ({ url, mirrorPrefix }) =>
+        async (signal: AbortSignal) => {
+          const data = (await fetchJson(url, timeoutSignal(PROBE_TIMEOUT_MS, signal))) as Parameters<
+            typeof apiToInfo
+          >[0]
+          return { info: apiToInfo(data, mirrorPrefix) }
+        },
     ),
   ]
 

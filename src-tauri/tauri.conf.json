@@ -62,8 +62,11 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVFRjAyMTFEOTYwRTlERTYKUldUbW5RNldIU0h3WGthRGI5cVRseTF4KzFmcnd2V0FPOXJJdE01aG8zcFhHMHdRNkNmOVU2SFgK",
       "endpoints": [
-        "https://ghfast.top/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
         "https://gh-proxy.com/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
+        "https://ghproxy.net/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
+        "https://mirror.ghproxy.com/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
+        "https://gh.llkk.cc/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
+        "https://ghfast.top/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
         "https://github.com/aeroray/Museek/releases/latest/download/latest.json"
       ]
     }

@@ -38,10 +38,13 @@ export function AboutSettings() {
   const [installing, setInstalling] = useState(false)
   const [progress, setProgress] = useState<DownloadProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** Index into update.downloadUrls for “try another mirror”. */
+  const [mirrorIndex, setMirrorIndex] = useState(0)
 
   const checkUpdate = async () => {
     setChecking(true)
     setError(null)
+    setMirrorIndex(0)
     try {
       const info = await checkForAppUpdate()
       if (info) {
@@ -67,11 +70,25 @@ export function AboutSettings() {
       await installAppUpdate(setProgress)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+    } finally {
       setInstalling(false)
     }
   }
 
-  const manualUrl = update?.downloadUrl || RELEASES_URL
+  const mirrorUrls = update?.downloadUrls?.length
+    ? update.downloadUrls
+    : update?.downloadUrl
+      ? [update.downloadUrl]
+      : [RELEASES_URL]
+  const manualUrl = mirrorUrls[mirrorIndex % mirrorUrls.length] ?? RELEASES_URL
+  const canCycleMirror = !update?.canInstall && mirrorUrls.length > 1
+
+  const openMirror = () => void openExternal(manualUrl)
+  const tryAnotherMirror = () => {
+    const next = (mirrorIndex + 1) % mirrorUrls.length
+    setMirrorIndex(next)
+    void openExternal(mirrorUrls[next] ?? RELEASES_URL)
+  }
 
   return (
     <ScrollArea className="h-full">
@@ -117,6 +134,7 @@ export function AboutSettings() {
             setUpdate(null)
             setError(null)
             setProgress(null)
+            setMirrorIndex(0)
           }
         }}
       >
@@ -155,10 +173,17 @@ export function AboutSettings() {
                     {t("about.installNow")}
                   </Button>
                 ) : (
-                  <Button onClick={() => void openExternal(manualUrl)}>
-                    <ExternalLink size={15} className="mr-2" />
-                    {t("about.mirrorDownload")}
-                  </Button>
+                  <>
+                    {canCycleMirror && (
+                      <Button variant="outline" onClick={tryAnotherMirror}>
+                        {t("about.tryAnotherMirror")}
+                      </Button>
+                    )}
+                    <Button onClick={openMirror}>
+                      <ExternalLink size={15} className="mr-2" />
+                      {t("about.mirrorDownload")}
+                    </Button>
+                  </>
                 )}
               </>
             )}
