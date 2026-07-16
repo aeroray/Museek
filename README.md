@@ -90,13 +90,19 @@ pnpm install
 pnpm tauri dev
 ```
 
+Install deps, then run the desktop app in dev mode.  
+安装依赖后，以开发模式启动桌面应用。
+
 ### Build · 打包
 
 ```bash
-# Windows → NSIS setup.exe（随系统语言自动中/英文安装界面）
+# Windows → NSIS setup.exe (installer UI follows OS language: Chinese / English)
+# Windows → NSIS setup.exe（安装界面随系统语言自动中/英文）
 # Requires updater signing key in the environment (see Auto-update below).
+# 需在环境中配置更新签名私钥（见下方「应用内更新」）。
 pnpm tauri build
 
+# macOS Apple Silicon → DMG (build on an Apple Silicon Mac)
 # macOS Apple Silicon → DMG（需在 Apple Silicon Mac 上构建）
 pnpm tauri build -- --target aarch64-apple-darwin
 ```
@@ -107,30 +113,30 @@ Installers land in `src-tauri/target/*/release/bundle/` (Windows: NSIS `setup.ex
 ### Auto-update · 应用内更新
 
 In-app updates use [`tauri-plugin-updater`](https://v2.tauri.app/plugin/updater/) against  
-`https://github.com/aeroray/Museek/releases/latest/download/latest.json`.
+`https://github.com/aeroray/Museek/releases/latest/download/latest.json`.  
+应用内更新使用官方 [`tauri-plugin-updater`](https://v2.tauri.app/plugin/updater/)，清单地址同上（GitHub Releases 上的 `latest.json`）。
 
-**Signing keys（私钥勿提交仓库）**
+**Signing keys · 签名密钥**（never commit the private key · 私钥勿提交仓库）
 
 ```bash
-# Already generated locally for this machine (example path):
-#   %USERPROFILE%\.tauri\museek.key      — private
-#   %USERPROFILE%\.tauri\museek.key.pub  — public (also in tauri.conf.json)
+# Example local paths · 本机示例路径：
+#   %USERPROFILE%\.tauri\museek.key      — private · 私钥
+#   %USERPROFILE%\.tauri\museek.key.pub  — public · 公钥（已写入 tauri.conf.json）
 
-# Local signed build:
+# Local signed build · 本地签名构建：
 set TAURI_SIGNING_PRIVATE_KEY_PATH=%USERPROFILE%\.tauri\museek.key
 pnpm tauri build
 ```
 
-**GitHub Actions secrets**
+**GitHub Actions secrets · CI 密钥**
 
-| Secret | Value |
-| --- | --- |
-| `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `museek.key` |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password if the key has one (omit / empty if none) |
+| Secret | English | 中文 |
+| --- | --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `museek.key` | `museek.key` 的完整内容 |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password if the key has one (omit / empty if none) | 若密钥有密码则填写；无密码可省略或留空 |
 
-Tag a release (`git tag vX.Y.Z && git push origin vX.Y.Z`). The Release workflow uploads installers, `.sig` files, and `latest.json` (`includeUpdaterJson: true`). Publish the draft release so clients can see it.
-
-应用内更新走官方 updater，清单为 GitHub Releases 上的 `latest.json`。发版前设置上述 Secret；打 `v*` 标签后由 CI 生成签名产物并写入 `latest.json`。
+Tag a release (`git tag vX.Y.Z && git push origin vX.Y.Z`). The Release workflow uploads installers, `.sig` files, and `latest.json` (`includeUpdaterJson: true`). Publish the draft release so clients can see it.  
+打标签发版（`git tag vX.Y.Z && git push origin vX.Y.Z`）。Release 工作流会上传安装包、`.sig` 与 `latest.json`（`includeUpdaterJson: true`）。请把草稿 Release **Publish** 发布后，客户端才能检查到更新。
 
 ### First play · 第一次播放
 
@@ -161,7 +167,7 @@ Scan to follow — send **音源** for source links and updates.
 ## Tech · 技术栈
 
 - **[Tauri 2](https://tauri.app/)** (Rust) — native shell, plugins, OS media controls<br>**[Tauri 2](https://tauri.app/)**（Rust）—— 轻量原生外壳与插件，以及系统媒体控制
-- **[React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/)**
+- **[React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/)** — UI toolchain<br>**[React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/)** —— 前端技术栈
 - **[Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)** · **[Zustand](https://zustand-demo.pmnd.rs/)** · React Router<br>**[Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)** · **[Zustand](https://zustand-demo.pmnd.rs/)** · React Router 构建界面与状态
 - Crypto helpers (`js-md5`, `aes-js`, `node-forge`, `pako`) for encrypted lyric / source formats<br>加密相关：`js-md5`、`aes-js`、`node-forge`、`pako`，用于加密歌词 / 音源格式
 
