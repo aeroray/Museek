@@ -51,9 +51,9 @@ function AppInit() {
       })
     })
 
-    // Defer update check so first paint stays snappy; result drives the sidebar card.
+    // One automatic update check per launch (after first paint).
     const timer = window.setTimeout(() => {
-      void useUpdateStore.getState().checkInBackground()
+      void useUpdateStore.getState().checkOnStartup()
     }, 2500)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps

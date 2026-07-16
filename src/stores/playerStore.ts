@@ -306,10 +306,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             ? "error"
             : state.status
 
+      // Use the *computed* status for isPlaying — if we keyed off storeStatus==="loading"
+      // after already promoting status to "playing", one frame shows Play instead of Pause.
       set({
-        isPlaying: storeStatus === "loading" ? false : state.isPlaying,
-        currentTime: storeStatus === "loading" ? 0 : state.currentTime,
-        duration: storeStatus === "loading" ? 0 : state.duration,
+        isPlaying: status === "loading" ? false : state.isPlaying,
+        currentTime: status === "loading" ? 0 : state.currentTime,
+        duration: status === "loading" ? 0 : state.duration,
         status,
         currentLyricIndex,
       })

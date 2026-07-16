@@ -201,8 +201,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "about.updateTitle": "发现新版本",
     "about.updateDesc": "有新版本 v{version} 可用，点击前往 GitHub 下载安装包。",
     "about.updateDescInstall": "有新版本 v{version} 可用。可在应用内下载安装并自动重启，或前往 GitHub 手动下载。",
+    "about.updateDescMirror": "有新版本 v{version} 可用。当前网络无法直连 GitHub 完成应用内安装，请使用镜像下载或打开 Releases。",
     "about.download": "前往下载",
     "about.installNow": "立即更新",
+    "about.mirrorDownload": "镜像下载",
     "about.later": "稍后",
     "about.updating": "正在下载安装…",
     "about.updatingPercent": "正在下载安装… {percent}%",
@@ -213,6 +215,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "update.cardTitle": "新版本 v{version}",
     "update.goUpdate": "去更新",
     "update.dismiss": "关闭提示",
+    "update.availableToast": "发现新版本 v{version}",
 
     // Quality labels
     "quality.128k": "标准 128k",
@@ -536,8 +539,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "about.updateTitle": "Update available",
     "about.updateDesc": "Version v{version} is available. Click to download the installer from GitHub.",
     "about.updateDescInstall": "Version v{version} is available. Install in-app and relaunch, or open GitHub for a manual download.",
+    "about.updateDescMirror": "Version v{version} is available. In-app install needs GitHub access; use the mirror download or open Releases instead.",
     "about.download": "Download",
     "about.installNow": "Update now",
+    "about.mirrorDownload": "Mirror download",
     "about.later": "Later",
     "about.updating": "Downloading and installing…",
     "about.updatingPercent": "Downloading and installing… {percent}%",
@@ -548,6 +553,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "update.cardTitle": "New version v{version}",
     "update.goUpdate": "Update",
     "update.dismiss": "Dismiss",
+    "update.availableToast": "Update available: v{version}",
 
     // Quality labels
     "quality.128k": "Standard 128k",

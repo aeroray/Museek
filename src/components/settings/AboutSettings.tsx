@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { RefreshCw, Loader2, Download } from "lucide-react"
+import { RefreshCw, Loader2, Download, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -51,7 +51,7 @@ export function AboutSettings() {
       }
     } catch (e) {
       useUiStore.getState().notify({
-        message: t("about.checkFailed", { msg: String(e) }),
+        message: t("about.checkFailed", { msg: String(e instanceof Error ? e.message : e) }),
         variant: "error",
       })
     } finally {
@@ -66,10 +66,12 @@ export function AboutSettings() {
     try {
       await installAppUpdate(setProgress)
     } catch (e) {
-      setError(String(e))
+      setError(e instanceof Error ? e.message : String(e))
       setInstalling(false)
     }
   }
+
+  const manualUrl = update?.downloadUrl || RELEASES_URL
 
   return (
     <ScrollArea className="h-full">
@@ -80,7 +82,6 @@ export function AboutSettings() {
               <p className="text-base font-semibold">{t("app.name")}</p>
               <p className="text-muted-foreground">{t("settings.about.version", { version: __APP_VERSION__ })}</p>
               <p className="text-muted-foreground">{t("settings.about.description")}</p>
-              <p className="pt-2 text-muted-foreground">{t("app.tagline")}</p>
             </div>
             <Button variant="outline" size="sm" onClick={() => void checkUpdate()} disabled={checking} className="shrink-0">
               {checking ? (
@@ -123,7 +124,9 @@ export function AboutSettings() {
           <DialogHeader>
             <DialogTitle>{t("about.updateTitle")}</DialogTitle>
             <DialogDescription>
-              {t("about.updateDescInstall", { version: update?.version ?? "" })}
+              {update?.canInstall
+                ? t("about.updateDescInstall", { version: update.version })
+                : t("about.updateDescMirror", { version: update?.version ?? "" })}
             </DialogDescription>
           </DialogHeader>
           {installing && (
@@ -137,7 +140,7 @@ export function AboutSettings() {
             </div>
           )}
           {error && <p className="text-sm text-destructive">{t("about.updateFailed", { msg: error })}</p>}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-0 flex-wrap">
             {!installing && (
               <>
                 <Button variant="ghost" size="sm" onClick={() => void openExternal(RELEASES_URL)}>
@@ -146,10 +149,17 @@ export function AboutSettings() {
                 <Button variant="outline" onClick={() => setUpdate(null)}>
                   {t("common.cancel")}
                 </Button>
-                <Button onClick={() => void onInstall()}>
-                  <Download size={15} className="mr-2" />
-                  {t("about.installNow")}
-                </Button>
+                {update?.canInstall ? (
+                  <Button onClick={() => void onInstall()}>
+                    <Download size={15} className="mr-2" />
+                    {t("about.installNow")}
+                  </Button>
+                ) : (
+                  <Button onClick={() => void openExternal(manualUrl)}>
+                    <ExternalLink size={15} className="mr-2" />
+                    {t("about.mirrorDownload")}
+                  </Button>
+                )}
               </>
             )}
             {installing && (
