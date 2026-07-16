@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TrackRow } from "@/components/common/TrackRow"
+import { VirtualList } from "@/components/common/VirtualList"
 import { getHotPlaylists, getPlaylistDetail, type Playlist } from "@/lib/playlists"
 import { playPlaylist } from "@/lib/playlists/play"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
@@ -19,7 +20,7 @@ import type { MusicInfo } from "@/types/music"
 
 export function HotPlaylists() {
   const t = useT()
-  const { playAll } = usePlayerStore()
+  const playAll = usePlayerStore((s) => s.playAll)
   const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
   const addFavoritePlaylist = usePlaylistStore((s) => s.addFavoritePlaylist)
   const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)
@@ -44,15 +45,23 @@ export function HotPlaylists() {
   const [detailLoading, setDetailLoading] = useState(!!openFromNav)
   const [detailError, setDetailError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
   const [filter, setFilter] = useState("")
 
-  // Reset scroll to the top when drilling into a playlist or going back, so the
-  // new view doesn't inherit the previous list's scroll offset.
+  // Bind the Radix viewport once mounted (needed for virtualization + scroll reset).
   useEffect(() => {
     const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    if (vp) vp.scrollTop = 0
+    setViewportEl(vp instanceof HTMLElement ? vp : null)
+  }, [selected, detailLoading])
+
+  useEffect(() => {
     setFilter("")
   }, [selected])
+
+  // Reset scroll to the top when drilling into a playlist or going back.
+  useEffect(() => {
+    if (viewportEl) viewportEl.scrollTop = 0
+  }, [selected, viewportEl])
 
   // Load the platform's hot playlists. Extracted so the retry button can re-run it.
   const loadList = useCallback(() => {
@@ -225,9 +234,15 @@ export function HotPlaylists() {
               {shownSongs.length === 0 ? (
                 <div className="text-center py-16 text-sm text-muted-foreground">{t("hotPlaylists.noMatch")}</div>
               ) : (
-                shownSongs.map(({ song, rank }) => (
-                  <TrackRow key={song.id} song={song} rank={rank} fallbackImg={selected?.img} />
-                ))
+                <VirtualList
+                  items={shownSongs}
+                  scrollElement={viewportEl}
+                  getKey={(row) => row.song.id}
+                >
+                  {(row) => (
+                    <TrackRow song={row.song} rank={row.rank} fallbackImg={selected?.img} />
+                  )}
+                </VirtualList>
               )}
             </div>
           )

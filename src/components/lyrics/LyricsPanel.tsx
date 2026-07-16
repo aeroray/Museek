@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { X, AArrowUp, AArrowDown } from "lucide-react"
+import { X, AArrowUp, AArrowDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -16,15 +16,40 @@ const LYRIC_FONT_KEY = "museek.lyricFontScale"
 const FADE = "linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%)"
 
 export function LyricsPanel() {
-  const { currentSong, lyricLines, currentLyricIndex, showLyrics, currentPicUrl, isPlaying, setShowLyrics, seek } =
-    usePlayerStore()
+  const currentSong = usePlayerStore((s) => s.currentSong)
+  const lyricLines = usePlayerStore((s) => s.lyricLines)
+  const currentLyricIndex = usePlayerStore((s) => s.currentLyricIndex)
+  const showLyrics = usePlayerStore((s) => s.showLyrics)
+  const lyricsLoading = usePlayerStore((s) => s.lyricsLoading)
+  const currentPicUrl = usePlayerStore((s) => s.currentPicUrl)
+  const isPlaying = usePlayerStore((s) => s.isPlaying)
+  const setShowLyrics = usePlayerStore((s) => s.setShowLyrics)
+  const seek = usePlayerStore((s) => s.seek)
   const t = useT()
   const [fontScale, setFontScale] = useState(() => {
     const v = parseFloat(localStorage.getItem(LYRIC_FONT_KEY) ?? "")
     return Number.isFinite(v) ? Math.min(FONT_MAX, Math.max(FONT_MIN, v)) : 1
   })
+  const [coverReady, setCoverReady] = useState(false)
   const lineRefs = useRef<(HTMLDivElement | null)[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
+  const coverSrc = currentPicUrl
+    ? (hiResCover(currentPicUrl, currentSong?.source) ?? currentPicUrl)
+    : null
+
+  // Reset cover fade whenever the art URL changes (first open / track switch).
+  useEffect(() => {
+    setCoverReady(false)
+  }, [coverSrc])
+
+  // Preload blur backdrop so we can fade it in with the cover (avoids a harsh pop).
+  useEffect(() => {
+    if (!currentPicUrl) return
+    const img = new Image()
+    img.onload = () => setCoverReady(true)
+    img.onerror = () => setCoverReady(true)
+    img.src = currentPicUrl
+  }, [currentPicUrl])
 
   // Center the active lyric line by scrolling ONLY the lyric viewport — never via
   // element.scrollIntoView(), which also scrolls scrollable ancestors and the
@@ -48,14 +73,13 @@ export function LyricsPanel() {
     if (currentLyricIndex >= 0) centerActiveLine("smooth")
   }, [currentLyricIndex, centerActiveLine])
 
-  // The panel stays mounted (it only toggles visibility), so opening it mid-song
-  // wouldn't re-trigger the scroll above. Jump straight to the current line when
-  // the panel opens. rAF waits for the lyric list to lay out.
+  // Jump to the current line when the panel opens or lyrics finish loading.
+  // rAF waits for the lyric list to lay out.
   useEffect(() => {
-    if (!showLyrics) return
+    if (!showLyrics || lyricsLoading || lyricLines.length === 0) return
     const id = requestAnimationFrame(() => centerActiveLine("auto"))
     return () => cancelAnimationFrame(id)
-  }, [showLyrics, centerActiveLine])
+  }, [showLyrics, lyricsLoading, lyricLines.length, centerActiveLine])
 
   // Close the panel with Esc.
   useEffect(() => {
@@ -78,20 +102,23 @@ export function LyricsPanel() {
 
   return createPortal(
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-background">
-      {/* Heavily-blurred album cover as the backdrop (premium look); the gradient
-          is the fallback when the track has no cover. A scrim keeps text legible. */}
+      {/* Heavily-blurred album cover as the backdrop; gradient is the fallback. */}
       {currentPicUrl ? (
         <div
-          className="absolute inset-0 scale-125 bg-cover bg-center"
+          className={cn(
+            "absolute inset-0 scale-125 bg-cover bg-center transition-opacity duration-500",
+            coverReady ? "opacity-100" : "opacity-0"
+          )}
           style={{ backgroundImage: `url(${currentPicUrl})`, filter: "blur(80px) saturate(1.5)" }}
         />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-background to-secondary/30" />
-      )}
-      {/* Scrim tint for legibility. We deliberately DON'T use backdrop-blur here:
-          on macOS WKWebView a viewport-sized backdrop-filter can leave an
-          unblurred strip at the bottom edge. The backdrop layer above already
-          carries a reliable filter blur, so the tint alone is enough. */}
+      ) : null}
+      <div
+        className={cn(
+          "absolute inset-0 bg-gradient-to-br from-primary/30 via-background to-secondary/30 transition-opacity duration-500",
+          currentPicUrl && coverReady ? "opacity-0" : "opacity-100"
+        )}
+      />
+      {/* Scrim tint for legibility — no viewport-sized backdrop-blur (WKWebView edge bug). */}
       <div className="absolute inset-0 bg-background/65" />
 
       {/* Top-right controls: font size + close */}
@@ -140,7 +167,6 @@ export function LyricsPanel() {
               isPlaying && "lyric-cover-float"
             )}
           >
-            {/* A theme-color light that flows around the border while playing. */}
             {isPlaying && <span className="lyric-cover-beam" aria-hidden="true" />}
             <div
               className={cn(
@@ -148,11 +174,21 @@ export function LyricsPanel() {
                 isPlaying ? "inset-[2px] rounded-[14px]" : "inset-0 rounded-2xl"
               )}
             >
-              {currentPicUrl ? (
+              {coverSrc ? (
                 <img
-                  src={hiResCover(currentPicUrl, currentSong?.source) ?? currentPicUrl}
+                  key={coverSrc}
+                  src={coverSrc}
                   alt="album"
-                  className="w-full h-full object-cover"
+                  ref={(el) => {
+                    // Cached images may finish before onLoad attaches — reconcile.
+                    if (el?.complete) setCoverReady(true)
+                  }}
+                  onLoad={() => setCoverReady(true)}
+                  onError={() => setCoverReady(true)}
+                  className={cn(
+                    "w-full h-full object-cover transition-opacity duration-500",
+                    coverReady ? "opacity-100" : "opacity-0"
+                  )}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -166,12 +202,17 @@ export function LyricsPanel() {
         {/* Right: centered lyrics with a top/bottom fade */}
         <div className="flex-1 min-h-0" style={{ maskImage: FADE, WebkitMaskImage: FADE }}>
           <ScrollArea ref={scrollRef} className="h-full">
-            {lyricLines.length === 0 ? (
+            {lyricsLoading ? (
+              <div className="flex flex-col items-center justify-center gap-3 h-full min-h-[60vh] text-muted-foreground">
+                <Loader2 size={28} className="animate-spin" />
+                <p className="text-sm">{t("lyrics.loading")}</p>
+              </div>
+            ) : lyricLines.length === 0 ? (
               <div className="flex items-center justify-center h-full min-h-[60vh] text-muted-foreground">
                 {currentSong ? t("lyrics.empty") : t("lyrics.selectSong")}
               </div>
             ) : (
-              <div className="py-[42vh] px-10 text-center">
+              <div className="py-[42vh] px-10 text-center animate-in fade-in duration-300">
                 {lyricLines.map((line, i) => {
                   const active = i === currentLyricIndex
                   return (

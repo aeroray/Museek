@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react"
 import { Play, Plus, Heart, Download, Music } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CoverImage } from "@/components/common/CoverImage"
@@ -20,8 +21,11 @@ import type { MusicInfo, Quality } from "@/types/music"
  * Shared song row for the Search / Charts / Hot-playlist lists. Hover reveals
  * the play overlay + queue/download actions; the favorite heart stays visible
  * once a song is favorited so the state is obvious at a glance.
+ *
+ * Store subscriptions are narrow on purpose — a full `usePlayerStore()` would
+ * re-render every row on each audio timeupdate and make large lists feel sticky.
  */
-export function TrackRow({
+export const TrackRow = memo(function TrackRow({
   song,
   rank,
   fallbackImg,
@@ -32,13 +36,15 @@ export function TrackRow({
    *  the playlist's cover). Display only — never written back to the song. */
   fallbackImg?: string | null
 }) {
-  const { play, addToQueue } = usePlayerStore()
-  const { addToFavorites, removeFromFavorites, isFavorite } = usePlaylistStore()
-  const { addTask } = useDownloadStore()
+  const play = usePlayerStore((s) => s.play)
+  const addToQueue = usePlayerStore((s) => s.addToQueue)
+  const fav = usePlaylistStore((s) => s.favorites.some((f) => f.id === song.id))
+  const addToFavorites = usePlaylistStore((s) => s.addToFavorites)
+  const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites)
+  const addTask = useDownloadStore((s) => s.addTask)
   const t = useT()
-  const fav = isFavorite(song.id)
   const thumb = song.meta.picUrl || fallbackImg
-  const best = bestQuality(song)
+  const best = useMemo(() => bestQuality(song), [song])
 
   return (
     <div
@@ -59,7 +65,7 @@ export function TrackRow({
         )}
         <button
           onClick={() => play(song)}
-          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100"
         >
           <Play size={16} className="ml-0.5 text-white" fill="currentColor" strokeWidth={0} />
         </button>
@@ -95,7 +101,7 @@ export function TrackRow({
         <Button
           variant="ghost"
           size="icon"
-          className={cn("h-8 w-8 transition-opacity duration-150", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
+          className={cn("h-8 w-8", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
           onClick={(e) => {
             e.stopPropagation()
             if (fav) removeFromFavorites(song.id)
@@ -134,4 +140,4 @@ export function TrackRow({
       </div>
     </div>
   )
-}
+})

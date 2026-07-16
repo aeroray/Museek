@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 
 export function Library() {
   const t = useT()
-  const { playAll } = usePlayerStore()
+  const playAll = usePlayerStore((s) => s.playAll)
   // Platform + board live in the UI store so the choice survives leaving and
   // returning to this page. An empty stored board falls back to the platform's first.
   const source = useUiStore((s) => s.chartSource)

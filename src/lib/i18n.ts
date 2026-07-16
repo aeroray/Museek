@@ -179,6 +179,7 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Lyrics panel
     "lyrics.empty": "暂无歌词",
+    "lyrics.loading": "歌词加载中…",
     "lyrics.selectSong": "请选择歌曲",
     "lyrics.noCover": "No Cover",
 
@@ -503,6 +504,7 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Lyrics panel
     "lyrics.empty": "No lyrics",
+    "lyrics.loading": "Loading lyrics…",
     "lyrics.selectSong": "Select a song",
     "lyrics.noCover": "No Cover",
 

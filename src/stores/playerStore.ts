@@ -65,6 +65,8 @@ interface PlayerState {
   error: string | null
   lyricLines: LyricLine[]
   currentLyricIndex: number
+  /** True while fetching/parsing lyrics for the current song (avoids empty→content flash). */
+  lyricsLoading: boolean
   showQueue: boolean
   showLyrics: boolean
   currentPicUrl: string | null
@@ -125,6 +127,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     error: null,
     lyricLines: [],
     currentLyricIndex: -1,
+    lyricsLoading: false,
     showQueue: false,
     showLyrics: false,
     currentPicUrl: null,
@@ -156,6 +159,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         status: "loading",
         error: null,
         lyricLines: [],
+        currentLyricIndex: -1,
+        lyricsLoading: true,
         currentPicUrl: null,
         currentTime: 0,
         duration: 0,
@@ -203,7 +208,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         const isNetwork =
           /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(raw)
         const message = isNetwork ? t("player.err.network", { msg: raw }) : t("player.failedDetail", { msg: raw })
-        set({ status: "error", error: message })
+        set({ status: "error", error: message, lyricsLoading: false })
         useUiStore.getState().notify({ message, variant: "error" })
         return
       }
@@ -384,6 +389,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           duration: 0,
           lyricLines: [],
           currentLyricIndex: -1,
+          lyricsLoading: false,
           currentPicUrl: null,
         })
         return
@@ -398,17 +404,28 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     async _loadLyric(song) {
       // Disk cache first (avoids re-fetching + re-decrypting on replay), then
       // built-in per-platform lyric APIs, then a source script.
-      let lyricInfo = await getCachedLyric(song.source, song.meta.songId)
-      if (!lyricInfo?.lyric) {
-        lyricInfo = await getBuiltinLyric(song)
+      const songId = song.id
+      set({ lyricsLoading: true })
+      try {
+        let lyricInfo = await getCachedLyric(song.source, song.meta.songId)
         if (!lyricInfo?.lyric) {
-          lyricInfo = await sourceRunner.getLyric({ source: song.source, action: "lyric", info: song })
+          lyricInfo = await getBuiltinLyric(song)
+          if (!lyricInfo?.lyric) {
+            lyricInfo = await sourceRunner.getLyric({ source: song.source, action: "lyric", info: song })
+          }
+          if (lyricInfo?.lyric) putCachedLyric(song.source, song.meta.songId, lyricInfo)
         }
-        if (lyricInfo?.lyric) putCachedLyric(song.source, song.meta.songId, lyricInfo)
-      }
-      if (lyricInfo?.lyric) {
-        const lines = parseLrc(lyricInfo.lyric, lyricInfo.tlyric ?? undefined)
-        set({ lyricLines: lines })
+        // Stale result after a quick track change — don't clobber the new song.
+        if (get().currentSong?.id !== songId) return
+        if (lyricInfo?.lyric) {
+          const lines = parseLrc(lyricInfo.lyric, lyricInfo.tlyric ?? undefined)
+          set({ lyricLines: lines, lyricsLoading: false })
+        } else {
+          set({ lyricLines: [], lyricsLoading: false })
+        }
+      } catch {
+        if (get().currentSong?.id !== songId) return
+        set({ lyricLines: [], lyricsLoading: false })
       }
     },
 
@@ -446,6 +463,7 @@ if (import.meta.hot) {
       currentPicUrl: s.currentPicUrl,
       lyricLines: s.lyricLines,
       currentLyricIndex: s.currentLyricIndex,
+      lyricsLoading: s.lyricsLoading,
       volume: s.volume,
       muted: s.muted,
     }

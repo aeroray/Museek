@@ -9,7 +9,8 @@ import { useT } from "@/lib/i18n"
 export function Playlist() {
   const { id } = useParams<{ id: string }>()
   const { userLists, removeSongFromPlaylist, deletePlaylist } = usePlaylistStore()
-  const { play, addToQueue } = usePlayerStore()
+  const play = usePlayerStore((s) => s.play)
+  const addToQueue = usePlayerStore((s) => s.addToQueue)
   const t = useT()
 
   const playlist = userLists.find((p) => p.id === id)

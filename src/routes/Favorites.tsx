@@ -26,10 +26,17 @@ const PLATFORMS: Source[] = ["wy", "kw", "kg", "tx", "mg"]
 const SORTS = ["added", "name"] as const
 
 export function Favorites() {
-  const { favorites, removeFromFavorites, favoritePlaylists, removeFavoritePlaylist } = usePlaylistStore()
-  const { play, playAll } = usePlayerStore()
-  const { addTask } = useDownloadStore()
-  const { favoritesSort, favoritesPlatform, setFavoritesSort, setFavoritesPlatform } = useSettingsStore()
+  const favorites = usePlaylistStore((s) => s.favorites)
+  const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites)
+  const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
+  const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)
+  const play = usePlayerStore((s) => s.play)
+  const playAll = usePlayerStore((s) => s.playAll)
+  const addTask = useDownloadStore((s) => s.addTask)
+  const favoritesSort = useSettingsStore((s) => s.favoritesSort)
+  const favoritesPlatform = useSettingsStore((s) => s.favoritesPlatform)
+  const setFavoritesSort = useSettingsStore((s) => s.setFavoritesSort)
+  const setFavoritesPlatform = useSettingsStore((s) => s.setFavoritesPlatform)
   const tab = useUiStore((s) => s.favoritesTab)
   const setTab = useUiStore((s) => s.setFavoritesTab)
   const t = useT()
@@ -283,7 +290,7 @@ export function Favorites() {
                       {!editing && (
                         <button
                           onClick={() => play(song)}
-                          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100"
                         >
                           <Play size={16} className="ml-0.5 text-white" fill="currentColor" strokeWidth={0} />
                         </button>
