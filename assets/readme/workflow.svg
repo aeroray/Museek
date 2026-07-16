@@ -1,29 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
-  <title id="title">How Museek works</title>
-  <desc id="desc">Discovery uses public platform APIs. Playback URLs come from user-imported lx-music compatible source scripts.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" role="img" aria-labelledby="title desc">
+  <title id="title">How Museek works · 工作原理</title>
+  <desc id="desc">Discover via public APIs; play via user source scripts / 发现走公开 API，播放走你导入的音源脚本</desc>
   <defs>
     <linearGradient id="wfbg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0A0A0C"/>
       <stop offset="100%" stop-color="#101418"/>
     </linearGradient>
   </defs>
-  <rect width="1200" height="360" rx="28" fill="url(#wfbg)"/>
-  <text x="56" y="58" fill="#7A7A86" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" letter-spacing="2">ARCHITECTURE</text>
-  <text x="56" y="98" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="34" font-weight="700">Two lanes, one player</text>
-  <text x="56" y="132" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16">Discover via public APIs · play via your source scripts · Museek hosts no music</text>
-  <g transform="translate(56 168)">
-    <rect width="520" height="140" rx="20" fill="#141418" stroke="#2A2A32"/>
-    <text x="24" y="36" fill="#1FDD7A" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" font-weight="700" letter-spacing="1.5">LANE A · DISCOVER</text>
-    <text x="24" y="68" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="20" font-weight="650">Search · Charts · Playlists</text>
-    <text x="24" y="98" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">Renderer → Tauri HTTP → platform public web APIs</text>
-    <text x="24" y="122" fill="#5C5C68" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13">cached / throttled read-only requests</text>
+  <rect width="1200" height="380" rx="28" fill="url(#wfbg)"/>
+  <text x="56" y="52" fill="#7A7A86" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13" letter-spacing="2">ARCHITECTURE · 架构</text>
+  <text x="56" y="92" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="32" font-weight="700">Two lanes, one player · 双通道，一个播放器</text>
+  <text x="56" y="126" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="15">Discover via public APIs · play via your scripts · Museek hosts no music</text>
+  <text x="56" y="150" fill="#6E6E7A" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="14">发现走公开 API · 播放走你导入的音源脚本 · 拾音本身不托管任何音乐</text>
+  <g transform="translate(56 180)">
+    <rect width="520" height="150" rx="20" fill="#141418" stroke="#2A2A32"/>
+    <text x="24" y="34" fill="#1FDD7A" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" font-weight="700" letter-spacing="1.2">LANE A · DISCOVER · 发现</text>
+    <text x="24" y="66" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="18" font-weight="650">Search · Charts · Playlists</text>
+    <text x="24" y="92" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="14">搜索 · 排行榜 · 歌单</text>
+    <text x="24" y="120" fill="#6E6E7A" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13">Renderer → Tauri HTTP → public web APIs</text>
   </g>
-  <g transform="translate(624 168)">
-    <rect width="520" height="140" rx="20" fill="#141418" stroke="#2A2A32"/>
-    <text x="24" y="36" fill="#1FDD7A" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" font-weight="700" letter-spacing="1.5">LANE B · PLAY</text>
-    <text x="24" y="68" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="20" font-weight="650">musicUrl · lyric · pic</text>
-    <text x="24" y="98" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">lx-music scripts behind globalThis.lx · multi-source failover</text>
-    <text x="24" y="122" fill="#5C5C68" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13">skips short VIP trial clips, then tries the next source</text>
+  <g transform="translate(624 180)">
+    <rect width="520" height="150" rx="20" fill="#141418" stroke="#2A2A32"/>
+    <text x="24" y="34" fill="#1FDD7A" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="12" font-weight="700" letter-spacing="1.2">LANE B · PLAY · 播放</text>
+    <text x="24" y="66" fill="#F4F4F8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="18" font-weight="650">musicUrl · lyric · pic</text>
+    <text x="24" y="92" fill="#8A8A96" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="14">音源脚本 · 多源失败转移 · 跳过 VIP 试听提示音</text>
+    <text x="24" y="120" fill="#6E6E7A" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13">lx-music scripts behind globalThis.lx</text>
   </g>
 </svg>

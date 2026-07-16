@@ -1,6 +1,6 @@
 <div align="center">
 
-![Museek — desktop music aggregator across NetEase, KuWo, KuGou, QQ Music, and Migu](./assets/readme/hero.svg)
+![Museek · 拾音 — desktop music aggregator / 跨平台桌面音乐聚合](./assets/readme/hero.svg)
 
 </div>
 
@@ -51,17 +51,17 @@
 
 | | English | 中文 |
 | --- | --- | --- |
-| **Discover** | Search songs, playlists, and users across five platforms; browse charts and hot playlists; trending word cloud on empty search. | 五平台搜索单曲 / 歌单 / 用户；排行榜与热门歌单；空搜索页热词云。 |
-| **Sources** | Import lx-music scripts by URL (paste several at once). Multi-source failover; skips short VIP trial clips. | 链接导入音源（可一次粘贴多条）。多源失败转移；跳过 VIP 试听提示音。 |
-| **Player** | Queue, shuffle / repeat, quality auto-downgrade, immersive synced lyrics, Windows SMTC / macOS Now Playing, keyboard shortcuts. | 队列与循环模式、音质自动降级、沉浸歌词、系统媒体控制、键盘快捷键。 |
-| **Library** | Favorite songs & whole playlists; batch download; disk cache for audio / lyrics / covers. | 收藏单曲与歌单；批量下载；音频 / 歌词 / 封面本地缓存。 |
-| **Desktop** | Light / dark / system themes, EN / 简体中文, tray close behavior, prevent-sleep while playing, encrypted cloud-folder sync. | 主题与中英界面、托盘关闭、播放防休眠、网盘文件夹加密同步。 |
+| **Discover · 发现** | Search songs, playlists, and users across five platforms; browse charts and hot playlists; trending word cloud on empty search. | 五平台搜索单曲 / 歌单 / 用户；排行榜与热门歌单；空搜索页热词云。 |
+| **Sources · 音源** | Import lx-music scripts by URL (paste several at once). Multi-source failover; skips short VIP trial clips. | 链接导入音源（可一次粘贴多条）。多源失败转移；跳过 VIP 试听提示音。 |
+| **Player · 播放器** | Queue, shuffle / repeat, quality auto-downgrade, immersive synced lyrics, Windows SMTC / macOS Now Playing, keyboard shortcuts. | 队列与循环模式、音质自动降级、沉浸歌词、系统媒体控制、键盘快捷键。 |
+| **Library · 收藏库** | Favorite songs & whole playlists; batch download; disk cache for audio / lyrics / covers. | 收藏单曲与歌单；批量下载；音频 / 歌词 / 封面本地缓存。 |
+| **Desktop · 桌面** | Light / dark / system themes, EN / 简体中文, tray close behavior, prevent-sleep while playing, encrypted cloud-folder sync. | 主题与中英界面、托盘关闭、播放防休眠、网盘文件夹加密同步。 |
 
 ---
 
 <div align="center">
 
-![How Museek works: discover via public APIs, play via user source scripts](./assets/readme/workflow.svg)
+![How Museek works · 工作原理：公开 API 发现，音源脚本播放](./assets/readme/workflow.svg)
 
 </div>
 
@@ -79,9 +79,9 @@ Search / charts / playlists hit public web APIs through Tauri’s HTTP plugin. P
 
 ### Prerequisites · 环境
 
-- [Node.js](https://nodejs.org/) 18+ and [pnpm](https://pnpm.io/)
-- [Rust](https://www.rust-lang.org/tools/install) stable
-- Tauri 2 [system prerequisites](https://tauri.app/start/prerequisites/) (Windows: WebView2 + MSVC)
+- [Node.js](https://nodejs.org/) 18+ and [pnpm](https://pnpm.io/)<br>[Node.js](https://nodejs.org/) 18+ 与 [pnpm](https://pnpm.io/)
+- [Rust](https://www.rust-lang.org/tools/install) stable<br>[Rust](https://www.rust-lang.org/tools/install) 工具链（stable）
+- Tauri 2 [system prerequisites](https://tauri.app/start/prerequisites/) (Windows: WebView2 + MSVC)<br>Tauri 2 的[系统依赖](https://tauri.app/start/prerequisites/)（Windows 需 WebView2 + MSVC）
 
 ### Develop · 开发
 
@@ -96,7 +96,8 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
-Installers land in `src-tauri/target/release/bundle/` (Windows: `.msi` + NSIS `setup.exe`).
+Installers land in `src-tauri/target/release/bundle/` (Windows: `.msi` + NSIS `setup.exe`).  
+打包产物位于 `src-tauri/target/release/bundle/`（Windows 下为 `.msi` 与 NSIS 的 `setup.exe`）。
 
 ### First play · 第一次播放
 
@@ -126,10 +127,10 @@ Scan to follow — send **音源** for source links and updates.
 
 ## Tech · 技术栈
 
-- **[Tauri 2](https://tauri.app/)** (Rust) — native shell, plugins, OS media controls  
-- **[React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/)**  
-- **[Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)** · **[Zustand](https://zustand-demo.pmnd.rs/)** · React Router  
-- Crypto helpers (`js-md5`, `aes-js`, `node-forge`, `pako`) for encrypted lyric / source formats
+- **[Tauri 2](https://tauri.app/)** (Rust) — native shell, plugins, OS media controls<br>**[Tauri 2](https://tauri.app/)**（Rust）—— 轻量原生外壳与插件，以及系统媒体控制
+- **[React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/)**
+- **[Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)** · **[Zustand](https://zustand-demo.pmnd.rs/)** · React Router<br>**[Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)** · **[Zustand](https://zustand-demo.pmnd.rs/)** · React Router 构建界面与状态
+- Crypto helpers (`js-md5`, `aes-js`, `node-forge`, `pako`) for encrypted lyric / source formats<br>加密相关：`js-md5`、`aes-js`、`node-forge`、`pako`，用于加密歌词 / 音源格式
 
 ---
 
@@ -141,4 +142,5 @@ This project is for **personal study and research only**. Museek does not provid
 
 ## License · 许可
 
-[MIT License](LICENSE)
+Released under the [MIT License](LICENSE).  
+基于 [MIT License](LICENSE) 发布。
