@@ -69,8 +69,28 @@
         line-height: 1.55;
         font-weight: 400;
         -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
         overflow-x: hidden;
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+      p,
+      .subtitle,
+      .tagline,
+      .card p,
+      .show-txt p,
+      .dl-sub,
+      .disclaimer,
+      .note {
+        text-wrap: pretty;
+      }
+      .tabular {
+        font-variant-numeric: tabular-nums;
       }
 
       a {
@@ -194,48 +214,69 @@
         font-size: 14px;
       }
       .nav-links a.link {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 8px 4px;
         color: var(--muted);
         font-weight: 500;
-        transition: color 0.2s;
+        transition-property: color;
+        transition-duration: 0.2s;
+        transition-timing-function: var(--ease);
       }
       .nav-links a.link:hover {
         color: var(--fg);
       }
       .lang-toggle {
+        position: relative;
         background: rgba(255, 255, 255, 0.06);
         border: 1px solid var(--border);
         color: var(--muted);
         border-radius: 980px;
+        min-height: 40px;
+        min-width: 40px;
         padding: 6px 13px;
         font-size: 13px;
         font-weight: 600;
         font-family: inherit;
         cursor: pointer;
-        transition:
-          color 0.2s,
-          background 0.2s;
+        transition-property: color, background-color, border-color, transform;
+        transition-duration: 0.2s;
+        transition-timing-function: var(--ease);
       }
       .lang-toggle:hover {
         color: var(--fg);
         background: rgba(255, 255, 255, 0.12);
       }
+      .lang-toggle:active {
+        transform: scale(0.96);
+      }
       .btn {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
         border-radius: 980px;
+        min-height: 40px;
         padding: 9px 18px;
         font-size: 14px;
         font-weight: 600;
-        transition:
-          transform 0.25s var(--ease),
-          box-shadow 0.25s var(--ease),
-          background 0.25s,
-          opacity 0.25s,
-          border-color 0.25s;
+        transition-property: transform, box-shadow, background-color, opacity,
+          border-color, filter;
+        transition-duration: 0.25s;
+        transition-timing-function: var(--ease);
         white-space: nowrap;
         cursor: pointer;
         border: 1px solid transparent;
+      }
+      /* Optical: slightly less padding on the leading icon side */
+      .btn:has(> svg:first-child) {
+        padding-left: 16px;
+        padding-right: 18px;
+      }
+      .btn:active {
+        transform: scale(0.96);
       }
       .btn-primary {
         background: var(--accent-grad);
@@ -246,6 +287,9 @@
         transform: translateY(-2px);
         box-shadow: 0 14px 38px -8px rgba(31, 221, 122, 0.75);
       }
+      .btn-primary:active {
+        transform: scale(0.96);
+      }
       .btn-ghost {
         background: rgba(255, 255, 255, 0.05);
         border-color: var(--border);
@@ -255,8 +299,16 @@
         background: rgba(255, 255, 255, 0.11);
         transform: translateY(-2px);
       }
+      .btn-ghost:active {
+        transform: scale(0.96);
+      }
       .nav .btn {
         padding: 7px 16px;
+        min-height: 40px;
+      }
+      .nav .btn:has(> svg:first-child) {
+        padding-left: 12px;
+        padding-right: 14px;
       }
 
       /* ---------- Hero ---------- */
@@ -328,6 +380,39 @@
       .eyebrow .eq rect {
         fill: var(--accent);
       }
+      /* Hero enter: split + stagger (one-shot) */
+      .hero-chunk {
+        opacity: 0;
+        transform: translateY(14px);
+        filter: blur(4px);
+        animation: hero-in 0.75s var(--ease) forwards;
+      }
+      .hero-chunk:nth-child(1) {
+        animation-delay: 0.05s;
+      }
+      .hero-chunk:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .hero-chunk:nth-child(3) {
+        animation-delay: 0.25s;
+      }
+      .hero-chunk:nth-child(4) {
+        animation-delay: 0.35s;
+      }
+      .hero-chunk:nth-child(5) {
+        animation-delay: 0.45s;
+      }
+      .hero-chunk:nth-child(6) {
+        animation-delay: 0.55s;
+      }
+      @keyframes hero-in {
+        to {
+          opacity: 1;
+          transform: none;
+          filter: blur(0);
+        }
+      }
+
       .hero h1 {
         font-family: var(--display);
         font-size: clamp(56px, 11vw, 130px);
@@ -396,17 +481,21 @@
         border: 1px solid var(--border);
         box-shadow:
           0 50px 130px -40px rgba(0, 0, 0, 0.92),
-          0 0 80px -30px rgba(139, 92, 255, 0.35),
+          0 0 80px -30px rgba(31, 221, 122, 0.18),
           0 0 0 1px rgba(255, 255, 255, 0.03);
         transform: rotateX(8deg) scale(0.99);
         transform-origin: center top;
-        transition: transform 0.6s var(--ease);
+        transition-property: transform;
+        transition-duration: 0.6s;
+        transition-timing-function: var(--ease);
         line-height: 0;
       }
       .shot img {
         width: 100%;
         height: auto;
         display: block;
+        outline: 1px solid rgba(255, 255, 255, 0.1);
+        outline-offset: -1px;
       }
 
       /* ---------- Sections ---------- */
@@ -469,10 +558,9 @@
         border-radius: var(--radius);
         padding: 30px 28px;
         overflow: hidden;
-        transition:
-          transform 0.4s var(--ease),
-          border-color 0.4s,
-          background 0.4s;
+        transition-property: transform, border-color, background-color;
+        transition-duration: 0.4s;
+        transition-timing-function: var(--ease);
       }
       .card::before {
         content: "";
@@ -499,7 +587,8 @@
       .card .ico {
         width: 46px;
         height: 46px;
-        border-radius: 13px;
+        /* Concentric with card radius (~22) when sitting in padded surface */
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -552,20 +641,22 @@
         border: 1px solid var(--border);
         box-shadow: 0 36px 90px -34px rgba(0, 0, 0, 0.85);
         line-height: 0;
-        transition:
-          transform 0.5s var(--ease),
-          box-shadow 0.5s var(--ease);
+        transition-property: transform, box-shadow;
+        transition-duration: 0.5s;
+        transition-timing-function: var(--ease);
       }
       .show-frame:hover {
         transform: translateY(-6px);
         box-shadow:
           0 44px 100px -34px rgba(0, 0, 0, 0.9),
-          0 0 60px -26px rgba(139, 92, 255, 0.4);
+          0 0 50px -28px rgba(31, 221, 122, 0.28);
       }
       .show-frame img {
         width: 100%;
         height: auto;
         display: block;
+        outline: 1px solid rgba(255, 255, 255, 0.1);
+        outline-offset: -1px;
       }
       .show-txt {
         flex: 1;
@@ -608,10 +699,9 @@
         border-radius: 20px;
         background: var(--bg-card);
         overflow: hidden;
-        transition:
-          transform 0.45s var(--ease),
-          border-color 0.45s,
-          background 0.45s;
+        transition-property: transform, border-color, background-color;
+        transition-duration: 0.45s;
+        transition-timing-function: var(--ease);
       }
       .plat-card::before {
         content: "";
@@ -690,7 +780,8 @@
       .dl-badge {
         width: 80px;
         height: 80px;
-        border-radius: 22px;
+        /* Concentric: mark ~14px radius + ~16px pad → outer ≈ 30 */
+        border-radius: 30px;
         margin: 0 auto 30px;
         display: flex;
         align-items: center;
@@ -703,6 +794,7 @@
       .dl-badge svg {
         width: 48px;
         height: 48px;
+        border-radius: 14px;
       }
       .dl-title {
         font-family: var(--display);
@@ -775,18 +867,21 @@
         color: var(--muted);
       }
 
-      /* Reveal on scroll */
+      /* Reveal on scroll — interruptible transitions; will-change only while pending */
       .reveal {
         opacity: 0;
-        transform: translateY(28px);
-        transition:
-          opacity 0.9s var(--ease),
-          transform 0.9s var(--ease);
+        transform: translateY(18px);
+        transition-property: opacity, transform, filter;
+        transition-duration: 0.7s;
+        transition-timing-function: var(--ease);
         will-change: opacity, transform;
+        filter: blur(3px);
       }
       .reveal.in {
         opacity: 1;
         transform: none;
+        filter: blur(0);
+        will-change: auto;
       }
       .grid .card.reveal {
         transition-delay: var(--d, 0s);
@@ -810,12 +905,27 @@
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        * {
-          animation: none !important;
+        html {
           scroll-behavior: auto;
         }
+        .eq.live rect,
+        .hero::before,
+        .hero-chunk {
+          animation: none !important;
+        }
+        .hero-chunk,
         .reveal {
-          opacity: 1;
+          opacity: 1 !important;
+          transform: none !important;
+          filter: none !important;
+          will-change: auto;
+        }
+        .btn:hover,
+        .btn:active,
+        .lang-toggle:active,
+        .card:hover,
+        .show-frame:hover,
+        .plat-card:hover {
           transform: none;
         }
       }
@@ -871,7 +981,7 @@
     <main id="top">
       <section class="hero">
         <div class="wrap">
-          <div class="eyebrow">
+          <div class="eyebrow hero-chunk">
             <svg class="eq live" viewBox="0 0 100 80" aria-hidden="true">
               <rect x="8" y="20" width="12" height="40" rx="6" />
               <rect x="28" y="20" width="12" height="40" rx="6" />
@@ -883,15 +993,15 @@
               >兼容 lx-music 音源 · 跨平台桌面应用</span
             >
           </div>
-          <h1>
+          <h1 class="hero-chunk">
             <span class="grad">Museek</span> <span class="cn">· 拾音</span>
           </h1>
-          <p class="tagline" data-i18n="hero.tagline">万千旋律，一拾即得。</p>
-          <p class="subtitle" data-i18n="hero.subtitle">
+          <p class="tagline hero-chunk" data-i18n="hero.tagline">万千旋律，一拾即得。</p>
+          <p class="subtitle hero-chunk" data-i18n="hero.subtitle">
             搜索、排行榜、歌单、同步歌词与下载 —— 网易云、酷我、酷狗、QQ
             音乐、咪咕，多家平台，一站搞定。
           </p>
-          <div class="cta">
+          <div class="cta hero-chunk">
             <a
               class="btn btn-primary"
               href="https://github.com/aeroray/Museek/releases/latest"
@@ -923,7 +1033,7 @@
               >在 GitHub 查看源码</a
             >
           </div>
-          <p class="note" data-i18n="hero.note">
+          <p class="note hero-chunk" data-i18n="hero.note">
             基于 Tauri 2 · React 19 构建 · MIT 开源 · 仅供学习研究
           </p>
         </div>
@@ -1159,7 +1269,7 @@
             API、并播放由用户自行导入的音源脚本所返回链接的界面。请勿用于任何商业用途，并遵守各平台的服务条款与版权规定；使用所产生的一切后果由使用者自行承担。</span
           >
           <div class="copy">
-            © <span id="year"></span> Museek · 拾音 — Released under the MIT
+            © <span id="year" class="tabular"></span> Museek · 拾音 — Released under the MIT
             License.
           </div>
         </div>
