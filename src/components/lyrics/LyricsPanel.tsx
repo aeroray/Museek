@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { X, AArrowUp, AArrowDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { CoverImage } from "@/components/common/CoverImage"
 import { usePlayerStore } from "@/stores/playerStore"
 import { hiResCover } from "@/lib/cover"
 import { useT } from "@/lib/i18n"
@@ -36,20 +37,6 @@ export function LyricsPanel() {
   const coverSrc = currentPicUrl
     ? (hiResCover(currentPicUrl, currentSong?.source) ?? currentPicUrl)
     : null
-
-  // Reset cover fade whenever the art URL changes (first open / track switch).
-  useEffect(() => {
-    setCoverReady(false)
-  }, [coverSrc])
-
-  // Preload blur backdrop so we can fade it in with the cover (avoids a harsh pop).
-  useEffect(() => {
-    if (!currentPicUrl) return
-    const img = new Image()
-    img.onload = () => setCoverReady(true)
-    img.onerror = () => setCoverReady(true)
-    img.src = currentPicUrl
-  }, [currentPicUrl])
 
   // Center the active lyric line by scrolling ONLY the lyric viewport — never via
   // element.scrollIntoView(), which also scrolls scrollable ancestors and the
@@ -102,11 +89,12 @@ export function LyricsPanel() {
 
   return createPortal(
     <div className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-background">
-      {/* Heavily-blurred album cover as the backdrop; gradient is the fallback. */}
+      {/* Heavily-blurred album cover as the backdrop; gradient is the fallback.
+          Fades in with the same timing as CoverImage so the art doesn't pop. */}
       {currentPicUrl ? (
         <div
           className={cn(
-            "absolute inset-0 scale-125 bg-cover bg-center transition-opacity duration-500",
+            "absolute inset-0 scale-125 bg-cover bg-center transition-opacity duration-700 ease-out",
             coverReady ? "opacity-100" : "opacity-0"
           )}
           style={{ backgroundImage: `url(${currentPicUrl})`, filter: "blur(80px) saturate(1.5)" }}
@@ -114,7 +102,7 @@ export function LyricsPanel() {
       ) : null}
       <div
         className={cn(
-          "absolute inset-0 bg-gradient-to-br from-primary/30 via-background to-secondary/30 transition-opacity duration-500",
+          "absolute inset-0 bg-gradient-to-br from-primary/30 via-background to-secondary/30 transition-opacity duration-700 ease-out",
           currentPicUrl && coverReady ? "opacity-0" : "opacity-100"
         )}
       />
@@ -175,21 +163,7 @@ export function LyricsPanel() {
               )}
             >
               {coverSrc ? (
-                <img
-                  key={coverSrc}
-                  src={coverSrc}
-                  alt="album"
-                  ref={(el) => {
-                    // Cached images may finish before onLoad attaches — reconcile.
-                    if (el?.complete) setCoverReady(true)
-                  }}
-                  onLoad={() => setCoverReady(true)}
-                  onError={() => setCoverReady(true)}
-                  className={cn(
-                    "w-full h-full object-cover transition-opacity duration-500",
-                    coverReady ? "opacity-100" : "opacity-0"
-                  )}
-                />
+                <CoverImage src={coverSrc} alt="album" loading="eager" onLoaded={setCoverReady} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                   {t("lyrics.noCover")}
