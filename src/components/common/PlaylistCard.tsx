@@ -61,12 +61,12 @@ export function PlaylistCard({
       >
         <div
           className={cn(
-            "aspect-square rounded-xl overflow-hidden bg-muted relative shadow-sm",
+            "aspect-square rounded-2xl overflow-hidden bg-muted relative shadow-[var(--shadow-border)] transition-shadow duration-200 group-hover:shadow-[var(--shadow-elevated)]",
             selectable && selected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
           )}
         >
           {playlist.img ? (
-            <div className="h-full w-full transition-transform duration-300 group-hover:scale-105">
+            <div className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-[1.04]">
               <CoverImage src={playlist.img} />
             </div>
           ) : (
@@ -75,7 +75,7 @@ export function PlaylistCard({
             </div>
           )}
           {/* gentle darken on hover — affordance that the cover is clickable */}
-          <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/10" />
+          <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/15" />
 
           {/* Selection checkbox (batch edit) */}
           {selectable && (
@@ -102,7 +102,12 @@ export function PlaylistCard({
                 favorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
               )}
             >
-              <Heart size={14} className={favorited ? "text-red-500" : ""} fill={favorited ? "currentColor" : "none"} />
+              <Heart
+                size={14}
+                className={cn(favorited ? "text-red-500 icon-heart-burst" : "")}
+                fill={favorited ? "currentColor" : "none"}
+                key={favorited ? "on" : "off"}
+              />
             </button>
           )}
 
@@ -128,12 +133,12 @@ export function PlaylistCard({
               title={t("common.playAll")}
               className="absolute bottom-2 right-2 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center opacity-0 translate-y-1.5 transition-[opacity,transform] duration-200 ease-out group-hover:opacity-100 group-hover:translate-y-0 active:scale-[0.96]"
             >
-              <Play size={18} className="ml-0.5" fill="currentColor" strokeWidth={0} />
+              <Play size={18} className="ml-0.5 icon-play-pop" fill="currentColor" strokeWidth={0} />
             </button>
           )}
         </div>
 
-        <p className="text-sm mt-2 leading-snug line-clamp-2 min-h-[2.5rem] text-pretty" title={playlist.name}>
+        <p className="text-sm mt-2.5 leading-snug line-clamp-2 min-h-[2.5rem] text-pretty font-medium tracking-tight" title={playlist.name}>
           {playlist.name}
         </p>
         {(playlist.author || playlist.playCount) && (

@@ -17,16 +17,18 @@ export function TopBar() {
   return (
     <div
       data-tauri-drag-region
-      className="h-9 shrink-0 flex items-center justify-between gap-0.5 pl-2 pr-1 border-b border-border"
+      className="h-10 shrink-0 flex items-center justify-between gap-0.5 pl-2 pr-1 border-b border-border/50"
     >
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+        className="h-7 w-7 text-muted-foreground hover:text-foreground icon-hover-panel"
         onClick={toggleSidebar}
         title={sidebarCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
       >
-        {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        <span key={sidebarCollapsed ? "open" : "close"} className="icon-pop-in">
+          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </span>
       </Button>
 
       <div className="flex items-center gap-1">
@@ -34,7 +36,7 @@ export function TopBar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground icon-hover-arrow-left"
             onClick={() => navigate(-1)}
             title={t("nav.back")}
           >
@@ -43,7 +45,7 @@ export function TopBar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground icon-hover-arrow-right"
             onClick={() => navigate(1)}
             title={t("nav.forward")}
           >

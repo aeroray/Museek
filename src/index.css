@@ -4,77 +4,95 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    /* Warm ink neutrals — listening-room feel, not sterile cool gray */
+    --background: 40 24% 97%;
+    --foreground: 30 12% 10%;
+    --card: 40 20% 99%;
+    --card-foreground: 30 12% 10%;
+    --popover: 40 20% 99%;
+    --popover-foreground: 30 12% 10%;
+    --primary: 30 10% 14%;
+    --primary-foreground: 40 24% 97%;
+    --secondary: 35 14% 93%;
+    --secondary-foreground: 30 10% 16%;
+    --muted: 35 12% 93%;
+    --muted-foreground: 30 6% 42%;
+    --accent: 35 14% 93%;
+    --accent-foreground: 30 10% 16%;
+    --destructive: 0 62% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --border: 35 12% 88%;
+    --input: 35 12% 88%;
+    --ring: 30 10% 30%;
     --radius: 0.75rem;
+    --sidebar: 40 18% 95.5%;
+    --player: 40 20% 98%;
+
+    /* Hot-search heat scale — warm → cool, desaturated for both themes */
+    --heat-1: 350 52% 46%;
+    --heat-2: 18 56% 46%;
+    --heat-3: 38 52% 42%;
+    --heat-4: 168 40% 34%;
+    --heat-5: 215 22% 44%;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    /* Off-black charcoal with a warm cast — never pure #000 */
+    --background: 30 8% 7%;
+    --foreground: 40 12% 96%;
+    --card: 30 7% 9%;
+    --card-foreground: 40 12% 96%;
+    --popover: 30 7% 10%;
+    --popover-foreground: 40 12% 96%;
+    --primary: 40 14% 94%;
+    --primary-foreground: 30 10% 12%;
+    --secondary: 30 6% 14%;
+    --secondary-foreground: 40 12% 96%;
+    --muted: 30 6% 14%;
+    --muted-foreground: 30 5% 58%;
+    --accent: 30 6% 15%;
+    --accent-foreground: 40 12% 96%;
+    --destructive: 0 48% 38%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 30 6% 16%;
+    --input: 30 6% 16%;
+    --ring: 40 10% 72%;
+    --sidebar: 30 8% 8.5%;
+    --player: 30 7% 8.5%;
+
+    --heat-1: 350 58% 68%;
+    --heat-2: 18 62% 64%;
+    --heat-3: 40 58% 62%;
+    --heat-4: 168 44% 56%;
+    --heat-5: 215 18% 62%;
   }
 
-  /* Accent palettes — only override the brand/primary color so the neutral
-     base stays clean (a restrained accent on neutral reads as premium).
+  /* Accent palettes — desaturated so they sit with neutrals, not scream.
      Applied after .dark so they win in both light and dark mode. */
   [data-palette="violet"] {
-    --primary: 262 72% 53%;
+    --primary: 262 48% 52%;
     --primary-foreground: 0 0% 100%;
-    --ring: 262 72% 53%;
+    --ring: 262 48% 52%;
   }
   [data-palette="blue"] {
-    --primary: 221 83% 53%;
+    --primary: 212 52% 48%;
     --primary-foreground: 0 0% 100%;
-    --ring: 221 83% 53%;
+    --ring: 212 52% 48%;
   }
   [data-palette="emerald"] {
-    --primary: 160 84% 39%;
+    --primary: 158 42% 36%;
     --primary-foreground: 0 0% 100%;
-    --ring: 160 84% 39%;
+    --ring: 158 42% 36%;
   }
   [data-palette="rose"] {
-    --primary: 347 77% 50%;
+    --primary: 350 48% 48%;
     --primary-foreground: 0 0% 100%;
-    --ring: 347 77% 50%;
+    --ring: 350 48% 48%;
   }
   [data-palette="amber"] {
-    --primary: 38 92% 50%;
-    --primary-foreground: 30 60% 12%;
-    --ring: 38 92% 50%;
+    --primary: 34 68% 46%;
+    --primary-foreground: 30 40% 10%;
+    --ring: 34 68% 46%;
   }
 }
 
@@ -82,37 +100,89 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground;
+    position: relative;
+    /* Bundled serifs everywhere — Source Serif 4 (Latin) + Noto Serif SC (CJK) */
+    font-family: "Source Serif 4", "Noto Serif SC", "Songti SC", SimSun, Georgia, serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-optical-sizing: auto;
+    /* Subpixel keeps small UI text sharper than grayscale antialiased in WebView2 */
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
   }
   h1,
   h2,
   h3 {
     text-wrap: balance;
+    letter-spacing: -0.02em;
   }
   p {
     text-wrap: pretty;
   }
 
-  /* Soft depth ring — prefers transparent shadows over solid borders on cards. */
+  /* Soft depth — warm-tinted shadows, not generic black */
   :root {
     --shadow-border:
-      0px 0px 0px 1px rgba(0, 0, 0, 0.06),
-      0px 1px 2px -1px rgba(0, 0, 0, 0.06),
-      0px 2px 4px 0px rgba(0, 0, 0, 0.04);
+      0px 0px 0px 1px hsl(30 12% 10% / 0.05),
+      0px 1px 2px -1px hsl(30 20% 20% / 0.06),
+      0px 2px 6px 0px hsl(30 18% 18% / 0.04);
     --shadow-border-hover:
-      0px 0px 0px 1px rgba(0, 0, 0, 0.08),
-      0px 1px 2px -1px rgba(0, 0, 0, 0.08),
-      0px 2px 4px 0px rgba(0, 0, 0, 0.06);
+      0px 0px 0px 1px hsl(30 12% 10% / 0.07),
+      0px 1px 3px -1px hsl(30 20% 20% / 0.08),
+      0px 4px 10px 0px hsl(30 18% 18% / 0.06);
+    --shadow-elevated:
+      0 8px 24px -8px hsl(30 25% 18% / 0.14),
+      0 2px 6px -2px hsl(30 20% 20% / 0.08);
   }
   .dark {
-    --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
-    --shadow-border-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
+    --shadow-border:
+      0 0 0 1px hsl(40 12% 100% / 0.07),
+      0 1px 2px hsl(0 0% 0% / 0.35);
+    --shadow-border-hover:
+      0 0 0 1px hsl(40 12% 100% / 0.12),
+      0 2px 8px hsl(0 0% 0% / 0.4);
+    --shadow-elevated:
+      0 12px 32px -10px hsl(0 0% 0% / 0.55),
+      0 0 0 1px hsl(40 12% 100% / 0.06);
   }
 }
 
-/* Custom scrollbar for dark mode */
+/* Film grain — breaks flat digital surfaces without distracting */
+body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+}
+.dark body::before {
+  opacity: 0.06;
+}
+
+/* Soft ambient wash behind main content */
+.app-ambient {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, hsl(var(--primary) / 0.06), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, hsl(var(--primary) / 0.04), transparent 50%),
+    hsl(var(--background));
+}
+.dark .app-ambient {
+  background:
+    radial-gradient(ellipse 70% 45% at 8% -8%, hsl(var(--primary) / 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 100% 0%, hsl(34 50% 40% / 0.05), transparent 50%),
+    hsl(var(--background));
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -123,38 +193,33 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/30 rounded-full;
+  @apply bg-muted-foreground/25 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/50;
+  @apply bg-muted-foreground/45;
 }
 
-/* Prevent text selection on drag */
 .no-select {
   user-select: none;
 }
 
-/* Lyrics-page cover: a slow, subtle float + breathe while playing (premium feel). */
+/* Lyrics-page cover: slow float + breathe while playing */
 @keyframes lyricCoverFloat {
   0%,
   100% {
     transform: translateY(0) scale(1);
-    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
+    box-shadow: 0 25px 50px -12px hsl(30 30% 8% / 0.4);
   }
   50% {
     transform: translateY(-12px) scale(1.015);
-    box-shadow: 0 40px 70px -15px rgb(0 0 0 / 0.45);
+    box-shadow: 0 40px 70px -15px hsl(30 30% 8% / 0.5);
   }
 }
 .lyric-cover-float {
   animation: lyricCoverFloat 6s ease-in-out infinite;
 }
 
-/* Lyrics-page cover: a thin theme-color light that flows around the cover's
-   border while playing. A conic-gradient larger than the cover rotates BEHIND
-   it; the cover sits on top inset by the border width, so only a glowing ring
-   shows. The cover wrapper clips this, so nothing ever spills past the cover. */
 @keyframes lyricCoverBeam {
   to {
     transform: rotate(360deg);
@@ -162,7 +227,6 @@
 }
 .lyric-cover-beam {
   position: absolute;
-  /* Oversized + centered so the spinning gradient always covers the corners. */
   width: 150%;
   height: 150%;
   left: -25%;
@@ -178,4 +242,381 @@
   pointer-events: none;
   will-change: transform;
   animation: lyricCoverBeam 4s linear infinite;
+}
+
+/* Nav active indicator: expand from center */
+@keyframes navIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scaleY(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scaleY(1);
+  }
+}
+.nav-active-bar {
+  transform-origin: center;
+  animation: navIn 180ms ease-out;
+}
+
+/* Hot-search cloud: staggered entrance (transform only — opacity comes from tiers) */
+@keyframes hotCloudIn {
+  from {
+    transform: translateY(8px) scale(0.96);
+    filter: blur(2px);
+  }
+  to {
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.hot-cloud-word {
+  animation: hotCloudIn 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* ── Icon micro-animations ─────────────────────────────────────────
+   Hover: one-shot fun on the SVG. State change: pop-in / heart burst.
+   Respect reduced-motion; keep transforms interruptible where possible. */
+
+.icon-swap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 300ms cubic-bezier(0.2, 0, 0, 1),
+    filter 300ms cubic-bezier(0.2, 0, 0, 1),
+    transform 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes iconPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+.icon-pop-in {
+  display: inline-flex;
+  animation: iconPopIn 300ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes iconHeartBurst {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.35);
+  }
+  55% {
+    transform: scale(0.88);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.icon-heart-burst {
+  animation: iconHeartBurst 420ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes iconSearch {
+  0%,
+  100% {
+    transform: rotate(0deg) translate(0, 0);
+  }
+  30% {
+    transform: rotate(-14deg) translate(1px, -1px);
+  }
+  55% {
+    transform: rotate(8deg) translate(-0.5px, 0.5px);
+  }
+  75% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes iconList {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-2px);
+  }
+  70% {
+    transform: translateY(1px);
+  }
+}
+@keyframes iconTrend {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  45% {
+    transform: translate(1.5px, -2.5px);
+  }
+}
+@keyframes iconHeartBeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.22);
+  }
+  45% {
+    transform: scale(0.94);
+  }
+  65% {
+    transform: scale(1.1);
+  }
+}
+@keyframes iconDownload {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(2.5px);
+  }
+  55% {
+    transform: translateY(-1px);
+  }
+}
+@keyframes iconSpinNudge {
+  0% {
+    transform: rotate(0deg);
+  }
+  60% {
+    transform: rotate(90deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes iconSkipPrev {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(-3px);
+  }
+}
+@keyframes iconSkipNext {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(3px);
+  }
+}
+@keyframes iconShuffle {
+  0%,
+  100% {
+    transform: rotate(0deg) translateX(0);
+  }
+  25% {
+    transform: rotate(-8deg) translateX(-1px);
+  }
+  50% {
+    transform: rotate(8deg) translateX(1px);
+  }
+  75% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes iconRepeat {
+  0% {
+    transform: rotate(0deg);
+  }
+  65% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes iconMic {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-2px) scale(1.08);
+  }
+}
+@keyframes iconPlus {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(90deg) scale(1.12);
+  }
+}
+@keyframes iconPlayPop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes iconSun {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(45deg) scale(1.1);
+  }
+}
+@keyframes iconMoon {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-18deg);
+  }
+}
+@keyframes iconPanel {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(-2px);
+  }
+  70% {
+    transform: translateX(1px);
+  }
+}
+@keyframes iconArrowLeft {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  45% {
+    transform: translateX(-3px);
+  }
+}
+@keyframes iconArrowRight {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  45% {
+    transform: translateX(3px);
+  }
+}
+@keyframes iconMaximize {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.15);
+  }
+}
+@keyframes iconAudioPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .icon-hover-search:hover svg {
+    animation: iconSearch 480ms ease;
+  }
+  .icon-hover-list:hover svg {
+    animation: iconList 420ms ease;
+  }
+  .icon-hover-trend:hover svg {
+    animation: iconTrend 420ms ease;
+  }
+  .icon-hover-heart:hover svg {
+    animation: iconHeartBeat 480ms ease;
+  }
+  .icon-hover-download:hover svg {
+    animation: iconDownload 420ms ease;
+  }
+  .icon-hover-settings:hover svg {
+    animation: iconSpinNudge 480ms ease;
+    transform-origin: center;
+  }
+  .icon-hover-skip-prev:hover svg {
+    animation: iconSkipPrev 320ms ease;
+  }
+  .icon-hover-skip-next:hover svg {
+    animation: iconSkipNext 320ms ease;
+  }
+  .icon-hover-shuffle:hover svg {
+    animation: iconShuffle 450ms ease;
+  }
+  .icon-hover-repeat:hover svg {
+    animation: iconRepeat 420ms ease;
+  }
+  .icon-hover-mic:hover svg {
+    animation: iconMic 400ms ease;
+  }
+  .icon-hover-plus:hover svg {
+    animation: iconPlus 400ms ease;
+  }
+  .icon-hover-sun:hover svg {
+    animation: iconSun 500ms ease;
+    transform-origin: center;
+  }
+  .icon-hover-moon:hover svg {
+    animation: iconMoon 500ms ease;
+    transform-origin: 60% 40%;
+  }
+  .icon-hover-panel:hover svg {
+    animation: iconPanel 380ms ease;
+  }
+  .icon-hover-arrow-left:hover svg {
+    animation: iconArrowLeft 320ms ease;
+  }
+  .icon-hover-arrow-right:hover svg {
+    animation: iconArrowRight 320ms ease;
+  }
+  .icon-hover-maximize:hover svg {
+    animation: iconMaximize 360ms ease;
+  }
+
+  /* Nested icons (TrackRow / overlays) — animate the icon itself on parent hover */
+  .group\/row:hover .icon-play-pop,
+  .group:hover .icon-play-pop {
+    animation: iconPlayPop 280ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  .icon-audio-pulse {
+    animation: iconAudioPulse 2.4s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-pop-in,
+  .icon-heart-burst,
+  .icon-audio-pulse,
+  .nav-active-bar,
+  .hot-cloud-word,
+  .lyric-cover-float,
+  .lyric-cover-beam {
+    animation: none !important;
+  }
 }

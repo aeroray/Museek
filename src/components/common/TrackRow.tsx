@@ -48,14 +48,14 @@ export const TrackRow = memo(function TrackRow({
 
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 hover:bg-accent/50 rounded-md group cursor-pointer"
+      className="flex items-center gap-3 px-3 py-2 rounded-xl group group/row cursor-pointer transition-[background-color,transform] duration-200 ease-out hover:bg-accent/55 active:scale-[0.995]"
       onDoubleClick={() => play(song)}
     >
       {rank != null && (
-        <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0">{rank}</span>
+        <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0 font-medium">{rank}</span>
       )}
 
-      <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden bg-muted">
+      <div className="relative h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-muted shadow-[var(--shadow-border)]">
         {thumb ? (
           <CoverImage src={thumb} />
         ) : (
@@ -65,9 +65,9 @@ export const TrackRow = memo(function TrackRow({
         )}
         <button
           onClick={() => play(song)}
-          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100"
+          className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         >
-          <Play size={16} className="ml-0.5 text-white" fill="currentColor" strokeWidth={0} />
+          <Play size={16} className="ml-0.5 text-white icon-play-pop" fill="currentColor" strokeWidth={0} />
         </button>
       </div>
 
@@ -88,7 +88,7 @@ export const TrackRow = memo(function TrackRow({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 opacity-0 group-hover:opacity-100"
+          className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
           onClick={(e) => {
             e.stopPropagation()
             addToQueue([song])
@@ -101,7 +101,7 @@ export const TrackRow = memo(function TrackRow({
         <Button
           variant="ghost"
           size="icon"
-          className={cn("h-8 w-8", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
+          className={cn("h-8 w-8 icon-hover-heart", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
           onClick={(e) => {
             e.stopPropagation()
             if (fav) removeFromFavorites(song.id)
@@ -109,7 +109,11 @@ export const TrackRow = memo(function TrackRow({
           }}
           title={t(fav ? "common.unfavorite" : "common.favorite")}
         >
-          <Heart size={14} className={fav ? "fill-red-500 text-red-500" : ""} />
+          <Heart
+            key={fav ? "on" : "off"}
+            size={14}
+            className={cn(fav && "fill-red-500 text-red-500 icon-heart-burst")}
+          />
         </Button>
 
         <DropdownMenu>
@@ -117,7 +121,7 @@ export const TrackRow = memo(function TrackRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+              className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
               onClick={(e) => e.stopPropagation()}
               title={t("common.download")}
             >

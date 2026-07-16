@@ -47,26 +47,32 @@ export function PlayerBar() {
   }
 
   return (
-    <footer className="border-t border-border bg-card shrink-0 flex flex-col gap-1">
+    <footer
+      className={cn(
+        "shrink-0 flex flex-col gap-0.5 border-t border-border/50",
+        "bg-player/85 backdrop-blur-xl supports-[backdrop-filter]:bg-player/70",
+        "shadow-[0_-8px_24px_-16px_hsl(30_20%_10%/0.12)]"
+      )}
+    >
       {/* Full-width progress bar across the top — modern player layout */}
       <ProgressSlider />
 
-      <div className="flex items-center px-4 pb-3 gap-4">
+      <div className="flex items-center px-4 pb-3.5 gap-4">
         {/* Left: Song info */}
-        <div className="flex items-center gap-4 w-72 shrink-0">
+        <div className="flex items-center gap-3.5 w-72 shrink-0">
           {coverSrc ? (
             <button
               type="button"
               onClick={() => !loading && setShowLyrics(true)}
               title={t("player.lyrics")}
               disabled={loading}
-              className="group relative h-12 w-12 rounded-md overflow-hidden shrink-0 transition-transform duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none"
+              className="group relative h-12 w-12 rounded-xl overflow-hidden shrink-0 transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.96] disabled:pointer-events-none shadow-[var(--shadow-border)]"
             >
               <img
                 src={coverSrc}
-                alt="album art"
+                alt=""
                 className={cn(
-                  "h-full w-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10 transition-[opacity,filter] duration-200",
+                  "h-full w-full object-cover transition-[opacity,filter] duration-200",
                   loading && "opacity-60 blur-[1px]"
                 )}
               />
@@ -75,13 +81,13 @@ export function PlayerBar() {
                   <Loader2 size={18} className="animate-spin text-white" />
                 </span>
               ) : (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                  <Maximize2 size={16} className="text-white" />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 icon-hover-maximize">
+                  <Maximize2 size={15} className="text-white icon-play-pop" />
                 </span>
               )}
             </button>
           ) : (
-            <div className="relative h-12 w-12 rounded-md bg-muted flex items-center justify-center overflow-hidden shrink-0">
+            <div className="relative h-12 w-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-[var(--shadow-border)]">
               {loading ? (
                 <Loader2 size={18} className="animate-spin text-muted-foreground" />
               ) : (
@@ -90,14 +96,14 @@ export function PlayerBar() {
             </div>
           )}
           {currentSong ? (
-            <div className="min-w-0 space-y-1.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <p className="text-sm font-medium truncate" title={currentSong.name}>
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-sm font-semibold tracking-tight truncate" title={currentSong.name}>
                   {currentSong.name}
                 </p>
                 <PlatformBadge source={currentSong.source} />
               </div>
-              <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <p className="text-xs text-muted-foreground truncate min-w-0" title={currentSong.singer}>
                   {currentSong.singer}
                 </p>
@@ -122,7 +128,7 @@ export function PlayerBar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0"
+                className="h-9 w-9 shrink-0 icon-hover-search"
                 disabled={!currentSong}
                 title={t("player.searchOther")}
               >
@@ -144,7 +150,7 @@ export function PlayerBar() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-9 w-9 shrink-0", showLyrics && "text-primary")}
+            className={cn("h-9 w-9 shrink-0 icon-hover-mic", showLyrics && "text-primary")}
             onClick={() => setShowLyrics(!showLyrics)}
             disabled={!currentSong}
             title={t("player.lyrics")}
@@ -154,7 +160,7 @@ export function PlayerBar() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-9 w-9 shrink-0", showQueue && "text-primary")}
+            className={cn("h-9 w-9 shrink-0 icon-hover-list", showQueue && "text-primary")}
             onClick={() => setShowQueue(!showQueue)}
             disabled={queue.length === 0}
             title={t("player.queue")}

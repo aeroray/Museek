@@ -10,8 +10,8 @@ export function ProgressSlider() {
   const disabled = !currentSong || status === "loading" || status === "idle" || status === "error"
 
   return (
-    <div className={cn("flex items-center gap-3 w-full pt-3 pb-1.5", disabled && "opacity-50")}>
-      <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right shrink-0">
+    <div className={cn("flex items-center gap-3 w-full px-4 pt-3 pb-1", disabled && "opacity-50")}>
+      <span className="text-[11px] text-muted-foreground/80 tabular-nums w-10 text-right shrink-0 font-medium tracking-wide">
         {formatDuration(currentTime)}
       </span>
       <Slider
@@ -26,7 +26,7 @@ export function ProgressSlider() {
           seek((v / 100) * duration)
         }}
       />
-      <span className="text-[11px] text-muted-foreground tabular-nums w-10 shrink-0">
+      <span className="text-[11px] text-muted-foreground/80 tabular-nums w-10 shrink-0 font-medium tracking-wide">
         {formatDuration(duration)}
       </span>
     </div>

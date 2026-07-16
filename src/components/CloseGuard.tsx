@@ -129,18 +129,25 @@ export function CloseGuard() {
           </Label>
         )}
 
-        {showDontRemind && (
-          <Label className="flex items-center gap-2 text-sm font-normal text-muted-foreground cursor-pointer select-none">
-            <Checkbox checked={dontRemind} onCheckedChange={(v) => setDontRemind(v === true)} />
-            {t("close.dontRemind")}
-          </Label>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setDialogOpen(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button onClick={onConfirmQuit}>{t("close.exitNow")}</Button>
+        <DialogFooter className="flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {showDontRemind ? (
+            <Label className="flex items-center gap-2 text-xs font-normal text-muted-foreground cursor-pointer select-none mr-auto">
+              <Checkbox
+                className="size-4 shrink-0 rounded-sm"
+                checked={dontRemind}
+                onCheckedChange={(v) => setDontRemind(v === true)}
+              />
+              {t("close.dontRemind")}
+            </Label>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
+          <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="destructive" onClick={onConfirmQuit}>{t("close.exitNow")}</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

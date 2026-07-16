@@ -16,9 +16,9 @@
         "label": "main",
         "title": "Museek 拾音",
         "width": 1200,
-        "height": 770,
+        "height": 780,
         "minWidth": 1200,
-        "minHeight": 770,
+        "minHeight": 780,
         "center": true,
         "decorations": false
       }

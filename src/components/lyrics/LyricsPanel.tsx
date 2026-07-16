@@ -141,7 +141,7 @@ export function LyricsPanel() {
         <div className="w-2/5 flex flex-col items-center justify-center gap-6 p-12 shrink-0">
           {currentSong && (
             <div className="text-center max-w-xs">
-              <p className="text-2xl font-bold truncate" title={currentSong.name}>
+              <p className="text-2xl font-semibold truncate tracking-tight" title={currentSong.name}>
                 {currentSong.name}
               </p>
               <p className="text-muted-foreground mt-1.5 truncate" title={currentSong.singer}>
@@ -186,7 +186,7 @@ export function LyricsPanel() {
                 {currentSong ? t("lyrics.empty") : t("lyrics.selectSong")}
               </div>
             ) : (
-              <div className="py-[42vh] px-10 text-center animate-in fade-in duration-300">
+              <div className="py-[42vh] pl-4 pr-24 text-center animate-in fade-in duration-300">
                 {lyricLines.map((line, i) => {
                   const active = i === currentLyricIndex
                   return (

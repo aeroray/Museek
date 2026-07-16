@@ -14,7 +14,30 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: [
+          "Source Serif 4",
+          "Noto Serif SC",
+          "Songti SC",
+          "SimSun",
+          "Georgia",
+          "Times New Roman",
+          "serif",
+        ],
+        serif: [
+          "Source Serif 4",
+          "Noto Serif SC",
+          "Songti SC",
+          "SimSun",
+          "Georgia",
+          "Times New Roman",
+          "serif",
+        ],
+      },
       colors: {
+        sidebar: "hsl(var(--sidebar))",
+        player: "hsl(var(--player))",
+
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

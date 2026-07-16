@@ -4,12 +4,12 @@ export type ThemeMode = "light" | "dark" | "system"
 export type Palette = "default" | "violet" | "blue" | "emerald" | "rose" | "amber"
 
 export const PALETTES: { id: Palette; name: string; color: string }[] = [
-  { id: "default", name: "石墨", color: "hsl(240 5.9% 10%)" },
-  { id: "violet", name: "紫罗兰", color: "hsl(262 72% 53%)" },
-  { id: "blue", name: "海蓝", color: "hsl(221 83% 53%)" },
-  { id: "emerald", name: "翡翠", color: "hsl(160 84% 39%)" },
-  { id: "rose", name: "玫瑰", color: "hsl(347 77% 50%)" },
-  { id: "amber", name: "琥珀金", color: "hsl(38 92% 50%)" },
+  { id: "default", name: "石墨", color: "hsl(30 10% 14%)" },
+  { id: "violet", name: "紫罗兰", color: "hsl(262 48% 52%)" },
+  { id: "blue", name: "海蓝", color: "hsl(212 52% 48%)" },
+  { id: "emerald", name: "翡翠", color: "hsl(158 42% 36%)" },
+  { id: "rose", name: "玫瑰", color: "hsl(350 48% 48%)" },
+  { id: "amber", name: "琥珀金", color: "hsl(34 68% 46%)" },
 ]
 
 const MODE_KEY = "museek.theme.mode"

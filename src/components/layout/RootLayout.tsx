@@ -9,10 +9,10 @@ import { DownloadLocationDialog } from "@/components/DownloadLocationDialog"
 
 export function RootLayout() {
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-col h-dvh overflow-hidden bg-background">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-hidden flex flex-col">
+        <main className="flex-1 overflow-hidden flex flex-col app-ambient min-w-0">
           <TopBar />
           <div className="flex-1 min-h-0 flex flex-col">
             <Outlet />

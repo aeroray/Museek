@@ -5,6 +5,7 @@ import { loadLyric } from "@/lib/lyric/loadLyric"
 import {
   applyAudioSource,
   beginPlayGeneration,
+  findCachedPlayableSrc,
   isPlayGenerationCurrent,
   resolvePlayableSrc,
   revokeCurrentObjectUrl,
@@ -150,37 +151,57 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       }
 
       try {
-        // Try the preferred quality, auto-downgrading until a source delivers a URL.
-        const { url, quality: actual } = await sourceRunner.getMusicUrlAdaptive(song, preferred)
-        if (!isPlayGenerationCurrent(gen)) return
-
-        // Record the real quality on the now-playing queue item so its badge
-        // reflects what actually played (and stays put when it's no longer active).
-        set((s) => {
-          const q = [...s.queue]
-          if (q[idx]) q[idx] = { ...q[idx], playedQuality: actual }
-          return { currentQuality: actual, queue: q }
-        })
-        if (actual !== preferred) {
-          notify({
-            message: t("player.qualityDowngraded", { quality: t(`quality.${actual}`) }),
-            variant: "info",
-          })
-        }
         const settings = useSettingsStore.getState()
-        const src = await resolvePlayableSrc(song, actual, url, {
-          audioCache: settings.audioCache,
-          maxCacheMB: settings.maxCacheMB,
-        })
+
+        // Fast path: reuse on-disk audio before any remote URL resolve / probe.
+        // Without this, A→B→A still spins on loading even when A is already cached.
+        const cached = await findCachedPlayableSrc(song, preferred, settings.audioCache)
         if (!isPlayGenerationCurrent(gen)) return
 
-        applyAudioSource(src)
-        await audioPlayer.play()
-        if (!isPlayGenerationCurrent(gen)) return
+        if (cached) {
+          set((s) => {
+            const q = [...s.queue]
+            if (q[idx]) q[idx] = { ...q[idx], playedQuality: cached.quality }
+            return { currentQuality: cached.quality, queue: q }
+          })
+          applyAudioSource(cached.src)
+          await audioPlayer.play()
+          if (!isPlayGenerationCurrent(gen)) return
 
-        // Publish to the OS media controls (taskbar / media flyout).
-        lastMediaPlaying = true
-        updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
+          lastMediaPlaying = true
+          updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
+        } else {
+          // Slow path: resolve a remote URL (adaptive quality), then cache + play.
+          const { url, quality: actual } = await sourceRunner.getMusicUrlAdaptive(song, preferred)
+          if (!isPlayGenerationCurrent(gen)) return
+
+          // Record the real quality on the now-playing queue item so its badge
+          // reflects what actually played (and stays put when it's no longer active).
+          set((s) => {
+            const q = [...s.queue]
+            if (q[idx]) q[idx] = { ...q[idx], playedQuality: actual }
+            return { currentQuality: actual, queue: q }
+          })
+          if (actual !== preferred) {
+            notify({
+              message: t("player.qualityDowngraded", { quality: t(`quality.${actual}`) }),
+              variant: "info",
+            })
+          }
+          const src = await resolvePlayableSrc(song, actual, url, {
+            audioCache: settings.audioCache,
+            maxCacheMB: settings.maxCacheMB,
+          })
+          if (!isPlayGenerationCurrent(gen)) return
+
+          applyAudioSource(src)
+          await audioPlayer.play()
+          if (!isPlayGenerationCurrent(gen)) return
+
+          // Publish to the OS media controls (taskbar / media flyout).
+          lastMediaPlaying = true
+          updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
+        }
       } catch (err) {
         if (!isPlayGenerationCurrent(gen)) return
         const raw = (err as Error).message || t("player.err.unknown")
@@ -372,6 +393,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           currentLyricIndex: -1,
           lyricsLoading: false,
           currentPicUrl: null,
+          showLyrics: false,
         })
         return
       }

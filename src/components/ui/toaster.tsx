@@ -9,10 +9,11 @@ export function Toaster() {
   const { toast, clearToast } = useUiStore()
   const navigate = useNavigate()
 
-  // Auto-dismiss informational/plain toasts; keep actionable ones until dismissed.
+  // Auto-dismiss all toasts (actionable ones stay a bit longer so the CTA is usable).
   useEffect(() => {
-    if (!toast || toast.actionTo) return
-    const id = window.setTimeout(clearToast, 4500)
+    if (!toast) return
+    const ms = toast.actionTo ? 6500 : 4000
+    const id = window.setTimeout(clearToast, ms)
     return () => window.clearTimeout(id)
   }, [toast, clearToast])
 

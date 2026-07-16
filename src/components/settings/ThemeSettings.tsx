@@ -37,6 +37,9 @@ export function ThemeSettings() {
                     variant={mode === m.id ? "default" : "outline"}
                     size="sm"
                     onClick={() => setMode(m.id)}
+                    className={
+                      m.id === "light" ? "icon-hover-sun" : m.id === "dark" ? "icon-hover-moon" : "icon-hover-settings"
+                    }
                   >
                     <Icon size={15} className="mr-2" />
                     {t(m.labelKey)}
@@ -55,7 +58,7 @@ export function ThemeSettings() {
                   size="sm"
                   onClick={() => setLang(l.id)}
                 >
-                  <span className="mr-2 inline-flex w-5 justify-center text-xs font-bold tabular-nums">{l.glyph}</span>
+                  <span className="mr-2 inline-flex w-5 justify-center text-xs font-semibold tabular-nums">{l.glyph}</span>
                   {t(l.labelKey)}
                 </Button>
               ))}
@@ -75,12 +78,12 @@ export function ThemeSettings() {
                   >
                     <span
                       className={cn(
-                        "h-10 w-10 rounded-full flex items-center justify-center ring-offset-2 ring-offset-background transition-transform",
-                        active ? "ring-2 ring-ring" : "group-hover:scale-110"
+                        "h-9 w-9 rounded-2xl flex items-center justify-center ring-offset-2 ring-offset-background transition-transform duration-200",
+                        active ? "ring-2 ring-ring scale-105" : "group-hover:scale-110"
                       )}
                       style={{ backgroundColor: p.color }}
                     >
-                      {active && <Check size={16} className="text-white drop-shadow" />}
+                      {active && <Check size={15} className="text-white drop-shadow icon-pop-in" strokeWidth={2.5} />}
                     </span>
                     <span className={cn("text-xs", active ? "text-foreground font-medium" : "text-muted-foreground")}>
                       {t(`palette.${p.id}`)}

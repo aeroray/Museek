@@ -1,6 +1,7 @@
 import { audioPlayer } from "@/lib/audio"
 import { httpFetch } from "@/lib/http"
 import { getCachedAudioUrl, putCachedAudio } from "@/lib/mediaCache"
+import { qualityCandidates } from "@/lib/quality"
 import { sourceRunner } from "@/lib/sourceRunner"
 import type { MusicInfo, Quality } from "@/types/music"
 
@@ -34,6 +35,24 @@ export function revokeCurrentObjectUrl(): void {
     URL.revokeObjectURL(currentObjectUrl)
     currentObjectUrl = null
   }
+}
+
+/**
+ * Probe disk cache for a playable copy before any remote URL resolve.
+ * Walks the same quality ladder as adaptive URL fetch so a previously
+ * downgraded cache entry (e.g. 128k when flac was requested) still hits.
+ */
+export async function findCachedPlayableSrc(
+  song: MusicInfo,
+  preferred: Quality,
+  audioCache: boolean,
+): Promise<{ src: string; quality: Quality } | null> {
+  if (!isTauri || !audioCache) return null
+  for (const quality of qualityCandidates(preferred)) {
+    const src = await getCachedAudioUrl(song.source, song.meta.songId, quality)
+    if (src) return { src, quality }
+  }
+  return null
 }
 
 /**

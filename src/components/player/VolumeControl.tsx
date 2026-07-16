@@ -8,18 +8,15 @@ export function VolumeControl() {
 
   const pct = Math.round((muted ? 0 : volume) * 100)
 
-  const VolumeIcon = muted || volume === 0
-    ? VolumeX
-    : volume < 0.3
-    ? Volume
-    : volume < 0.7
-    ? Volume1
-    : Volume2
+  const level = muted || volume === 0 ? "mute" : volume < 0.3 ? "low" : volume < 0.7 ? "mid" : "high"
+  const VolumeIcon = level === "mute" ? VolumeX : level === "low" ? Volume : level === "mid" ? Volume1 : Volume2
 
   return (
     <div className="flex items-center gap-2">
       <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setMuted(!muted)}>
-        <VolumeIcon size={16} />
+        <span key={level} className="icon-pop-in">
+          <VolumeIcon size={16} />
+        </span>
       </Button>
       <div className="group relative flex items-center">
         {/* value bubble on hover */}
