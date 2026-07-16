@@ -84,6 +84,20 @@ export function AboutSettings() {
             </Button>
           </div>
         </SettingsCard>
+
+        <SettingsCard className="mt-4">
+          <div className="flex flex-col items-center gap-3 p-6 text-center">
+            <img
+              src="/gzh/qrcode.webp"
+              alt={t("about.gzhTitle")}
+              className="h-40 w-40 rounded-xl bg-white object-contain"
+            />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">{t("about.gzhTitle")}</p>
+              <p className="text-xs text-muted-foreground">{t("about.gzhHint")}</p>
+            </div>
+          </div>
+        </SettingsCard>
       </div>
 
       {/* Update available */}

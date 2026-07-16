@@ -102,6 +102,15 @@ The packaged app and installers are written to `src-tauri/target/release/bundle/
 3. **Play & collect.** Play tracks, build a queue, favorite songs, view synced lyrics, and download in your preferred quality.<br>**播放与收藏。** 播放歌曲、构建队列、收藏、查看同步歌词、按首选音质下载。
 4. **Sync.** In **Settings → Data**, export / import a JSON file — or pick a cloud-synced folder for automatic, encrypted sync across your devices.<br>**同步。** 在 **设置 → 数据** 导出 / 导入 JSON 文件,或指定一个被网盘同步的文件夹,实现多设备自动加密同步。
 
+## 📢 WeChat · 微信公众号
+
+Scan to follow our WeChat official account — send **音源** to get every source link, plus updates.<br>
+扫码关注公众号，发送「音源」即可获取全部音源链接，并接收最新动态。
+
+<p align="center">
+  <img src="./public/gzh/qrcode.webp" width="200" height="200" alt="WeChat official account QR code · 微信公众号二维码" />
+</p>
+
 ## 🧠 How it works · 工作原理
 
 Search, charts, and playlists call the platforms' public web APIs directly from the renderer (routed through Tauri's HTTP plugin to bypass CORS). Playback URLs are resolved by running **lx-music–compatible source scripts** in the renderer behind a `globalThis.lx` compatibility layer — Museek only handles the `musicUrl` / `lyric` / `pic` actions. Read-only requests are cached/throttled to be gentle on the upstream services.
