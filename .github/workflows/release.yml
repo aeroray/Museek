@@ -84,6 +84,19 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Museek ${{ github.ref_name }}"
           releaseBody: |
+            ## What's new · 更新内容
+
+            - **In-app updater · 应用内更新** — checks asynchronously after startup, shows an update card above Settings, and supports signed download, install, and relaunch from the About page.  
+              启动后异步检查更新；有新版本时在「设置」上方显示提示卡片，并可在「关于」页完成签名校验、下载、安装与重启。
+            - **Localized installers · 双语安装包** — Windows NSIS follows the system language (Chinese / English); macOS ships an Apple Silicon DMG with localized English / Chinese metadata.  
+              Windows NSIS 随系统语言显示中文 / 英文；macOS 提供 Apple Silicon DMG 与中英本地化元数据。
+            - **Architecture and playback · 架构与播放** — extracted playback, lyric, source, notification, and quality services for more reliable failover and maintenance.  
+              拆分播放、歌词、音源、通知与音质服务，提升失败转移可靠性与后续可维护性。
+            - **Polish · 体验优化** — refined loading feedback, lyrics cover transitions, window sizing, documentation, and the GitHub landing page.  
+              优化加载反馈、歌词封面过渡、窗口尺寸、双语文档与 GitHub 落地页。
+
+            ## Download · 下载
+
             下载下方对应平台的安装包：
             - **Windows**：`*_x64-setup.exe`（NSIS 安装包）
             - **macOS (Apple Silicon)**：`*_aarch64.dmg`
