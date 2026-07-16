@@ -1,0 +1,4 @@
+/* English — Finder / Launchpad / About display names */
+"CFBundleDisplayName" = "Museek";
+"CFBundleName" = "Museek";
+"NSHumanReadableCopyright" = "Copyright © 2026 Museek. Released under the MIT License.";

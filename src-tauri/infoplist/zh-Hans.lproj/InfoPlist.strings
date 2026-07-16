@@ -1,0 +1,4 @@
+/* Simplified Chinese — Finder / Launchpad / About display names */
+"CFBundleDisplayName" = "Museek 拾音";
+"CFBundleName" = "拾音";
+"NSHumanReadableCopyright" = "Copyright © 2026 Museek 拾音。基于 MIT 许可证发布。";

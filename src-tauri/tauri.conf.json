@@ -29,14 +29,34 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "dmg"],
+    "category": "Music",
+    "shortDescription": "Museek — multi-platform desktop music aggregator",
+    "longDescription": "Museek (拾音) is a cross-platform desktop music aggregator with multi-source search, charts, playlists, synced lyrics, and downloads. Compatible with lx-music sources.",
+    "copyright": "Copyright © 2026 Museek. MIT License.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "hardenedRuntime": true,
+      "license": "../LICENSE",
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 },
+        "windowSize": { "width": 660, "height": 400 }
+      }
+    }
   },
   "plugins": {}
 }

@@ -35,5 +35,9 @@ description = "Run the desktop app in dev mode"
 run = "pnpm tauri dev"
 
 [tasks.tauri-build]
-description = "Build the desktop app installers"
+description = "Build desktop installers (Windows NSIS / macOS DMG)"
 run = "pnpm tauri build"
+
+[tasks.tauri-build-macos-arm]
+description = "Build Apple Silicon (aarch64) macOS DMG"
+run = "pnpm tauri build -- --target aarch64-apple-darwin"

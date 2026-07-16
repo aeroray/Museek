@@ -15,5 +15,25 @@
     <key>NSAllowsArbitraryLoads</key>
     <true/>
   </dict>
+
+  <!-- Default locale + declared localizations (EN / Simplified Chinese) -->
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>en</string>
+    <string>zh-Hans</string>
+  </array>
+  <key>CFBundleAllowMixedLocalizations</key>
+  <true/>
+  <key>LSHasLocalizedDisplayName</key>
+  <true/>
+
+  <!-- Prefer Apple Silicon when a universal binary is present -->
+  <key>LSArchitecturePriority</key>
+  <array>
+    <string>arm64</string>
+    <string>x86_64</string>
+  </array>
 </dict>
 </plist>

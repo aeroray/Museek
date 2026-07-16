@@ -93,11 +93,15 @@ pnpm tauri dev
 ### Build · 打包
 
 ```bash
+# Windows → NSIS setup.exe（随系统语言自动中/英文安装界面）
 pnpm tauri build
+
+# macOS Apple Silicon → DMG（需在 Apple Silicon Mac 上构建）
+pnpm tauri build -- --target aarch64-apple-darwin
 ```
 
-Installers land in `src-tauri/target/release/bundle/` (Windows: `.msi` + NSIS `setup.exe`).  
-打包产物位于 `src-tauri/target/release/bundle/`（Windows 下为 `.msi` 与 NSIS 的 `setup.exe`）。
+Installers land in `src-tauri/target/*/release/bundle/` (Windows: NSIS `setup.exe`; macOS: `.dmg`).  
+打包产物位于 `src-tauri/target/*/release/bundle/`（Windows：NSIS `setup.exe`；macOS：`.dmg`）。
 
 ### First play · 第一次播放
 
