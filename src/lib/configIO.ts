@@ -1,9 +1,9 @@
 import { readData, writeData } from "@/lib/db"
 
 // Import/export of all user config as one JSON file, so it can be synced across
-// devices. Covers the db.ts JSON files (settings, sources, favorites, history,
-// platform order/selection) plus the direct-localStorage prefs (language, theme,
-// sidebar, lyric font). Deliberately excludes the on-disk audio/lyric cache and
+// devices. Covers the db.ts JSON files (settings, sources, favorites, history)
+// plus the direct-localStorage prefs (language, theme, sidebar, lyric font,
+// top-bar lyrics). Deliberately excludes the on-disk audio/lyric cache and
 // downloaded files — those are device-local and large.
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -13,8 +13,6 @@ const DB_FILES = [
   "sources.json",
   "playlists.json",
   "searchHistory.json",
-  "platformOrder.json",
-  "searchPlatform.json",
 ] as const
 
 const LS_KEYS = [
@@ -23,6 +21,7 @@ const LS_KEYS = [
   "museek.theme.palette",
   "museek.sidebarCollapsed",
   "museek.lyricFontScale",
+  "museek.topBarLyrics",
 ] as const
 
 // Settings specific to THIS device that must never travel via sync: the sync

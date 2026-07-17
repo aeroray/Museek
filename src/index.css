@@ -543,6 +543,18 @@ html[data-maximized="true"] .app-shell {
     transform: scale(1.15);
   }
 }
+@keyframes iconCaptions {
+  0%,
+  100% {
+    transform: scale(1) translateY(0);
+  }
+  35% {
+    transform: scale(1.1) translateY(-1px);
+  }
+  65% {
+    transform: scale(0.96) translateY(0);
+  }
+}
 @keyframes iconAudioPulse {
   0%,
   100% {
@@ -677,6 +689,9 @@ html[data-maximized="true"] .app-shell {
   }
   .icon-hover-maximize:hover svg {
     animation: iconMaximize 360ms ease;
+  }
+  .icon-hover-captions:hover svg {
+    animation: iconCaptions 400ms ease;
   }
 
   /* Nested icons (TrackRow / overlays) — animate the icon itself on parent hover */

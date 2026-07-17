@@ -8,14 +8,18 @@ import { LyricsPanel } from "@/components/lyrics/LyricsPanel"
 import { Toaster } from "@/components/ui/toaster"
 import { DownloadLocationDialog } from "@/components/DownloadLocationDialog"
 import { isMacOs } from "@/lib/os"
+import { showMainWindow } from "@/lib/showWindow"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
-/** Keep CSS window chrome in sync with OS + maximize state. */
+/** Keep CSS window chrome in sync with OS + maximize state; reveal window when ready. */
 function useWindowChrome() {
   useEffect(() => {
     // macOS Overlay windows use system corner radius; Windows/Linux stay CSS-clipped.
     document.documentElement.dataset.os = isMacOs() ? "macos" : "other"
+
+    // Show after first paint so Windows never flashes decorated/white chrome.
+    void showMainWindow()
 
     if (!isTauri) return
     let unlisten: (() => void) | undefined

@@ -217,6 +217,8 @@ pub fn run() {
                 }
                 // Non-macOS: frameless + custom WindowControls (conf uses
                 // decorations:true only so macOS Overlay traffic lights exist).
+                // Must run while still hidden (visible:false) so Windows never
+                // flashes the native title bar.
                 #[cfg(not(target_os = "macos"))]
                 {
                     let _ = window.set_decorations(false);
@@ -224,6 +226,16 @@ pub fn run() {
                 #[cfg(target_os = "windows")]
                 {
                     let _ = window.set_shadow(false);
+                }
+
+                // Fallback show if the frontend never calls show() (crash / hang).
+                // Normal path: frontend shows after first paint (see showMainWindow).
+                {
+                    let w = window.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(4000));
+                        let _ = w.show();
+                    });
                 }
 
                 // Windows: add prev / play-pause / next buttons to the taskbar

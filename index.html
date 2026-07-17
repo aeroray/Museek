@@ -5,6 +5,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Museek · 拾音</title>
+    <!-- Transparent shell before CSS loads — avoids a white flash on Windows. -->
+    <style>
+      html, body, #root {
+        margin: 0;
+        height: 100%;
+        background: transparent !important;
+      }
+    </style>
   </head>
 
   <body>

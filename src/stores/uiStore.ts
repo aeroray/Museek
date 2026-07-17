@@ -11,6 +11,8 @@ export interface Toast {
 }
 
 const SIDEBAR_KEY = "museek.sidebarCollapsed"
+/** Default on — only "0" means hidden. Synced via configIO prefs. */
+const TOP_BAR_LYRICS_KEY = "museek.topBarLyrics"
 
 interface UiState {
   toast: Toast | null
@@ -21,6 +23,9 @@ interface UiState {
   setDownloadLocationPrompt: (open: boolean) => void
   sidebarCollapsed: boolean
   toggleSidebar: () => void
+  /** Show the live lyric line in the top bar (default true). */
+  topBarLyrics: boolean
+  toggleTopBarLyrics: () => void
   // Selected platform per page, kept in memory so switching tabs and coming back
   // preserves the choice (not persisted to disk — that's intentionally cheap).
   chartSource: Source
@@ -46,6 +51,12 @@ export const useUiStore = create<UiState>((set, get) => ({
     const next = !get().sidebarCollapsed
     localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0")
     set({ sidebarCollapsed: next })
+  },
+  topBarLyrics: localStorage.getItem(TOP_BAR_LYRICS_KEY) !== "0",
+  toggleTopBarLyrics: () => {
+    const next = !get().topBarLyrics
+    localStorage.setItem(TOP_BAR_LYRICS_KEY, next ? "1" : "0")
+    set({ topBarLyrics: next })
   },
   chartSource: "wy",
   chartBoardId: "",
