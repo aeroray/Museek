@@ -214,6 +214,10 @@ pub fn run() {
                 #[cfg(target_os = "macos")]
                 {
                     let _ = window.set_shadow(true);
+                    // macOS Overlay chrome has no Windows-style decorated flash —
+                    // show immediately so cold start feels instant again.
+                    let _ = window.show();
+                    let _ = window.set_focus();
                 }
                 // Non-macOS: frameless + custom WindowControls (conf uses
                 // decorations:true only so macOS Overlay traffic lights exist).
@@ -228,8 +232,9 @@ pub fn run() {
                     let _ = window.set_shadow(false);
                 }
 
-                // Fallback show if the frontend never calls show() (crash / hang).
-                // Normal path: frontend shows after first paint (see showMainWindow).
+                // Windows/Linux fallback if the frontend never calls show().
+                // macOS is already shown above.
+                #[cfg(not(target_os = "macos"))]
                 {
                     let w = window.clone();
                     std::thread::spawn(move || {

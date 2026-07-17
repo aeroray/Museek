@@ -18,7 +18,8 @@ function useWindowChrome() {
     // macOS Overlay windows use system corner radius; Windows/Linux stay CSS-clipped.
     document.documentElement.dataset.os = isMacOs() ? "macos" : "other"
 
-    // Show after first paint so Windows never flashes decorated/white chrome.
+    // Windows: show after first paint (avoids decorated/white flash).
+    // macOS: already shown from Rust; this is a no-op focus ensure.
     void showMainWindow()
 
     if (!isTauri) return
