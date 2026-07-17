@@ -135,14 +135,14 @@ export function Favorites() {
         </div>
       </div>
 
-      {/* Shared toolbar: sort / filter / batch-edit (both tabs) */}
+      {/* Shared toolbar: sort / filter / search / batch-edit — fixed height both modes */}
       {total > 0 && (
-        <div className="px-4 py-2 border-b border-border flex items-center gap-1.5">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
           {!editing ? (
             <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 gap-1.5">
+                  <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5">
                     <ArrowDownUp size={14} />
                     <span className="hidden sm:inline">{t(`favorites.sort.${favoritesSort}`)}</span>
                   </Button>
@@ -159,7 +159,7 @@ export function Favorites() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 gap-1.5">
+                  <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5">
                     <ListFilter size={14} />
                     <span className="hidden sm:inline">
                       {favoritesPlatform === "all" ? t("favorites.allPlatforms") : t(`platform.${favoritesPlatform}`)}
@@ -180,23 +180,39 @@ export function Favorites() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button variant="ghost" size="sm" className="h-8 ml-auto" onClick={() => setEditing(true)}>
+              <div className="relative min-w-0 flex-1">
+                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="h-8 pl-9"
+                  placeholder={t(isSongs ? "favorites.searchPlaceholder" : "favorites.searchPlaylistsPlaceholder")}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+
+              <Button variant="ghost" size="sm" className="h-8 shrink-0" onClick={() => setEditing(true)}>
                 <Pencil size={14} className="mr-1.5" />
                 {t("favorites.batchEdit")}
               </Button>
             </>
           ) : (
             <>
-              <span className="text-sm text-muted-foreground">
+              <span className="truncate text-sm leading-8 text-muted-foreground">
                 {t("favorites.selectedCount", { count: selected.size })}
               </span>
-              <div className="ml-auto flex items-center gap-1.5">
+              <div className="ml-auto flex shrink-0 items-center gap-1.5">
                 <Button variant="ghost" size="sm" className="h-8" onClick={toggleAll}>
                   <CheckCheck size={14} className="mr-1.5" />
                   {allSelected ? t("favorites.deselectAll") : t("favorites.selectAll")}
                 </Button>
                 {isSongs && (
-                  <Button variant="outline" size="sm" disabled={selected.size === 0} onClick={batchDownload}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={selected.size === 0}
+                    onClick={batchDownload}
+                  >
                     <Download size={14} className="mr-1.5" />
                     {t("favorites.batchDownload")}
                   </Button>
@@ -204,9 +220,9 @@ export function Favorites() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-8 text-destructive hover:text-destructive"
                   disabled={selected.size === 0}
                   onClick={batchDelete}
-                  className="text-destructive hover:text-destructive"
                 >
                   <Trash2 size={14} className="mr-1.5" />
                   {t("favorites.batchDelete")}
@@ -217,21 +233,6 @@ export function Favorites() {
               </div>
             </>
           )}
-        </div>
-      )}
-
-      {/* Shared search (both tabs) */}
-      {total > 0 && !editing && (
-        <div className="px-4 py-2 border-b border-border">
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9 h-9"
-              placeholder={t(isSongs ? "favorites.searchPlaceholder" : "favorites.searchPlaylistsPlaceholder")}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
         </div>
       )}
 
@@ -279,7 +280,7 @@ export function Favorites() {
                       </span>
                     )}
 
-                    <div className="relative h-10 w-10 shrink-0 rounded overflow-hidden bg-muted">
+                    <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-muted shadow-[var(--shadow-border)]">
                       {song.meta.picUrl ? (
                         <img src={song.meta.picUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                       ) : (

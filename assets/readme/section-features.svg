@@ -5,8 +5,8 @@
   <rect width="1200" height="132" rx="24" fill="#0A0A0C"/>
   <!-- Official Museek mark (same geometry as app-icon.svg) -->
   <svg x="56" y="34" width="64" height="64" viewBox="0 0 1024 1024" aria-hidden="true">
-    <rect x="80" y="80" width="864" height="864" rx="156" fill="#000000"/>
-    <g fill="#FFFFFF">
+    <rect width="1024" height="1024" rx="256" fill="#000000"/>
+    <g fill="#FFFFFF" transform="scale(1.185185185) translate(-80 -80)">
       <rect x="220" y="467" width="64" height="90" rx="32"/>
       <rect x="324" y="347" width="64" height="330" rx="32"/>
       <rect x="428" y="242" width="64" height="540" rx="32"/>

@@ -1265,7 +1265,6 @@
             .replace(/\swidth="[^"]*"/, "")
             .replace(/\sheight="[^"]*"/, "")
             .replace(/<!--[\s\S]*?-->/g, "")
-            .replace(/viewBox="[^"]*"/, 'viewBox="80 80 864 864"')
             .trim()
           document.querySelectorAll("[data-brand-mark]").forEach((el) => {
             el.innerHTML = svg

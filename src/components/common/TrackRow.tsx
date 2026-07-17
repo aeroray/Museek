@@ -55,7 +55,7 @@ export const TrackRow = memo(function TrackRow({
         <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0 font-medium">{rank}</span>
       )}
 
-      <div className="relative h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-muted shadow-[var(--shadow-border)]">
+      <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-muted shadow-[var(--shadow-border)]">
         {thumb ? (
           <CoverImage src={thumb} />
         ) : (

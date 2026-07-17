@@ -21,10 +21,16 @@
         "minWidth": 1200,
         "minHeight": 780,
         "center": true,
-        "decorations": false,
+        "decorations": true,
         "transparent": true,
         "shadow": false,
-        "backgroundColor": [0, 0, 0, 0]
+        "backgroundColor": [0, 0, 0, 0],
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 18
+        }
       }
     ],
     "security": {

@@ -85,6 +85,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "common.download": "下载",
     "common.retry": "重试",
     "common.cancel": "取消",
+    "common.play": "播放",
+    "common.pause": "暂停",
     "common.playAll": "播放全部",
 
     // Search
@@ -439,6 +441,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "common.download": "Download",
     "common.retry": "Retry",
     "common.cancel": "Cancel",
+    "common.play": "Play",
+    "common.pause": "Pause",
     "common.playAll": "Play all",
 
     // Search

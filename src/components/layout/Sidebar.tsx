@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom"
 import { Search, ListMusic, TrendingUp, Heart, Download, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { isMacOs } from "@/lib/os"
 import { useT } from "@/lib/i18n"
 import { useUiStore } from "@/stores/uiStore"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -33,6 +34,7 @@ export function Sidebar() {
   const t = useT()
   const collapsed = useUiStore((s) => s.sidebarCollapsed)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
+  const mac = isMacOs()
 
   return (
     <aside
@@ -42,11 +44,15 @@ export function Sidebar() {
         collapsed ? "w-16" : "w-56"
       )}
     >
+      {/* macOS: reserve space for native traffic lights (titleBarStyle Overlay). */}
+      {mac && <div data-tauri-drag-region className="h-9 shrink-0" />}
+
       {/* Header: logo + brand — also a window drag handle (frameless window). */}
       <div
         data-tauri-drag-region
         className={cn(
-          "brand-mark-hot px-3 pt-3.5 pb-2 flex items-center gap-3",
+          "brand-mark-hot px-3 pb-2 flex items-center gap-3",
+          mac ? "pt-1" : "pt-3.5",
           collapsed && "justify-center px-2"
         )}
       >

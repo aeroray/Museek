@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { X, AArrowUp, AArrowDown, Loader2, Music, Maximize2, Minimize2 } from "lucide-react"
+import { X, AArrowUp, AArrowDown, Loader2, Music, Maximize2, Minimize2, Heart, Play, Pause } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { CoverImage } from "@/components/common/CoverImage"
+import { SpecularFrame } from "@/components/common/SpecularFrame"
 import { usePlayerStore } from "@/stores/playerStore"
+import { usePlaylistStore } from "@/stores/playlistStore"
 import { hiResCover } from "@/lib/cover"
 import {
   enterLyricsFullscreen,
@@ -30,8 +32,15 @@ export function LyricsPanel() {
   const lyricsLoading = usePlayerStore((s) => s.lyricsLoading)
   const currentPicUrl = usePlayerStore((s) => s.currentPicUrl)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
+  const status = usePlayerStore((s) => s.status)
   const setShowLyrics = usePlayerStore((s) => s.setShowLyrics)
   const seek = usePlayerStore((s) => s.seek)
+  const togglePlay = usePlayerStore((s) => s.togglePlay)
+  const fav = usePlaylistStore((s) =>
+    currentSong ? s.favorites.some((f) => f.id === currentSong.id) : false,
+  )
+  const addToFavorites = usePlaylistStore((s) => s.addToFavorites)
+  const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites)
   const t = useT()
   const [fontScale, setFontScale] = useState(() => {
     const v = parseFloat(localStorage.getItem(LYRIC_FONT_KEY) ?? "")
@@ -151,6 +160,58 @@ export function LyricsPanel() {
   const inc = () => setScale(Math.min(FONT_MAX, +(fontScale + FONT_STEP).toFixed(2)))
   const showBlur = !!thumbSrc
 
+  const coverArt = (
+    <div className="group/cover relative h-full w-full bg-muted/50">
+      {thumbSrc ? (
+        <>
+          <img
+            src={thumbSrc}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            decoding="async"
+          />
+          {needsHeroUpgrade && (
+            <CoverImage
+              src={heroSrc}
+              alt="album"
+              loading="eager"
+              className="absolute inset-0 !outline-none"
+            />
+          )}
+        </>
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/60 text-muted-foreground/50">
+          <Music size={36} strokeWidth={1.5} className="animate-pulse" />
+          <span className="text-xs">{t("lyrics.noCover")}</span>
+        </div>
+      )}
+      {currentSong && (
+        <button
+          type="button"
+          onClick={() => togglePlay()}
+          disabled={status === "idle"}
+          className={cn(
+            "absolute inset-0 z-[2] flex items-center justify-center",
+            "bg-black/40 opacity-0 transition-opacity duration-200 ease-out",
+            "group-hover/cover:opacity-100 focus-visible:opacity-100",
+            "disabled:pointer-events-none",
+          )}
+          title={isPlaying ? t("common.pause") : t("common.play")}
+        >
+          <span className="text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)] transition-transform duration-200 ease-out active:scale-[0.96]">
+            {status === "loading" ? (
+              <Loader2 size={40} className="animate-spin" strokeWidth={2} />
+            ) : isPlaying ? (
+              <Pause size={42} fill="currentColor" strokeWidth={0} />
+            ) : (
+              <Play size={42} fill="currentColor" strokeWidth={0} className="ml-1" />
+            )}
+          </span>
+        </button>
+      )}
+    </div>
+  )
+
   return (
     <div
       className={cn(
@@ -176,6 +237,29 @@ export function LyricsPanel() {
         )}
       />
       <div className="absolute inset-0 bg-background/65" />
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "absolute top-4 left-4 z-20 h-9 w-9 icon-hover-heart",
+          fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground/70 hover:text-foreground",
+        )}
+        onClick={() => {
+          if (!currentSong) return
+          if (fav) removeFromFavorites(currentSong.id)
+          else addToFavorites(currentSong)
+        }}
+        disabled={!currentSong}
+        title={t(fav ? "common.unfavorite" : "common.favorite")}
+      >
+        <Heart
+          key={fav ? "on" : "off"}
+          size={18}
+          fill={fav ? "currentColor" : "none"}
+          className={fav ? "icon-heart-burst" : undefined}
+        />
+      </Button>
 
       <Button
         variant="ghost"
@@ -221,7 +305,7 @@ export function LyricsPanel() {
       </div>
 
       <div className="relative z-10 flex h-full min-h-0">
-        <div className="w-2/5 flex flex-col items-center justify-center gap-6 p-12 shrink-0">
+        <div className="flex w-2/5 shrink-0 flex-col items-center justify-center gap-6 overflow-visible p-12">
           {currentSong && (
             <div className="text-center max-w-xs">
               <p className="text-2xl font-semibold truncate tracking-tight" title={currentSong.name}>
@@ -232,39 +316,29 @@ export function LyricsPanel() {
               </p>
             </div>
           )}
-          <div
-            className={cn(
-              "relative w-60 h-60 rounded-2xl overflow-hidden shadow-2xl shrink-0",
-              isPlaying && "lyric-cover-float"
-            )}
-          >
-            {isPlaying && <span className="lyric-cover-beam" aria-hidden="true" />}
-            <div
-              className={cn(
-                "absolute z-[1] overflow-hidden bg-muted/50",
-                isPlaying ? "inset-[2px] rounded-[14px]" : "inset-0 rounded-2xl"
-              )}
-            >
-              {thumbSrc ? (
-                <>
-                  <img
-                    src={thumbSrc}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    decoding="async"
-                  />
-                  {needsHeroUpgrade && (
-                    <CoverImage src={heroSrc} alt="album" loading="eager" className="absolute inset-0" />
-                  )}
-                </>
-              ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/60 text-muted-foreground/50">
-                  <Music size={36} strokeWidth={1.5} className="animate-pulse" />
-                  <span className="text-xs">{t("lyrics.noCover")}</span>
-                </div>
-              )}
+          {isPlaying ? (
+            <div className="lyric-cover-float shrink-0">
+              <SpecularFrame
+                autoAnimate
+                followMouse={false}
+                className="h-60 w-60"
+                radius={16}
+                lineColor="#ffffff"
+                baseColor="#9ca3af"
+                intensity={1.85}
+                shineSize={18}
+                shineFade={28}
+                thickness={0.8}
+                speed={-0.5}
+              >
+                {coverArt}
+              </SpecularFrame>
             </div>
-          </div>
+          ) : (
+            <div className="h-60 w-60 shrink-0 overflow-hidden rounded-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.35)]">
+              {coverArt}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 min-h-0" style={{ maskImage: FADE, WebkitMaskImage: FADE }}>

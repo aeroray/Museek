@@ -204,9 +204,22 @@ pub fn run() {
                 // and Win11 system rounding that fights CSS radius.
                 // macOS: native shadow is fine with transparent windows and
                 // avoids needing a CSS outer glow that bleeds into corners.
+                //
+                // Window chrome is platform-split:
+                // - macOS: decorations + Overlay title bar → native traffic lights
+                //   (configured in tauri.conf.json).
+                // - Windows: strip decorations immediately for the custom
+                //   WindowControls chrome (conf starts with decorations:true so
+                //   macOS can show traffic lights at create-time).
                 #[cfg(target_os = "macos")]
                 {
                     let _ = window.set_shadow(true);
+                }
+                // Non-macOS: frameless + custom WindowControls (conf uses
+                // decorations:true only so macOS Overlay traffic lights exist).
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let _ = window.set_decorations(false);
                 }
                 #[cfg(target_os = "windows")]
                 {

@@ -22,8 +22,6 @@ export function BrandMark({ live = false, className, barsOnly = false, title }: 
       .replace(/\swidth="[^"]*"/, "")
       .replace(/\sheight="[^"]*"/, "")
       .replace(/<!--[\s\S]*?-->/g, "")
-      // Crop to the rounded square (file keeps padding for OS icon generation).
-      .replace(/viewBox="[^"]*"/, 'viewBox="80 80 864 864"')
       .trim()
 
     svg = svg.replace(

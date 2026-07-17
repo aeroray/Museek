@@ -1,5 +1,6 @@
 import { Minus, Square, X } from "lucide-react"
 import { useT } from "@/lib/i18n"
+import { isMacOs } from "@/lib/os"
 import { cn } from "@/lib/utils"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -9,12 +10,12 @@ async function currentWindow() {
   return getCurrentWindow()
 }
 
-// Custom minimize / maximize / close buttons for the frameless (decorations:false)
-// window. Close goes through the normal flow — CloseGuard intercepts the window's
-// onCloseRequested and applies the tray / confirm / quit behaviour. Tauri-only.
+// Custom minimize / maximize / close for Windows (and Linux) frameless chrome.
+// macOS uses native traffic lights via titleBarStyle: Overlay — hide these.
+// Close still goes through CloseGuard (onCloseRequested).
 export function WindowControls() {
   const t = useT()
-  if (!isTauri) return null
+  if (!isTauri || isMacOs()) return null
 
   const base =
     "relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.96]"
