@@ -8,10 +8,8 @@
       name="description"
       content="Museek 拾音 是一款跨平台桌面音乐聚合应用：多平台搜索、排行榜、歌单、同步歌词与下载，一站搞定。兼容 lx-music 音源。"
     />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%23000'/%3E%3Cg fill='%23fff'%3E%3Crect x='16' y='45.5' width='7' height='9' rx='3.5'/%3E%3Crect x='28' y='33' width='7' height='34' rx='3.5'/%3E%3Crect x='40' y='22' width='7' height='56' rx='3.5'/%3E%3Crect x='52' y='39' width='7' height='22' rx='3.5'/%3E%3Crect x='64' y='30' width='7' height='40' rx='3.5'/%3E%3Crect x='76' y='45.5' width='7' height='9' rx='3.5'/%3E%3C/g%3E%3C/svg%3E"
-    />
+    <!-- Favicon = canonical mark (same file as the desktop app). -->
+    <link rel="icon" type="image/svg+xml" href="./app-icon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -196,10 +194,17 @@
         font-size: 20px;
         letter-spacing: 0.01em;
       }
-      .brand svg {
+      .brand .brand-slot {
+        display: block;
         width: 28px;
         height: 28px;
-        border-radius: 8px;
+        line-height: 0;
+        flex-shrink: 0;
+      }
+      .brand .brand-slot > svg {
+        width: 100%;
+        height: 100%;
+        display: block;
       }
       .brand .cn {
         font-family: "Poppins", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -780,21 +785,23 @@
       .dl-badge {
         width: 80px;
         height: 80px;
-        /* Concentric: mark ~14px radius + ~16px pad → outer ≈ 30 */
-        border-radius: 30px;
         margin: 0 auto 30px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #000;
-        box-shadow:
-          0 22px 60px -16px rgba(31, 221, 122, 0.55),
-          0 0 0 1px var(--border);
+        background: transparent;
+        filter: drop-shadow(0 22px 40px rgba(31, 221, 122, 0.45));
       }
-      .dl-badge svg {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
+      .dl-badge .brand-slot {
+        display: block;
+        width: 80px;
+        height: 80px;
+        line-height: 0;
+      }
+      .dl-badge .brand-slot > svg {
+        width: 100%;
+        height: 100%;
+        display: block;
       }
       .dl-title {
         font-family: var(--display);
@@ -837,7 +844,7 @@
         flex-wrap: wrap;
         margin-bottom: 36px;
       }
-      .foot-top .brand svg {
+      .foot-top .brand .brand-slot {
         width: 30px;
         height: 30px;
       }
@@ -936,17 +943,7 @@
     <header id="hdr">
       <div class="wrap nav">
         <a class="brand" href="#top" aria-label="Museek">
-          <svg viewBox="0 0 100 100" aria-hidden="true">
-            <rect width="100" height="100" rx="26" fill="#000" />
-            <g class="eq" fill="#fff">
-              <rect x="16" y="45.5" width="7" height="9" rx="3.5" />
-              <rect x="28" y="33" width="7" height="34" rx="3.5" />
-              <rect x="40" y="22" width="7" height="56" rx="3.5" />
-              <rect x="52" y="39" width="7" height="22" rx="3.5" />
-              <rect x="64" y="30" width="7" height="40" rx="3.5" />
-              <rect x="76" y="45.5" width="7" height="9" rx="3.5" />
-            </g>
-          </svg>
+          <span class="brand-slot" data-brand-mark></span>
           <span>Museek <span class="cn">拾音</span></span>
         </a>
         <nav class="nav-links">
@@ -1175,16 +1172,7 @@
       <section class="download-cta" id="download">
         <div class="wrap reveal">
           <div class="dl-badge">
-            <svg viewBox="0 0 100 100" aria-hidden="true">
-              <g class="eq live" fill="#fff">
-                <rect x="16" y="45.5" width="7" height="9" rx="3.5" />
-                <rect x="28" y="33" width="7" height="34" rx="3.5" />
-                <rect x="40" y="22" width="7" height="56" rx="3.5" />
-                <rect x="52" y="39" width="7" height="22" rx="3.5" />
-                <rect x="64" y="30" width="7" height="40" rx="3.5" />
-                <rect x="76" y="45.5" width="7" height="9" rx="3.5" />
-              </g>
-            </svg>
+            <span class="brand-slot" data-brand-mark data-live></span>
           </div>
           <div class="kicker" data-i18n="dl.kicker">即刻开始</div>
           <h2 class="dl-title">
@@ -1242,17 +1230,7 @@
       <div class="wrap">
         <div class="foot-top">
           <a class="brand" href="#top">
-            <svg viewBox="0 0 100 100" aria-hidden="true">
-              <rect width="100" height="100" rx="26" fill="#000" />
-              <g class="eq" fill="#fff">
-                <rect x="16" y="45.5" width="7" height="9" rx="3.5" />
-                <rect x="28" y="33" width="7" height="34" rx="3.5" />
-                <rect x="40" y="22" width="7" height="56" rx="3.5" />
-                <rect x="52" y="39" width="7" height="22" rx="3.5" />
-                <rect x="64" y="30" width="7" height="40" rx="3.5" />
-                <rect x="76" y="45.5" width="7" height="9" rx="3.5" />
-              </g>
-            </svg>
+            <span class="brand-slot" data-brand-mark></span>
             <span>Museek <span class="cn">拾音</span></span>
           </a>
           <div class="badges">
@@ -1278,6 +1256,27 @@
 
     <script>
       document.getElementById("year").textContent = new Date().getFullYear();
+
+      // Hydrate every brand slot from the canonical app-icon.svg (single source).
+      ;(async () => {
+        try {
+          const raw = await fetch("./app-icon.svg").then((r) => r.text())
+          let svg = raw
+            .replace(/\swidth="[^"]*"/, "")
+            .replace(/\sheight="[^"]*"/, "")
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/viewBox="[^"]*"/, 'viewBox="80 80 864 864"')
+            .trim()
+          document.querySelectorAll("[data-brand-mark]").forEach((el) => {
+            el.innerHTML = svg
+            if (el.hasAttribute("data-live")) {
+              el.querySelector(".eq")?.classList.add("live")
+            }
+          })
+        } catch (err) {
+          console.warn("Failed to load app-icon.svg", err)
+        }
+      })()
 
       const hdr = document.getElementById("hdr");
       const onScroll = () =>

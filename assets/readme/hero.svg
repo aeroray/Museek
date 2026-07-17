@@ -31,7 +31,7 @@
   </svg>
   <!-- Official Museek mark (same geometry as app-icon.svg) -->
   <svg x="56" y="44" width="56" height="56" viewBox="0 0 1024 1024" aria-hidden="true">
-    <rect x="80" y="80" width="864" height="864" rx="200" fill="#000000"/>
+    <rect x="80" y="80" width="864" height="864" rx="156" fill="#000000"/>
     <g fill="#FFFFFF">
       <rect x="220" y="467" width="64" height="90" rx="32"/>
       <rect x="324" y="347" width="64" height="330" rx="32"/>

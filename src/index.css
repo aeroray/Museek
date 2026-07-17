@@ -100,12 +100,20 @@
   * {
     @apply border-border;
   }
+  /* Transparent chrome layers — any opaque color here shows as square
+     corners outside .app-shell's radius on a light desktop. */
   html {
     scroll-behavior: smooth;
+    height: 100%;
+    background: transparent !important;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     position: relative;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: transparent !important;
     /* Bundled serifs everywhere — Source Serif 4 (Latin) + Noto Serif SC (CJK) */
     font-family: "Source Serif 4", "Noto Serif SC", "Songti SC", SimSun, Georgia, serif;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -113,6 +121,10 @@
     /* Subpixel keeps small UI text sharper than grayscale antialiased in WebView2 */
     -webkit-font-smoothing: auto;
     -moz-osx-font-smoothing: auto;
+  }
+  #root {
+    height: 100%;
+    background: transparent !important;
   }
   h1,
   h2,
@@ -151,20 +163,46 @@
   }
 }
 
-/* Film grain — breaks flat digital surfaces without distracting */
-body::before {
+/* Cross-platform window chrome: same radius on macOS + Windows.
+   Window/webview must be truly transparent; only this shell is opaque.
+   Never use outer box-shadow here — it paints into the transparent corner
+   pixels and shows as a colored fringe (worse on white desktops), and makes
+   the visible radius look smaller. Edge definition is inset-only. */
+.app-shell {
+  --window-radius: 12px;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--window-radius);
+  /* Belt-and-suspenders for WebView2 compositing quirks */
+  clip-path: inset(0 round var(--window-radius));
+  background: hsl(var(--background));
+  box-shadow: inset 0 0 0 1px hsl(30 12% 10% / 0.1);
+}
+.dark .app-shell {
+  box-shadow: inset 0 0 0 1px hsl(40 12% 100% / 0.12);
+}
+html[data-maximized="true"] .app-shell {
+  border-radius: 0;
+  clip-path: none;
+  box-shadow: none;
+}
+
+/* Film grain — clipped inside the rounded shell */
+.app-shell::before {
   content: "";
   pointer-events: none;
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 9998;
+  border-radius: inherit;
   opacity: 0.045;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 180px 180px;
 }
-.dark body::before {
+.dark .app-shell::before {
   opacity: 0.06;
 }
 
@@ -536,6 +574,73 @@ body::before {
   }
   50% {
     transform: scale(1.06);
+  }
+}
+
+/* Brand mark equalizer — mirrors docs landing `.eq` / `.eqbar` motion */
+@keyframes brandEqBar {
+  0%,
+  100% {
+    transform: scaleY(0.32);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.brand-mark {
+  display: block;
+  line-height: 0;
+}
+.brand-mark > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* In-app mark follows the active theme palette (OS/favicon stay black). */
+.brand-mark:not(.bars-only) .mark-bg {
+  fill: hsl(var(--primary));
+}
+.brand-mark:not(.bars-only) .eq {
+  fill: hsl(var(--primary-foreground));
+}
+.brand-mark .eq rect {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.brand-mark.live .eq rect,
+.brand-mark-hot:hover .brand-mark .eq rect {
+  animation: brandEqBar 1.05s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.brand-mark.live .eq rect:nth-of-type(1),
+.brand-mark-hot:hover .brand-mark .eq rect:nth-of-type(1) {
+  animation-delay: -0.9s;
+}
+.brand-mark.live .eq rect:nth-of-type(2),
+.brand-mark-hot:hover .brand-mark .eq rect:nth-of-type(2) {
+  animation-delay: -0.2s;
+}
+.brand-mark.live .eq rect:nth-of-type(3),
+.brand-mark-hot:hover .brand-mark .eq rect:nth-of-type(3) {
+  animation-delay: -0.55s;
+}
+.brand-mark.live .eq rect:nth-of-type(4),
+.brand-mark-hot:hover .brand-mark .eq rect:nth-of-type(4) {
+  animation-delay: -0.75s;
+}
+.brand-mark.live .eq rect:nth-of-type(5),
+.brand-mark-hot:hover .brand-mark .eq rect:nth-of-type(5) {
+  animation-delay: -0.35s;
+}
+.brand-mark.live .eq rect:nth-of-type(6),
+.brand-mark-hot:hover .brand-mark .eq rect:nth-of-type(6) {
+  animation-delay: -0.65s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-mark.live .eq rect,
+  .brand-mark-hot:hover .brand-mark .eq rect {
+    animation: none;
   }
 }
 

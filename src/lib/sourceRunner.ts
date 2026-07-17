@@ -3,6 +3,7 @@ import { t } from "@/lib/i18n"
 import { qualityCandidates } from "@/lib/quality"
 import { toLxMusicInfo } from "@/lib/lxMusicInfo"
 import { looksLikeRealAudio } from "@/lib/audioUrlProbe"
+import { createAsyncCache } from "@/lib/cache"
 import type {
   SourceScript,
   LxRequestPayload,
@@ -11,6 +12,12 @@ import type {
 import type { LyricInfo, MusicInfo, Quality } from "@/types/music"
 
 type LxHandler = (payload: unknown) => Promise<LxRequestResult>
+
+/** Cap parallel musicUrl probes so many enabled sources don't stampede CDNs. */
+const MUSIC_URL_WAVE = 3
+/** Successful play URLs are reusable briefly (CDN links expire; keep TTL short). */
+const musicUrlCache = createAsyncCache<string>(4 * 60_000, 80)
+const picCache = createAsyncCache<string | null>(30 * 60_000, 80)
 
 /**
  * Injected by sourceStore so this module never imports the store (breaks the
@@ -31,8 +38,8 @@ export function bindSourceRegistry(r: SourceRegistry): void {
 }
 
 class SourceRunner {
-  // Multiple enabled sources can be loaded simultaneously; on each request we try
-  // them in order (failover) until one returns a valid result. Keyed by script id.
+  // Multiple enabled sources can be loaded simultaneously; musicUrl races them
+  // in small waves and takes the first valid full-track URL. Keyed by script id.
   private handlers = new Map<string, LxHandler>()
 
   async loadScript(script: SourceScript): Promise<Record<string, unknown> | undefined> {
@@ -107,17 +114,13 @@ class SourceRunner {
     return this.handlers.size > 0
   }
 
-  // Order to try sources: the enabled+loaded sources in list order (top-to-bottom
-  // in the UI). Earlier entries are tried first.
+  // Enabled+loaded sources in UI list order (used for lyric/pic failover and
+  // as the musicUrl race participant set).
   private getOrderedIds(): string[] {
     return registry
       .getScripts()
       .filter((s) => s.enabled && this.handlers.has(s.id))
       .map((s) => s.id)
-  }
-
-  private nameOf(id: string): string {
-    return registry.getScripts().find((s) => s.id === id)?.name ?? id
   }
 
   private buildRequest(
@@ -134,39 +137,96 @@ class SourceRunner {
     }
   }
 
-  // Try each enabled source in turn; return the first valid URL. Throws an
-  // aggregated error only if every source fails.
+  private musicUrlKey(payload: LxRequestPayload): string {
+    const q = payload.type ?? "128k"
+    return `${payload.source}:${payload.info.meta.songId}:${q}`
+  }
+
+  /**
+   * Race a wave of sources; first URL that passes the real-audio probe wins.
+   * After a winner, remaining probes in the wave are cancelled (no more HEAD/Range).
+   */
+  private raceMusicUrlWave(
+    ids: string[],
+    payload: LxRequestPayload,
+    quality: Quality,
+  ): Promise<string> {
+    const request = this.buildRequest("musicUrl", payload)
+
+    type Outcome = { ok: true; url: string } | { ok: false }
+
+    return new Promise((resolve, reject) => {
+      let settled = false
+      let remaining = ids.length
+      if (!remaining) {
+        reject(new Error(t("sources.err.allFailed")))
+        return
+      }
+
+      const tryOne = async (id: string): Promise<Outcome> => {
+        if (settled) return { ok: false }
+        const handler = this.handlers.get(id)
+        if (!handler) return { ok: false }
+        try {
+          const result = await handler(request)
+          if (settled) return { ok: false }
+          if (typeof result === "string" && result.startsWith("http")) {
+            if (
+              await looksLikeRealAudio(result, payload.info, quality, () => settled)
+            ) {
+              if (settled) return { ok: false }
+              return { ok: true, url: result }
+            }
+          }
+        } catch {
+          /* counted as failure below */
+        }
+        return { ok: false }
+      }
+
+      for (const id of ids) {
+        void tryOne(id).then((outcome) => {
+          if (settled) return
+          if (outcome.ok) {
+            settled = true
+            resolve(outcome.url)
+            return
+          }
+          remaining -= 1
+          if (remaining === 0) {
+            settled = true
+            reject(new Error(t("sources.err.allFailed")))
+          }
+        })
+      }
+    })
+  }
+
+  /**
+   * Resolve a playback URL: wave-race enabled sources (cap concurrency), with a
+   * short TTL cache so replay / quality retries don't re-hit every script.
+   */
   async getMusicUrl(payload: LxRequestPayload): Promise<string> {
     const ids = this.getOrderedIds()
     if (!ids.length) throw new Error(t("sources.err.noEnabled"))
 
-    const errors: string[] = []
     const quality = (payload.type ?? "128k") as Quality
+    const key = this.musicUrlKey(payload)
 
-    for (const id of ids) {
-      const handler = this.handlers.get(id)
-      if (!handler) continue
-      try {
-        const result = await handler(this.buildRequest("musicUrl", payload))
-        if (typeof result === "string" && result.startsWith("http")) {
-          // Reject trial / VIP-notice clips so failover moves to the next source
-          // instead of "succeeding" with a few-second restriction notice.
-          if (await looksLikeRealAudio(result, payload.info, quality))
-            return result
-          errors.push(t("sources.err.tooSmall", { name: this.nameOf(id) }))
-          continue
+    return musicUrlCache(key, async () => {
+      let lastErr: unknown
+      for (let i = 0; i < ids.length; i += MUSIC_URL_WAVE) {
+        const wave = ids.slice(i, i + MUSIC_URL_WAVE)
+        try {
+          return await this.raceMusicUrlWave(wave, payload, quality)
+        } catch (err) {
+          lastErr = err
         }
-        errors.push(t("sources.err.invalidUrl", { name: this.nameOf(id) }))
-      } catch (err) {
-        errors.push(
-          t("sources.err.sourceMsg", {
-            name: this.nameOf(id),
-            msg: (err as Error).message,
-          }),
-        )
       }
-    }
-    throw new Error(t("sources.err.allFailed", { errors: errors.join("；") }))
+      throw lastErr instanceof Error
+        ? lastErr
+        : new Error(t("sources.err.allFailed"))
+    })
   }
 
   // Resolve a playback URL starting at `preferred`, stepping down the quality
@@ -212,18 +272,21 @@ class SourceRunner {
   }
 
   async getPic(payload: LxRequestPayload): Promise<string | null> {
-    for (const id of this.getOrderedIds()) {
-      const handler = this.handlers.get(id)
-      if (!handler) continue
-      try {
-        const result = await handler(this.buildRequest("pic", payload))
-        if (typeof result === "string" && result.startsWith("http"))
-          return result
-      } catch {
-        // try next source
+    const key = `${payload.source}:${payload.info.meta.songId}`
+    return picCache(key, async () => {
+      for (const id of this.getOrderedIds()) {
+        const handler = this.handlers.get(id)
+        if (!handler) continue
+        try {
+          const result = await handler(this.buildRequest("pic", payload))
+          if (typeof result === "string" && result.startsWith("http"))
+            return result
+        } catch {
+          // try next source
+        }
       }
-    }
-    return null
+      return null
+    })
   }
 }
 

@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { readFileSync } from "node:fs";
+import { copyFileSync, readFileSync } from "node:fs";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -13,6 +13,29 @@ const host = process.env.TAURI_DEV_HOST;
 const appVersion = JSON.parse(
   readFileSync(path.resolve(__dirname, "package.json"), "utf-8"),
 ).version as string;
+
+const brandIconSrc = path.resolve(__dirname, "app-icon.svg");
+
+/** Keep favicon + docs mark copies identical to root `app-icon.svg`. */
+function syncBrandIcon(): Plugin {
+  const sync = () => {
+    copyFileSync(brandIconSrc, path.resolve(__dirname, "public/favicon.svg"));
+    copyFileSync(brandIconSrc, path.resolve(__dirname, "docs/app-icon.svg"));
+  };
+  return {
+    name: "museek-sync-brand-icon",
+    buildStart() {
+      sync();
+    },
+    configureServer(server) {
+      sync();
+      server.watcher.add(brandIconSrc);
+      server.watcher.on("change", (file) => {
+        if (path.resolve(file) === brandIconSrc) sync();
+      });
+    },
+  };
+}
 
 // Dev-only CORS proxy: lets the browser preview (which has no Tauri IPC bridge)
 // reach the music APIs by forwarding requests server-side. The client hits
@@ -64,7 +87,7 @@ function devCorsProxy(): Plugin {
 }
 
 export default defineConfig(async () => ({
-  plugins: [react(), devCorsProxy()],
+  plugins: [react(), syncBrandIcon(), devCorsProxy()],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },

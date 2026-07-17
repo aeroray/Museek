@@ -62,6 +62,8 @@ interface KgBangSongRaw {
   hash_high?: string
   filesize_high?: number
   authors?: KgAuthorRaw[]
+  /** Cover template with `{size}` placeholder, e.g. `http://imge.kugou.com/stdmusic/{size}/...jpg` */
+  album_sizable_cover?: string
 }
 
 interface KgBangResponse {
@@ -105,7 +107,9 @@ function normalizeKgBangSong(raw: KgBangSongRaw): MusicInfo {
     meta: {
       songId,
       albumId: raw.album_id != null ? String(raw.album_id) : "",
-      picUrl: null,
+      picUrl: raw.album_sizable_cover
+        ? raw.album_sizable_cover.replace("{size}", "240")
+        : null,
       hash: raw.hash,
       qualitys,
       _qualitys,

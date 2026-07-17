@@ -9,6 +9,9 @@ import type { MusicInfo, Quality } from "@/types/music"
  * clip — a valid URL — so failover would stop there. We size-check the URL:
  * a real song is far larger than a few-second notice. Keyed on the song's stated
  * duration when known; FAILS OPEN (accepts) when size can't be determined.
+ *
+ * Content-Length results are TTL-cached per URL so concurrent source races and
+ * quality retries don't each fire HEAD + Range against the same CDN.
  */
 
 const BITRATE_KBPS: Record<Quality, number> = {
@@ -19,6 +22,11 @@ const BITRATE_KBPS: Record<Quality, number> = {
 }
 
 const MIN_AUDIO_BYTES = 150 * 1024
+const LENGTH_TTL_MS = 5 * 60_000
+const LENGTH_CACHE_MAX = 120
+
+const lengthCache = new Map<string, { len: number | null; expires: number }>()
+const lengthInflight = new Map<string, Promise<number | null>>()
 
 function intervalToSeconds(interval: string): number {
   const parts = interval.split(":").map((p) => parseInt(p, 10))
@@ -46,7 +54,15 @@ export function parseSizeToBytes(s: string | null | undefined): number | null {
   return Math.round(val * (units[m[2].toUpperCase()] ?? 1))
 }
 
-async function resolvedContentLength(url: string): Promise<number | null> {
+function rememberLength(url: string, len: number | null): void {
+  lengthCache.set(url, { len, expires: Date.now() + LENGTH_TTL_MS })
+  if (lengthCache.size > LENGTH_CACHE_MAX) {
+    const oldest = lengthCache.keys().next().value
+    if (oldest !== undefined && oldest !== url) lengthCache.delete(oldest)
+  }
+}
+
+async function fetchContentLength(url: string): Promise<number | null> {
   try {
     const head = await httpFetch(url, { method: "HEAD" })
     if (head.ok) {
@@ -74,13 +90,38 @@ async function resolvedContentLength(url: string): Promise<number | null> {
   return null
 }
 
-/** True if the URL plausibly points to the full song (or we couldn't tell). */
+async function resolvedContentLength(url: string): Promise<number | null> {
+  const hit = lengthCache.get(url)
+  if (hit && Date.now() < hit.expires) return hit.len
+
+  const pending = lengthInflight.get(url)
+  if (pending) return pending
+
+  const job = fetchContentLength(url)
+    .then((len) => {
+      rememberLength(url, len)
+      return len
+    })
+    .finally(() => {
+      lengthInflight.delete(url)
+    })
+  lengthInflight.set(url, job)
+  return job
+}
+
+/**
+ * True if the URL plausibly points to the full song (or we couldn't tell).
+ * Pass `isCancelled` from a source race so losers stop probing after a winner.
+ */
 export async function looksLikeRealAudio(
   url: string,
   song: MusicInfo,
   quality: Quality,
+  isCancelled?: () => boolean,
 ): Promise<boolean> {
+  if (isCancelled?.()) return false
   const len = await resolvedContentLength(url)
+  if (isCancelled?.()) return false
   if (len == null) return true
 
   const known = parseSizeToBytes(song.meta._qualitys?.[quality]?.size)

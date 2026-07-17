@@ -1,9 +1,11 @@
 import { NavLink } from "react-router-dom"
-import { Search, ListMusic, TrendingUp, Heart, Download, Settings, AudioLines } from "lucide-react"
+import { Search, ListMusic, TrendingUp, Heart, Download, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
 import { useUiStore } from "@/stores/uiStore"
+import { usePlayerStore } from "@/stores/playerStore"
 import { SidebarUpdateCard } from "@/components/layout/SidebarUpdateCard"
+import { BrandMark } from "@/components/brand/BrandMark"
 
 // Settings is rendered separately at the bottom; these fill the main nav.
 const navItems = [
@@ -30,6 +32,7 @@ const navLinkClass =
 export function Sidebar() {
   const t = useT()
   const collapsed = useUiStore((s) => s.sidebarCollapsed)
+  const isPlaying = usePlayerStore((s) => s.isPlaying)
 
   return (
     <aside
@@ -43,21 +46,17 @@ export function Sidebar() {
       <div
         data-tauri-drag-region
         className={cn(
-          "px-3 pt-3.5 pb-2 flex items-center gap-3 [&>*]:pointer-events-none",
+          "brand-mark-hot px-3 pt-3.5 pb-2 flex items-center gap-3",
           collapsed && "justify-center px-2"
         )}
       >
-        <div
-          className={cn(
-            "h-10 w-10 rounded-2xl bg-primary text-primary-foreground",
-            "flex items-center justify-center shrink-0",
-            "shadow-[var(--shadow-elevated)] ring-1 ring-black/5 dark:ring-white/10"
-          )}
-        >
-          <AudioLines size={20} strokeWidth={2.25} className="icon-audio-pulse" />
+        {/* Logo keeps pointer events so hover can drive the eq animation;
+            text stays non-interactive so the drag region still works. */}
+        <div className="pointer-events-auto h-9 w-9 shrink-0 drop-shadow-sm">
+          <BrandMark live={isPlaying} className="h-full w-full" title={t("app.name")} />
         </div>
         {!collapsed && (
-          <div className="min-w-0 flex-1 flex flex-col justify-center">
+          <div className="pointer-events-none min-w-0 flex-1 flex flex-col justify-center">
             <h1 className="text-[15px] font-semibold tracking-tight leading-none truncate text-balance">
               {t("app.name")}
             </h1>

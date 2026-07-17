@@ -176,6 +176,23 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             if let Some(window) = app.get_webview_window("main") {
+                // Fully clear window + webview backplates so CSS corner pixels
+                // show the desktop (not a square default fill). Alpha must be 0
+                // on Windows 8+ for the webview layer.
+                let _ = window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
+                // Windows: keep shadow off — enabling it adds a 1px white border
+                // and Win11 system rounding that fights CSS radius.
+                // macOS: native shadow is fine with transparent windows and
+                // avoids needing a CSS outer glow that bleeds into corners.
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = window.set_shadow(true);
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = window.set_shadow(false);
+                }
+
                 // Windows: add prev / play-pause / next buttons to the taskbar
                 // thumbnail toolbar (shown when hovering the taskbar icon).
                 #[cfg(target_os = "windows")]
@@ -187,9 +204,6 @@ pub fn run() {
                 let hwnd = window.hwnd().ok().map(|h| h.0 as *mut std::ffi::c_void);
                 #[cfg(not(target_os = "windows"))]
                 let hwnd = None;
-                // `window` is only read on Windows (hwnd); mark it used elsewhere.
-                #[cfg(not(target_os = "windows"))]
-                let _ = &window;
 
                 let config = PlatformConfig {
                     dbus_name: "museek",

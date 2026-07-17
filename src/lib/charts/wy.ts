@@ -127,19 +127,22 @@ const QUALITY_ORDER: Quality[] = ["flac24bit", "flac", "320k", "128k"]
 function normalizeWyTrack(item: WyTrackRaw): MusicInfo {
   const qualitys: MusicQuality[] = []
   const privilege = item.privilege ?? {}
+  const maxbr = privilege.maxbr ?? 0
 
-  if (privilege.maxBrLevel === "hires") {
+  // Detect each tier from EITHER the privilege bitrate cascade OR the presence of
+  // the matching audio-file object (hr/sq/h/l). Toplist playlist/detail often
+  // returns a capped anonymous `maxbr` (128k) even when higher files exist —
+  // same fix as src/lib/playlists/wy.ts.
+  if (privilege.maxBrLevel === "hires" || item.hr) {
     qualitys.push({ type: "flac24bit", size: item.hr ? sizeFormate(item.hr.size ?? 0) : null })
   }
-  // Fall-through cascade mirrors the reference switch on maxbr.
-  const maxbr = privilege.maxbr ?? 0
-  if (maxbr >= 999000) {
+  if (maxbr >= 999000 || item.sq) {
     qualitys.push({ type: "flac", size: item.sq ? sizeFormate(item.sq.size ?? 0) : null })
   }
-  if (maxbr >= 320000) {
+  if (maxbr >= 320000 || item.h) {
     qualitys.push({ type: "320k", size: item.h ? sizeFormate(item.h.size ?? 0) : null })
   }
-  if (maxbr >= 128000) {
+  if (maxbr >= 128000 || item.l) {
     qualitys.push({ type: "128k", size: item.l ? sizeFormate(item.l.size ?? 0) : null })
   }
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })

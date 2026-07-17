@@ -190,7 +190,12 @@ function normalizeTxListSong(raw: TxListSongRaw): MusicInfo | null {
 // is ignored (the _ prefix keeps it strict-mode clean while matching the
 // dispatcher shape). This endpoint intermittently returns a non-zero `code`
 // (transient rate-limit / load-balancer hiccup), so — like the lx-music
-// reference — we retry up to 3 times before surfacing the error.
+// reference — we retry up to 3 times with backoff before surfacing the error.
+function retryDelayMs(tryNum: number): number {
+  // ~400ms, ~800ms + small jitter — avoid hammering on 429-ish failures.
+  return 400 * (tryNum + 1) + Math.floor(Math.random() * 200)
+}
+
 export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Promise<MusicInfo[]> {
   const url =
     `https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg` +
@@ -208,13 +213,19 @@ export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Pr
   })
 
   if (!res.ok) {
-    if (tryNum < 2) return getTxPlaylistDetail(id, _page, tryNum + 1)
+    if (tryNum < 2) {
+      await new Promise((r) => setTimeout(r, retryDelayMs(tryNum)))
+      return getTxPlaylistDetail(id, _page, tryNum + 1)
+    }
     throw new Error(`QQ playlist detail failed: ${res.status}`)
   }
 
   const data = (await res.json()) as TxListDetailResponse
   if (!data || data.code !== 0 || !data.cdlist?.length) {
-    if (tryNum < 2) return getTxPlaylistDetail(id, _page, tryNum + 1)
+    if (tryNum < 2) {
+      await new Promise((r) => setTimeout(r, retryDelayMs(tryNum)))
+      return getTxPlaylistDetail(id, _page, tryNum + 1)
+    }
     throw new Error("QQ playlist detail failed: bad response")
   }
 

@@ -338,7 +338,8 @@ const dict: Record<Lang, Record<string, string>> = {
       "链接返回的不是有效的音源脚本（可能是网页或错误页）",
     "sources.err.loadFailed": "音源「{name}」加载失败：{msg}",
     "sources.err.noEnabled": "没有已启用的音源",
-    "sources.err.allFailed": "所有音源均失败 → {errors}",
+    "sources.err.allFailed":
+      "所有音源均无法播放此歌曲，请尝试在其他平台搜索",
     "sources.err.invalidUrl": "{name}：返回无效链接",
     "sources.err.tooSmall": "{name}：返回的疑似试听/受限片段（体积过小）",
     "sources.err.sourceMsg": "{name}：{msg}",
@@ -373,6 +374,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "player.goImport": "去导入",
     "lyrics.fontIncrease": "增大字体",
     "lyrics.fontDecrease": "减小字体",
+    "lyrics.fullscreen": "全屏沉浸",
+    "lyrics.exitFullscreen": "退出全屏",
   },
   en: {
     // App
@@ -678,7 +681,8 @@ const dict: Record<Lang, Record<string, string>> = {
       "The link did not return a valid source script (it may be a web page or error page)",
     "sources.err.loadFailed": 'Failed to load source "{name}": {msg}',
     "sources.err.noEnabled": "No enabled sources",
-    "sources.err.allFailed": "All sources failed → {errors}",
+    "sources.err.allFailed":
+      "All sources failed to play this song. Try searching on another platform.",
     "sources.err.invalidUrl": "{name}: returned an invalid link",
     "sources.err.tooSmall": "{name}: returned a likely trial/restricted clip (too small)",
     "sources.err.sourceMsg": "{name}: {msg}",
@@ -714,6 +718,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "player.goImport": "Import",
     "lyrics.fontIncrease": "Increase font size",
     "lyrics.fontDecrease": "Decrease font size",
+    "lyrics.fullscreen": "Immersive fullscreen",
+    "lyrics.exitFullscreen": "Exit fullscreen",
   },
 };
 

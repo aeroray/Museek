@@ -1,9 +1,10 @@
 // A tiny in-memory TTL cache for read-only third-party calls (search, charts,
-// playlists). It serves two purposes for reducing request frequency:
+// playlists, lyrics, play URLs, covers). It serves two purposes for reducing
+// request frequency:
 //
 //   1. Result caching — within `ttlMs`, an identical key returns the previous
 //      result instead of hitting the network (e.g. switching back to a chart
-//      board or re-selecting a search platform).
+//      board, re-selecting a search platform, or replaying a song).
 //   2. In-flight de-duplication — because we cache the *promise*, several rapid
 //      identical calls (double-clicks, React effect re-runs) share one request.
 //
