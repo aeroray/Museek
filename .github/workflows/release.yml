@@ -24,9 +24,10 @@ jobs:
           # Windows — NSIS setup .exe only (no MSI)
           - platform: windows-latest
             args: "--bundles nsis"
-          # macOS — Apple Silicon (M-series) .dmg only
+          # macOS — Apple Silicon: DMG for manual install + updater (.app.tar.gz)
+          # The in-app updater requires .app.tar.gz + .sig, NOT the .dmg.
           - platform: macos-latest
-            args: "--target aarch64-apple-darwin --bundles dmg"
+            args: "--target aarch64-apple-darwin --bundles app,dmg"
 
     runs-on: ${{ matrix.platform }}
 
@@ -91,10 +92,11 @@ jobs:
 
             - **Windows**: `*_x64-setup.exe` (NSIS; installer UI follows system language: Chinese / English)  
               **Windows**：`*_x64-setup.exe`（NSIS；安装界面随系统语言自动中/英文）
-            - **macOS (Apple Silicon)**: `*_aarch64.dmg`  
+            - **macOS (Apple Silicon)**: `*_aarch64.dmg` (first install) / in-app update uses `.app.tar.gz`  
+              **macOS（Apple Silicon）**：首次安装用 `*_aarch64.dmg`；应用内更新使用 `.app.tar.gz`
 
-            Already installed? Use **Settings → About → Check for updates** (this Release must include `latest.json` and `.sig`).  
-            已安装用户可在「设置 → 关于 → 检查更新」升级（需本 Release 含 `latest.json` 与 `.sig`）。
+            Already installed? Use **Settings → About → Install update** (this Release must include `latest.json` and `.sig`).  
+            已安装用户可在「设置 → 关于 → 安装更新」升级（需本 Release 含 `latest.json` 与 `.sig`）。
 
             ⚠️ Museek ships **no** music sources. Import lx-music–compatible scripts under **Settings → Sources** before playing.  
             ⚠️ Museek **不内置**音源；请先在「设置 → 音源管理」导入兼容 lx-music 的音源脚本。

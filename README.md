@@ -102,13 +102,13 @@ Install deps, then run the desktop app in dev mode.
 # 需在环境中配置更新签名私钥（见下方「应用内更新」）。
 pnpm tauri build
 
-# macOS Apple Silicon → DMG (build on an Apple Silicon Mac)
-# macOS Apple Silicon → DMG（需在 Apple Silicon Mac 上构建）
-pnpm tauri build -- --target aarch64-apple-darwin
+# macOS Apple Silicon → DMG + updater .app.tar.gz (build on Apple Silicon)
+# macOS Apple Silicon → DMG + 应用内更新用 .app.tar.gz（需在 Apple Silicon Mac 上构建）
+pnpm tauri build -- --target aarch64-apple-darwin --bundles app,dmg
 ```
 
-Installers land in `src-tauri/target/*/release/bundle/` (Windows: NSIS `setup.exe`; macOS: `.dmg`), plus updater `.sig` artifacts when signing is configured.  
-打包产物位于 `src-tauri/target/*/release/bundle/`（Windows：NSIS `setup.exe`；macOS：`.dmg`）；配置签名后还会生成 updater 用的 `.sig`。
+Installers land in `src-tauri/target/*/release/bundle/` (Windows: NSIS `setup.exe`; macOS: `.dmg` + `.app.tar.gz` for in-app updates), plus updater `.sig` artifacts when signing is configured.  
+打包产物位于 `src-tauri/target/*/release/bundle/`（Windows：NSIS `setup.exe`；macOS：`.dmg` 与应用内更新用 `.app.tar.gz`）；配置签名后还会生成 updater 用的 `.sig`。
 
 ### Auto-update · 应用内更新
 

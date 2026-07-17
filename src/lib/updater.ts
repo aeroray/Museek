@@ -193,10 +193,10 @@ function pickAssetUrl(
     )
   }
   if (os === "macos") {
+    // In-app updater needs .app.tar.gz (+ .sig), never the .dmg installer.
     return (
-      names.find((a) => /aarch64\.dmg$/i.test(a.name))?.url ??
-      names.find((a) => /\.dmg$/i.test(a.name))?.url ??
-      names.find((a) => /\.app\.tar\.gz$/i.test(a.name))?.url
+      names.find((a) => /\.app\.tar\.gz$/i.test(a.name) && !/\.sig$/i.test(a.name))?.url ??
+      names.find((a) => /aarch64.*\.tar\.gz$/i.test(a.name) && !/\.sig$/i.test(a.name))?.url
     )
   }
   return names[0]?.url
@@ -245,9 +245,11 @@ function manifestToHint(data: LatestJson, mirrorPrefix: string): MirrorHint | nu
   const os = detectOs()
   const platformKey =
     os === "windows" ? "windows-x86_64" : os === "macos" ? "darwin-aarch64" : ""
-  const platformUrl = platformKey ? data.platforms?.[platformKey]?.url : undefined
+  const platform = platformKey ? data.platforms?.[platformKey] : undefined
+  // No signed updater package for this OS → not an in-app-installable update.
+  if (!platform?.url || !platform.signature) return null
 
-  return attachDownloads(version, data.notes, platformUrl, mirrorPrefix)
+  return attachDownloads(version, data.notes, platform.url, mirrorPrefix)
 }
 
 function apiToHint(
@@ -262,8 +264,10 @@ function apiToHint(
   const tag = String(data.tag_name || "").replace(/^v/, "")
   if (!tag) throw new Error("invalid api payload")
   if (!isNewer(tag, __APP_VERSION__)) return null
+  // Only surface updates when a real updater artifact exists (not .dmg alone).
   const asset = pickAssetUrl(data.assets ?? [])
-  return attachDownloads(tag, data.body, asset, mirrorPrefix, data.html_url || RELEASES_URL)
+  if (!asset) return null
+  return attachDownloads(tag, data.body, asset, mirrorPrefix)
 }
 
 /**
@@ -441,7 +445,9 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
     // Mirror found a newer version — must bind plugin Update before surfacing.
     const pluginUpdate = await bindPluginUpdate()
     if (!pluginUpdate) {
-      throw new Error("无法完成应用内更新准备。请稍后重试「检查更新」。")
+      throw new Error(
+        "发现新版本，但当前平台缺少可用的应用内更新包（需签名的 updater 产物）。请稍后重试或从 Releases 手动安装。",
+      )
     }
 
     const downloadUrls = resolveDownloadUrls(pluginUpdate, hint)
