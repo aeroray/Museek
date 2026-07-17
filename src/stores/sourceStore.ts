@@ -11,8 +11,9 @@ interface SourceState {
   isLoading: boolean
   error: string | null
 
-  importScript: (rawScript: string, url?: string) => Promise<void>
-  importScriptFromUrl: (url: string) => Promise<void>
+  /** @returns whether this created a new entry or refreshed a duplicate */
+  importScript: (rawScript: string, url?: string) => Promise<"added" | "updated">
+  importScriptFromUrl: (url: string) => Promise<"added" | "updated">
   removeScript: (id: string) => void
   toggleEnabled: (id: string) => Promise<void>
   reorderScripts: (from: number, to: number) => void
@@ -62,6 +63,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
         writeData("sources.json", scripts)
         return { scripts, isLoading: false }
       })
+      return existing ? "updated" : "added"
     } catch (err) {
       set({ isLoading: false, error: (err as Error).message })
       throw err
@@ -92,7 +94,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     }
 
     // importScript handles validation, persistence and isLoading from here
-    await get().importScript(rawScript, url)
+    return get().importScript(rawScript, url)
   },
 
   removeScript(id) {

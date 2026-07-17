@@ -6,6 +6,7 @@ import { resolveAdaptiveUrl } from "@/lib/playback"
 import { notify } from "@/lib/notify"
 import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
+import { readData, writeData } from "@/lib/db"
 import { t } from "@/lib/i18n"
 
 export type DownloadStatus = "waiting" | "downloading" | "completed" | "error"
@@ -17,19 +18,28 @@ export interface DownloadTask {
   status: DownloadStatus
   progress: number
   error?: string
+  /** Absolute path written on disk when completed (used if delete-with-task is on). */
+  filePath?: string
 }
 
 interface DownloadState {
   tasks: DownloadTask[]
   addTask: (song: MusicInfo, quality?: Quality) => void
   removeTask: (id: string) => void
+  removeTasks: (ids: string[]) => void
   clearCompleted: () => void
   startTask: (id: string) => Promise<void>
   updateProgress: (id: string, progress: number) => void
   updateStatus: (id: string, status: DownloadStatus, error?: string) => void
   // Start queued tasks up to the configured concurrency limit.
   _pump: () => void
+  /** Device-local history (not synced). Restores queue across restarts. */
+  loadFromDisk: () => Promise<void>
 }
+
+const STORE_FILE = "downloads.json"
+const STATUSES: DownloadStatus[] = ["waiting", "downloading", "completed", "error"]
+const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
 
 function sanitize(s: string): string {
   return s.replace(/[/\\:*?"<>|]/g, "_").trim()
@@ -53,6 +63,38 @@ function buildFilename(song: MusicInfo, scheme: NamingScheme, ext: string): stri
   return `${base || "audio"}.${ext}`
 }
 
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+
+async function deleteFileIfNeeded(filePath: string | undefined) {
+  if (!filePath || !isTauri) return
+  if (!useSettingsStore.getState().deleteDownloadFiles) return
+  try {
+    const { remove, exists } = await import("@tauri-apps/plugin-fs")
+    if (await exists(filePath)) await remove(filePath)
+  } catch {
+    /* ignore — task still removed from the list */
+  }
+}
+
+function persist(tasks: DownloadTask[]) {
+  // Device-local only — deliberately excluded from config sync (see configIO DB_FILES).
+  writeData(STORE_FILE, tasks)
+}
+
+function isTask(v: unknown): v is DownloadTask {
+  if (!v || typeof v !== "object") return false
+  const t = v as DownloadTask
+  return (
+    typeof t.id === "string" &&
+    !!t.song &&
+    typeof t.song === "object" &&
+    typeof t.song.name === "string" &&
+    QUALITIES.includes(t.quality) &&
+    STATUSES.includes(t.status) &&
+    typeof t.progress === "number"
+  )
+}
+
 export const useDownloadStore = create<DownloadState>((set, get) => ({
   tasks: [],
 
@@ -71,28 +113,59 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       status: "waiting",
       progress: 0,
     }
-    set((s) => ({ tasks: [...s.tasks, task] }))
+    set((s) => {
+      const tasks = [...s.tasks, task]
+      persist(tasks)
+      return { tasks }
+    })
     notify({ message: t("download.added", { name: song.name }), variant: "success" })
     get()._pump()
   },
 
   removeTask(id) {
-    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }))
+    const task = get().tasks.find((t) => t.id === id)
+    void deleteFileIfNeeded(task?.filePath)
+    set((s) => {
+      const tasks = s.tasks.filter((t) => t.id !== id)
+      persist(tasks)
+      return { tasks }
+    })
+    get()._pump()
+  },
+
+  removeTasks(ids) {
+    const idSet = new Set(ids)
+    const toDelete = get().tasks.filter((t) => idSet.has(t.id))
+    for (const task of toDelete) void deleteFileIfNeeded(task.filePath)
+    set((s) => {
+      const tasks = s.tasks.filter((t) => !idSet.has(t.id))
+      persist(tasks)
+      return { tasks }
+    })
     get()._pump()
   },
 
   clearCompleted() {
-    set((s) => ({ tasks: s.tasks.filter((t) => t.status !== "completed") }))
+    const done = get().tasks.filter((t) => t.status === "completed")
+    for (const task of done) void deleteFileIfNeeded(task.filePath)
+    set((s) => {
+      const tasks = s.tasks.filter((t) => t.status !== "completed")
+      persist(tasks)
+      return { tasks }
+    })
   },
 
   updateProgress(id, progress) {
+    // Progress ticks are frequent — keep them in memory only; status changes persist.
     set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, progress } : t)) }))
   },
 
   updateStatus(id, status, error) {
-    set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === id ? { ...t, status, error } : t)),
-    }))
+    set((s) => {
+      const tasks = s.tasks.map((t) => (t.id === id ? { ...t, status, error } : t))
+      persist(tasks)
+      return { tasks }
+    })
   },
 
   _pump() {
@@ -108,6 +181,21 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     }
   },
 
+  async loadFromDisk() {
+    const raw = await readData<unknown>(STORE_FILE, [])
+    const list = Array.isArray(raw) ? raw.filter(isTask) : []
+    const interrupted = list.some((task) => task.status === "downloading")
+    // Interrupted mid-download → re-queue so _pump can finish them after launch.
+    const tasks = list.map((task) =>
+      task.status === "downloading"
+        ? { ...task, status: "waiting" as const, progress: 0, error: undefined }
+        : task
+    )
+    set({ tasks })
+    if (interrupted) persist(tasks)
+    get()._pump()
+  },
+
   async startTask(id) {
     const task = get().tasks.find((t) => t.id === id)
     if (!task || task.status === "downloading" || task.status === "completed") return
@@ -118,7 +206,11 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       // Resolve URL with auto-downgrade; tell the user if the quality stepped down.
       const { url, quality: actual } = await resolveAdaptiveUrl(task.song, task.quality)
       if (actual !== task.quality) {
-        set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, quality: actual } : t)) }))
+        set((s) => {
+          const tasks = s.tasks.map((t) => (t.id === id ? { ...t, quality: actual } : t))
+          persist(tasks)
+          return { tasks }
+        })
         notify({
           message: t("download.qualityDowngraded", { name: task.song.name, quality: t(`quality.${actual}`) }),
           variant: "info",
@@ -158,10 +250,16 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       if (!downloadDir) throw new Error(t("download.noLocationError"))
       const filename = buildFilename(task.song, fileNaming, ext)
       const dir = downloadDir.replace(/[/\\]+$/, "")
-      await writeFile(`${dir}/${filename}`, merged)
+      const filePath = `${dir}/${filename}`
+      await writeFile(filePath, merged)
 
-      get().updateStatus(id, "completed")
-      get().updateProgress(id, 100)
+      set((s) => {
+        const tasks = s.tasks.map((t) =>
+          t.id === id ? { ...t, status: "completed" as const, progress: 100, filePath } : t
+        )
+        persist(tasks)
+        return { tasks }
+      })
       notify({ message: t("download.complete", { name: task.song.name }), variant: "success" })
     } catch (err) {
       get().updateStatus(id, "error", (err as Error).message)

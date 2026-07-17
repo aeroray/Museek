@@ -66,25 +66,28 @@ export function PlayerBar() {
               onClick={() => !loading && setShowLyrics(true)}
               title={t("player.lyrics")}
               disabled={loading}
-              className="group relative h-12 w-12 rounded-xl overflow-hidden shrink-0 transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.96] disabled:pointer-events-none shadow-[var(--shadow-border)]"
+              // Outer owns shadow + scale; inner clips overlay so it never paints past rounded corners.
+              className="group relative h-12 w-12 shrink-0 transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.96] disabled:pointer-events-none"
             >
-              <img
-                src={coverSrc}
-                alt=""
-                className={cn(
-                  "h-full w-full object-cover transition-[opacity,filter] duration-200",
-                  loading && "opacity-60 blur-[1px]"
+              <span className="absolute inset-0 overflow-hidden rounded-xl shadow-[var(--shadow-border)]">
+                <img
+                  src={coverSrc}
+                  alt=""
+                  className={cn(
+                    "h-full w-full object-cover transition-opacity duration-200",
+                    loading && "opacity-60"
+                  )}
+                />
+                {loading ? (
+                  <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/45">
+                    <Loader2 size={18} className="animate-spin text-white" />
+                  </span>
+                ) : (
+                  <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 icon-hover-maximize">
+                    <Maximize2 size={15} className="text-white icon-play-pop" />
+                  </span>
                 )}
-              />
-              {loading ? (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/45">
-                  <Loader2 size={18} className="animate-spin text-white" />
-                </span>
-              ) : (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 icon-hover-maximize">
-                  <Maximize2 size={15} className="text-white icon-play-pop" />
-                </span>
-              )}
+              </span>
             </button>
           ) : (
             <div className="relative h-12 w-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-[var(--shadow-border)]">

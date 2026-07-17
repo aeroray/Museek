@@ -126,27 +126,25 @@ async function searchWy(query: string, page: number, limit: number): Promise<Pla
   return out
 }
 
-// ---------- QQ (plain GET) ----------
+// ---------- QQ (signed Desktop search, search_type=3) ----------
 async function searchTx(query: string, page: number, limit: number): Promise<Playlist[]> {
-  const res = await httpFetch(
-    `http://c.y.qq.com/soso/fcgi-bin/client_music_search_songlist?page_no=${page - 1}` +
-      `&num_per_page=${limit}&format=json&query=${encodeURIComponent(query)}` +
-      `&remoteplace=txt.yqq.playlist&inCharset=utf8&outCharset=utf-8`,
-    { method: "GET", headers: { "User-Agent": UA, Referer: "http://y.qq.com/portal/search.html" } },
-  )
-  if (!res.ok) return []
-  const data = (await res.json()) as any
-  if (data?.code !== 0) return []
-  return (data.data?.list ?? []).map(
-    (item: any): Playlist => ({
-      id: String(item.dissid),
-      name: item.dissname ?? "",
-      img: item.imgurl ?? null,
-      playCount: formatPlayCount(item.listennum),
-      author: item.creator?.name,
-      source: "tx",
-    }),
-  )
+  try {
+    const { qqDesktopSearch } = await import("@/lib/search/txDesktop")
+    const data = await qqDesktopSearch(query, page, limit, 3)
+    const body = (data.body ?? {}) as { songlist?: { list?: any[] } }
+    return (body.songlist?.list ?? []).map(
+      (item: any): Playlist => ({
+        id: String(item.dissid),
+        name: item.dissname ?? "",
+        img: item.imgurl ?? null,
+        playCount: formatPlayCount(item.listennum),
+        author: item.creator?.name,
+        source: "tx",
+      }),
+    )
+  } catch {
+    return []
+  }
 }
 
 // ---------- KuWo (r.s, ft=playlist) ----------

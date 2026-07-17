@@ -1,5 +1,6 @@
 import { Folder, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore"
@@ -17,10 +18,12 @@ export function DownloadSettings() {
     downloadDir,
     maxConcurrent,
     fileNaming,
+    deleteDownloadFiles,
     setDownloadQuality,
     setDownloadDir,
     setMaxConcurrent,
     setFileNaming,
+    setDeleteDownloadFiles,
   } = useSettingsStore()
   const t = useT()
   const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -113,6 +116,14 @@ export function DownloadSettings() {
               ))}
             </div>
           </SettingRow>
+
+          <SettingRow
+            title={t("download.deleteFilesTitle")}
+            desc={t("download.deleteFilesDesc")}
+            control={
+              <Switch checked={deleteDownloadFiles} onCheckedChange={setDeleteDownloadFiles} />
+            }
+          />
         </SettingsCard>
       </div>
     </ScrollArea>

@@ -78,23 +78,53 @@ class SourceRunner {
 
     ;(globalThis as unknown as Record<string, unknown>).lx = lx
 
+    // Scripts often throw inside async init (.catch → throw) which becomes an
+    // unhandled rejection — capture it so import shows the real reason.
+    let asyncInitError: Error | null = null
+    const onUnhandled = (ev: PromiseRejectionEvent) => {
+      const reason = ev.reason
+      asyncInitError = reason instanceof Error ? reason : new Error(String(reason ?? "init failed"))
+      ev.preventDefault?.()
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("unhandledrejection", onUnhandled)
+    }
+
     try {
       // eslint-disable-next-line no-new-func
       const fn = new Function(script.rawScript)
       fn()
     } catch (err) {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("unhandledrejection", onUnhandled)
+      }
       throw new Error(`Script execution failed: ${(err as Error).message}`)
     }
 
     // Wait for lx.send('inited') — 10s to allow for slow init HTTP requests
     const timeout = new Promise<void>((_, reject) =>
       setTimeout(() => {
-        if (!initedResolved)
-          reject(new Error("Script did not call lx.send('inited') within 10s"))
-      }, 10000),
+        if (!initedResolved) {
+          reject(
+            new Error(
+              asyncInitError?.message ||
+                "Script did not call lx.send('inited') within 10s (init API may be blocked)"
+            )
+          )
+        }
+      }, 10000)
     )
 
-    await Promise.race([initedPromise, timeout])
+    try {
+      await Promise.race([initedPromise, timeout])
+    } catch (err) {
+      if (asyncInitError) throw asyncInitError
+      throw err
+    } finally {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("unhandledrejection", onUnhandled)
+      }
+    }
 
     if (!capturedHandler)
       throw new Error("Script did not register a request handler")

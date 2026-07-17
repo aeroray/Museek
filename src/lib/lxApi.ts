@@ -120,6 +120,22 @@ export function createLxApi(options: LxApiOptions) {
         .then(async (res) => {
           clearTimeout(timer)
           const rawText = await res.text()
+          // Cloudflare / WAF challenge pages are HTML — scripts that expect JSON
+          // then fail with opaque "init failed". Surface rate-limits clearly.
+          if (
+            res.status === 429 ||
+            res.status === 403 ||
+            (rawText.length > 200 && /^\s*</.test(rawText) && /cloudflare|just a moment|attention required/i.test(rawText))
+          ) {
+            callback(
+              new Error(
+                `HTTP ${res.status}: source API blocked or rate-limited (${new URL(url).hostname})`
+              ),
+              null,
+              null
+            )
+            return
+          }
           let body: unknown
           try {
             body = JSON.parse(rawText)

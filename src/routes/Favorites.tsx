@@ -137,7 +137,7 @@ export function Favorites() {
 
       {/* Shared toolbar: sort / filter / search / batch-edit — fixed height both modes */}
       {total > 0 && (
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+        <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
           {!editing ? (
             <>
               <DropdownMenu>
@@ -183,7 +183,7 @@ export function Favorites() {
               <div className="relative min-w-0 flex-1">
                 <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  className="h-8 pl-9"
+                  className="h-8 py-0 pl-9"
                   placeholder={t(isSongs ? "favorites.searchPlaceholder" : "favorites.searchPlaylistsPlaceholder")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}

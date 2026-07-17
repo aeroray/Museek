@@ -1,5 +1,15 @@
 import { useState, useRef } from "react"
-import { Upload, Trash2, AlertCircle, Loader2, ClipboardPaste, GripVertical, X, QrCode } from "lucide-react"
+import {
+  Upload,
+  Trash2,
+  AlertCircle,
+  Loader2,
+  ClipboardPaste,
+  GripVertical,
+  X,
+  QrCode,
+  FileCode2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
@@ -12,6 +22,8 @@ import { useFlip } from "@/hooks/useFlip"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+
 /** True when the line looks like an http(s) URL (lx-music source scripts are fetched by URL). */
 function isHttpUrl(line: string): boolean {
   try {
@@ -20,6 +32,59 @@ function isHttpUrl(line: string): boolean {
   } catch {
     return false
   }
+}
+
+function looksLikeScript(raw: string): boolean {
+  return Boolean(raw.trim()) && !/^\s*</.test(raw)
+}
+
+/** Toast for batch import: distinguish new vs duplicate-merge vs fail. */
+function notifyImportResult(added: number, updated: number, fail: number, t: (key: string, params?: Record<string, string | number>) => string) {
+  const parts: string[] = []
+  if (added) parts.push(t("sources.importAdded", { n: added }))
+  if (updated) parts.push(t("sources.importDup", { n: updated }))
+  if (fail) parts.push(t("sources.importFailed", { n: fail }))
+  if (!parts.length) return
+  useUiStore.getState().notify({
+    message: parts.join(t("sources.importJoin")),
+    variant: fail && !added && !updated ? "error" : fail ? "info" : "success",
+  })
+}
+
+/** Pick one or more local .js files and return path/name + content. */
+async function pickLocalScripts(): Promise<{ label: string; content: string }[]> {
+  if (isTauri) {
+    const { open } = await import("@tauri-apps/plugin-dialog")
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "JavaScript", extensions: ["js"] }],
+    })
+    if (!selected) return []
+    const paths = Array.isArray(selected) ? selected : [selected]
+    const { readTextFile } = await import("@tauri-apps/plugin-fs")
+    const out: { label: string; content: string }[] = []
+    for (const path of paths) {
+      out.push({ label: path, content: await readTextFile(path) })
+    }
+    return out
+  }
+
+  return new Promise((resolve) => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".js,text/javascript"
+    input.multiple = true
+    input.onchange = async () => {
+      const list = input.files
+      if (!list?.length) return resolve([])
+      const out: { label: string; content: string }[] = []
+      for (const file of Array.from(list)) {
+        out.push({ label: file.name, content: await file.text() })
+      }
+      resolve(out)
+    }
+    input.click()
+  })
 }
 
 // The "follow our WeChat account for sources" guide — shown in the empty state
@@ -42,16 +107,26 @@ function GzhGuide() {
 }
 
 export function SourceManager() {
-  const { scripts, isLoading, error, importScriptFromUrl, removeScript, toggleEnabled, reorderScripts, clearError } =
-    useSourceStore()
+  const {
+    scripts,
+    isLoading,
+    error,
+    importScript,
+    importScriptFromUrl,
+    removeScript,
+    toggleEnabled,
+    reorderScripts,
+    clearError,
+  } = useSourceStore()
   const t = useT()
   const enabledCount = scripts.filter((s) => s.enabled).length
   const [url, setUrl] = useState("")
-  const [importing, setImporting] = useState(false)
+  const [importingKind, setImportingKind] = useState<"url" | "file" | null>(null)
   const [getOpen, setGetOpen] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const drag = useDragSort(reorderScripts)
   const flipRef = useFlip(scripts.map((s) => s.id).join(","))
+  const busy = importingKind !== null
 
   async function handleImport() {
     // Multiple links may be pasted — one per line. Import each; keep the lines
@@ -76,31 +151,66 @@ export function SourceManager() {
       return
     }
 
-    setImporting(true)
+    setImportingKind("url")
+    let added = 0
+    let updated = 0
     const failed: string[] = []
-    for (const u of urls) {
-      try {
-        await importScriptFromUrl(u)
-      } catch {
-        failed.push(u)
+    try {
+      for (const u of urls) {
+        try {
+          const result = await importScriptFromUrl(u)
+          if (result === "added") added++
+          else updated++
+        } catch {
+          failed.push(u)
+        }
       }
+    } finally {
+      setImportingKind(null)
     }
-    setImporting(false)
     setUrl(failed.join("\n"))
-    const ok = urls.length - failed.length
-    if (failed.length === 0) {
-      useUiStore.getState().notify({ message: t("sources.importOk", { count: ok }), variant: "success" })
-    } else {
-      useUiStore
-        .getState()
-        .notify({ message: t("sources.importPartial", { ok, fail: failed.length }), variant: ok ? "info" : "error" })
+    notifyImportResult(added, updated, failed.length, t)
+  }
+
+  async function handleImportFile() {
+    let files: { label: string; content: string }[]
+    try {
+      files = await pickLocalScripts()
+    } catch (e) {
+      useUiStore.getState().notify({
+        message: t("sources.importFileFailed", { msg: String(e) }),
+        variant: "error",
+      })
+      return
+    }
+    if (!files.length) return
+
+    setImportingKind("file")
+    try {
+      let added = 0
+      let updated = 0
+      let fail = 0
+      for (const file of files) {
+        try {
+          if (!looksLikeScript(file.content)) throw new Error(t("sources.err.notAScript"))
+          // Label with local: so re-importing the same path updates in place.
+          const result = await importScript(file.content, `local:${file.label}`)
+          if (result === "added") added++
+          else updated++
+        } catch {
+          fail++
+        }
+      }
+      notifyImportResult(added, updated, fail, t)
+    } finally {
+      setImportingKind(null)
     }
   }
 
   async function handlePaste() {
     try {
       let text: string | null = null
-      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      if (isTauri) {
         // Tauri: read via the clipboard plugin (capability-gated, no permission prompt).
         const { readText } = await import("@tauri-apps/plugin-clipboard-manager")
         text = await readText()
@@ -133,15 +243,15 @@ export function SourceManager() {
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-line">{t("sources.hint")}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-stretch">
           <div className="relative flex-1">
             <textarea
               ref={inputRef}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder={t("sources.urlPlaceholder")}
-              disabled={importing}
-              className="h-20 w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={busy}
+              className="h-full min-h-[6.75rem] w-full resize-none break-all rounded-md border border-input bg-transparent px-3 py-2 pr-12 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
             <div className="absolute right-2 top-2 flex flex-col gap-1">
               <Button
@@ -149,7 +259,7 @@ export function SourceManager() {
                 size="icon"
                 className="h-7 w-7 text-muted-foreground"
                 onClick={handlePaste}
-                disabled={importing}
+                disabled={busy}
                 title={t("sources.paste")}
               >
                 <ClipboardPaste size={14} />
@@ -160,7 +270,7 @@ export function SourceManager() {
                   size="icon"
                   className="h-7 w-7 text-muted-foreground"
                   onClick={() => setUrl("")}
-                  disabled={importing}
+                  disabled={busy}
                   title={t("sources.clear")}
                 >
                   <X size={14} />
@@ -168,13 +278,25 @@ export function SourceManager() {
               ) : null}
             </div>
           </div>
-          <div className="flex w-32 shrink-0 flex-col gap-2">
-            <Button variant="outline" onClick={() => setGetOpen(true)} className="h-9">
+          <div className="flex w-36 shrink-0 flex-col gap-2">
+            <Button variant="outline" onClick={() => setGetOpen(true)} className="h-9" disabled={busy}>
               <QrCode size={16} className="mr-2" />
               {t("sources.getSources")}
             </Button>
-            <Button onClick={handleImport} disabled={importing || !url.trim()} className="h-9">
-              {importing ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Upload size={16} className="mr-2" />}
+            <Button variant="outline" onClick={handleImportFile} disabled={busy} className="h-9">
+              {importingKind === "file" ? (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              ) : (
+                <FileCode2 size={16} className="mr-2" />
+              )}
+              {t("sources.importFile")}
+            </Button>
+            <Button onClick={handleImport} disabled={busy || !url.trim()} className="h-9">
+              {importingKind === "url" ? (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              ) : (
+                <Upload size={16} className="mr-2" />
+              )}
               {t("sources.import")}
             </Button>
           </div>

@@ -18,6 +18,9 @@ interface Persisted {
   downloadDir: string | null
   maxConcurrent: number
   fileNaming: NamingScheme
+  // When removing a download task, also delete the saved audio file on disk.
+  // Default off — clearing the task list should not wipe the library.
+  deleteDownloadFiles: boolean
   // Cache the audio of played songs to disk (faster replays + offline).
   audioCache: boolean
   // Disk cache size cap in MB; least-recently-used audio is evicted beyond this.
@@ -46,6 +49,7 @@ interface SettingsState extends Persisted {
   setDownloadDir: (dir: string | null) => void
   setMaxConcurrent: (n: number) => void
   setFileNaming: (s: NamingScheme) => void
+  setDeleteDownloadFiles: (v: boolean) => void
   setAudioCache: (v: boolean) => void
   setMaxCacheMB: (n: number) => void
   setPreventSleepWhilePlaying: (v: boolean) => void
@@ -66,6 +70,7 @@ const DEFAULTS: Persisted = {
   downloadDir: null,
   maxConcurrent: 1,
   fileNaming: "singer-name",
+  deleteDownloadFiles: false,
   audioCache: true,
   maxCacheMB: 1024,
   preventSleepWhilePlaying: true,
@@ -94,6 +99,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       downloadDir,
       maxConcurrent,
       fileNaming,
+      deleteDownloadFiles,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
@@ -112,6 +118,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       downloadDir,
       maxConcurrent,
       fileNaming,
+      deleteDownloadFiles,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
@@ -147,6 +154,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setFileNaming(s) {
       set({ fileNaming: s })
+      persist()
+    },
+    setDeleteDownloadFiles(v) {
+      set({ deleteDownloadFiles: v })
       persist()
     },
     setAudioCache(v) {
@@ -214,6 +225,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         fileNaming: NAMINGS.includes(data.fileNaming as NamingScheme)
           ? (data.fileNaming as NamingScheme)
           : DEFAULTS.fileNaming,
+        deleteDownloadFiles:
+          typeof data.deleteDownloadFiles === "boolean"
+            ? data.deleteDownloadFiles
+            : DEFAULTS.deleteDownloadFiles,
         audioCache: typeof data.audioCache === "boolean" ? data.audioCache : DEFAULTS.audioCache,
         maxCacheMB: CACHE_LIMITS_MB.includes(data.maxCacheMB as number)
           ? (data.maxCacheMB as number)

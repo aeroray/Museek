@@ -20,6 +20,7 @@ import { maybeAutoImport } from "@/lib/sync"
 import { useGlobalShortcuts } from "@/lib/shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
+import { useDownloadStore } from "@/stores/downloadStore"
 import { useUpdateStore } from "@/stores/updateStore"
 
 // Wire domain toast port once — stores/lib call notify() without importing uiStore.
@@ -30,6 +31,7 @@ function AppInit() {
   const { loadFromDisk: loadPlaylists } = usePlaylistStore()
   const { loadHistory } = useSearchStore()
   const { loadFromDisk: loadSettings } = useSettingsStore()
+  const { loadFromDisk: loadDownloads } = useDownloadStore()
 
   // Global media keyboard shortcuts (space / arrows / M / L), gated by settings.
   useGlobalShortcuts()
@@ -43,11 +45,13 @@ function AppInit() {
       loadPlaylists()
       loadHistory()
       // After settings load, trim the cache in case the limit was lowered.
+      // Downloads need downloadDir from settings before unfinished tasks resume.
       loadSettings().then(() => {
         const s = useSettingsStore.getState()
         enforceLimit(s.maxCacheMB * 1024 * 1024)
         // Show the tray icon only if the saved close-behavior is "hide to tray".
         setTrayVisible(s.closeBehavior === "tray")
+        void loadDownloads()
       })
     })
 
