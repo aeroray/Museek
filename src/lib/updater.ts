@@ -8,12 +8,15 @@ export type UpdateInfo = {
   version: string
   currentVersion: string
   body?: string
-  /** True when tauri-plugin-updater can download + install in-app. */
-  canInstall: boolean
+  /**
+   * Always true when returned from check — we only surface updates that are
+   * bound to a plugin `Update` and can silent-install.
+   */
+  canInstall: true
   /** Installer URL from the probe that won (same mirror as the successful check). */
-  downloadUrl?: string
-  /** Winner first, then other mirrors wrapping the same asset (for “try another”). */
-  downloadUrls?: string[]
+  downloadUrl: string
+  /** Winner first, then other mirrors wrapping the same asset. */
+  downloadUrls: string[]
   /** Host label of the winning probe, e.g. "gh-proxy.com" or "github.com". */
   sourceLabel?: string
 }
@@ -49,10 +52,14 @@ const GH_MIRRORS = [
 const PROBE_TIMEOUT_MS = 5_000
 /** Longer budget when we already know a newer version and need the plugin Update. */
 const INSTALL_BIND_TIMEOUT_MS = 12_000
+/** Second bind attempt after a short pause when the first bind times out. */
+const INSTALL_BIND_RETRY_MS = 16_000
 
 export const RELEASES_URL = `https://github.com/${REPO}/releases/latest`
 
 let cached: Update | null = null
+/** Winner-first installer URLs from the successful check (prefer over rebuild). */
+let cachedDownloadUrls: string[] = []
 
 /** True when a plugin Update is cached for in-app silent install. */
 export function hasCachedInstall(): boolean {
@@ -63,7 +70,11 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 }
 
-function toInfo(update: Update, extras?: Partial<UpdateInfo>): UpdateInfo {
+function toInfo(update: Update, extras: {
+  downloadUrl: string
+  downloadUrls: string[]
+  sourceLabel?: string
+}): UpdateInfo {
   return {
     version: update.version,
     currentVersion: update.currentVersion,
@@ -119,21 +130,31 @@ function artifactUrlFromRaw(raw: unknown): string | undefined {
   return url && typeof url === "string" ? url : undefined
 }
 
-function artifactUrlsFromUpdate(update: Update): string[] {
+function artifactUrlsFromUpdate(update: Update, winnerPrefix = ""): string[] {
   const direct = artifactUrlFromRaw(update.rawJson)
-  if (direct) return buildDownloadUrls(direct, "")
+  if (direct) return buildDownloadUrls(direct, winnerPrefix)
   return []
 }
 
+type MirrorHint = {
+  version: string
+  body?: string
+  downloadUrl?: string
+  downloadUrls?: string[]
+  sourceLabel?: string
+}
+
 function attachDownloads(
-  base: Omit<UpdateInfo, "downloadUrl" | "downloadUrls" | "sourceLabel">,
+  version: string,
+  body: string | undefined,
   assetUrl: string | undefined,
   mirrorPrefix: string,
   fallback?: string,
-): UpdateInfo {
+): MirrorHint {
   if (!assetUrl) {
     return {
-      ...base,
+      version,
+      body,
       downloadUrl: fallback || RELEASES_URL,
       downloadUrls: fallback ? [fallback] : [RELEASES_URL],
       sourceLabel: mirrorLabel(mirrorPrefix),
@@ -141,7 +162,8 @@ function attachDownloads(
   }
   const downloadUrls = buildDownloadUrls(assetUrl, mirrorPrefix)
   return {
-    ...base,
+    version,
+    body,
     downloadUrl: downloadUrls[0],
     downloadUrls,
     sourceLabel: mirrorLabel(mirrorPrefix),
@@ -186,8 +208,8 @@ type LatestJson = {
   platforms?: Record<string, { url?: string; signature?: string }>
 }
 
-/** Successful probe: null = already on latest; UpdateInfo = newer available. */
-type ProbeOk = { info: UpdateInfo | null; update?: Update }
+/** Successful probe: null = already on latest; otherwise hint and/or plugin Update. */
+type ProbeOk = { hint: MirrorHint | null; update?: Update }
 
 async function fetchJson(url: string, signal: AbortSignal): Promise<unknown> {
   const res = await httpFetch(url, {
@@ -215,7 +237,7 @@ function timeoutSignal(ms: number, parent?: AbortSignal): AbortSignal {
   return ctrl.signal
 }
 
-function manifestToInfo(data: LatestJson, mirrorPrefix: string): UpdateInfo | null {
+function manifestToHint(data: LatestJson, mirrorPrefix: string): MirrorHint | null {
   if (!data?.version) throw new Error("invalid manifest")
   const version = String(data.version).replace(/^v/, "")
   if (!isNewer(version, __APP_VERSION__)) return null
@@ -225,19 +247,10 @@ function manifestToInfo(data: LatestJson, mirrorPrefix: string): UpdateInfo | nu
     os === "windows" ? "windows-x86_64" : os === "macos" ? "darwin-aarch64" : ""
   const platformUrl = platformKey ? data.platforms?.[platformKey]?.url : undefined
 
-  return attachDownloads(
-    {
-      version,
-      currentVersion: __APP_VERSION__,
-      body: data.notes,
-      canInstall: false,
-    },
-    platformUrl,
-    mirrorPrefix,
-  )
+  return attachDownloads(version, data.notes, platformUrl, mirrorPrefix)
 }
 
-function apiToInfo(
+function apiToHint(
   data: {
     tag_name?: string
     body?: string
@@ -245,22 +258,12 @@ function apiToInfo(
     assets?: { name?: string; browser_download_url?: string }[]
   },
   mirrorPrefix: string,
-): UpdateInfo | null {
+): MirrorHint | null {
   const tag = String(data.tag_name || "").replace(/^v/, "")
   if (!tag) throw new Error("invalid api payload")
   if (!isNewer(tag, __APP_VERSION__)) return null
   const asset = pickAssetUrl(data.assets ?? [])
-  return attachDownloads(
-    {
-      version: tag,
-      currentVersion: __APP_VERSION__,
-      body: data.body,
-      canInstall: false,
-    },
-    asset,
-    mirrorPrefix,
-    data.html_url || RELEASES_URL,
-  )
+  return attachDownloads(tag, data.body, asset, mirrorPrefix, data.html_url || RELEASES_URL)
 }
 
 /**
@@ -299,20 +302,54 @@ function friendlyNetworkError(err: unknown): Error {
     /error sending request|failed to fetch|network|timed out|abort|dns|connection/i.test(raw) ||
     /github\.com/i.test(raw)
   ) {
-    return new Error(
-      "无法连接 GitHub（中国大陆网络常见）。已尝试镜像仍失败时，请稍后重试或从 Releases 页面手动下载。",
-    )
+    return new Error("无法完成更新检查（网络受限）。请稍后重试「检查更新」。")
   }
   return err instanceof Error ? err : new Error(raw)
 }
 
 function clearCachedUpdate() {
-  if (!cached) return
+  if (!cached) {
+    cachedDownloadUrls = []
+    return
+  }
   const prev = cached
   cached = null
+  cachedDownloadUrls = []
   void prev.close().catch(() => {
     /* ignore */
   })
+}
+
+async function bindPluginUpdate(): Promise<Update | null> {
+  const first = await check({ timeout: INSTALL_BIND_TIMEOUT_MS }).catch(() => null)
+  if (first && isNewer(first.version, __APP_VERSION__)) return first
+  if (first) {
+    void first.close().catch(() => {
+      /* ignore */
+    })
+  }
+  await new Promise((r) => window.setTimeout(r, 400))
+  const second = await check({ timeout: INSTALL_BIND_RETRY_MS }).catch(() => null)
+  if (second && isNewer(second.version, __APP_VERSION__)) return second
+  if (second) {
+    void second.close().catch(() => {
+      /* ignore */
+    })
+  }
+  return null
+}
+
+function resolveDownloadUrls(update: Update, hint: MirrorHint | null): string[] {
+  const fromHint =
+    hint?.downloadUrls &&
+    hint.downloadUrls.length > 0 &&
+    hint.downloadUrls[0] !== RELEASES_URL
+      ? hint.downloadUrls
+      : null
+  if (fromHint) return fromHint
+  const fromPlugin = artifactUrlsFromUpdate(update)
+  if (fromPlugin.length) return fromPlugin
+  return hint?.downloadUrls?.length ? hint.downloadUrls : []
 }
 
 type ManifestProbe = { url: string; mirrorPrefix: string }
@@ -321,9 +358,9 @@ type ManifestProbe = { url: string; mirrorPrefix: string }
  * Concurrent update check: official updater + latest.json mirrors + GitHub API
  * mirrors all fire at once; the first successful answer wins.
  *
- * `canInstall` is true only when we hold a plugin `Update`. If a mirror discovers
- * a newer version first, we re-bind via plugin `check()` so About can offer
- * silent in-app install.
+ * Only returns an available update when a plugin `Update` is bound (silent
+ * install is possible). Mirror-only discoveries re-bind the plugin; bind
+ * failure is treated as a failed check — never a half-state UI.
  */
 export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
   if (!isTauri()) return null
@@ -342,14 +379,17 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
     // Plugin path — enables in-app install when an endpoint (incl. mirrors) works.
     async () => {
       const update = await check({ timeout: PROBE_TIMEOUT_MS })
-      if (!update) return { info: null }
+      if (!update) return { hint: null }
       const downloadUrls = artifactUrlsFromUpdate(update)
+      const urls = downloadUrls.length ? downloadUrls : []
       return {
-        info: toInfo(update, {
+        hint: {
+          version: update.version,
+          body: update.body,
+          downloadUrl: urls[0],
+          downloadUrls: urls,
           sourceLabel: "updater",
-          downloadUrl: downloadUrls[0] ?? RELEASES_URL,
-          downloadUrls: downloadUrls.length ? downloadUrls : [RELEASES_URL],
-        }),
+        },
         update,
       }
     },
@@ -357,50 +397,63 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
       ({ url, mirrorPrefix }) =>
         async (signal: AbortSignal) => {
           const data = (await fetchJson(url, timeoutSignal(PROBE_TIMEOUT_MS, signal))) as LatestJson
-          return { info: manifestToInfo(data, mirrorPrefix) }
+          return { hint: manifestToHint(data, mirrorPrefix) }
         },
     ),
     ...apiProbes.map(
       ({ url, mirrorPrefix }) =>
         async (signal: AbortSignal) => {
           const data = (await fetchJson(url, timeoutSignal(PROBE_TIMEOUT_MS, signal))) as Parameters<
-            typeof apiToInfo
+            typeof apiToHint
           >[0]
-          return { info: apiToInfo(data, mirrorPrefix) }
+          return { hint: apiToHint(data, mirrorPrefix) }
         },
     ),
   ]
 
   try {
-    const { info, update } = await raceProbes(probes)
-    if (update) {
-      cached = update
-      return info ? { ...info, canInstall: true } : null
-    }
-    if (!info) return null
+    const { hint, update } = await raceProbes(probes)
 
-    // Mirror found a newer version — bind plugin Update for silent install.
-    const pluginUpdate = await check({ timeout: INSTALL_BIND_TIMEOUT_MS }).catch(() => null)
-    if (pluginUpdate && isNewer(pluginUpdate.version, __APP_VERSION__)) {
-      cached = pluginUpdate
-      const fromPlugin = artifactUrlsFromUpdate(pluginUpdate)
-      const downloadUrls =
-        info.downloadUrls && info.downloadUrls.length > 0 && info.downloadUrls[0] !== RELEASES_URL
-          ? info.downloadUrls
-          : fromPlugin.length
-            ? fromPlugin
-            : info.downloadUrls
-      return {
-        ...info,
-        version: pluginUpdate.version,
-        currentVersion: pluginUpdate.currentVersion,
-        body: pluginUpdate.body ?? info.body,
-        canInstall: true,
-        downloadUrl: downloadUrls?.[0] ?? info.downloadUrl,
-        downloadUrls,
+    if (update) {
+      const downloadUrls = resolveDownloadUrls(update, hint)
+      if (!downloadUrls.length) {
+        // Still installable via plugin's announced URL; Rust will append it.
+        cached = update
+        cachedDownloadUrls = []
+        return toInfo(update, {
+          downloadUrl: RELEASES_URL,
+          downloadUrls: [],
+          sourceLabel: hint?.sourceLabel ?? "updater",
+        })
       }
+      cached = update
+      cachedDownloadUrls = downloadUrls
+      return toInfo(update, {
+        downloadUrl: downloadUrls[0],
+        downloadUrls,
+        sourceLabel: hint?.sourceLabel ?? "updater",
+      })
     }
-    return { ...info, canInstall: false }
+
+    // Already on latest (every probe that succeeded said so).
+    if (!hint) return null
+
+    // Mirror found a newer version — must bind plugin Update before surfacing.
+    const pluginUpdate = await bindPluginUpdate()
+    if (!pluginUpdate) {
+      throw new Error("无法完成应用内更新准备。请稍后重试「检查更新」。")
+    }
+
+    const downloadUrls = resolveDownloadUrls(pluginUpdate, hint)
+    cached = pluginUpdate
+    cachedDownloadUrls = downloadUrls
+    const info = toInfo(pluginUpdate, {
+      downloadUrl: downloadUrls[0] ?? hint.downloadUrl ?? RELEASES_URL,
+      downloadUrls,
+      sourceLabel: hint.sourceLabel,
+    })
+    if (!info.body && hint.body) return { ...info, body: hint.body }
+    return info
   } catch (e) {
     throw friendlyNetworkError(e)
   }
@@ -445,25 +498,32 @@ function progressFromEvents(
 }
 
 /**
- * Race mirrors for the installer binary (TTFB + failover), verify signature,
- * quiet-install, then relaunch. Falls back to plugin downloadAndInstall if the
- * race path fails. Only reports failure after every mirror (and fallback) loses.
+ * Prefer check-winner URLs, then race remaining mirrors. Falls back to plugin
+ * downloadAndInstall if the race path fails. Only reports failure after every
+ * mirror (and fallback) loses.
  */
 export async function installAppUpdate(
   onProgress?: (p: DownloadProgress) => void,
+  preferredUrls?: string[],
 ): Promise<void> {
   if (!isTauri()) throw new Error("Updater is only available in the desktop app")
   const update =
     cached ?? (await check({ timeout: INSTALL_BIND_TIMEOUT_MS }).catch(() => null))
   if (!update) {
-    throw new Error(
-      "当前网络无法完成应用内安装。请稍后重试「检查更新」，或从 Releases 页面手动下载。",
-    )
+    throw new Error("无法完成应用内安装。请稍后重试「检查更新」。")
   }
   cached = update
   onProgress?.({ downloaded: 0, total: null, percent: null, phase: "downloading" })
 
-  const urls = artifactUrlsFromUpdate(update)
+  const fromPreferred =
+    preferredUrls && preferredUrls.length > 0
+      ? preferredUrls
+      : cachedDownloadUrls.length
+        ? cachedDownloadUrls
+        : artifactUrlsFromUpdate(update)
+  // Ensure plugin announced URL is present (Rust also appends it).
+  const urls = [...fromPreferred]
+
   let installing = false
   const unlistenProgress = await listen<DownloadProgress>("update-download-progress", (event) => {
     if (event.payload.phase === "installing") installing = true

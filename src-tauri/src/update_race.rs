@@ -74,17 +74,68 @@ async fn order_by_probe(urls: &[String]) -> Vec<String> {
     ordered
 }
 
-/// Check for update, race mirrors for the artifact, verify signature, quiet-install.
-/// On Windows, `install` exits the process after launching the NSIS installer.
+async fn try_download_one<R: Runtime>(
+    app: &AppHandle<R>,
+    update: &mut tauri_plugin_updater::Update,
+    url: &str,
+) -> Result<(), String> {
+    let parsed = Url::parse(url).map_err(|e| e.to_string())?;
+    update.download_url = parsed;
+
+    let downloaded = Arc::new(AtomicU64::new(0));
+    let app_chunk = app.clone();
+    let downloaded_chunk = Arc::clone(&downloaded);
+    let app_done = app.clone();
+
+    let bytes = update
+        .download(
+            move |chunk_len, content_length| {
+                let total = downloaded_chunk.fetch_add(chunk_len as u64, Ordering::Relaxed)
+                    + chunk_len as u64;
+                let percent = content_length
+                    .filter(|t| *t > 0)
+                    .map(|t| ((total.min(t) as f64 / t as f64) * 100.0).round() as u32)
+                    .map(|p| p.min(100));
+                emit_progress(
+                    &app_chunk,
+                    ProgressPayload {
+                        downloaded: total,
+                        total: content_length,
+                        percent,
+                        phase: "downloading",
+                    },
+                );
+            },
+            move || {
+                let total = downloaded.load(Ordering::Relaxed);
+                emit_progress(
+                    &app_done,
+                    ProgressPayload {
+                        downloaded: total,
+                        total: Some(total),
+                        percent: Some(100),
+                        phase: "installing",
+                    },
+                );
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Signal JS so a dropped IPC after process::exit is not treated as failure.
+    let _ = app.emit("update-about-to-install", ());
+    update.install(bytes).map_err(|e| e.to_string())
+}
+
+/// Check for update, prefer the check-winner URL first, then TTFB-race the rest,
+/// verify signature, quiet-install. On Windows, `install` exits after launching NSIS.
 pub async fn run<R: Runtime>(app: AppHandle<R>, urls: Vec<String>) -> Result<(), String> {
     let updater = app.updater().map_err(|e| e.to_string())?;
     let mut update = updater
         .check()
         .await
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| {
-            "当前没有可安装的更新。请稍后重试「检查更新」，或从 Releases 页面手动下载。".to_string()
-        })?;
+        .ok_or_else(|| "当前没有可安装的更新。请稍后重试「检查更新」。".to_string())?;
 
     let mut candidates = if urls.is_empty() {
         vec![update.download_url.to_string()]
@@ -95,8 +146,6 @@ pub async fn run<R: Runtime>(app: AppHandle<R>, urls: Vec<String>) -> Result<(),
     if !candidates.iter().any(|u| u == &announced) {
         candidates.push(announced);
     }
-
-    let ordered = order_by_probe(&candidates).await;
 
     emit_progress(
         &app,
@@ -110,69 +159,31 @@ pub async fn run<R: Runtime>(app: AppHandle<R>, urls: Vec<String>) -> Result<(),
 
     let mut last_err: Option<String> = None;
 
-    for url in ordered {
-        let parsed = match Url::parse(&url) {
-            Ok(u) => u,
-            Err(e) => {
-                last_err = Some(e.to_string());
-                continue;
-            }
-        };
-        update.download_url = parsed;
+    // 1) Prefer the check-winner (first URL) for a full download attempt.
+    let (preferred, rest) = match candidates.split_first() {
+        Some((first, rest)) => (Some(first.clone()), rest.to_vec()),
+        None => (None, Vec::new()),
+    };
 
-        let downloaded = Arc::new(AtomicU64::new(0));
-        let app_chunk = app.clone();
-        let downloaded_chunk = Arc::clone(&downloaded);
-        let app_done = app.clone();
+    if let Some(first) = preferred {
+        match try_download_one(&app, &mut update, &first).await {
+            Ok(()) => return Ok(()),
+            Err(e) => last_err = Some(e),
+        }
+    }
 
-        let result = update
-            .download(
-                move |chunk_len, content_length| {
-                    let total = downloaded_chunk.fetch_add(chunk_len as u64, Ordering::Relaxed)
-                        + chunk_len as u64;
-                    let percent = content_length
-                        .filter(|t| *t > 0)
-                        .map(|t| ((total.min(t) as f64 / t as f64) * 100.0).round() as u32)
-                        .map(|p| p.min(100));
-                    emit_progress(
-                        &app_chunk,
-                        ProgressPayload {
-                            downloaded: total,
-                            total: content_length,
-                            percent,
-                            phase: "downloading",
-                        },
-                    );
-                },
-                move || {
-                    let total = downloaded.load(Ordering::Relaxed);
-                    emit_progress(
-                        &app_done,
-                        ProgressPayload {
-                            downloaded: total,
-                            total: Some(total),
-                            percent: Some(100),
-                            phase: "installing",
-                        },
-                    );
-                },
-            )
-            .await;
-
-        match result {
-            Ok(bytes) => {
-                // Signal JS so a dropped IPC after process::exit is not treated as failure.
-                let _ = app.emit("update-about-to-install", ());
-                update.install(bytes).map_err(|e| e.to_string())?;
-                return Ok(());
-            }
-            Err(e) => {
-                last_err = Some(e.to_string());
+    // 2) Remaining mirrors: TTFB probe, then sequential failover.
+    if !rest.is_empty() {
+        let ordered = order_by_probe(&rest).await;
+        for url in ordered {
+            match try_download_one(&app, &mut update, &url).await {
+                Ok(()) => return Ok(()),
+                Err(e) => last_err = Some(e),
             }
         }
     }
 
     Err(last_err.unwrap_or_else(|| {
-        "所有镜像均无法下载安装包。请稍后重试，或从 Releases 页面手动下载。".to_string()
+        "所有镜像均无法下载安装包。请稍后重试「检查更新」。".to_string()
     }))
 }

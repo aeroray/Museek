@@ -1,12 +1,11 @@
 import type { ReactNode } from "react"
-import { RefreshCw, Loader2, Download, ExternalLink, Github, Globe, ChevronRight } from "lucide-react"
+import { RefreshCw, Loader2, Download, Github, Globe, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SettingsCard } from "@/components/settings/SettingsCard"
 import { useUpdateStore } from "@/stores/updateStore"
 import { useT } from "@/lib/i18n"
-import { RELEASES_URL } from "@/lib/updater"
 import { cn } from "@/lib/utils"
 
 const GITHUB_URL = "https://github.com/aeroray/Museek"
@@ -28,9 +27,12 @@ function formatCheckedAt(ts: number, locale: string): string {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: false,
     }).format(new Date(ts))
   } catch {
-    return new Date(ts).toLocaleString()
+    const d = new Date(ts)
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `${d.getMonth() + 1}/${d.getDate()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
   }
 }
 
@@ -95,9 +97,7 @@ export function AboutSettings() {
   const checkNow = useUpdateStore((s) => s.checkNow)
   const install = useUpdateStore((s) => s.install)
   const isUpdating = phase === "downloading" || phase === "installing"
-
-  const canShowInstall = !!(available?.canInstall)
-  const showMirrorFallback = !!(available && !available.canInstall && !isUpdating)
+  const canShowInstall = !!available
 
   const onPrimary = () => {
     if (canShowInstall && !isUpdating) {
@@ -127,14 +127,9 @@ export function AboutSettings() {
                 </Badge>
               </div>
               <p className="text-muted-foreground">{t("settings.about.description")}</p>
-              {available?.canInstall && (
+              {available && (
                 <p className="text-xs text-primary font-medium">
                   {t("about.updateDescInstall", { version: available.version })}
-                </p>
-              )}
-              {showMirrorFallback && (
-                <p className="text-xs text-muted-foreground">
-                  {t("about.updateDescMirror", { version: available.version })}
                 </p>
               )}
               {installError && (
@@ -168,27 +163,6 @@ export function AboutSettings() {
                 <p className="text-[11px] text-muted-foreground/80 tabular-nums">
                   {t("about.lastChecked", { time: formatCheckedAt(lastCheckedAt, locale) })}
                 </p>
-              )}
-              {showMirrorFallback && (
-                <div className="flex flex-wrap justify-end gap-1.5 pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => void openExternal(available.downloadUrl || RELEASES_URL)}
-                  >
-                    <ExternalLink size={13} className="mr-1.5" />
-                    {t("about.mirrorDownload")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => void openExternal(RELEASES_URL)}
-                  >
-                    {t("about.openReleases")}
-                  </Button>
-                </div>
               )}
             </div>
           </div>

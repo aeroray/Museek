@@ -48,7 +48,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     set({
       available: info,
       dismissed: false,
-      phase: info?.canInstall ? "available" : info ? "available" : "idle",
+      phase: info ? "available" : "idle",
     }),
 
   dismiss: () => {
@@ -132,13 +132,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   install: async () => {
     const { available, isUpdating } = get()
     if (isUpdating()) return
-    if (!available?.canInstall) {
-      notify({
-        message: t("update.cannotInstall"),
-        variant: "error",
-      })
-      return
-    }
+    if (!available) return
 
     set({
       phase: "downloading",
@@ -148,13 +142,16 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     })
 
     try {
-      await installAppUpdate((p) => {
-        const nextPhase = p.phase === "installing" ? "installing" : "downloading"
-        set({
-          progress: p,
-          phase: nextPhase,
-        })
-      })
+      await installAppUpdate(
+        (p) => {
+          const nextPhase = p.phase === "installing" ? "installing" : "downloading"
+          set({
+            progress: p,
+            phase: nextPhase,
+          })
+        },
+        available.downloadUrls,
+      )
       // relaunch() normally kills us; if it returns, treat as done.
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

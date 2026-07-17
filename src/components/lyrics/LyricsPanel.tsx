@@ -241,29 +241,6 @@ export function LyricsPanel() {
       <Button
         variant="ghost"
         size="icon"
-        className={cn(
-          "absolute top-4 left-4 z-20 h-9 w-9 icon-hover-heart",
-          fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground/70 hover:text-foreground",
-        )}
-        onClick={() => {
-          if (!currentSong) return
-          if (fav) removeFromFavorites(currentSong.id)
-          else addToFavorites(currentSong)
-        }}
-        disabled={!currentSong}
-        title={t(fav ? "common.unfavorite" : "common.favorite")}
-      >
-        <Heart
-          key={fav ? "on" : "off"}
-          size={18}
-          fill={fav ? "currentColor" : "none"}
-          className={fav ? "icon-heart-burst" : undefined}
-        />
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="icon"
         className="absolute top-4 right-4 z-20 h-9 w-9 text-muted-foreground/70 hover:text-foreground"
         onClick={closeLyrics}
       >
@@ -301,6 +278,28 @@ export function LyricsPanel() {
           title={t("lyrics.fontDecrease")}
         >
           <AArrowDown size={20} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "h-9 w-9 icon-hover-heart",
+            fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground/55 hover:text-muted-foreground",
+          )}
+          onClick={() => {
+            if (!currentSong) return
+            if (fav) removeFromFavorites(currentSong.id)
+            else addToFavorites(currentSong)
+          }}
+          disabled={!currentSong}
+          title={t(fav ? "common.unfavorite" : "common.favorite")}
+        >
+          <Heart
+            key={fav ? "on" : "off"}
+            size={18}
+            fill={fav ? "currentColor" : "none"}
+            className={fav ? "icon-heart-burst" : undefined}
+          />
         </Button>
       </div>
 

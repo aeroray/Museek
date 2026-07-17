@@ -122,14 +122,12 @@ export function SidebarUpdateCard() {
         <button
           type="button"
           onClick={() => void install()}
-          disabled={!available?.canInstall}
           title={t("update.cardTitle", { version: available!.version })}
           className={cn(
             "flex size-10 mx-auto items-center justify-center rounded-xl",
             "bg-primary/10 text-primary ring-1 ring-primary/15",
             "transition-[background-color,transform] duration-200 ease-out",
             "hover:bg-primary/15 active:scale-[0.96]",
-            "disabled:opacity-50 disabled:pointer-events-none",
           )}
         >
           <ArrowDownToLine size={16} strokeWidth={2.25} className="shrink-0" />
@@ -175,23 +173,19 @@ export function SidebarUpdateCard() {
             <p className="truncate text-sm font-medium tracking-tight text-foreground">
               {t("update.cardTitle", { version: available!.version })}
             </p>
-            {available?.canInstall ? (
-              <button
-                type="button"
-                onClick={() => void install()}
-                className={cn(
-                  "mt-0.5 inline-flex items-center text-xs font-medium text-primary",
-                  "transition-opacity duration-150 hover:opacity-80",
-                )}
-              >
-                {t("update.installNow")}
-                <span aria-hidden className="ml-0.5">
-                  →
-                </span>
-              </button>
-            ) : (
-              <p className="mt-0.5 text-xs text-muted-foreground">{t("update.cannotInstall")}</p>
-            )}
+            <button
+              type="button"
+              onClick={() => void install()}
+              className={cn(
+                "mt-0.5 inline-flex items-center text-xs font-medium text-primary",
+                "transition-opacity duration-150 hover:opacity-80",
+              )}
+            >
+              {t("update.installNow")}
+              <span aria-hidden className="ml-0.5">
+                →
+              </span>
+            </button>
           </div>
         </div>
       </div>
