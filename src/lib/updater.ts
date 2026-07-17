@@ -1,5 +1,7 @@
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater"
 import { relaunch } from "@tauri-apps/plugin-process"
+import { invoke } from "@tauri-apps/api/core"
+import { listen } from "@tauri-apps/api/event"
 import { httpFetch } from "@/lib/http"
 
 export type UpdateInfo = {
@@ -21,6 +23,8 @@ export type DownloadProgress = {
   percent: number | null
   downloaded: number
   total: number | null
+  /** Optional phase hint from download events (Finished → installing). */
+  phase?: "downloading" | "installing"
 }
 
 const REPO = "aeroray/Museek"
@@ -43,10 +47,17 @@ const GH_MIRRORS = [
 
 /** Per-request budget — concurrent probes, so keep this tight. */
 const PROBE_TIMEOUT_MS = 5_000
+/** Longer budget when we already know a newer version and need the plugin Update. */
+const INSTALL_BIND_TIMEOUT_MS = 12_000
 
 export const RELEASES_URL = `https://github.com/${REPO}/releases/latest`
 
 let cached: Update | null = null
+
+/** True when a plugin Update is cached for in-app silent install. */
+export function hasCachedInstall(): boolean {
+  return cached != null
+}
 
 function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -89,10 +100,29 @@ function mirrorLabel(mirrorPrefix: string): string {
 function buildDownloadUrls(assetUrl: string, winnerPrefix: string): string[] {
   const primary = withMirror(assetUrl, winnerPrefix)
   const rest = GH_MIRRORS.filter((m) => m !== winnerPrefix).map((m) => withMirror(assetUrl, m))
-  // Direct GitHub as last resort when winner was a mirror
-  const direct = winnerPrefix ? assetUrl : null
-  const ordered = [primary, ...rest, ...(direct && direct !== primary ? [direct] : [])]
-  return [...new Set(ordered)]
+  // Direct GitHub last — often slow or blocked; mirrors race first.
+  const direct = assetUrl
+  const ordered = [primary, ...rest, direct]
+  return [...new Set(ordered.filter(Boolean))]
+}
+
+/** Platform artifact URL from updater / latest.json `platforms` map. */
+function artifactUrlFromRaw(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const platforms = (raw as LatestJson).platforms
+  if (!platforms) return undefined
+  const os = detectOs()
+  const key =
+    os === "windows" ? "windows-x86_64" : os === "macos" ? "darwin-aarch64" : ""
+  if (!key) return undefined
+  const url = platforms[key]?.url
+  return url && typeof url === "string" ? url : undefined
+}
+
+function artifactUrlsFromUpdate(update: Update): string[] {
+  const direct = artifactUrlFromRaw(update.rawJson)
+  if (direct) return buildDownloadUrls(direct, "")
+  return []
 }
 
 function attachDownloads(
@@ -289,8 +319,11 @@ type ManifestProbe = { url: string; mirrorPrefix: string }
 
 /**
  * Concurrent update check: official updater + latest.json mirrors + GitHub API
- * mirrors all fire at once; the first successful answer wins — and its mirror
- * prefix is reused for the installer download URL.
+ * mirrors all fire at once; the first successful answer wins.
+ *
+ * `canInstall` is true only when we hold a plugin `Update`. If a mirror discovers
+ * a newer version first, we re-bind via plugin `check()` so About can offer
+ * silent in-app install.
  */
 export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
   if (!isTauri()) return null
@@ -310,8 +343,13 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
     async () => {
       const update = await check({ timeout: PROBE_TIMEOUT_MS })
       if (!update) return { info: null }
+      const downloadUrls = artifactUrlsFromUpdate(update)
       return {
-        info: toInfo(update, { sourceLabel: "updater", downloadUrl: RELEASES_URL, downloadUrls: [RELEASES_URL] }),
+        info: toInfo(update, {
+          sourceLabel: "updater",
+          downloadUrl: downloadUrls[0] ?? RELEASES_URL,
+          downloadUrls: downloadUrls.length ? downloadUrls : [RELEASES_URL],
+        }),
         update,
       }
     },
@@ -335,8 +373,34 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
 
   try {
     const { info, update } = await raceProbes(probes)
-    if (update) cached = update
-    return info
+    if (update) {
+      cached = update
+      return info ? { ...info, canInstall: true } : null
+    }
+    if (!info) return null
+
+    // Mirror found a newer version — bind plugin Update for silent install.
+    const pluginUpdate = await check({ timeout: INSTALL_BIND_TIMEOUT_MS }).catch(() => null)
+    if (pluginUpdate && isNewer(pluginUpdate.version, __APP_VERSION__)) {
+      cached = pluginUpdate
+      const fromPlugin = artifactUrlsFromUpdate(pluginUpdate)
+      const downloadUrls =
+        info.downloadUrls && info.downloadUrls.length > 0 && info.downloadUrls[0] !== RELEASES_URL
+          ? info.downloadUrls
+          : fromPlugin.length
+            ? fromPlugin
+            : info.downloadUrls
+      return {
+        ...info,
+        version: pluginUpdate.version,
+        currentVersion: pluginUpdate.currentVersion,
+        body: pluginUpdate.body ?? info.body,
+        canInstall: true,
+        downloadUrl: downloadUrls?.[0] ?? info.downloadUrl,
+        downloadUrls,
+      }
+    }
+    return { ...info, canInstall: false }
   } catch (e) {
     throw friendlyNetworkError(e)
   }
@@ -351,35 +415,88 @@ function progressFromEvents(
     if (event.event === "Started") {
       total = event.data.contentLength ?? null
       downloaded = 0
-    } else if (event.event === "Progress") {
+      onProgress?.({
+        downloaded: 0,
+        total,
+        percent: total && total > 0 ? 0 : null,
+      })
+      return
+    }
+    if (event.event === "Progress") {
       downloaded += event.data.chunkLength
     } else if (event.event === "Finished") {
       if (total != null) downloaded = total
+      // Signal install phase to callers (download done, applying update).
+      onProgress?.({
+        downloaded,
+        total,
+        percent: total && total > 0 ? 100 : null,
+        phase: "installing",
+      })
+      return
     }
     onProgress?.({
       downloaded,
       total,
       percent: total && total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : null,
+      phase: "downloading",
     })
   }
 }
 
-/** Download, verify signature, install, then relaunch. Requires a successful plugin check(). */
+/**
+ * Race mirrors for the installer binary (TTFB + failover), verify signature,
+ * quiet-install, then relaunch. Falls back to plugin downloadAndInstall if the
+ * race path fails. Only reports failure after every mirror (and fallback) loses.
+ */
 export async function installAppUpdate(
   onProgress?: (p: DownloadProgress) => void,
 ): Promise<void> {
   if (!isTauri()) throw new Error("Updater is only available in the desktop app")
-  const update = cached ?? (await check({ timeout: PROBE_TIMEOUT_MS }).catch(() => null))
+  const update =
+    cached ?? (await check({ timeout: INSTALL_BIND_TIMEOUT_MS }).catch(() => null))
   if (!update) {
     throw new Error(
-      "当前网络无法直连 GitHub 完成应用内安装。请使用「镜像下载」或打开 Releases 手动安装。",
+      "当前网络无法完成应用内安装。请稍后重试「检查更新」，或从 Releases 页面手动下载。",
     )
   }
   cached = update
+  onProgress?.({ downloaded: 0, total: null, percent: null, phase: "downloading" })
+
+  const urls = artifactUrlsFromUpdate(update)
+  let installing = false
+  const unlistenProgress = await listen<DownloadProgress>("update-download-progress", (event) => {
+    if (event.payload.phase === "installing") installing = true
+    onProgress?.(event.payload)
+  })
+  const unlistenInstall = await listen("update-about-to-install", () => {
+    installing = true
+    onProgress?.({
+      downloaded: 0,
+      total: null,
+      percent: 100,
+      phase: "installing",
+    })
+  })
+
   try {
-    await update.downloadAndInstall(progressFromEvents(onProgress))
-  } catch (e) {
-    throw friendlyNetworkError(e)
+    try {
+      await invoke("race_download_and_install", { urls })
+    } catch (raceErr) {
+      // Windows quiet-install calls process::exit after launching NSIS — IPC drops.
+      if (installing) return
+      // Fallback: plugin path (sequential endpoints / announced GitHub URL).
+      try {
+        await update.downloadAndInstall(progressFromEvents(onProgress))
+      } catch (pluginErr) {
+        throw friendlyNetworkError(pluginErr ?? raceErr)
+      }
+    }
+  } finally {
+    unlistenProgress()
+    unlistenInstall()
   }
+
+  // Windows quiet install exits the process before this; macOS/Linux need relaunch.
   await relaunch()
 }

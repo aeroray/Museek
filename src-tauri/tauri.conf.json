@@ -72,7 +72,10 @@
         "https://gh.llkk.cc/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
         "https://ghfast.top/https://github.com/aeroray/Museek/releases/latest/download/latest.json",
         "https://github.com/aeroray/Museek/releases/latest/download/latest.json"
-      ]
+      ],
+      "windows": {
+        "installMode": "quiet"
+      }
     }
   }
 }

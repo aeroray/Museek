@@ -4,6 +4,9 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod update_race;
+
 // OS media controls (Windows SMTC / macOS Now Playing / Linux MPRIS) — the media
 // flyout / lock-screen play-pause-next-prev. MediaControls isn't Send/Sync on
 // Windows (raw window + COM handles); we only touch it from `media_update` behind
@@ -159,6 +162,23 @@ fn set_tray_visible(app: tauri::AppHandle, visible: bool) {
     }
 }
 
+/// Concurrent mirror race for the updater artifact, then signature-verified quiet install.
+#[tauri::command]
+async fn race_download_and_install(
+    app: tauri::AppHandle,
+    urls: Vec<String>,
+) -> Result<(), String> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = (app, urls);
+        Err("Updater is not available on this platform".into())
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        update_race::run(app, urls).await
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -241,7 +261,8 @@ pub fn run() {
             media_update,
             set_prevent_sleep,
             quit_app,
-            set_tray_visible
+            set_tray_visible,
+            race_download_and_install
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

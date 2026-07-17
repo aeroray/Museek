@@ -14,6 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { backupToFolder } from "@/lib/sync"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { useUpdateStore } from "@/stores/updateStore"
+import { notify } from "@/lib/notify"
 import { useT } from "@/lib/i18n"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -23,6 +25,8 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
  *  - Close button in "tray" mode  → hide to tray (keep running).
  *  - Close button in "exit" mode  → confirm (unless dismissed), then quit.
  *  - Tray "Quit" (a "quit-requested" event) → quit.
+ *  - While an update installer is applying → block quit/hide briefly.
+ *    Download runs in the background and does not block normal use.
  * On any real quit it first backs up to the sync folder — silently when
  * auto-backup is on, or via a checkbox in the dialog when it's off.
  * Settings are read fresh on each close so the listeners never go stale.
@@ -48,6 +52,12 @@ export function CloseGuard() {
   // Decide what to do when a quit/close is requested. `fromClose` = triggered by
   // the window close button (vs. the tray Quit item).
   const handleQuit = async (fromClose: boolean) => {
+    // Download is background — only block quit while the installer is applying.
+    if (useUpdateStore.getState().isInstalling()) {
+      notify({ message: t("update.busyQuit"), variant: "info" })
+      return
+    }
+
     const st = useSettingsStore.getState()
     const canSync = !!st.syncFolder
 
@@ -73,6 +83,10 @@ export function CloseGuard() {
   }
 
   const onConfirmQuit = async () => {
+    if (useUpdateStore.getState().isInstalling()) {
+      notify({ message: t("update.busyQuit"), variant: "info" })
+      return
+    }
     const st = useSettingsStore.getState()
     setDialogOpen(false)
     if (st.syncFolder) {
