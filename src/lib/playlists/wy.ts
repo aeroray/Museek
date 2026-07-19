@@ -4,7 +4,7 @@ import * as aesjs from "aes-js"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist } from "./index"
+import type { Playlist, PlaylistDetail } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/wy/songList.js
 // NetEase. The reference signs the hot-list request with weapi (/weapi/
@@ -160,6 +160,9 @@ interface WyTrackRaw {
 interface WyPlaylistDetailResponse {
   code?: number
   playlist?: {
+    name?: string
+    coverImgUrl?: string
+    creator?: { nickname?: string }
     tracks?: WyTrackRaw[]
     trackIds?: { id?: number | string }[]
   }
@@ -272,7 +275,7 @@ async function getWySongDetails(ids: (number | string)[]): Promise<MusicInfo[]> 
 }
 
 // page is ignored — the whole list (up to MAX_DETAIL_SONGS) is returned at once.
-export async function getWyPlaylistDetail(id: string, _page = 1): Promise<MusicInfo[]> {
+export async function getWyPlaylistDetail(id: string, _page = 1): Promise<PlaylistDetail> {
   const payload = { id, n: LIMIT_SONG, s: 0 }
 
   const data = await eapiPost<WyPlaylistDetailResponse>(
@@ -284,8 +287,15 @@ export async function getWyPlaylistDetail(id: string, _page = 1): Promise<MusicI
     throw new Error("NetEase playlist detail failed: bad response")
   }
 
-  const tracks = data.playlist.tracks ?? []
-  const trackIds = data.playlist.trackIds ?? []
+  const pl = data.playlist
+  const info = {
+    name: pl.name ?? "",
+    img: pl.coverImgUrl ?? null,
+    author: pl.creator?.nickname,
+  }
+
+  const tracks = pl.tracks ?? []
+  const trackIds = pl.trackIds ?? []
 
   // Expand the full list via song/detail when playlist/detail truncated `tracks`
   // (large playlists like the default "我喜欢的音乐"). Reorder to the playlist's
@@ -299,9 +309,9 @@ export async function getWyPlaylistDetail(id: string, _page = 1): Promise<MusicI
     if (songs.length) {
       const byId = new Map(songs.map((s) => [s.meta.songId, s]))
       const ordered = ids.map((x) => byId.get(String(x))).filter((s): s is MusicInfo => !!s)
-      if (ordered.length) return ordered
+      if (ordered.length) return { info, list: ordered }
     }
   }
 
-  return tracks.map(normalizeWyTrack)
+  return { info, list: tracks.map(normalizeWyTrack) }
 }

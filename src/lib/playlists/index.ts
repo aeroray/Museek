@@ -20,6 +20,18 @@ export interface Playlist {
   source: Source
 }
 
+/** Playlist metadata returned alongside tracks (lx-music `info`). */
+export interface PlaylistDetailInfo {
+  name: string
+  img: string | null
+  author?: string
+}
+
+export interface PlaylistDetail {
+  info: PlaylistDetailInfo
+  list: MusicInfo[]
+}
+
 function fetchHotPlaylists(source: Source, page: number): Promise<Playlist[]> {
   switch (source) {
     case "kw":
@@ -37,7 +49,7 @@ function fetchHotPlaylists(source: Source, page: number): Promise<Playlist[]> {
   }
 }
 
-function fetchPlaylistDetail(source: Source, id: string, page: number): Promise<MusicInfo[]> {
+function fetchPlaylistDetail(source: Source, id: string, page: number): Promise<PlaylistDetail> {
   switch (source) {
     case "kw":
       return getKwPlaylistDetail(id, page)
@@ -50,14 +62,14 @@ function fetchPlaylistDetail(source: Source, id: string, page: number): Promise<
     case "mg":
       return getMgPlaylistDetail(id, page)
     default:
-      return Promise.resolve([])
+      return Promise.resolve({ info: { name: "", img: null }, list: [] })
   }
 }
 
 // Hot lists and playlist contents are stable over a session — cache for 5 min so
 // switching platforms / reopening a playlist is instant and avoids re-requests.
 const hotCache = createAsyncCache<Playlist[]>(5 * 60_000)
-const detailCache = createAsyncCache<MusicInfo[]>(5 * 60_000)
+const detailCache = createAsyncCache<PlaylistDetail>(5 * 60_000)
 
 /**
  * Fetch the platform's hot/recommended playlists (default "热门" sort, cached).
@@ -69,12 +81,12 @@ export function getHotPlaylists(source: Source, page = 1): Promise<Playlist[]> {
 }
 
 /**
- * Fetch the songs inside a playlist for the given platform (cached).
+ * Fetch songs inside a playlist plus list metadata (name/cover) for the platform.
  */
 export function getPlaylistDetail(
   source: Source,
   id: string,
   page = 1
-): Promise<MusicInfo[]> {
+): Promise<PlaylistDetail> {
   return detailCache(`${source}:${id}:${page}`, () => fetchPlaylistDetail(source, id, page))
 }

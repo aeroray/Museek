@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist } from "./index"
+import type { Playlist, PlaylistDetail } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/tx/songList.js
 // Hot playlists use the unsigned musicu.fcg get_playlist_by_tag method
@@ -131,6 +131,9 @@ interface TxListDetailResponse {
   code?: number
   cdlist?: Array<{
     songlist?: TxListSongRaw[]
+    dissname?: string
+    logo?: string
+    nickname?: string
   }>
 }
 
@@ -196,7 +199,7 @@ function retryDelayMs(tryNum: number): number {
   return 400 * (tryNum + 1) + Math.floor(Math.random() * 200)
 }
 
-export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Promise<MusicInfo[]> {
+export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Promise<PlaylistDetail> {
   const url =
     `https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg` +
     `?type=1&json=1&utf8=1&onlysong=0&new_format=1&disstid=${id}` +
@@ -229,10 +232,18 @@ export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Pr
     throw new Error("QQ playlist detail failed: bad response")
   }
 
+  const cd = data.cdlist[0]
   const list: MusicInfo[] = []
-  for (const item of data.cdlist[0].songlist ?? []) {
+  for (const item of cd.songlist ?? []) {
     const song = normalizeTxListSong(item)
     if (song) list.push(song)
   }
-  return list
+  return {
+    info: {
+      name: cd.dissname ?? "",
+      img: cd.logo || null,
+      author: cd.nickname,
+    },
+    list,
+  }
 }

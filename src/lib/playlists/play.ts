@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n"
  */
 export async function playPlaylist(pl: Playlist): Promise<void> {
   try {
-    const songs = await getPlaylistDetail(pl.source, pl.id)
+    const { list: songs } = await getPlaylistDetail(pl.source, pl.id)
     if (!songs.length) {
       notify({ message: t("hotPlaylists.playlistEmpty"), variant: "info" })
       return

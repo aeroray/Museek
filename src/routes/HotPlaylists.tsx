@@ -1,13 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { ListMusic, Play, ChevronLeft, RotateCw, Heart, Search, X } from "lucide-react"
+import { ListMusic, Play, ChevronLeft, RotateCw, Heart, Search, X, Link2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { TrackRow } from "@/components/common/TrackRow"
 import { VirtualList } from "@/components/common/VirtualList"
 import { getHotPlaylists, getPlaylistDetail, type Playlist } from "@/lib/playlists"
+import { parsePlaylistLink } from "@/lib/playlists/openLink"
 import { playPlaylist } from "@/lib/playlists/play"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
@@ -16,7 +25,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { MusicInfo } from "@/types/music"
+import type { MusicInfo, Source } from "@/types/music"
 
 export function HotPlaylists() {
   const t = useT()
@@ -47,6 +56,12 @@ export function HotPlaylists() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
   const [filter, setFilter] = useState("")
+  const [openDialog, setOpenDialog] = useState(false)
+  // Dialog platform is local so switching tabs here doesn't reload the page grid.
+  const [openSource, setOpenSource] = useState<Source>(source)
+  const [openInput, setOpenInput] = useState("")
+  const [openBusy, setOpenBusy] = useState(false)
+  const [openError, setOpenError] = useState<string | null>(null)
 
   // Bind the Radix viewport once mounted (needed for virtualization + scroll reset).
   useEffect(() => {
@@ -87,9 +102,41 @@ export function HotPlaylists() {
     // Use the playlist's own platform (so opening from Favorites works regardless
     // of the currently-selected platform tab).
     getPlaylistDetail(pl.source, pl.id)
-      .then(setSongs)
+      .then(({ info, list }) => {
+        setSelected((prev) =>
+          prev && prev.source === pl.source && prev.id === pl.id
+            ? {
+                ...prev,
+                name: info.name || prev.name,
+                img: info.img ?? prev.img,
+                author: info.author ?? prev.author,
+              }
+            : prev,
+        )
+        setSongs(list)
+      })
       .catch((e) => setDetailError((e as Error).message))
       .finally(() => setDetailLoading(false))
+  }
+
+  const openByLink = async () => {
+    setOpenError(null)
+    setOpenBusy(true)
+    try {
+      const id = await parsePlaylistLink(openSource, openInput)
+      setOpenDialog(false)
+      setOpenInput("")
+      openPlaylist({
+        id,
+        name: t("hotPlaylists.openName", { id }),
+        img: null,
+        source: openSource,
+      })
+    } catch (e) {
+      setOpenError((e as Error).message)
+    } finally {
+      setOpenBusy(false)
+    }
   }
 
   // Retry the last failed action: a playlist detail if one is open, else the list.
@@ -175,6 +222,20 @@ export function HotPlaylists() {
             <>
               <ListMusic size={20} />
               <h2 className="text-lg font-semibold">{t("hotPlaylists.title")}</h2>
+              <div className="flex-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0"
+                onClick={() => {
+                  setOpenSource(source)
+                  setOpenError(null)
+                  setOpenDialog(true)
+                }}
+              >
+                <Link2 size={14} className="mr-1.5" />
+                {t("hotPlaylists.open")}
+              </Button>
             </>
           )}
         </div>
@@ -287,6 +348,76 @@ export function HotPlaylists() {
           </div>
         )}
       </ScrollArea>
+
+      <Dialog
+        open={openDialog}
+        onOpenChange={(open) => {
+          setOpenDialog(open)
+          if (!open) {
+            setOpenError(null)
+            setOpenBusy(false)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("hotPlaylists.openTitle")}</DialogTitle>
+            <DialogDescription>{t("hotPlaylists.openHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <PlatformTabs
+              value={openSource}
+              onChange={(s) => {
+                setOpenSource(s)
+                if (openError) setOpenError(null)
+              }}
+            />
+            <div className="relative">
+              <textarea
+                className="flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-2 pr-9 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                placeholder={t("hotPlaylists.openPlaceholder")}
+                value={openInput}
+                onChange={(e) => {
+                  setOpenInput(e.target.value)
+                  if (openError) setOpenError(null)
+                }}
+                disabled={openBusy}
+                autoFocus
+              />
+              {openInput && !openBusy && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenInput("")
+                    if (openError) setOpenError(null)
+                  }}
+                  title={t("search.clear")}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            {openError && <p className="text-sm text-destructive">{openError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenDialog(false)} disabled={openBusy}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={openByLink} disabled={openBusy || !openInput.trim()}>
+              {openBusy ? (
+                <>
+                  <Loader2 size={14} className="mr-1.5 animate-spin" />
+                  {t("hotPlaylists.openOpening")}
+                </>
+              ) : (
+                t("hotPlaylists.openConfirm")
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }

@@ -68,6 +68,14 @@ const dict: Record<Lang, Record<string, string>> = {
     "window.maximize": "最大化 / 还原",
     "window.close": "关闭",
     "hotPlaylists.title": "歌单",
+    "hotPlaylists.open": "打开外部歌单",
+    "hotPlaylists.openTitle": "打开外部歌单",
+    "hotPlaylists.openHint":
+      "粘贴歌单链接或 ID（需与上方所选平台一致）。QQ 个人收藏（如「我喜欢」）须将个人主页设为公开后才能打开。",
+    "hotPlaylists.openPlaceholder": "歌单链接或 ID…",
+    "hotPlaylists.openConfirm": "打开",
+    "hotPlaylists.openOpening": "正在打开…",
+    "hotPlaylists.openName": "歌单 {id}",
     "hotPlaylists.empty": "暂无歌单",
     "hotPlaylists.failed": "歌单加载失败：{msg}",
     "hotPlaylists.favorite": "收藏歌单",
@@ -93,10 +101,12 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Search
     "search.placeholder": "搜索歌曲、歌手",
-    "search.placeholderPlaylist": "搜索歌单，或输入用户名",
+    "search.placeholderPlaylist": "搜索歌单",
+    "search.placeholderPlaylistUser": "搜索歌单，或输入用户名",
     "search.scopeSong": "单曲",
     "search.scopePlaylist": "歌单",
-    "search.playlistHint": "按歌单名搜索，或输入用户名找到 TA 的歌单",
+    "search.playlistHint": "按歌单名搜索；也可在「歌单」页用链接/ID 打开",
+    "search.playlistHintUser": "按歌单名搜索，或输入用户名找到 TA 的歌单；也可在「歌单」页用链接/ID 打开",
     "search.history": "搜索历史",
     "search.dragHint": "按住可拖拽排序",
     "search.clearHistory": "清空",
@@ -172,6 +182,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "playlist.addToQueue": "加入队列",
     "playlist.delete": "删除歌单",
     "playlist.empty": "歌单还没有歌曲",
+    "playlists.openEmpty": "请粘贴歌单链接或 ID",
+    "playlists.openInvalid": "无法从内容中解析出歌单 ID，请确认平台选择正确",
 
     // Player bar
     "player.empty": "无播放内容",
@@ -441,6 +453,14 @@ const dict: Record<Lang, Record<string, string>> = {
     "window.maximize": "Maximize / Restore",
     "window.close": "Close",
     "hotPlaylists.title": "Playlists",
+    "hotPlaylists.open": "Open external playlist",
+    "hotPlaylists.openTitle": "Open external playlist",
+    "hotPlaylists.openHint":
+      "Paste a playlist link or ID (must match the platform selected above). QQ personal lists (e.g. Liked) require a public profile.",
+    "hotPlaylists.openPlaceholder": "Playlist link or ID…",
+    "hotPlaylists.openConfirm": "Open",
+    "hotPlaylists.openOpening": "Opening…",
+    "hotPlaylists.openName": "Playlist {id}",
     "hotPlaylists.empty": "No playlists",
     "hotPlaylists.failed": "Failed to load: {msg}",
     "hotPlaylists.favorite": "Favorite",
@@ -466,10 +486,13 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Search
     "search.placeholder": "Search songs, artists",
-    "search.placeholderPlaylist": "Search playlists, or a username",
+    "search.placeholderPlaylist": "Search playlists",
+    "search.placeholderPlaylistUser": "Search playlists, or a username",
     "search.scopeSong": "Songs",
     "search.scopePlaylist": "Playlists",
-    "search.playlistHint": "Search by playlist name, or a username to find their playlists",
+    "search.playlistHint": "Search by playlist name — or open a link/ID on the Playlists page",
+    "search.playlistHintUser":
+      "Search by playlist name, or a username to find their playlists — or open a link/ID on the Playlists page",
     "search.history": "Search history",
     "search.dragHint": "Drag to reorder",
     "search.clearHistory": "Clear",
@@ -546,6 +569,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "playlist.addToQueue": "Add to queue",
     "playlist.delete": "Delete playlist",
     "playlist.empty": "This playlist has no songs yet",
+    "playlists.openEmpty": "Paste a playlist link or ID",
+    "playlists.openInvalid": "Couldn't parse a playlist ID — check the selected platform",
 
     // Player bar
     "player.empty": "Nothing playing",

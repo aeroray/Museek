@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist } from "./index"
+import type { Playlist, PlaylistDetail } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kw/songList.js
 // Hot playlists come from the unsigned getRcmPlayList endpoint (the "default"
@@ -123,6 +123,9 @@ interface KwListSongRaw {
 interface KwListDetailResponse {
   result?: string
   musiclist?: KwListSongRaw[]
+  title?: string
+  pic?: string
+  uname?: string
 }
 
 function normalizeKwListSong(raw: KwListSongRaw): MusicInfo {
@@ -149,7 +152,7 @@ function normalizeKwListSong(raw: KwListSongRaw): MusicInfo {
   }
 }
 
-export async function getKwPlaylistDetail(id: string, page = 1): Promise<MusicInfo[]> {
+export async function getKwPlaylistDetail(id: string, page = 1): Promise<PlaylistDetail> {
   const url =
     `http://nplserver.kuwo.cn/pl.svc?op=getlistinfo&pid=${id}&pn=${page - 1}&rn=${LIMIT_SONG}` +
     `&encode=utf8&keyset=pl2012&identity=kuwo&pcmp4=1&vipver=MUSIC_9.0.5.0_W1&newver=1`
@@ -169,5 +172,12 @@ export async function getKwPlaylistDetail(id: string, page = 1): Promise<MusicIn
     throw new Error("KuWo playlist detail failed: bad response")
   }
 
-  return data.musiclist.map(normalizeKwListSong)
+  return {
+    info: {
+      name: data.title ?? "",
+      img: data.pic || null,
+      author: data.uname,
+    },
+    list: data.musiclist.map(normalizeKwListSong),
+  }
 }

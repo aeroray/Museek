@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist } from "./index"
+import type { Playlist, PlaylistDetail } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kg/songList.js
 // Hot playlists use the unsigned v9 getSpecial endpoint with t=5 (推荐 — the
@@ -99,8 +99,10 @@ export async function getKgHotPlaylists(page = 1): Promise<Playlist[]> {
 }
 
 // --- detail ---
-// Step 1: scrape the special "single" HTML page for `global.data = [...]`.
+// Step 1: scrape the special "single" HTML page for `global.data = [...]`
+// and playlist name/cover from `global = { name, pic }` (lx-music listInfo).
 const listDataRx = /global\.data = (\[.+?\]);/
+const listInfoRx = /global = \{[\s\S]+?name: "(.+)"[\s\S]+?pic: "(.+)"[\s\S]+?\};/
 const htmlLinkRx = /^.+\/(\d+)\.html(?:\?.*|&.*$|#.*$|$)/
 
 interface KgGlobalSong {
@@ -205,7 +207,7 @@ async function resolveHashes(hashes: string[]): Promise<KgGatewaySong[]> {
   return (json.data ?? []).map((group) => group?.[0]).filter(Boolean) as KgGatewaySong[]
 }
 
-export async function getKgPlaylistDetail(id: string, _page = 1): Promise<MusicInfo[]> {
+export async function getKgPlaylistDetail(id: string, _page = 1): Promise<PlaylistDetail> {
   // Accept the id_<specialid> form produced by getKgHotPlaylists, a bare numeric
   // id, or a www.kugou.com/.../<id>.html link.
   let specialId = id
@@ -227,6 +229,12 @@ export async function getKgPlaylistDetail(id: string, _page = 1): Promise<MusicI
   const match = html.match(listDataRx)
   if (!match) throw new Error("KuGou playlist detail failed: list data not found")
 
+  const infoMatch = html.match(listInfoRx)
+  const info = {
+    name: infoMatch?.[1] ?? "",
+    img: infoMatch?.[2] ? infoMatch[2].replace("{size}", "240") : null,
+  }
+
   const songs = JSON.parse(match[1]) as KgGlobalSong[]
   const hashes: string[] = []
   const seenHash = new Set<string>()
@@ -235,7 +243,7 @@ export async function getKgPlaylistDetail(id: string, _page = 1): Promise<MusicI
     seenHash.add(s.hash)
     hashes.push(s.hash)
   }
-  if (hashes.length === 0) return []
+  if (hashes.length === 0) return { info, list: [] }
 
   // Step 2: resolve hashes via the gateway in batches of 100.
   const groups: KgGatewaySong[][] = []
@@ -252,5 +260,5 @@ export async function getKgPlaylistDetail(id: string, _page = 1): Promise<MusicI
     seenId.add(song.meta.songId)
     list.push(song)
   }
-  return list
+  return { info, list }
 }

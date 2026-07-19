@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist } from "./index"
+import type { Playlist, PlaylistDetail, PlaylistDetailInfo } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/mg/songList.js
 // Hot playlists come from the unsigned playlist-square-recommend endpoint (the
@@ -199,18 +199,41 @@ function normalizeMgSong(raw: MgSongRaw): MusicInfo {
   }
 }
 
-export async function getMgPlaylistDetail(id: string, page = 1): Promise<MusicInfo[]> {
-  const url =
+export async function getMgPlaylistDetail(id: string, page = 1): Promise<PlaylistDetail> {
+  const songUrl =
     `https://app.c.nf.migu.cn/MIGUM3.0/resource/playlist/song/v2.0` +
     `?pageNo=${page}&pageSize=${LIMIT_SONG}&playlistId=${id}`
+  const infoUrl = `https://c.musicapp.migu.cn/MIGUM3.0/resource/playlist/v2.0?playlistId=${id}`
 
-  const res = await tauriFetch(url, { method: "GET", headers: DEFAULT_HEADERS })
+  const [songRes, infoRes] = await Promise.all([
+    tauriFetch(songUrl, { method: "GET", headers: DEFAULT_HEADERS }),
+    tauriFetch(infoUrl, { method: "GET", headers: DEFAULT_HEADERS }),
+  ])
 
-  if (!res.ok) throw new Error(`Migu playlist detail failed: ${res.status}`)
+  if (!songRes.ok) throw new Error(`Migu playlist detail failed: ${songRes.status}`)
 
-  const data = (await res.json()) as MgDetailResponse
+  const data = (await songRes.json()) as MgDetailResponse
   if (!data || data.code !== "000000") {
     throw new Error(`Migu playlist detail failed: ${data?.info ?? "bad response"}`)
+  }
+
+  let info: PlaylistDetailInfo = { name: "", img: null }
+  if (infoRes.ok) {
+    try {
+      const infoData = (await infoRes.json()) as {
+        code?: string
+        data?: { title?: string; imgItem?: { img?: string }; ownerName?: string }
+      }
+      if (infoData.code === "000000" && infoData.data) {
+        info = {
+          name: infoData.data.title ?? "",
+          img: infoData.data.imgItem?.img || null,
+          author: infoData.data.ownerName,
+        }
+      }
+    } catch {
+      /* keep empty info */
+    }
   }
 
   const seen = new Set<string>()
@@ -220,5 +243,5 @@ export async function getMgPlaylistDetail(id: string, page = 1): Promise<MusicIn
     seen.add(song.songId)
     list.push(normalizeMgSong(song))
   }
-  return list
+  return { info, list }
 }

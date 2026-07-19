@@ -91,6 +91,13 @@ export function Search() {
     !error &&
     (scope === "song" ? results.length === 0 : playlistResults.length === 0)
 
+  // Only NetEase resolves an exact nickname to that user's playlists.
+  const playlistSupportsUser = platform === "wy"
+  const playlistPlaceholder = playlistSupportsUser
+    ? "search.placeholderPlaylistUser"
+    : "search.placeholderPlaylist"
+  const playlistHint = playlistSupportsUser ? "search.playlistHintUser" : "search.playlistHint"
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border">
@@ -98,7 +105,7 @@ export function Search() {
           <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
           <Input
             className="pl-9 pr-9"
-            placeholder={t(scope === "song" ? "search.placeholder" : "search.placeholderPlaylist")}
+            placeholder={t(scope === "song" ? "search.placeholder" : playlistPlaceholder)}
             value={inputValue}
             onChange={(e) => handleChange(e.target.value)}
             onCompositionStart={() => { composingRef.current = true }}
@@ -222,7 +229,7 @@ export function Search() {
               <SearchIcon size={28} className="text-muted-foreground" />
             </div>
             <p className="text-base font-medium">{t("search.emptyTitlePlaylist")}</p>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">{t("search.playlistHint")}</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">{t(playlistHint)}</p>
           </div>
         ) : (
           <ScrollArea className="flex-1">
