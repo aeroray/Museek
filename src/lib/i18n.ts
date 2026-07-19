@@ -412,6 +412,7 @@ const dict: Record<Lang, Record<string, string>> = {
     // Player errors (surfaced in UI)
     "player.err.network":
       "音源服务器连接失败，请检查网络/代理或更换音源（{msg}）",
+    "player.err.invalidAudio": "音源返回的内容不是有效音频，请更换音源或稍后重试",
     "player.err.unknown": "未知错误",
     "player.failedDetail": "播放失败：{msg}",
     "player.noSource": "尚未启用音源，无法播放",
@@ -801,6 +802,7 @@ const dict: Record<Lang, Record<string, string>> = {
     // Player errors (surfaced in UI)
     "player.err.network":
       "Could not connect to the source server. Check your network/proxy or switch sources ({msg})",
+    "player.err.invalidAudio": "The source returned a non-audio body — try another source or retry later",
     "player.err.unknown": "Unknown error",
     "player.failedDetail": "Playback failed: {msg}",
     "player.noSource": "No source enabled — can't play",

@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { cdnHeadersForUrl } from "@/lib/cdnHeaders"
 import { httpFetch as tauriFetch } from "@/lib/http"
 import { writeFile } from "@tauri-apps/plugin-fs"
 import type { MusicInfo, Quality } from "@/types/music"
@@ -217,7 +218,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
         })
       }
 
-      const res = await tauriFetch(url, { method: "GET" })
+      const res = await tauriFetch(url, { method: "GET", headers: cdnHeadersForUrl(url) })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const contentLength = parseInt(res.headers.get("content-length") || "0")

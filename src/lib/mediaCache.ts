@@ -1,3 +1,4 @@
+import { looksLikeNonAudioBytes } from "@/lib/audioBytes"
 import { readData, writeData } from "@/lib/db"
 import type { LyricInfo, Quality, Source } from "@/types/music"
 
@@ -131,11 +132,23 @@ export async function putCachedLyric(source: Source, songId: string, data: Lyric
 export async function getCachedAudioUrl(source: Source, songId: string, quality: Quality): Promise<string | null> {
   if (!isTauri) return null
   await ensureLoaded()
-  const entry = index.find((e) => e.key === `audio:${source}:${songId}:${quality}`)
+  const key = `audio:${source}:${songId}:${quality}`
+  const entry = index.find((e) => e.key === key)
   if (!entry) return null
   try {
-    const { readFile, BaseDirectory } = await import("@tauri-apps/plugin-fs")
+    const { readFile, remove, BaseDirectory } = await import("@tauri-apps/plugin-fs")
     const bytes = await readFile(entry.path, { baseDir: BaseDirectory.AppData })
+    // Drop corrupt cache entries (e.g. HTML 403 pages stored as .mp3).
+    if (looksLikeNonAudioBytes(bytes)) {
+      try {
+        await remove(entry.path, { baseDir: BaseDirectory.AppData })
+      } catch {
+        /* ignore */
+      }
+      index = index.filter((e) => e.key !== key)
+      persistIndex()
+      return null
+    }
     entry.lastUsed = Date.now()
     persistIndex()
     const type = entry.path.endsWith(".flac") ? "audio/flac" : "audio/mpeg"

@@ -4,6 +4,7 @@ import { qualityCandidates } from "@/lib/quality"
 import { toLxMusicInfo } from "@/lib/lxMusicInfo"
 import { looksLikeRealAudio } from "@/lib/audioUrlProbe"
 import { createAsyncCache } from "@/lib/cache"
+import { getWyBuiltinMusicUrl } from "@/lib/playlists/wyUrl"
 import type {
   SourceScript,
   LxRequestPayload,
@@ -262,6 +263,8 @@ class SourceRunner {
   // Resolve a playback URL starting at `preferred`, stepping down the quality
   // ladder until a source returns a usable URL. Returns the quality that
   // actually worked so callers can show / notify when it was downgraded.
+  // For NetEase (`wy`), fall back to the built-in public URL API when every
+  // imported script fails or returns a non-audio body.
   async getMusicUrlAdaptive(
     song: MusicInfo,
     preferred: Quality,
@@ -281,6 +284,20 @@ class SourceRunner {
         lastErr = err
       }
     }
+
+    if (song.source === "wy") {
+      for (const quality of candidates) {
+        try {
+          const url = await getWyBuiltinMusicUrl(song.meta.songId, quality)
+          if (await looksLikeRealAudio(url, song, quality)) {
+            return { url, quality }
+          }
+        } catch (err) {
+          lastErr = err
+        }
+      }
+    }
+
     throw lastErr instanceof Error
       ? lastErr
       : new Error(t("sources.err.noEnabled"))

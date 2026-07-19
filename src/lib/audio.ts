@@ -22,6 +22,8 @@ class AudioPlayer {
   constructor() {
     this.audio = new Audio()
     this.audio.preload = "auto"
+    // NetEase and similar CDNs hotlink-check Referer; never send the app origin.
+    this.audio.setAttribute("referrerpolicy", "no-referrer")
     this.bindEvents()
   }
 
