@@ -66,10 +66,10 @@ function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) 
       className={cn(
         "fixed inset-0 z-50 min-h-dvh bg-black/30 select-none",
         "opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))]",
-        "transition-opacity duration-[450ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
+        "transition-opacity duration-450 ease-drawer-out",
         "supports-[backdrop-filter]:backdrop-blur-sm",
         "data-[ending-style]:pointer-events-none data-[ending-style]:opacity-0",
-        "data-[ending-style]:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+        "data-[ending-style]:duration-drawer-swipe",
         "data-[starting-style]:opacity-0 data-[swiping]:duration-0",
         "data-[snap-points]:[--drawer-overlay-min-opacity:0.5]",
         "supports-[-webkit-touch-callout:none]:absolute",
@@ -140,7 +140,7 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
             "[--drawer-bleed-background:transparent]",
             "[--drawer-inset:0.5rem]",
             "[transform:translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale))]",
-            "transition-[transform,height,opacity,filter] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "transition-[transform,height,opacity,filter] duration-450 ease-drawer-spring",
             // Nested
             "data-[nested-drawer-open]:overflow-hidden data-[nested-drawer-open]:brightness-95",
             // Bleed fill on swipe overshoot (hidden until swiping)
@@ -167,7 +167,7 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
             "[--stack-shrink:calc(1-var(--stack-scale))]",
             // Open / close transitions
             "data-[ending-style]:[transform:var(--closed-transform)] data-[ending-style]:opacity-[0.9999]",
-            "data-[ending-style]:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+            "data-[ending-style]:duration-drawer-swipe",
             "data-[starting-style]:[transform:var(--closed-transform)]",
             "data-[swiping]:duration-0 data-[nested-drawer-swiping]:duration-0",
             // Axis
@@ -198,7 +198,7 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
             data-slot="drawer-content"
             className={cn(
               "flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain rounded-[inherit] select-text",
-              "transition-opacity duration-300 ease-[cubic-bezier(0.45,1.005,0,1.005)]",
+              "transition-opacity duration-300 ease-drawer-nested",
               "group-data-[nested-drawer-open]/drawer-popup:opacity-0",
               "group-data-[nested-drawer-swiping]/drawer-popup:opacity-100",
               "group-data-[swiping]/drawer-popup:select-none",

@@ -21,6 +21,24 @@ import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player"
 // Last play-state pushed to the OS media controls (avoids redundant updates).
 let lastMediaPlaying = false
 
+const PLAY_START_TIMEOUT_MS = 10_000
+
+function playWithTimeout(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(t("player.err.playTimeout"))), PLAY_START_TIMEOUT_MS)
+    audioPlayer.play().then(
+      () => {
+        clearTimeout(timer)
+        resolve()
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
+}
+
 interface PlayerState {
   currentSong: MusicInfo | null
   currentQuality: Quality
@@ -165,7 +183,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             return { currentQuality: cached.quality, queue: q }
           })
           applyAudioSource(cached.src)
-          await audioPlayer.play()
+          await playWithTimeout()
           if (!isPlayGenerationCurrent(gen)) return
 
           lastMediaPlaying = true
@@ -195,7 +213,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           if (!isPlayGenerationCurrent(gen)) return
 
           applyAudioSource(src)
-          await audioPlayer.play()
+          await playWithTimeout()
           if (!isPlayGenerationCurrent(gen)) return
 
           // Publish to the OS media controls (taskbar / media flyout).
@@ -205,12 +223,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       } catch (err) {
         if (!isPlayGenerationCurrent(gen)) return
         const raw = (err as Error).message || t("player.err.unknown")
+        const isTimeout = raw === t("player.err.playTimeout")
         // Transport-level failures from the source's HTTP request (DNS/TLS/connection)
         // surface as cryptic reqwest strings — give a clearer hint that it's a
         // network/proxy/source-reachability problem, not a bug in the song itself.
         const isNetwork =
+          !isTimeout &&
           /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(raw)
-        const message = isNetwork ? t("player.err.network", { msg: raw }) : t("player.failedDetail", { msg: raw })
+        const message = isTimeout
+          ? raw
+          : isNetwork
+            ? t("player.err.network", { msg: raw })
+            : t("player.failedDetail", { msg: raw })
         set({ status: "error", error: message, lyricsLoading: false })
         notify({ message, variant: "error" })
         return

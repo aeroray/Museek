@@ -14,11 +14,60 @@ import type { LyricInfo, MusicInfo, Quality } from "@/types/music"
 
 type LxHandler = (payload: unknown) => Promise<LxRequestResult>
 
-/** Cap parallel musicUrl probes so many enabled sources don't stampede CDNs. */
-const MUSIC_URL_WAVE = 3
+/** Parallel musicUrl probes per wave — higher so 10–20 sources don't serialize. */
+const MUSIC_URL_WAVE = 12
+/** Per-source musicUrl attempt timeout (scripts without their own timeout can hang). */
+const MUSIC_URL_ATTEMPT_MS = 5_000
 /** Successful play URLs are reusable briefly (CDN links expire; keep TTL short). */
 const musicUrlCache = createAsyncCache<string>(4 * 60_000, 80)
 const picCache = createAsyncCache<string | null>(30 * 60_000, 80)
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    p.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(timer)
+        reject(e)
+      },
+    )
+  })
+}
+
+/** First fulfilled promise wins (Promise.any without requiring ES2021 lib). */
+function raceFirst<T>(promises: Promise<T>[]): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (!promises.length) {
+      reject(new Error("raceFirst: empty"))
+      return
+    }
+    let settled = false
+    let pending = promises.length
+    const errors: unknown[] = []
+    for (const p of promises) {
+      p.then(
+        (v) => {
+          if (settled) return
+          settled = true
+          resolve(v)
+        },
+        (err) => {
+          if (settled) return
+          errors.push(err)
+          pending -= 1
+          if (pending === 0) {
+            settled = true
+            reject(errors[0] instanceof Error ? errors[0] : new Error(String(errors[0])))
+          }
+        },
+      )
+    }
+  })
+}
 
 /**
  * Injected by sourceStore so this module never imports the store (breaks the
@@ -199,16 +248,24 @@ class SourceRunner {
         const handler = this.handlers.get(id)
         if (!handler) return { ok: false }
         try {
-          const result = await handler(request)
+          const url = await withTimeout(
+            (async () => {
+              const result = await handler(request)
+              if (settled) return null
+              if (typeof result === "string" && result.startsWith("http")) {
+                if (
+                  await looksLikeRealAudio(result, payload.info, quality, () => settled)
+                ) {
+                  return result
+                }
+              }
+              return null
+            })(),
+            MUSIC_URL_ATTEMPT_MS,
+            `musicUrl:${id}`,
+          )
           if (settled) return { ok: false }
-          if (typeof result === "string" && result.startsWith("http")) {
-            if (
-              await looksLikeRealAudio(result, payload.info, quality, () => settled)
-            ) {
-              if (settled) return { ok: false }
-              return { ok: true, url: result }
-            }
-          }
+          if (url) return { ok: true, url }
         } catch {
           /* counted as failure below */
         }
@@ -263,38 +320,74 @@ class SourceRunner {
   // Resolve a playback URL starting at `preferred`, stepping down the quality
   // ladder until a source returns a usable URL. Returns the quality that
   // actually worked so callers can show / notify when it was downgraded.
-  // For NetEase (`wy`), fall back to the built-in public URL API when every
-  // imported script fails or returns a non-audio body.
+  //
+  // NetEase (`wy`): race the built-in public URL API in parallel with imported
+  // sources on the first quality step so a slow/broken script list can't leave
+  // the player stuck on loading for tens of seconds.
   async getMusicUrlAdaptive(
     song: MusicInfo,
     preferred: Quality,
   ): Promise<{ url: string; quality: Quality }> {
     const candidates = qualityCandidates(preferred)
     let lastErr: unknown
-    for (const quality of candidates) {
+
+    const tryBuiltin = async (quality: Quality): Promise<string> => {
+      return withTimeout(
+        (async () => {
+          const url = await getWyBuiltinMusicUrl(song.meta.songId, quality)
+          if (!(await looksLikeRealAudio(url, song, quality))) {
+            throw new Error("NetEase builtin URL failed audio probe")
+          }
+          return url
+        })(),
+        MUSIC_URL_ATTEMPT_MS,
+        "musicUrl:wy-builtin",
+      )
+    }
+
+    for (let i = 0; i < candidates.length; i++) {
+      const quality = candidates[i]
+      const fromSources = this.getMusicUrl({
+        source: song.source,
+        action: "musicUrl",
+        info: song,
+        type: quality,
+      })
+
+      if (song.source === "wy") {
+        // First quality: race builtin vs sources. Later qualities: sources first,
+        // then builtin (avoids hammering the official API on every step).
+        if (i === 0) {
+          try {
+            return await raceFirst([
+              fromSources.then((url) => ({ url, quality })),
+              tryBuiltin(quality).then((url) => ({ url, quality })),
+            ])
+          } catch (err) {
+            lastErr = err
+            continue
+          }
+        }
+        try {
+          const url = await fromSources
+          return { url, quality }
+        } catch (err) {
+          lastErr = err
+          try {
+            const url = await tryBuiltin(quality)
+            return { url, quality }
+          } catch (e2) {
+            lastErr = e2
+          }
+        }
+        continue
+      }
+
       try {
-        const url = await this.getMusicUrl({
-          source: song.source,
-          action: "musicUrl",
-          info: song,
-          type: quality,
-        })
+        const url = await fromSources
         return { url, quality }
       } catch (err) {
         lastErr = err
-      }
-    }
-
-    if (song.source === "wy") {
-      for (const quality of candidates) {
-        try {
-          const url = await getWyBuiltinMusicUrl(song.meta.songId, quality)
-          if (await looksLikeRealAudio(url, song, quality)) {
-            return { url, quality }
-          }
-        } catch (err) {
-          lastErr = err
-        }
       }
     }
 

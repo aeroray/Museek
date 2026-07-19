@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Named motion tokens — avoids ambiguous arbitrary values like duration-[450ms]. */
+@layer utilities {
+  .duration-drawer-swipe {
+    transition-duration: calc(var(--drawer-swipe-strength, 1) * 400ms);
+  }
+}
+
 @layer base {
   :root {
     /* Warm ink neutrals — listening-room feel, not sterile cool gray */

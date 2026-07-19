@@ -216,7 +216,7 @@ export function LyricsPanel() {
     <div
       className={cn(
         "absolute inset-0 z-40 flex flex-col overflow-hidden bg-background",
-        "transition-transform duration-[320ms] will-change-transform",
+        "transition-transform duration-320 will-change-transform",
         entered ? "translate-y-0 ease-out" : "translate-y-full ease-in"
       )}
       aria-hidden={!entered}

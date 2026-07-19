@@ -6,7 +6,7 @@ import {
   looksLikeAudioBytes,
   looksLikeNonAudioBytes,
 } from "@/lib/audioBytes"
-import { cdnFetchStrategies, isNetEaseCdnUrl } from "@/lib/cdnHeaders"
+import { cdnHeadersForUrl, isNetEaseCdnUrl } from "@/lib/cdnHeaders"
 import { httpFetch } from "@/lib/http"
 import { getCachedAudioUrl, putCachedAudio } from "@/lib/mediaCache"
 import { qualityCandidates } from "@/lib/quality"
@@ -14,6 +14,9 @@ import { sourceRunner } from "@/lib/sourceRunner"
 import type { MusicInfo, Quality } from "@/types/music"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+
+/** Cap how long a cache download may block playback before falling back to stream. */
+const CACHE_DOWNLOAD_MS = 12_000
 
 // Object URL of cache-backed / proxied playback — revoke on switch / stop.
 let currentObjectUrl: string | null = null
@@ -82,39 +85,46 @@ function maybeGunzip(bytes: Uint8Array): Uint8Array {
 function acceptAudioBytes(bytes: Uint8Array, contentType: string | null): boolean {
   if (looksLikeNonAudioBytes(bytes)) return false
   if (looksLikeAudioBytes(bytes)) return true
-  // Some CDNs omit a clear magic at offset 0 but still send audio/* + a real body.
   if (isAudioContentType(contentType) && bytes.length >= 32 * 1024) return true
   return false
 }
 
-/**
- * Download playable bytes trying several CDN header strategies.
- * Returns null when every strategy yields a non-audio body.
- */
-async function downloadAudioBytes(
-  url: string,
-): Promise<{ bytes: Uint8Array; contentType: string | null } | null> {
-  for (const headers of cdnFetchStrategies(url)) {
-    try {
-      const res = await httpFetch(url, { method: "GET", headers })
-      if (!res.ok) continue
-      const contentType = res.headers.get("content-type")
-      const bytes = maybeGunzip(new Uint8Array(await res.arrayBuffer()))
-      if (acceptAudioBytes(bytes, contentType)) return { bytes, contentType }
-    } catch {
-      /* try next strategy */
-    }
-  }
-  return null
+function withAbortTimeout(ms: number): { signal: AbortSignal; clear: () => void } {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  return { signal: ctrl.signal, clear: () => clearTimeout(timer) }
 }
 
 /**
- * Prefer on-disk audio cache; otherwise try a native download (CDN Referer /
- * no-Referer / X-Real-IP strategies), validate bytes, cache, play from blob.
- *
- * Always falls back to the remote URL on download failure — many source scripts
- * return third-party hosts (not *.126.net) that only work as `audio.src` with
- * referrerpolicy=no-referrer, and throwing here blocked playback entirely.
+ * One-shot download with CDN headers + timeout. Used for disk cache only —
+ * never blocks playback across multiple strategies (that caused NetEase hangs).
+ */
+async function downloadAudioBytes(
+  url: string,
+  timeoutMs: number,
+): Promise<{ bytes: Uint8Array; contentType: string | null } | null> {
+  const { signal, clear } = withAbortTimeout(timeoutMs)
+  try {
+    const res = await httpFetch(url, {
+      method: "GET",
+      headers: cdnHeadersForUrl(url),
+      signal,
+    })
+    if (!res.ok) return null
+    const contentType = res.headers.get("content-type")
+    const bytes = maybeGunzip(new Uint8Array(await res.arrayBuffer()))
+    if (!acceptAudioBytes(bytes, contentType)) return null
+    return { bytes, contentType }
+  } catch {
+    return null
+  } finally {
+    clear()
+  }
+}
+
+/**
+ * Prefer on-disk audio cache; otherwise try a timed native download for cache,
+ * then fall back to streaming the remote URL (https-upgraded for NetEase).
  */
 export async function resolvePlayableSrc(
   song: MusicInfo,
@@ -129,27 +139,48 @@ export async function resolvePlayableSrc(
     if (cached) return cached
   }
 
-  // Skip the full download when cache is off and the URL isn't a hotlink CDN —
-  // stream remotely (Audio element uses referrerpolicy=no-referrer).
-  const shouldDownload = opts.audioCache || isNetEaseCdnUrl(url)
-  if (!shouldDownload) return url
+  // Prefer https for NetEase CDN (WebView-friendly); stream immediately so a
+  // slow full-file cache download can't leave the player on infinite loading.
+  const streamUrl = isNetEaseCdnUrl(url) ? url.replace(/^http:\/\//i, "https://") : url
+  if (!opts.audioCache) return streamUrl
+
+  // NetEase: play via stream first; warm disk cache in the background.
+  if (isNetEaseCdnUrl(url) || song.source === "wy") {
+    void (async () => {
+      try {
+        const downloaded = await downloadAudioBytes(url, CACHE_DOWNLOAD_MS)
+        if (!downloaded) return
+        const { ext } = mimeForQuality(quality)
+        const maxBytes = opts.maxCacheMB * 1024 * 1024
+        await putCachedAudio(
+          song.source,
+          song.meta.songId,
+          quality,
+          downloaded.bytes,
+          ext,
+          maxBytes,
+        )
+      } catch {
+        /* ignore background cache failures */
+      }
+    })()
+    return streamUrl
+  }
 
   try {
-    const downloaded = await downloadAudioBytes(url)
+    const downloaded = await downloadAudioBytes(url, CACHE_DOWNLOAD_MS)
     if (downloaded) {
       const { bytes } = downloaded
       const { ext, mime } = mimeForQuality(quality)
-      if (opts.audioCache) {
-        const maxBytes = opts.maxCacheMB * 1024 * 1024
-        await putCachedAudio(song.source, song.meta.songId, quality, bytes, ext, maxBytes)
-      }
+      const maxBytes = opts.maxCacheMB * 1024 * 1024
+      await putCachedAudio(song.source, song.meta.songId, quality, bytes, ext, maxBytes)
       return URL.createObjectURL(new Blob([bytes], { type: mime }))
     }
   } catch {
     /* fall through to remote URL */
   }
 
-  return url
+  return streamUrl
 }
 
 /** Shared adaptive URL resolve for playback and downloads. */

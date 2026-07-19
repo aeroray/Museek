@@ -77,6 +77,15 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      transitionDuration: {
+        320: "320ms",
+        450: "450ms",
+      },
+      transitionTimingFunction: {
+        "drawer-out": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "drawer-spring": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "drawer-nested": "cubic-bezier(0.45, 1.005, 0, 1.005)",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
