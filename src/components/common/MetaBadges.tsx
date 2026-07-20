@@ -10,6 +10,7 @@ export const PLATFORM_BRAND: Record<Source, string> = {
   kg: "#2D9CDB",
   tx: "#2BC275",
   mg: "#E54BA0",
+  local: "#78716C",
 }
 
 /** Tiny platform chip: brand dot + platform name. */

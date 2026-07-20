@@ -1,11 +1,12 @@
 import { create } from "zustand"
 import { readData, writeData } from "@/lib/db"
+import { normalizeLocalScanDepth } from "@/lib/localMusic/depth"
 import { setTrayVisible } from "@/lib/power"
-import type { Quality, Source } from "@/types/music"
+import type { OnlineSource, Quality } from "@/types/music"
 
 export type NamingScheme = "singer-name" | "name-singer" | "name"
 export type FavoritesSort = "added" | "name"
-export type FavoritesPlatform = Source | "all"
+export type FavoritesPlatform = OnlineSource | "all"
 // Close-button behavior: quit the app outright, or hide to the system tray.
 export type CloseBehavior = "exit" | "tray"
 
@@ -21,6 +22,10 @@ interface Persisted {
   // When removing a download task, also delete the saved audio file on disk.
   // Default off — clearing the task list should not wipe the library.
   deleteDownloadFiles: boolean
+  // Folder import recursion depth (0–2 finite levels; -1 = unlimited).
+  localScanDepth: number
+  // When removing a local-library entry, also delete the audio file on disk.
+  deleteLocalFiles: boolean
   // Cache the audio of played songs to disk (faster replays + offline).
   audioCache: boolean
   // Disk cache size cap in MB; least-recently-used audio is evicted beyond this.
@@ -50,6 +55,8 @@ interface SettingsState extends Persisted {
   setMaxConcurrent: (n: number) => void
   setFileNaming: (s: NamingScheme) => void
   setDeleteDownloadFiles: (v: boolean) => void
+  setLocalScanDepth: (n: number) => void
+  setDeleteLocalFiles: (v: boolean) => void
   setAudioCache: (v: boolean) => void
   setMaxCacheMB: (n: number) => void
   setPreventSleepWhilePlaying: (v: boolean) => void
@@ -71,6 +78,8 @@ const DEFAULTS: Persisted = {
   maxConcurrent: 1,
   fileNaming: "singer-name",
   deleteDownloadFiles: false,
+  localScanDepth: 0,
+  deleteLocalFiles: false,
   audioCache: true,
   maxCacheMB: 1024,
   preventSleepWhilePlaying: true,
@@ -100,6 +109,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       maxConcurrent,
       fileNaming,
       deleteDownloadFiles,
+      localScanDepth,
+      deleteLocalFiles,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
@@ -119,6 +130,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       maxConcurrent,
       fileNaming,
       deleteDownloadFiles,
+      localScanDepth,
+      deleteLocalFiles,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
@@ -158,6 +171,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setDeleteDownloadFiles(v) {
       set({ deleteDownloadFiles: v })
+      persist()
+    },
+    setLocalScanDepth(n) {
+      set({ localScanDepth: normalizeLocalScanDepth(n) })
+      persist()
+    },
+    setDeleteLocalFiles(v) {
+      set({ deleteLocalFiles: v })
       persist()
     },
     setAudioCache(v) {
@@ -229,6 +250,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.deleteDownloadFiles === "boolean"
             ? data.deleteDownloadFiles
             : DEFAULTS.deleteDownloadFiles,
+        localScanDepth:
+          typeof data.localScanDepth === "number"
+            ? normalizeLocalScanDepth(data.localScanDepth)
+            : DEFAULTS.localScanDepth,
+        deleteLocalFiles:
+          typeof data.deleteLocalFiles === "boolean" ? data.deleteLocalFiles : DEFAULTS.deleteLocalFiles,
         audioCache: typeof data.audioCache === "boolean" ? data.audioCache : DEFAULTS.audioCache,
         maxCacheMB: CACHE_LIMITS_MB.includes(data.maxCacheMB as number)
           ? (data.maxCacheMB as number)

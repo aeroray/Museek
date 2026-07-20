@@ -1,4 +1,5 @@
-export type Source = "kw" | "kg" | "tx" | "wy" | "mg"
+export type OnlineSource = "kw" | "kg" | "tx" | "wy" | "mg"
+export type Source = OnlineSource | "local"
 export type Quality = "128k" | "320k" | "flac" | "flac24bit"
 
 export interface MusicQuality {
@@ -18,6 +19,10 @@ export interface MusicInfoMeta {
   strMediaMid?: string
   // mg-specific
   copyrightId?: string
+  /** Absolute path of a local library file (source === "local"). */
+  filePath?: string
+  /** AppData-relative cover extracted from tags, e.g. museek/localCovers/….jpg */
+  localCoverRel?: string
 }
 
 export interface MusicInfo {
@@ -28,6 +33,14 @@ export interface MusicInfo {
   interval: string
   albumName: string
   meta: MusicInfoMeta
+}
+
+/** Device-local library entry (not synced). */
+export interface LocalTrack {
+  id: string
+  filePath: string
+  addedAt: number
+  song: MusicInfo
 }
 
 export interface SearchResult {

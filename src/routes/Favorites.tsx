@@ -20,9 +20,9 @@ import { useSettingsStore } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { Quality, Source } from "@/types/music"
+import type { OnlineSource, Quality } from "@/types/music"
 
-const PLATFORMS: Source[] = ["wy", "kw", "kg", "tx", "mg"]
+const PLATFORMS: OnlineSource[] = ["wy", "kw", "kg", "tx", "mg"]
 const SORTS = ["added", "name"] as const
 
 export function Favorites() {

@@ -28,7 +28,15 @@ const LS_KEYS = [
 // folder path, the stored passphrase, the auto-backup flag, the last-synced
 // timestamp, and the download location (Windows/macOS paths differ, so it's
 // per-device). Stripped on export; preserved (not overwritten) on import.
-const DEVICE_LOCAL_SETTINGS = ["syncFolder", "syncPassphrase", "autoBackupOnExit", "syncLastAt", "downloadDir"]
+const DEVICE_LOCAL_SETTINGS = [
+  "syncFolder",
+  "syncPassphrase",
+  "autoBackupOnExit",
+  "syncLastAt",
+  "downloadDir",
+  "localScanDepth",
+  "deleteLocalFiles",
+]
 
 export interface MuseekConfig {
   app: "museek"

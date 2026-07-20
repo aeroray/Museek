@@ -1,5 +1,5 @@
 import { httpFetch } from "@/lib/http"
-import type { Source } from "@/types/music"
+import type { OnlineSource } from "@/types/music"
 import { t } from "@/lib/i18n"
 
 // Parse a pasted playlist URL or raw ID into the id form each platform's
@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n"
 const LOOKS_LIKE_URL = /[?&:/]/
 
 const PATTERNS: Record<
-  Source,
+  OnlineSource,
   { primary: RegExp; secondary?: RegExp; /** How to turn a captured group into store id */ format?: (id: string) => string }
 > = {
   // https://y.qq.com/n/yqq/playlist/7217720898.html
@@ -39,13 +39,13 @@ const PATTERNS: Record<
   },
 }
 
-function isPlainId(s: string, source: Source): boolean {
+function isPlainId(s: string, source: OnlineSource): boolean {
   const trimmed = s.trim()
   if (source === "kg" && /^id_\d+$/i.test(trimmed)) return true
   return /^\d+$/.test(trimmed)
 }
 
-function normalizePlainId(s: string, source: Source): string {
+function normalizePlainId(s: string, source: OnlineSource): string {
   const trimmed = s.trim()
   if (source === "kg") {
     return trimmed.startsWith("id_") ? trimmed : `id_${trimmed}`
@@ -81,7 +81,7 @@ async function resolveRedirect(link: string, tryNum = 0): Promise<string> {
   return link
 }
 
-function matchId(input: string, source: Source): string | null {
+function matchId(input: string, source: OnlineSource): string | null {
   const { primary, secondary, format } = PATTERNS[source]
   let m = primary.exec(input)
   if (!m && secondary) m = secondary.exec(input)
@@ -93,7 +93,7 @@ function matchId(input: string, source: Source): string | null {
  * Resolve a pasted playlist link or raw ID for `source`.
  * Throws with a localized message when the input cannot be parsed.
  */
-export async function parsePlaylistLink(source: Source, raw: string): Promise<string> {
+export async function parsePlaylistLink(source: OnlineSource, raw: string): Promise<string> {
   let input = raw.trim()
   if (!input) throw new Error(t("playlists.openEmpty"))
 

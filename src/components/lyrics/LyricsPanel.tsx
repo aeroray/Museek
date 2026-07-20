@@ -341,18 +341,18 @@ export function LyricsPanel() {
           )}
         </div>
 
-        <div className="flex-1 min-h-0" style={{ maskImage: FADE, WebkitMaskImage: FADE }}>
-          <ScrollArea ref={scrollRef} className="h-full">
-            {lyricsLoading && lyricLines.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 h-full min-h-[60vh] text-muted-foreground">
-                <Loader2 size={28} className="animate-spin" />
-                <p className="text-sm">{t("lyrics.loading")}</p>
-              </div>
-            ) : lyricLines.length === 0 ? (
-              <div className="flex items-center justify-center h-full min-h-[60vh] text-muted-foreground">
-                {currentSong ? t("lyrics.empty") : t("lyrics.selectSong")}
-              </div>
-            ) : (
+        <div className="relative flex-1 min-h-0" style={{ maskImage: FADE, WebkitMaskImage: FADE }}>
+          {lyricsLoading && lyricLines.length === 0 ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+              <Loader2 size={28} className="animate-spin" />
+              <p className="text-sm">{t("lyrics.loading")}</p>
+            </div>
+          ) : lyricLines.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+              {currentSong ? t("lyrics.empty") : t("lyrics.selectSong")}
+            </div>
+          ) : (
+            <ScrollArea ref={scrollRef} className="h-full">
               <div className="py-[42vh] pl-4 pr-24 text-center animate-in fade-in duration-300">
                 {lyricLines.map((line, i) => {
                   const active = i === currentLyricIndex
@@ -381,8 +381,8 @@ export function LyricsPanel() {
                   )
                 })}
               </div>
-            )}
-          </ScrollArea>
+            </ScrollArea>
+          )}
         </div>
       </div>
     </div>

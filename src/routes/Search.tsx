@@ -15,7 +15,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type { Playlist } from "@/lib/playlists"
-import type { Source } from "@/types/music"
+import type { OnlineSource } from "@/types/music"
 
 export function Search() {
   // Seed the input from the store so returning to the page keeps the last query
@@ -27,7 +27,7 @@ export function Search() {
     results, playlistResults, isLoading, error, page, allPage, search, searchHistory,
     platform, setPlatform, scope, setScope, searchOnPlatform, removeHistoryItem, clearHistory, clearResults,
   } = useSearchStore()
-  const navSearch = (useLocation().state as { searchSong?: { platform: Source; query: string } } | null)?.searchSong
+  const navSearch = (useLocation().state as { searchSong?: { platform: OnlineSource; query: string } } | null)?.searchSong
   const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
   const addFavoritePlaylist = usePlaylistStore((s) => s.addFavoritePlaylist)
   const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)

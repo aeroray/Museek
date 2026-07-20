@@ -1,12 +1,13 @@
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
-import type { Source } from "@/types/music"
+import type { OnlineSource, Source } from "@/types/music"
 
 // Fixed display order across Search / Charts / Playlists:
 // NetEase, KuWo, KuGou, QQ Music, Migu. The first entry is the default selection.
-export const PLATFORM_ORDER: Source[] = ["wy", "kw", "kg", "tx", "mg"]
+// "local" is intentionally excluded — it has its own page.
+export const PLATFORM_ORDER: OnlineSource[] = ["wy", "kw", "kg", "tx", "mg"]
 
-const LABEL: Record<Source, string> = {
+const LABEL: Record<OnlineSource, string> = {
   wy: "platform.wy",
   kw: "platform.kw",
   kg: "platform.kg",
@@ -15,7 +16,7 @@ const LABEL: Record<Source, string> = {
 }
 
 // A small brand-ish accent dot per platform for visual distinction.
-const BRAND: Record<Source, string> = {
+const BRAND: Record<OnlineSource, string> = {
   wy: "#E60026",
   kw: "#F5A623",
   kg: "#2D9CDB",
@@ -33,7 +34,7 @@ export function PlatformTabs({
   className,
 }: {
   value: Source
-  onChange: (s: Source) => void
+  onChange: (s: OnlineSource) => void
   className?: string
 }) {
   const t = useT()

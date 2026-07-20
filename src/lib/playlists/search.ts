@@ -2,7 +2,7 @@ import { httpFetch } from "@/lib/http"
 import * as md5Lib from "js-md5"
 import * as aesjs from "aes-js"
 import { createAsyncCache } from "@/lib/cache"
-import type { Source } from "@/types/music"
+import type { OnlineSource } from "@/types/music"
 import type { Playlist } from "./index"
 
 // Search for PLAYLISTS (not songs) on each platform — ported from lx-music's
@@ -270,7 +270,7 @@ async function searchMg(query: string, page: number, limit: number): Promise<Pla
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-const fns: Record<Source, (q: string, page: number, limit: number) => Promise<Playlist[]>> = {
+const fns: Record<OnlineSource, (q: string, page: number, limit: number) => Promise<Playlist[]>> = {
   wy: searchWy,
   tx: searchTx,
   kw: searchKw,
@@ -280,7 +280,12 @@ const fns: Record<Source, (q: string, page: number, limit: number) => Promise<Pl
 
 const cache = createAsyncCache<Playlist[]>(3 * 60_000)
 
-export async function searchPlaylists(source: Source, query: string, page = 1, limit = 30): Promise<Playlist[]> {
+export async function searchPlaylists(
+  source: OnlineSource,
+  query: string,
+  page = 1,
+  limit = 30
+): Promise<Playlist[]> {
   const q = query.trim()
   if (!q) return []
   return cache(`${source}:${q}:${page}`, async () => {

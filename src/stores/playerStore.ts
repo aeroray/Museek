@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { audioPlayer } from "@/lib/audio"
 import { sourceRunner } from "@/lib/sourceRunner"
 import { loadLyric } from "@/lib/lyric/loadLyric"
+import { localFileToObjectUrl } from "@/lib/localMusic"
 import {
   applyAudioSource,
   beginPlayGeneration,
@@ -124,10 +125,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     async play(song, quality) {
       const preferred = quality ?? useSettingsStore.getState().playQuality
       const gen = beginPlayGeneration()
+      const isLocal = song.source === "local"
 
       // No source loaded → can't resolve a playback URL. Prompt to import instead
-      // of silently failing.
-      if (!sourceRunner.isReady()) {
+      // of silently failing. Local files play from disk and need no lx source.
+      if (!isLocal && !sourceRunner.isReady()) {
         notify({
           message: t("player.noSource"),
           variant: "error",
@@ -169,6 +171,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       }
 
       try {
+        if (isLocal) {
+          const filePath = song.meta.filePath
+          if (!filePath) throw new Error(t("local.missingPath"))
+          const src = await localFileToObjectUrl(filePath)
+          if (!isPlayGenerationCurrent(gen)) {
+            URL.revokeObjectURL(src)
+            return
+          }
+          const best = song.meta.qualitys[0]?.type ?? preferred
+          set((s) => {
+            const q = [...s.queue]
+            if (q[idx]) q[idx] = { ...q[idx], playedQuality: best }
+            return { currentQuality: best, queue: q }
+          })
+          applyAudioSource(src)
+          await playWithTimeout()
+          if (!isPlayGenerationCurrent(gen)) return
+          lastMediaPlaying = true
+          updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
+          get()._loadLyric(song)
+          get()._loadPic(song)
+          return
+        }
+
         const settings = useSettingsStore.getState()
 
         // Fast path: reuse on-disk audio before any remote URL resolve / probe.

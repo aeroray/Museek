@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import type { Source } from "@/types/music"
+import type { OnlineSource } from "@/types/music"
 
 export interface Toast {
   id: number
@@ -28,12 +28,12 @@ interface UiState {
   toggleTopBarLyrics: () => void
   // Selected platform per page, kept in memory so switching tabs and coming back
   // preserves the choice (not persisted to disk — that's intentionally cheap).
-  chartSource: Source
+  chartSource: OnlineSource
   chartBoardId: string
-  playlistSource: Source
-  setChartSource: (s: Source) => void
+  playlistSource: OnlineSource
+  setChartSource: (s: OnlineSource) => void
   setChartBoardId: (id: string) => void
-  setPlaylistSource: (s: Source) => void
+  setPlaylistSource: (s: OnlineSource) => void
   // Which Favorites tab is active — kept here so leaving (e.g. opening a
   // favorited playlist) and coming back restores the same tab.
   favoritesTab: "songs" | "playlists"

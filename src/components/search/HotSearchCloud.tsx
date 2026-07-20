@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { getHotSearch, type HotKeyword } from "@/lib/hotSearch"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { Source } from "@/types/music"
+import type { OnlineSource } from "@/types/music"
 
 type HeatTier = {
   size: string
@@ -30,7 +30,7 @@ export function HotSearchCloud({
   platformLabel,
   onSelect,
 }: {
-  platform: Source
+  platform: OnlineSource
   platformLabel: string
   onSelect: (keyword: string) => void
 }) {

@@ -4,7 +4,7 @@ import { getTxHotSearch } from "./tx"
 import { getKwHotSearch } from "./kw"
 import { getKgHotSearch } from "./kg"
 import { getMgHotSearch } from "./mg"
-import type { Source } from "@/types/music"
+import type { OnlineSource } from "@/types/music"
 
 // Per-platform "hot search" (热搜) keyword lists, ported from lx-music-desktop's
 // musicSdk/<platform>/hotSearch.js. Each fetcher returns keywords already ordered
@@ -17,7 +17,7 @@ export interface HotKeyword {
 
 type HotFn = () => Promise<string[]>
 
-const hotFns: Record<Source, HotFn> = {
+const hotFns: Record<OnlineSource, HotFn> = {
   wy: getWyHotSearch,
   tx: getTxHotSearch,
   kw: getKwHotSearch,
@@ -31,7 +31,7 @@ const hotCache = createAsyncCache<HotKeyword[]>(10 * 60_000)
 
 const MAX = 30
 
-export function getHotSearch(source: Source): Promise<HotKeyword[]> {
+export function getHotSearch(source: OnlineSource): Promise<HotKeyword[]> {
   return hotCache(source, async () => {
     const raw = await hotFns[source]()
     const seen = new Set<string>()

@@ -1,4 +1,4 @@
-import type { MusicInfo, Source } from "@/types/music"
+import type { MusicInfo, OnlineSource } from "@/types/music"
 import { createAsyncCache } from "@/lib/cache"
 import { kwBoards, getKwBoardSongs } from "./kw"
 import { kgBoards, getKgBoardSongs } from "./kg"
@@ -12,7 +12,7 @@ export interface ChartBoard {
 }
 
 // Static chart/leaderboard metadata per platform.
-export const ALL_BOARDS: Record<Source, ChartBoard[]> = {
+export const ALL_BOARDS: Record<OnlineSource, ChartBoard[]> = {
   kw: kwBoards,
   kg: kgBoards,
   tx: txBoards,
@@ -20,7 +20,7 @@ export const ALL_BOARDS: Record<Source, ChartBoard[]> = {
   mg: mgBoards,
 }
 
-function fetchBoardSongs(source: Source, boardId: string, page: number): Promise<MusicInfo[]> {
+function fetchBoardSongs(source: OnlineSource, boardId: string, page: number): Promise<MusicInfo[]> {
   switch (source) {
     case "kw":
       return getKwBoardSongs(boardId, page)
@@ -45,7 +45,7 @@ const boardCache = createAsyncCache<MusicInfo[]>(5 * 60_000)
  * Fetch the songs of a chart board for the given platform (cached).
  */
 export function getBoardSongs(
-  source: Source,
+  source: OnlineSource,
   boardId: string,
   page = 1
 ): Promise<MusicInfo[]> {

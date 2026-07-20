@@ -9,13 +9,13 @@ import { createAsyncCache } from "@/lib/cache"
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
 import { searchPlaylists } from "@/lib/playlists/search"
 import type { Playlist } from "@/lib/playlists"
-import type { MusicInfo, SearchResult, Source } from "@/types/music"
+import type { MusicInfo, OnlineSource, SearchResult } from "@/types/music"
 
 export type SearchScope = "song" | "playlist"
 
 type SearchFn = (query: string, page?: number, limit?: number) => Promise<SearchResult>
 
-const searchFns: Record<Source, SearchFn> = {
+const searchFns: Record<OnlineSource, SearchFn> = {
   kw: searchKuwo,
   kg: searchKugou,
   tx: searchTx,
@@ -30,7 +30,7 @@ const searchCache = createAsyncCache<SearchResult>(3 * 60_000)
 
 interface SearchState {
   query: string
-  platform: Source
+  platform: OnlineSource
   scope: SearchScope
   results: MusicInfo[]
   playlistResults: Playlist[]
@@ -42,11 +42,11 @@ interface SearchState {
   searchHistory: string[]
 
   search: (query: string, page?: number) => Promise<void>
-  setPlatform: (platform: Source) => void
+  setPlatform: (platform: OnlineSource) => void
   setScope: (scope: SearchScope) => void
   /** Jump straight to a song search on a specific platform (e.g. from the player
    *  bar's "search this song on another platform" for VIP tracks). */
-  searchOnPlatform: (platform: Source, query: string) => void
+  searchOnPlatform: (platform: OnlineSource, query: string) => void
   clearResults: () => void
   addToHistory: (query: string) => void
   removeHistoryItem: (query: string) => void

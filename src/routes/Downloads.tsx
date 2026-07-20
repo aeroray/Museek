@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react"
-import { Trash2, X, Download, Music, FolderOpen, Search, Pencil, Check, CheckCheck } from "lucide-react"
+import { Trash2, X, Download, Music, FolderOpen, Search, Pencil, Check, CheckCheck, Eraser } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
+import { CoverImage } from "@/components/common/CoverImage"
+import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
@@ -104,20 +105,20 @@ export function Downloads() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           {isTauri && (
-            <Button variant="ghost" size="sm" className="h-8" onClick={() => openDownloadFolder(downloadDir)}>
-              <FolderOpen size={15} className="mr-1.5" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => void openDownloadFolder(downloadDir)}
+            >
+              <FolderOpen size={14} className="mr-1.5" />
               {t("download.openFolder")}
-            </Button>
-          )}
-          {hasCompleted && !editing && (
-            <Button variant="outline" size="sm" className="h-8" onClick={clearCompleted}>
-              {t("downloads.clearCompleted")}
             </Button>
           )}
         </div>
       </div>
 
-      {/* Match Favorites toolbar: fixed h-12 both modes */}
+      {/* Match Favorites / Local toolbar: fixed h-12 both modes */}
       {tasks.length > 0 && (
         <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
           {!editing ? (
@@ -134,6 +135,12 @@ export function Downloads() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </div>
+              {hasCompleted && (
+                <Button variant="ghost" size="sm" className="h-8 shrink-0" onClick={clearCompleted}>
+                  <Eraser size={14} className="mr-1.5" />
+                  {t("downloads.clearCompleted")}
+                </Button>
+              )}
               <Button variant="ghost" size="sm" className="h-8 shrink-0" onClick={() => setEditing(true)}>
                 <Pencil size={14} className="mr-1.5" />
                 {t("downloads.batchEdit")}
@@ -178,7 +185,7 @@ export function Downloads() {
         </div>
       ) : (
         <ScrollArea className="flex-1">
-          <div className="px-3 py-2 space-y-0.5">
+          <div className="px-3 py-2">
             {displayed.length === 0 ? (
               <p className="text-center text-sm text-muted-foreground py-12">{t("downloads.noMatch")}</p>
             ) : (
@@ -188,7 +195,7 @@ export function Downloads() {
                   <div
                     key={task.id}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 group",
+                      "flex items-center gap-3 px-3 py-2 rounded-xl group transition-[background-color] duration-200 hover:bg-accent/55",
                       editing && "cursor-pointer",
                       editing && sel && "bg-primary/10"
                     )}
@@ -205,26 +212,31 @@ export function Downloads() {
                       </span>
                     )}
 
-                    <div className="relative h-11 w-11 shrink-0 rounded-md overflow-hidden bg-muted">
+                    <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-muted">
                       {task.song.meta.picUrl ? (
-                        <img src={task.song.meta.picUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                        <CoverImage src={task.song.meta.picUrl} />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                          <Music size={18} />
+                          <Music size={16} />
                         </div>
                       )}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium truncate">{task.song.name}</span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
-                          {task.quality}
-                        </Badge>
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm truncate font-medium">{task.song.name}</p>
+                        <PlatformBadge source={task.song.source} />
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{task.song.singer}</p>
-                      {task.status === "downloading" && <Progress value={task.progress} className="h-1 mt-1.5" />}
-                      {task.error && <p className="text-xs text-destructive truncate mt-0.5">{task.error}</p>}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-xs text-muted-foreground truncate min-w-0">{task.song.singer}</p>
+                        <QualityBadge quality={task.quality} />
+                      </div>
+                      {task.status === "downloading" && (
+                        <Progress value={task.progress} className="h-1 mt-0.5" />
+                      )}
+                      {task.error && (
+                        <p className="text-xs text-destructive truncate">{task.error}</p>
+                      )}
                     </div>
 
                     <span
@@ -241,14 +253,21 @@ export function Downloads() {
                         : t(`downloads.status.${task.status}`)}
                     </span>
 
+                    <span className="text-xs text-muted-foreground w-12 text-right shrink-0 tabular-nums">
+                      {task.song.interval}
+                    </span>
+
                     {!editing && (
-                      <>
+                      <div className="flex items-center gap-0.5 shrink-0">
                         {task.status === "completed" && isTauri && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                            onClick={() => openDownloadFolder(downloadDir)}
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void openDownloadFolder(downloadDir)
+                            }}
                             title={t("download.openFolder")}
                           >
                             <FolderOpen size={14} />
@@ -257,16 +276,24 @@ export function Downloads() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeTask(task.id)}
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeTask(task.id)
+                          }}
+                          title={
+                            task.status === "completed" || task.status === "error"
+                              ? t("downloads.batchDelete")
+                              : t("common.cancel")
+                          }
                         >
                           {task.status === "completed" || task.status === "error" ? (
-                            <Trash2 size={13} />
+                            <Trash2 size={14} />
                           ) : (
-                            <X size={13} />
+                            <X size={14} />
                           )}
                         </Button>
-                      </>
+                      </div>
                     )}
                   </div>
                 )

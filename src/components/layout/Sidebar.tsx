@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { Search, ListMusic, TrendingUp, Heart, Download, Settings } from "lucide-react"
+import { Search, ListMusic, TrendingUp, Heart, HardDrive, Download, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { isMacOs } from "@/lib/os"
 import { useT } from "@/lib/i18n"
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/hot-playlists", icon: ListMusic, labelKey: "nav.playlists", iconHover: "icon-hover-list" },
   { to: "/library", icon: TrendingUp, labelKey: "nav.library", iconHover: "icon-hover-trend" },
   { to: "/favorites", icon: Heart, labelKey: "nav.favorites", iconHover: "icon-hover-heart" },
+  { to: "/local", icon: HardDrive, labelKey: "nav.local", iconHover: "icon-hover-list" },
   { to: "/downloads", icon: Download, labelKey: "nav.downloads", iconHover: "icon-hover-download" },
 ]
 

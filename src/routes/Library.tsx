@@ -9,7 +9,7 @@ import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
-import type { MusicInfo, Source } from "@/types/music"
+import type { MusicInfo, OnlineSource } from "@/types/music"
 import { cn } from "@/lib/utils"
 
 export function Library() {
@@ -31,7 +31,7 @@ export function Library() {
 
   // Switch platform + its first board together (one batched update) so the fetch
   // effect below fires exactly once — avoids a wasted request for the old board.
-  const selectSource = (s: Source) => {
+  const selectSource = (s: OnlineSource) => {
     if (s === source) return
     setChartSource(s)
     setChartBoardId(ALL_BOARDS[s][0]?.id ?? "")

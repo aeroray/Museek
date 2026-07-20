@@ -16,7 +16,7 @@ import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { Source } from "@/types/music"
+import type { OnlineSource } from "@/types/music"
 
 export function PlayerBar() {
   const {
@@ -40,7 +40,7 @@ export function PlayerBar() {
 
   // Jump to the search page pre-filled with this song on another platform — handy
   // when the current platform's copy is VIP/unavailable.
-  const searchOther = (platform: Source) => {
+  const searchOther = (platform: OnlineSource) => {
     if (!currentSong) return
     const query = `${currentSong.name} ${currentSong.singer}`.trim()
     navigate("/search", { state: { searchSong: { platform, query } } })

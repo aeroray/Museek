@@ -5,6 +5,7 @@ import { Search } from "@/routes/Search"
 import { HotPlaylists } from "@/routes/HotPlaylists"
 import { Library } from "@/routes/Library"
 import { Favorites } from "@/routes/Favorites"
+import { LocalMusic } from "@/routes/LocalMusic"
 import { Playlist } from "@/routes/Playlist"
 import { Downloads } from "@/routes/Downloads"
 import { Settings } from "@/routes/Settings"
@@ -21,6 +22,7 @@ import { useGlobalShortcuts } from "@/lib/shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
 import { useDownloadStore } from "@/stores/downloadStore"
+import { useLocalMusicStore } from "@/stores/localMusicStore"
 import { useUpdateStore } from "@/stores/updateStore"
 
 // Wire domain toast port once — stores/lib call notify() without importing uiStore.
@@ -32,6 +34,7 @@ function AppInit() {
   const { loadHistory } = useSearchStore()
   const { loadFromDisk: loadSettings } = useSettingsStore()
   const { loadFromDisk: loadDownloads } = useDownloadStore()
+  const { loadFromDisk: loadLocalMusic } = useLocalMusicStore()
 
   // Global media keyboard shortcuts (space / arrows / M / L), gated by settings.
   useGlobalShortcuts()
@@ -52,6 +55,7 @@ function AppInit() {
         // Show the tray icon only if the saved close-behavior is "hide to tray".
         setTrayVisible(s.closeBehavior === "tray")
         void loadDownloads()
+        void loadLocalMusic()
       })
     })
 
@@ -79,6 +83,7 @@ export default function App() {
             <Route path="/hot-playlists" element={<HotPlaylists />} />
             <Route path="/library" element={<Library />} />
             <Route path="/favorites" element={<Favorites />} />
+            <Route path="/local" element={<LocalMusic />} />
             <Route path="/playlist/:id" element={<Playlist />} />
             <Route path="/downloads" element={<Downloads />} />
             <Route path="/settings" element={<Settings />} />

@@ -98,49 +98,53 @@ export const TrackRow = memo(function TrackRow({
           <Plus size={14} />
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn("h-8 w-8 icon-hover-heart", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (fav) removeFromFavorites(song.id)
-            else addToFavorites(song)
-          }}
-          title={t(fav ? "common.unfavorite" : "common.favorite")}
-        >
-          <Heart
-            key={fav ? "on" : "off"}
-            size={14}
-            className={cn(fav && "fill-red-500 text-red-500 icon-heart-burst")}
-          />
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        {song.source !== "local" && (
+          <>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
-              onClick={(e) => e.stopPropagation()}
-              title={t("common.download")}
+              className={cn("h-8 w-8 icon-hover-heart", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (fav) removeFromFavorites(song.id)
+                else addToFavorites(song)
+              }}
+              title={t(fav ? "common.unfavorite" : "common.favorite")}
             >
-              <Download size={14} />
+              <Heart
+                key={fav ? "on" : "off"}
+                size={14}
+                className={cn(fav && "fill-red-500 text-red-500 icon-heart-burst")}
+              />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[11rem]">
-            {song.meta.qualitys.map((q) => (
-              <DropdownMenuItem
-                key={q.type}
-                onClick={() => addTask(song, q.type as Quality)}
-                className="justify-between gap-8"
-              >
-                <span>{t("search.download", { quality: q.type })}</span>
-                {q.size && <span className="text-muted-foreground text-xs tabular-nums">{q.size}</span>}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
+                  onClick={(e) => e.stopPropagation()}
+                  title={t("common.download")}
+                >
+                  <Download size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[11rem]">
+                {song.meta.qualitys.map((q) => (
+                  <DropdownMenuItem
+                    key={q.type}
+                    onClick={() => addTask(song, q.type as Quality)}
+                    className="justify-between gap-8"
+                  >
+                    <span>{t("search.download", { quality: q.type })}</span>
+                    {q.size && <span className="text-muted-foreground text-xs tabular-nums">{q.size}</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
       </div>
     </div>
   )

@@ -31,7 +31,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { MusicInfo, Source } from "@/types/music"
+import type { MusicInfo, OnlineSource } from "@/types/music"
 
 export function HotPlaylists() {
   const t = useT()
@@ -77,7 +77,7 @@ export function HotPlaylists() {
   const [filter, setFilter] = useState("")
   const [openDialog, setOpenDialog] = useState(false)
   // Dialog platform is local so switching tabs here doesn't reload the page grid.
-  const [openSource, setOpenSource] = useState<Source>(source)
+  const [openSource, setOpenSource] = useState<OnlineSource>(source)
   const [openInput, setOpenInput] = useState("")
   const [openBusy, setOpenBusy] = useState(false)
   const [openError, setOpenError] = useState<string | null>(null)
