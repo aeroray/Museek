@@ -4,7 +4,7 @@ import * as aesjs from "aes-js"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist, PlaylistDetail } from "./index"
+import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/wy/songList.js
 // NetEase. The reference signs the hot-list request with weapi (/weapi/
@@ -84,6 +84,7 @@ interface WyPlaylistRaw {
   name?: string
   coverImgUrl?: string
   playCount?: number
+  creator?: { nickname?: string }
 }
 
 interface WyListResponse {
@@ -98,13 +99,45 @@ function normalizeWyPlaylist(raw: WyPlaylistRaw): Playlist {
     name: raw.name ?? "",
     img: raw.coverImgUrl ?? null,
     playCount: isNaN(playCount) || playCount === 0 ? undefined : formatPlayCount(playCount),
+    author: raw.creator?.nickname || undefined,
     source: "wy",
   }
 }
 
-export async function getWyHotPlaylists(page = 1): Promise<Playlist[]> {
+interface WyHotTagRaw {
+  name?: string
+  id?: number | string
+}
+
+interface WyHotTagsResponse {
+  code?: number
+  tags?: WyHotTagRaw[]
+}
+
+/** Hot category chips; `id` is the category name (used as `cat` on list). */
+export async function getWyPlaylistTags(): Promise<PlaylistTag[]> {
+  const data = await eapiPost<WyHotTagsResponse>(
+    "/api/playlist/hottags",
+    {},
+    "NetEase playlist tags"
+  )
+  if (!data || data.code !== 200 || !Array.isArray(data.tags)) {
+    throw new Error("NetEase playlist tags failed: bad response")
+  }
+  const out: PlaylistTag[] = []
+  const seen = new Set<string>()
+  for (const t of data.tags) {
+    const name = t.name?.trim()
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    out.push({ id: name, name })
+  }
+  return out
+}
+
+export async function getWyHotPlaylists(page = 1, tagId?: string | null): Promise<Playlist[]> {
   const payload = {
-    cat: "全部",
+    cat: tagId?.trim() || "全部",
     order: "hot",
     limit: LIMIT_LIST,
     offset: LIMIT_LIST * (page - 1),

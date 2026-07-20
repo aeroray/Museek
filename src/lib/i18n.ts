@@ -86,6 +86,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "hotPlaylists.playlistEmpty": "歌单是空的",
     "hotPlaylists.playFailed": "播放失败：{msg}",
     "hotPlaylists.playCountTip": "播放量",
+    "hotPlaylists.tagAll": "全部",
 
     // Common actions
     "common.addToQueue": "加入队列",
@@ -478,6 +479,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "hotPlaylists.playlistEmpty": "This playlist is empty",
     "hotPlaylists.playFailed": "Playback failed: {msg}",
     "hotPlaylists.playCountTip": "Plays",
+    "hotPlaylists.tagAll": "All",
 
     // Common actions
     "common.addToQueue": "Add to queue",

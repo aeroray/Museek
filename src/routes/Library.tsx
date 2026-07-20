@@ -2,8 +2,8 @@ import { useState, useEffect } from "react"
 import { TrendingUp, RotateCw, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton"
 import { TrackRow } from "@/components/common/TrackRow"
+import { TrackRowSkeleton } from "@/components/common/ListSkeletons"
 import { ALL_BOARDS, getBoardSongs } from "@/lib/charts"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -83,20 +83,24 @@ export function Library() {
         {/* Platform selector */}
         <PlatformTabs value={source} onChange={selectSource} />
 
-        {/* Board selector — the active board is highlighted in the theme color */}
+        {/* Board selector — match HotPlaylists category chips */}
         <div className="flex gap-1.5 flex-wrap">
           {boards.map((b) => {
             const active = boardId === b.id
             return (
-              <Button
+              <button
                 key={b.id}
-                variant={active ? "default" : "ghost"}
-                size="sm"
-                className={cn("h-7 px-3 text-xs rounded-full", active ? "font-medium shadow-sm" : "text-muted-foreground")}
+                type="button"
                 onClick={() => setChartBoardId(b.id)}
+                className={cn(
+                  "shrink-0 rounded-md px-2.5 py-1 text-xs transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
               >
                 {b.name}
-              </Button>
+              </button>
             )
           })}
         </div>
@@ -105,17 +109,9 @@ export function Library() {
       <ScrollArea className="flex-1">
         <div className="px-2 py-2">
           {loading ? (
-            <div className="space-y-1.5">
+            <div>
               {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-2">
-                  <Skeleton className="h-4 w-4 shrink-0" />
-                  <Skeleton className="h-10 w-10 rounded-md shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-3.5 w-1/3" />
-                    <Skeleton className="h-3 w-1/4" />
-                  </div>
-                  <Skeleton className="h-3 w-10" />
-                </div>
+                <TrackRowSkeleton key={i} showRank />
               ))}
             </div>
           ) : error ? (

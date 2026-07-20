@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getHotSearch, type HotKeyword } from "@/lib/hotSearch"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -87,8 +87,16 @@ export function HotSearchCloud({
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <Loader2 size={22} className="animate-spin" />
+          <div className="flex max-w-xl flex-wrap items-baseline justify-center gap-x-6 gap-y-4">
+            {Array.from({ length: 16 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className={cn(
+                  "rounded-md",
+                  i < 3 ? "h-8 w-24" : i < 7 ? "h-7 w-20" : i < 12 ? "h-5 w-16" : "h-4 w-14",
+                )}
+              />
+            ))}
           </div>
         ) : failed || items.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">{t("search.hotEmpty")}</p>

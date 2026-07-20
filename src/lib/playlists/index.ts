@@ -1,10 +1,10 @@
 import type { MusicInfo, Source } from "@/types/music"
 import { createAsyncCache } from "@/lib/cache"
-import { getKwHotPlaylists, getKwPlaylistDetail } from "./kw"
-import { getTxHotPlaylists, getTxPlaylistDetail } from "./tx"
-import { getWyHotPlaylists, getWyPlaylistDetail } from "./wy"
-import { getKgHotPlaylists, getKgPlaylistDetail } from "./kg"
-import { getMgHotPlaylists, getMgPlaylistDetail } from "./mg"
+import { getKwHotPlaylists, getKwPlaylistDetail, getKwPlaylistTags } from "./kw"
+import { getTxHotPlaylists, getTxPlaylistDetail, getTxPlaylistTags } from "./tx"
+import { getWyHotPlaylists, getWyPlaylistDetail, getWyPlaylistTags } from "./wy"
+import { getKgHotPlaylists, getKgPlaylistDetail, getKgPlaylistTags } from "./kg"
+import { getMgHotPlaylists, getMgPlaylistDetail, getMgPlaylistTags } from "./mg"
 
 // Hot/featured playlist (歌单) browsing, ported from lx-music-desktop's
 // per-platform songList.js. Mirrors the structure of src/lib/charts/index.ts:
@@ -20,6 +20,12 @@ export interface Playlist {
   source: Source
 }
 
+/** Category / tag chip for filtering the hot-playlist grid. */
+export interface PlaylistTag {
+  id: string
+  name: string
+}
+
 /** Playlist metadata returned alongside tracks (lx-music `info`). */
 export interface PlaylistDetailInfo {
   name: string
@@ -32,18 +38,39 @@ export interface PlaylistDetail {
   list: MusicInfo[]
 }
 
-function fetchHotPlaylists(source: Source, page: number): Promise<Playlist[]> {
+function fetchHotPlaylists(
+  source: Source,
+  page: number,
+  tagId?: string | null
+): Promise<Playlist[]> {
   switch (source) {
     case "kw":
-      return getKwHotPlaylists(page)
+      return getKwHotPlaylists(page, tagId)
     case "tx":
-      return getTxHotPlaylists(page)
+      return getTxHotPlaylists(page, tagId)
     case "wy":
-      return getWyHotPlaylists(page)
+      return getWyHotPlaylists(page, tagId)
     case "kg":
-      return getKgHotPlaylists(page)
+      return getKgHotPlaylists(page, tagId)
     case "mg":
-      return getMgHotPlaylists(page)
+      return getMgHotPlaylists(page, tagId)
+    default:
+      return Promise.resolve([])
+  }
+}
+
+function fetchPlaylistTags(source: Source): Promise<PlaylistTag[]> {
+  switch (source) {
+    case "kw":
+      return getKwPlaylistTags()
+    case "tx":
+      return getTxPlaylistTags()
+    case "wy":
+      return getWyPlaylistTags()
+    case "kg":
+      return getKgPlaylistTags()
+    case "mg":
+      return getMgPlaylistTags()
     default:
       return Promise.resolve([])
   }
@@ -66,18 +93,34 @@ function fetchPlaylistDetail(source: Source, id: string, page: number): Promise<
   }
 }
 
-// Hot lists and playlist contents are stable over a session — cache for 5 min so
-// switching platforms / reopening a playlist is instant and avoids re-requests.
+// Hot lists, tags, and playlist contents are stable over a session — cache for
+// 5 min so switching platforms / tags / reopening a playlist is instant.
 const hotCache = createAsyncCache<Playlist[]>(5 * 60_000)
+const tagsCache = createAsyncCache<PlaylistTag[]>(5 * 60_000)
 const detailCache = createAsyncCache<PlaylistDetail>(5 * 60_000)
 
 /**
  * Fetch the platform's hot/recommended playlists (default "热门" sort, cached).
+ * Pass `tagId` to filter by category; omit / null / "" for the default recommend list.
  * Pagination is best-effort: platforms whose hot endpoint returns a single
  * fixed page ignore `page`.
  */
-export function getHotPlaylists(source: Source, page = 1): Promise<Playlist[]> {
-  return hotCache(`${source}:${page}`, () => fetchHotPlaylists(source, page))
+export function getHotPlaylists(
+  source: Source,
+  page = 1,
+  tagId?: string | null
+): Promise<Playlist[]> {
+  const tagKey = tagId?.trim() || "_"
+  return hotCache(`${source}:${page}:${tagKey}`, () => fetchHotPlaylists(source, page, tagId))
+}
+
+/**
+ * Fetch category tags for the hot-playlist filter bar.
+ * Returns [] on unsupported sources; callers should hide the bar when empty
+ * (including when the network call fails — see UI).
+ */
+export function getPlaylistTags(source: Source): Promise<PlaylistTag[]> {
+  return tagsCache(`${source}:tags`, () => fetchPlaylistTags(source))
 }
 
 /**

@@ -175,7 +175,8 @@ export function LyricsPanel() {
               src={heroSrc}
               alt="album"
               loading="eager"
-              className="absolute inset-0 !outline-none"
+              showOutline={false}
+              className="absolute inset-0"
             />
           )}
         </>

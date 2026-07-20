@@ -4,7 +4,6 @@ import { ListMusic, Play, ChevronLeft, RotateCw, Heart, Search, X, Link2, Loader
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
   DialogContent,
@@ -14,8 +13,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { TrackRow } from "@/components/common/TrackRow"
+import { PlaylistCardSkeleton, TrackRowSkeleton } from "@/components/common/ListSkeletons"
 import { VirtualList } from "@/components/common/VirtualList"
-import { getHotPlaylists, getPlaylistDetail, type Playlist } from "@/lib/playlists"
+import {
+  getHotPlaylists,
+  getPlaylistDetail,
+  getPlaylistTags,
+  type Playlist,
+  type PlaylistTag,
+} from "@/lib/playlists"
 import { parsePlaylistLink } from "@/lib/playlists/openLink"
 import { playPlaylist } from "@/lib/playlists/play"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
@@ -53,7 +59,20 @@ export function HotPlaylists() {
   const [listError, setListError] = useState<string | null>(null)
   const [detailLoading, setDetailLoading] = useState(!!openFromNav)
   const [detailError, setDetailError] = useState<string | null>(null)
+  // Category filter: null = "全部" (platform default recommend). Hide the bar
+  // when tags fail or come back empty (e.g. transient API outage).
+  const [tags, setTags] = useState<PlaylistTag[]>([])
+  const [tagId, setTagId] = useState<string | null>(null)
+  // Keep tag state in sync with the platform tab without a one-frame stale load.
+  const [tagSource, setTagSource] = useState(source)
+  if (tagSource !== source) {
+    setTagSource(source)
+    setTagId(null)
+    setTags([])
+  }
   const scrollRef = useRef<HTMLDivElement>(null)
+  const tagScrollRef = useRef<HTMLDivElement>(null)
+  const [tagCanScrollRight, setTagCanScrollRight] = useState(false)
   const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
   const [filter, setFilter] = useState("")
   const [openDialog, setOpenDialog] = useState(false)
@@ -69,6 +88,38 @@ export function HotPlaylists() {
     setViewportEl(vp instanceof HTMLElement ? vp : null)
   }, [selected, detailLoading])
 
+  // Category chips: vertical wheel → horizontal scroll; fade when more tags exist to the right.
+  useEffect(() => {
+    const el = tagScrollRef.current
+    if (!el || tags.length === 0) {
+      setTagCanScrollRight(false)
+      return
+    }
+
+    const updateFade = () => {
+      setTagCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
+    }
+    updateFade()
+
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return
+      // Prefer converting vertical wheel to horizontal when the strip overflows.
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+
+    el.addEventListener("wheel", onWheel, { passive: false })
+    el.addEventListener("scroll", updateFade, { passive: true })
+    const ro = new ResizeObserver(updateFade)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener("wheel", onWheel)
+      el.removeEventListener("scroll", updateFade)
+      ro.disconnect()
+    }
+  }, [tags])
+
   useEffect(() => {
     setFilter("")
   }, [selected])
@@ -78,17 +129,32 @@ export function HotPlaylists() {
     if (viewportEl) viewportEl.scrollTop = 0
   }, [selected, viewportEl])
 
+  // Load category chips for the current platform; hide bar on failure / empty.
+  useEffect(() => {
+    let cancelled = false
+    getPlaylistTags(source)
+      .then((list) => {
+        if (!cancelled) setTags(list)
+      })
+      .catch(() => {
+        if (!cancelled) setTags([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [source])
+
   // Load the platform's hot playlists. Extracted so the retry button can re-run it.
   const loadList = useCallback(() => {
     setListLoading(true)
     setListError(null)
     setSelected(null)
     setSongs([])
-    getHotPlaylists(source)
+    getHotPlaylists(source, 1, tagId)
       .then(setPlaylists)
       .catch((e) => setListError((e as Error).message))
       .finally(() => setListLoading(false))
-  }, [source])
+  }, [source, tagId])
 
   useEffect(() => {
     loadList()
@@ -242,6 +308,49 @@ export function HotPlaylists() {
 
         {!selected && <PlatformTabs value={source} onChange={setSource} />}
 
+        {!selected && tags.length > 0 && (
+          <div className="relative -mx-1">
+            <div
+              ref={tagScrollRef}
+              className="flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              <button
+                type="button"
+                onClick={() => setTagId(null)}
+                className={cn(
+                  "shrink-0 rounded-md px-2.5 py-1 text-xs transition-colors",
+                  tagId == null
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {t("hotPlaylists.tagAll")}
+              </button>
+              {tags.map((tag) => (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => setTagId(tag.id)}
+                  className={cn(
+                    "shrink-0 rounded-md px-2.5 py-1 text-xs transition-colors",
+                    tagId === tag.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+            {tagCanScrollRight && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
+              />
+            )}
+          </div>
+        )}
+
         {selected && !detailLoading && !detailError && songs.length > 0 && (
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -268,16 +377,9 @@ export function HotPlaylists() {
         {selected ? (
           // --- Playlist detail ---
           detailLoading ? (
-            <div className="px-2 py-2 space-y-1.5">
+            <div className="px-2 py-2">
               {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-2">
-                  <Skeleton className="h-10 w-10 rounded-md shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-3.5 w-1/3" />
-                    <Skeleton className="h-3 w-1/4" />
-                  </div>
-                  <Skeleton className="h-3 w-10 shrink-0" />
-                </div>
+                <TrackRowSkeleton key={i} showRank />
               ))}
             </div>
           ) : detailError ? (
@@ -311,11 +413,7 @@ export function HotPlaylists() {
         listLoading ? (
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="aspect-square w-full rounded-xl" />
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
+              <PlaylistCardSkeleton key={i} />
             ))}
           </div>
         ) : listError ? (

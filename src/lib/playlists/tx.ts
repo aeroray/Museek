@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist, PlaylistDetail } from "./index"
+import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/tx/songList.js
 // Hot playlists use the unsigned musicu.fcg get_playlist_by_tag method
@@ -37,6 +37,7 @@ interface TxPlaylistRaw {
   title?: string
   access_num?: number
   cover_url_medium?: string
+  creator_info?: { nick?: string }
 }
 
 interface TxListResponse {
@@ -56,11 +57,155 @@ function normalizeTxPlaylist(raw: TxPlaylistRaw): Playlist {
     name: raw.title ?? "",
     img: raw.cover_url_medium || null,
     playCount: isNaN(access) || access === 0 ? undefined : formatPlayCount(access),
+    author: raw.creator_info?.nick || undefined,
     source: "tx",
   }
 }
 
-export async function getTxHotPlaylists(page = 1): Promise<Playlist[]> {
+interface TxCategoryItem {
+  id?: number | string
+  name?: string
+}
+
+interface TxCategoryGroup {
+  group_name?: string
+  v_item?: TxCategoryItem[]
+}
+
+interface TxTagsResponse {
+  code?: number
+  tags?: {
+    code?: number
+    data?: { v_group?: TxCategoryGroup[] }
+  }
+}
+
+interface TxCategoryListResponse {
+  code?: number
+  playlist?: {
+    code?: number
+    data?: {
+      content?: {
+        v_item?: Array<{
+          basic?: {
+            tid?: number | string
+            title?: string
+            play_cnt?: number
+            cover?: { medium_url?: string; default_url?: string }
+            creator?: { nick?: string }
+          }
+        }>
+      }
+    }
+  }
+}
+
+function musicuUrl(data: unknown): string {
+  return (
+    `https://u.y.qq.com/cgi-bin/musicu.fcg?loginUin=0&hostUin=0&format=json` +
+    `&inCharset=utf-8&outCharset=utf-8&notice=0&platform=wk_v15.json&needNewCode=0` +
+    `&data=${encodeURIComponent(JSON.stringify(data))}`
+  )
+}
+
+/** Flatten all category groups (热门 / 主题 / 场景 / …), de-duped by id. */
+export async function getTxPlaylistTags(): Promise<PlaylistTag[]> {
+  const url = musicuUrl({
+    tags: {
+      method: "get_all_categories",
+      param: { qq: "" },
+      module: "playlist.PlaylistAllCategoriesServer",
+    },
+  })
+
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)",
+    },
+  })
+  if (!res.ok) throw new Error(`QQ playlist tags failed: ${res.status}`)
+
+  const data = (await res.json()) as TxTagsResponse
+  const groups = data?.tags?.data?.v_group
+  if (!data || data.code !== 0 || !groups?.length) {
+    throw new Error("QQ playlist tags failed: bad response")
+  }
+
+  const out: PlaylistTag[] = []
+  const seen = new Set<string>()
+  for (const group of groups) {
+    for (const item of group.v_item ?? []) {
+      if (item.id == null || !item.name) continue
+      const id = String(item.id)
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, name: item.name })
+    }
+  }
+  return out
+}
+
+function normalizeTxCategoryBasic(basic: {
+  tid?: number | string
+  title?: string
+  play_cnt?: number
+  cover?: { medium_url?: string; default_url?: string }
+  creator?: { nick?: string }
+} | undefined): Playlist | null {
+  if (!basic || basic.tid == null) return null
+  const play = Number(basic.play_cnt)
+  return {
+    id: String(basic.tid),
+    name: basic.title ?? "",
+    img: basic.cover?.medium_url || basic.cover?.default_url || null,
+    playCount: isNaN(play) || play === 0 ? undefined : formatPlayCount(play),
+    author: basic.creator?.nick,
+    source: "tx",
+  }
+}
+
+export async function getTxHotPlaylists(page = 1, tagId?: string | null): Promise<Playlist[]> {
+  if (tagId) {
+    const id = parseInt(tagId, 10)
+    if (isNaN(id)) throw new Error("QQ hot playlists failed: bad tag")
+    const reqBody = {
+      comm: { cv: 1602, ct: 20 },
+      playlist: {
+        method: "get_category_content",
+        param: {
+          titleid: id,
+          caller: "0",
+          category_id: id,
+          size: LIMIT_LIST,
+          page: page - 1,
+          use_page: 1,
+        },
+        module: "playlist.PlayListCategoryServer",
+      },
+    }
+
+    const res = await tauriFetch(musicuUrl(reqBody), {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)",
+      },
+    })
+    if (!res.ok) throw new Error(`QQ hot playlists failed: ${res.status}`)
+
+    const data = (await res.json()) as TxCategoryListResponse
+    const items = data?.playlist?.data?.content?.v_item
+    if (!data || data.code !== 0 || !items) {
+      throw new Error("QQ hot playlists failed: bad response")
+    }
+    const out: Playlist[] = []
+    for (const row of items) {
+      const pl = normalizeTxCategoryBasic(row.basic)
+      if (pl) out.push(pl)
+    }
+    return out
+  }
+
   const reqBody = {
     comm: { cv: 1602, ct: 20 },
     playlist: {
@@ -76,12 +221,7 @@ export async function getTxHotPlaylists(page = 1): Promise<Playlist[]> {
     },
   }
 
-  const url =
-    `https://u.y.qq.com/cgi-bin/musicu.fcg?loginUin=0&hostUin=0&format=json` +
-    `&inCharset=utf-8&outCharset=utf-8&notice=0&platform=wk_v15.json&needNewCode=0` +
-    `&data=${encodeURIComponent(JSON.stringify(reqBody))}`
-
-  const res = await tauriFetch(url, {
+  const res = await tauriFetch(musicuUrl(reqBody), {
     method: "GET",
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)",

@@ -42,7 +42,7 @@ export function PlaylistCard({
   const t = useT()
   const activate = selectable ? onSelect : onOpen
   return (
-    <div className="group relative">
+    <div className="group relative min-w-0">
       <div
         role="button"
         tabIndex={0}
@@ -57,7 +57,7 @@ export function PlaylistCard({
             activate?.()
           }
         }}
-        className="w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+        className="w-full min-w-0 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
       >
         <div
           className={cn(
@@ -142,15 +142,15 @@ export function PlaylistCard({
           {playlist.name}
         </p>
         {(playlist.author || playlist.playCount) && (
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
             {playlist.author && (
-              <span className="flex items-center gap-1 min-w-0" title={playlist.author}>
+              <span className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden" title={playlist.author}>
                 <User size={11} className="shrink-0" />
                 <span className="truncate">{playlist.author}</span>
               </span>
             )}
             {playlist.playCount && (
-              <span className="flex items-center gap-1 shrink-0" title={t("hotPlaylists.playCountTip")}>
+              <span className="flex shrink-0 items-center gap-1" title={t("hotPlaylists.playCountTip")}>
                 <Headphones size={11} className="shrink-0" />
                 {playlist.playCount}
               </span>

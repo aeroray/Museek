@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist, PlaylistDetail } from "./index"
+import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kg/songList.js
 // Hot playlists use the unsigned v9 getSpecial endpoint with t=5 (推荐 — the
@@ -50,6 +50,8 @@ interface KgSpecialRaw {
   img?: string
   play_count?: number
   total_play_count?: string
+  nickname?: string
+  author?: string
 }
 
 interface KgSpecialResponse {
@@ -71,14 +73,62 @@ function normalizeKgSpecial(raw: KgSpecialRaw): Playlist {
     name: raw.specialname,
     img: img ? img.replace("{size}", "240") : null,
     playCount,
+    author: raw.nickname || raw.author || undefined,
     source: "kg",
   }
 }
 
-export async function getKgHotPlaylists(page = 1): Promise<Playlist[]> {
+interface KgHotTagEntry {
+  special_id?: string | number
+  special_name?: string
+}
+
+interface KgTagsResponse {
+  status?: number
+  data?: {
+    hotTag?: {
+      status?: number
+      data?: Record<string, KgHotTagEntry>
+    }
+  }
+}
+
+/** Hot tags from getSpecial?is_smarty=1 (`special_id` → list param `c`). */
+export async function getKgPlaylistTags(): Promise<PlaylistTag[]> {
+  const url = "http://www2.kugou.kugou.com/yueku/v9/special/getSpecial?is_smarty=1&cdn=cdn"
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: {
+      Referer: "https://www.kugou.com/",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    },
+  })
+  if (!res.ok) throw new Error(`KuGou playlist tags failed: ${res.status}`)
+
+  const data = (await res.json()) as KgTagsResponse
+  const hot = data?.data?.hotTag
+  if (!data || data.status !== 1 || hot?.status !== 1 || !hot.data) {
+    throw new Error("KuGou playlist tags failed: bad response")
+  }
+
+  const out: PlaylistTag[] = []
+  const seen = new Set<string>()
+  for (const key of Object.keys(hot.data)) {
+    const tag = hot.data[key]
+    if (tag?.special_id == null || !tag.special_name) continue
+    const id = String(tag.special_id)
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push({ id, name: tag.special_name })
+  }
+  return out
+}
+
+export async function getKgHotPlaylists(page = 1, tagId?: string | null): Promise<Playlist[]> {
+  const c = tagId?.trim() ?? ""
   const url =
     `http://www2.kugou.kugou.com/yueku/v9/special/getSpecial` +
-    `?is_ajax=1&cdn=cdn&t=${SORT_RECOMMEND}&c=&p=${page}`
+    `?is_ajax=1&cdn=cdn&t=${SORT_RECOMMEND}&c=${encodeURIComponent(c)}&p=${page}`
 
   const res = await tauriFetch(url, {
     method: "GET",

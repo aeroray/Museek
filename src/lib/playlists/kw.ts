@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist, PlaylistDetail } from "./index"
+import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kw/songList.js
 // Hot playlists come from the unsigned getRcmPlayList endpoint (the "default"
@@ -66,6 +66,7 @@ interface KwRcmPlaylistRaw {
   name: string
   img?: string
   listencnt?: number
+  uname?: string
 }
 
 interface KwRcmResponse {
@@ -82,11 +83,96 @@ function normalizeKwPlaylist(raw: KwRcmPlaylistRaw): Playlist {
     name: raw.name,
     img: raw.img || null,
     playCount: isNaN(listencnt) || listencnt === 0 ? undefined : formatPlayCount(listencnt),
+    author: raw.uname || undefined,
     source: "kw",
   }
 }
 
-export async function getKwHotPlaylists(page = 1): Promise<Playlist[]> {
+interface KwTagItem {
+  id?: string | number
+  name?: string
+  digest?: string
+}
+
+interface KwTagGroup {
+  data?: KwTagItem[]
+}
+
+interface KwTagResponse {
+  code?: number | string
+  data?: KwTagGroup[]
+}
+
+/** Flatten digest=10000 tags from getRcmTagList (playlist categories). */
+export async function getKwPlaylistTags(): Promise<PlaylistTag[]> {
+  const url =
+    "http://wapi.kuwo.cn/api/pc/classify/playlist/getRcmTagList?loginUid=0&loginSid=0&appUid=76039576"
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: {
+      Referer: "https://www.kuwo.cn/",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    },
+  })
+  if (!res.ok) throw new Error(`KuWo playlist tags failed: ${res.status}`)
+
+  const data = (await res.json()) as KwTagResponse
+  if (!data || String(data.code) !== "200" || !Array.isArray(data.data)) {
+    throw new Error("KuWo playlist tags failed: bad response")
+  }
+
+  // Prefer the first group (hot/featured); fall back to all digest-10000 tags.
+  const groups = data.data
+  const primary = groups[0]?.data?.length ? [groups[0]] : groups
+  const out: PlaylistTag[] = []
+  const seen = new Set<string>()
+  for (const group of primary) {
+    for (const item of group.data ?? []) {
+      if (String(item.digest) !== "10000" || item.id == null || !item.name) continue
+      const id = String(item.id)
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, name: item.name })
+    }
+  }
+  // If the first group had no digest-10000 items, scan everything.
+  if (out.length === 0) {
+    for (const group of groups) {
+      for (const item of group.data ?? []) {
+        if (String(item.digest) !== "10000" || item.id == null || !item.name) continue
+        const id = String(item.id)
+        if (seen.has(id)) continue
+        seen.add(id)
+        out.push({ id, name: item.name })
+      }
+    }
+  }
+  return out
+}
+
+export async function getKwHotPlaylists(page = 1, tagId?: string | null): Promise<Playlist[]> {
+  if (tagId) {
+    const url =
+      `http://wapi.kuwo.cn/api/pc/classify/playlist/getTagPlayList` +
+      `?loginUid=0&loginSid=0&appUid=76039576&pn=${page}&rn=${LIMIT_LIST}` +
+      `&id=${encodeURIComponent(tagId)}&order=hot`
+
+    const res = await tauriFetch(url, {
+      method: "GET",
+      headers: {
+        Referer: "https://www.kuwo.cn/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    })
+    if (!res.ok) throw new Error(`KuWo hot playlists failed: ${res.status}`)
+
+    const data = (await res.json()) as KwRcmResponse
+    if (!data || String(data.code) !== "200" || !data.data?.data) {
+      throw new Error("KuWo hot playlists failed: bad response")
+    }
+    return data.data.data.map(normalizeKwPlaylist)
+  }
+
   const url =
     `http://wapi.kuwo.cn/api/pc/classify/playlist/getRcmPlayList` +
     `?loginUid=0&loginSid=0&appUid=76039576&pn=${page}&rn=${LIMIT_LIST}&order=hot`

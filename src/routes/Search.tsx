@@ -4,8 +4,8 @@ import { Search as SearchIcon, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton"
 import { TrackRow } from "@/components/common/TrackRow"
+import { PlaylistCardSkeleton, TrackRowSkeleton } from "@/components/common/ListSkeletons"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { HotSearchCloud } from "@/components/search/HotSearchCloud"
@@ -235,12 +235,9 @@ export function Search() {
           <ScrollArea className="flex-1">
             <div className="p-4">
               {isLoading && playlistResults.length === 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
                   {Array.from({ length: 10 }).map((_, i) => (
-                    <div key={i} className="space-y-2">
-                      <Skeleton className="aspect-square w-full rounded-xl" />
-                      <Skeleton className="h-3.5 w-3/4" />
-                    </div>
+                    <PlaylistCardSkeleton key={i} />
                   ))}
                 </div>
               ) : error ? (
@@ -274,16 +271,9 @@ export function Search() {
         <ScrollArea className="flex-1">
           <div className="px-4 py-2">
             {isLoading && results.length === 0 && (
-              <div className="space-y-1.5 py-2">
+              <div>
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2">
-                    <Skeleton className="h-10 w-10 rounded-md shrink-0" />
-                    <div className="flex-1 space-y-1.5">
-                      <Skeleton className="h-3.5 w-1/3" />
-                      <Skeleton className="h-3 w-1/4" />
-                    </div>
-                    <Skeleton className="h-3 w-10" />
-                  </div>
+                  <TrackRowSkeleton key={i} />
                 ))}
               </div>
             )}
