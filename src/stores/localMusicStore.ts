@@ -10,6 +10,7 @@ import {
   pickLocalAudioFolder,
   resolveLocalCoverUrl,
 } from "@/lib/localMusic"
+import { normalizeCategoryName } from "@/lib/songCategories"
 import type { LocalCategory, LocalTrack, MusicInfo } from "@/types/music"
 
 const STORE_FILE = "localMusic.json"
@@ -90,10 +91,6 @@ function parseStore(raw: unknown): LocalMusicPersist {
     }
   }
   return { tracks: [], categories: [] }
-}
-
-function normalizeCategoryName(name: string): string {
-  return name.trim().replace(/\s+/g, " ")
 }
 
 async function hydrateCovers(tracks: LocalTrack[]): Promise<LocalTrack[]> {

@@ -1,6 +1,6 @@
 /**
- * Notifier port — domain modules call `notify()` instead of importing uiStore.
- * App binds the real toast handler once at startup.
+ * UI prompt port — domain modules call `notify()` / `promptDownloadLocation()`
+ * instead of importing uiStore. App binds handlers once at startup.
  */
 export type NotifyPayload = {
   message: string
@@ -9,14 +9,25 @@ export type NotifyPayload = {
   actionTo?: string
 }
 
-type Handler = (payload: NotifyPayload) => void
+type NotifyHandler = (payload: NotifyPayload) => void
+type PromptHandler = () => void
 
-let handler: Handler | null = null
+let notifyHandler: NotifyHandler | null = null
+let downloadLocationPromptHandler: PromptHandler | null = null
 
-export function bindNotify(h: Handler): void {
-  handler = h
+export function bindNotify(h: NotifyHandler): void {
+  notifyHandler = h
+}
+
+export function bindDownloadLocationPrompt(h: PromptHandler): void {
+  downloadLocationPromptHandler = h
 }
 
 export function notify(payload: NotifyPayload): void {
-  handler?.(payload)
+  notifyHandler?.(payload)
+}
+
+/** Ask the UI to open the “set download folder” prompt. */
+export function promptDownloadLocation(): void {
+  downloadLocationPromptHandler?.()
 }

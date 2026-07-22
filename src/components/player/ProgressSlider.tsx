@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from "react"
-import { audioPlayer } from "@/lib/audio"
+import { subscribePlaybackTime } from "@/lib/playback/clock"
 import { usePlayerStore } from "@/stores/playerStore"
 import { formatDuration, cn } from "@/lib/utils"
 
 /**
  * Playback seek bar.
  *
- * Uses a custom track (not Radix Slider): Radix insets the thumb so it stays
- * inside the track, while the range still uses raw %, so the fill lags the
- * thumb for the first half of a track. We keep fill + thumb on the same %.
- *
- * Visual time also runs on rAF while playing — HTMLAudioElement `timeupdate`
- * only fires ~4×/s and reads as stuttery.
+ * Custom track (not Radix): fill + thumb share the same %, so the range never
+ * lags the thumb. Smooth time comes from the playback-clock seam.
  */
 export function ProgressSlider() {
   const duration = usePlayerStore((s) => s.duration)
@@ -29,22 +25,14 @@ export function ProgressSlider() {
   const disabled = !currentSong || status === "loading" || status === "idle" || status === "error"
   const scrubbing = scrubTime !== null
 
-  // When paused / loading / after seek from elsewhere, mirror the store.
   useEffect(() => {
     if (scrubbing || status === "playing") return
     setDisplayTime(storeTime)
   }, [storeTime, status, scrubbing])
 
-  // Smooth clock while playing (skip while the user is dragging).
   useEffect(() => {
     if (status !== "playing" || scrubbing) return
-    let raf = 0
-    const tick = () => {
-      setDisplayTime(audioPlayer.getState().currentTime)
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    return subscribePlaybackTime((t) => setDisplayTime(t))
   }, [status, scrubbing])
 
   const time = scrubTime ?? displayTime
@@ -131,7 +119,6 @@ export function ProgressSlider() {
           }
         }}
       >
-        {/* Hit area is tall; the visible track expands slightly on hover. */}
         <div className="relative h-1.5 w-full grow overflow-visible rounded-full bg-secondary/80 transition-[height] duration-200 group-hover/slider:h-2">
           <div
             className="absolute inset-y-0 left-0 rounded-full bg-primary"

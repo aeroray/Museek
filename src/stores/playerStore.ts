@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { audioPlayer } from "@/lib/audio"
 import { sourceRunner } from "@/lib/sourceRunner"
-import { loadLyric } from "@/lib/lyric/loadLyric"
+import { findActiveLyricIndex, loadLyric } from "@/lib/lyrics"
 import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic"
 import {
   applyAudioSource,
@@ -399,15 +399,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       const state = audioPlayer.getState()
       const { lyricLines, status: storeStatus } = get()
 
-      let currentLyricIndex = -1
-      if (lyricLines.length) {
-        for (let i = lyricLines.length - 1; i >= 0; i--) {
-          if (state.currentTime >= lyricLines[i].time) {
-            currentLyricIndex = i
-            break
-          }
-        }
-      }
+      const currentLyricIndex = findActiveLyricIndex(lyricLines, state.currentTime)
 
       // While resolving a playback URL, pause()/timeupdate would otherwise report
       // "paused" and wipe the intentional loading UI (play spinner + disabled seek).

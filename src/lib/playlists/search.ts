@@ -1,6 +1,6 @@
 import { httpFetch } from "@/lib/http"
 import * as md5Lib from "js-md5"
-import * as aesjs from "aes-js"
+import { eapiParams } from "@/lib/platforms/wy/eapi"
 import { createAsyncCache } from "@/lib/cache"
 import type { OnlineSource } from "@/types/music"
 import type { Playlist } from "./index"
@@ -24,17 +24,6 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ---------- NetEase (eapi) ----------
-const EAPI_KEY = "e82ckenh8dichen8"
-function hexUpper(buf: Uint8Array) {
-  return Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase()
-}
-function eapiParams(url: string, obj: unknown): string {
-  const text = typeof obj === "object" ? JSON.stringify(obj) : String(obj)
-  const digest = md5(`nobody${url}use${text}md5forencrypt`)
-  const data = `${url}-36cd479b6b5-${text}-36cd479b6b5-${digest}`
-  const cipher = new aesjs.ModeOfOperation.ecb(aesjs.utils.utf8.toBytes(EAPI_KEY))
-  return hexUpper(cipher.encrypt(aesjs.padding.pkcs7.pad(aesjs.utils.utf8.toBytes(data))))
-}
 const WY_HEADERS = {
   "Content-Type": "application/x-www-form-urlencoded",
   "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/60 Safari/537.36",

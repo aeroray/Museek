@@ -14,7 +14,9 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSearchStore } from "@/stores/searchStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
-import { bindNotify } from "@/lib/notify"
+import { usePlayerStore } from "@/stores/playerStore"
+import { bindNotify, bindDownloadLocationPrompt } from "@/lib/notify"
+import { bindPlayAll } from "@/lib/playback/playAllPort"
 import { enforceLimit } from "@/lib/mediaCache"
 import { setTrayVisible } from "@/lib/power"
 import { maybeAutoImport } from "@/lib/sync"
@@ -25,8 +27,10 @@ import { useDownloadStore } from "@/stores/downloadStore"
 import { useLocalMusicStore } from "@/stores/localMusicStore"
 import { useUpdateStore } from "@/stores/updateStore"
 
-// Wire domain toast port once — stores/lib call notify() without importing uiStore.
+// Wire UI ports once — stores/lib never import uiStore.
 bindNotify((payload) => useUiStore.getState().notify(payload))
+bindDownloadLocationPrompt(() => useUiStore.getState().setDownloadLocationPrompt(true))
+bindPlayAll((songs) => usePlayerStore.getState().playAll(songs))
 
 function AppInit() {
   const { loadFromDisk: loadSources } = useSourceStore()

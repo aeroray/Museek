@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { readData, writeData } from "@/lib/db"
+import { normalizeCategoryName } from "@/lib/songCategories"
 import type { MusicInfo, Source } from "@/types/music"
 import type { Playlist as SourcePlaylist } from "@/lib/playlists"
 
@@ -45,10 +46,6 @@ interface PlaylistState extends PersistShape {
   removeFavoriteCategory: (id: string) => void
   setFavoritesCategory: (songIds: string[], categoryId: string | null) => void
   loadFromDisk: () => Promise<void>
-}
-
-function normalizeCategoryName(name: string): string {
-  return name.trim().replace(/\s+/g, " ")
 }
 
 function isFavoriteCategory(v: unknown): v is FavoriteCategory {

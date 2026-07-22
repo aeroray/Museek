@@ -1,5 +1,5 @@
 import { getPlaylistDetail, type Playlist } from "./index"
-import { usePlayerStore } from "@/stores/playerStore"
+import { playAllSongs } from "@/lib/playback/playAllPort"
 import { notify } from "@/lib/notify"
 import { t } from "@/lib/i18n"
 
@@ -15,7 +15,7 @@ export async function playPlaylist(pl: Playlist): Promise<void> {
       notify({ message: t("hotPlaylists.playlistEmpty"), variant: "info" })
       return
     }
-    usePlayerStore.getState().playAll(songs)
+    playAllSongs(songs)
   } catch (e) {
     notify({ message: t("hotPlaylists.playFailed", { msg: (e as Error).message }), variant: "error" })
   }

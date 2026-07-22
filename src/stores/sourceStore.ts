@@ -1,8 +1,7 @@
 import { create } from "zustand"
 import { httpFetch as tauriFetch } from "@/lib/http"
 import { parseScriptMeta } from "@/lib/lxApi"
-import { sourceRunner, bindSourceRegistry } from "@/lib/sourceRunner"
-import { readData, writeData } from "@/lib/db"
+import { sourceRunner, bindSourceRegistry, loadSourceScripts, saveSourceScripts } from "@/lib/sources"
 import { t } from "@/lib/i18n"
 import type { SourceScript } from "@/types/source"
 
@@ -60,7 +59,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
         const scripts = existing
           ? [script, ...s.scripts.filter((x) => x.id !== existing.id)]
           : [script, ...s.scripts]
-        writeData("sources.json", scripts)
+        saveSourceScripts(scripts)
         return { scripts, isLoading: false }
       })
       return existing ? "updated" : "added"
@@ -101,7 +100,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     sourceRunner.unloadScript(id)
     set((s) => {
       const scripts = s.scripts.filter((x) => x.id !== id)
-      writeData("sources.json", scripts)
+      saveSourceScripts(scripts)
       return { scripts }
     })
   },
@@ -114,7 +113,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     // Persist the new enabled flag immediately.
     set((s) => {
       const scripts = s.scripts.map((x) => (x.id === id ? { ...x, enabled: willEnable } : x))
-      writeData("sources.json", scripts)
+      saveSourceScripts(scripts)
       return { scripts }
     })
 
@@ -139,7 +138,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
       const scripts = [...s.scripts]
       const [moved] = scripts.splice(from, 1)
       scripts.splice(to, 0, moved)
-      writeData("sources.json", scripts)
+      saveSourceScripts(scripts)
       return { scripts }
     })
   },
@@ -153,7 +152,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
   },
 
   async loadFromDisk() {
-    const scripts = await readData<SourceScript[]>("sources.json", [])
+    const scripts = await loadSourceScripts()
     set({ scripts })
     // Load every enabled source (sequentially — they share globalThis.lx while
     // executing) so they can all participate in failover. Tolerate individual

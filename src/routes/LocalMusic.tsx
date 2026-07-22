@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   HardDrive,
   FolderOpen,
@@ -15,22 +15,13 @@ import {
   ChevronDown,
   ArrowDownUp,
   Tags,
-  Plus,
   TriangleAlert,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -45,16 +36,21 @@ import { useSettingsStore, type LocalSort } from "@/stores/settingsStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import {
+  categoryNameMap,
+  filterByCategoryId,
+  findActiveCategory,
+  labelForCategoryFilter,
+  type CategoryFilter,
+} from "@/lib/songCategories"
+import { CategoryAssignItems } from "@/components/songCategories/CategoryAssignItems"
+import { CategoryAssignMenu } from "@/components/songCategories/CategoryAssignMenu"
+import { CategoryFilterMenu } from "@/components/songCategories/CategoryFilterMenu"
+import { CategoryNameDialog } from "@/components/songCategories/CategoryNameDialog"
+import { useCategoryDialog } from "@/components/songCategories/useCategoryDialog"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 const SORTS: LocalSort[] = ["added", "name"]
-/** all = everything; none = uncategorized; else category id */
-type CategoryFilter = "all" | "none" | string
-
-type CatDialog =
-  | { mode: "create" }
-  | { mode: "rename"; id: string; name: string }
-  | null
 
 export function LocalMusic() {
   const tr = useT()
@@ -79,24 +75,24 @@ export function LocalMusic() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
-  const [catDialog, setCatDialog] = useState<CatDialog>(null)
-  const [catName, setCatName] = useState("")
-  const [assignAfterCreate, setAssignAfterCreate] = useState(false)
-  const catInputRef = useRef<HTMLInputElement>(null)
+  const categoryDialog = useCategoryDialog({
+    addCategory,
+    renameCategory,
+    onExists: () => notify({ message: tr("local.categoryExists"), variant: "error" }),
+    onCreated: (cat, assignSelected) => {
+      if (assignSelected && selected.size > 0) {
+        setTracksCategory([...selected], cat.id)
+        exitEdit()
+      } else {
+        setCategoryFilter(cat.id)
+      }
+    },
+  })
 
-  const categoryNameById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const c of categories) map.set(c.id, c.name)
-    return map
-  }, [categories])
+  const categoryNameById = useMemo(() => categoryNameMap(categories), [categories])
 
   const displayed = useMemo(() => {
-    let list = tracks
-    if (categoryFilter === "none") {
-      list = list.filter((t) => !t.categoryId)
-    } else if (categoryFilter !== "all") {
-      list = list.filter((t) => t.categoryId === categoryFilter)
-    }
+    let list = filterByCategoryId(tracks, categoryFilter, (track) => track.categoryId)
     const q = query.trim().toLowerCase()
     if (q) {
       list = list.filter(
@@ -138,37 +134,6 @@ export function LocalMusic() {
     exitEdit()
   }
 
-  const openCreateCategory = (assignSelected = false) => {
-    setAssignAfterCreate(assignSelected)
-    setCatName("")
-    setCatDialog({ mode: "create" })
-  }
-  const openRenameCategory = (id: string, name: string) => {
-    setAssignAfterCreate(false)
-    setCatName(name)
-    setCatDialog({ mode: "rename", id, name })
-  }
-  const submitCategory = () => {
-    const name = catName.trim()
-    if (!name || !catDialog) return
-    if (catDialog.mode === "create") {
-      const cat = addCategory(name)
-      if (!cat) {
-        notify({ message: tr("local.categoryExists"), variant: "error" })
-        return
-      }
-      if (assignAfterCreate && selected.size > 0) {
-        setTracksCategory([...selected], cat.id)
-        exitEdit()
-      } else {
-        setCategoryFilter(cat.id)
-      }
-    } else {
-      renameCategory(catDialog.id, name)
-    }
-    setCatDialog(null)
-    setAssignAfterCreate(false)
-  }
   const deleteCategory = (id: string) => {
     removeCategory(id)
     if (categoryFilter === id) setCategoryFilter("all")
@@ -208,17 +173,11 @@ export function LocalMusic() {
     }
   }
 
-  const categoryFilterLabel =
-    categoryFilter === "all"
-      ? tr("local.categoryAll")
-      : categoryFilter === "none"
-        ? tr("local.categoryNone")
-        : (categoryNameById.get(categoryFilter) ?? tr("local.categoryAll"))
-
-  const activeCategory =
-    categoryFilter !== "all" && categoryFilter !== "none"
-      ? categories.find((c) => c.id === categoryFilter)
-      : undefined
+  const categoryFilterLabel = labelForCategoryFilter(categoryFilter, categoryNameById, {
+    all: tr("local.categoryAll"),
+    none: tr("local.categoryNone"),
+  })
+  const activeCategory = findActiveCategory(categories, categoryFilter)
 
   return (
     <div className="flex flex-col h-full">
@@ -294,66 +253,23 @@ export function LocalMusic() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5">
-                      <Tags size={14} />
-                      <span className="hidden sm:inline max-w-28 truncate">{categoryFilterLabel}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-                    <DropdownMenuItem onClick={() => setCategoryFilter("all")}>
-                      <Check
-                        size={14}
-                        className={cn("mr-2", categoryFilter === "all" ? "opacity-100" : "opacity-0")}
-                      />
-                      {tr("local.categoryAll")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setCategoryFilter("none")}>
-                      <Check
-                        size={14}
-                        className={cn("mr-2", categoryFilter === "none" ? "opacity-100" : "opacity-0")}
-                      />
-                      {tr("local.categoryNone")}
-                    </DropdownMenuItem>
-                    {categories.length > 0 && <DropdownMenuSeparator />}
-                    {categories.map((cat) => (
-                      <DropdownMenuItem key={cat.id} onClick={() => setCategoryFilter(cat.id)}>
-                        <Check
-                          size={14}
-                          className={cn(
-                            "mr-2",
-                            categoryFilter === cat.id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {cat.name}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => openCreateCategory()}>
-                      <Plus size={14} className="mr-2" />
-                      {tr("local.categoryAdd")}
-                    </DropdownMenuItem>
-                    {activeCategory && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => openRenameCategory(activeCategory.id, activeCategory.name)}
-                        >
-                          <Pencil size={14} className="mr-2" />
-                          {tr("local.categoryRename")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => deleteCategory(activeCategory.id)}
-                        >
-                          <Trash2 size={14} className="mr-2" />
-                          {tr("local.categoryDelete")}
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <CategoryFilterMenu
+                  categories={categories}
+                  filter={categoryFilter}
+                  filterLabel={categoryFilterLabel}
+                  activeCategory={activeCategory}
+                  onFilter={setCategoryFilter}
+                  onCreate={categoryDialog.openCreate}
+                  onRename={categoryDialog.openRename}
+                  onDelete={deleteCategory}
+                  labels={{
+                    all: tr("local.categoryAll"),
+                    none: tr("local.categoryNone"),
+                    add: tr("local.categoryAdd"),
+                    rename: tr("local.categoryRename"),
+                    delete: tr("local.categoryDelete"),
+                  }}
+                />
 
                 <div className="relative min-w-0 flex-1">
                   <Search
@@ -382,30 +298,17 @@ export function LocalMusic() {
                     <CheckCheck size={14} className="mr-1.5" />
                     {allSelected ? tr("local.deselectAll") : tr("local.selectAll")}
                   </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8" disabled={selected.size === 0}>
-                        <Tags size={14} className="mr-1.5" />
-                        {tr("local.batchMove")}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
-                      <DropdownMenuItem onClick={() => batchMove(null)}>
-                        {tr("local.categoryNone")}
-                      </DropdownMenuItem>
-                      {categories.length > 0 && <DropdownMenuSeparator />}
-                      {categories.map((cat) => (
-                        <DropdownMenuItem key={cat.id} onClick={() => batchMove(cat.id)}>
-                          {cat.name}
-                        </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => openCreateCategory(true)}>
-                        <Plus size={14} className="mr-2" />
-                        {tr("local.categoryAdd")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <CategoryAssignMenu
+                    categories={categories}
+                    disabled={selected.size === 0}
+                    onAssign={batchMove}
+                    onCreate={() => categoryDialog.openCreate(true)}
+                    labels={{
+                      move: tr("local.batchMove"),
+                      none: tr("local.categoryNone"),
+                      add: tr("local.categoryAdd"),
+                    }}
+                  />
                   <Button
                     variant="outline"
                     size="sm"
@@ -566,44 +469,18 @@ export function LocalMusic() {
                             className="max-h-72 overflow-y-auto"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <DropdownMenuItem
-                              onClick={() => setTracksCategory([track.id], null)}
-                            >
-                              <Check
-                                size={14}
-                                className={cn(
-                                  "mr-2",
-                                  !track.categoryId ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {tr("local.categoryNone")}
-                            </DropdownMenuItem>
-                            {categories.length > 0 && <DropdownMenuSeparator />}
-                            {categories.map((cat) => (
-                              <DropdownMenuItem
-                                key={cat.id}
-                                onClick={() => setTracksCategory([track.id], cat.id)}
-                              >
-                                <Check
-                                  size={14}
-                                  className={cn(
-                                    "mr-2",
-                                    track.categoryId === cat.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                {cat.name}
-                              </DropdownMenuItem>
-                            ))}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => {
+                            <CategoryAssignItems
+                              categories={categories}
+                              onAssign={(categoryId) => setTracksCategory([track.id], categoryId)}
+                              onCreate={() => {
                                 setSelected(new Set([track.id]))
-                                openCreateCategory(true)
+                                categoryDialog.openCreate(true)
                               }}
-                            >
-                              <Plus size={14} className="mr-2" />
-                              {tr("local.categoryAdd")}
-                            </DropdownMenuItem>
+                              labels={{
+                                none: tr("local.categoryNone"),
+                                add: tr("local.categoryAdd"),
+                              }}
+                            />
                           </DropdownMenuContent>
                         </DropdownMenu>
                         {isTauri && (
@@ -642,44 +519,21 @@ export function LocalMusic() {
         </ScrollArea>
       )}
 
-      <Dialog
-        open={!!catDialog}
-        onOpenChange={(open) => {
-          if (!open) setCatDialog(null)
+      <CategoryNameDialog
+        dialog={categoryDialog.catDialog}
+        name={categoryDialog.catName}
+        onNameChange={categoryDialog.setCatName}
+        inputRef={categoryDialog.catInputRef}
+        onClose={categoryDialog.close}
+        onSubmit={categoryDialog.submit}
+        labels={{
+          add: tr("local.categoryAdd"),
+          rename: tr("local.categoryRename"),
+          placeholder: tr("local.categoryNamePlaceholder"),
+          cancel: tr("common.cancel"),
+          confirm: tr("common.confirm"),
         }}
-      >
-        <DialogContent
-          className="sm:max-w-sm"
-          initialFocus={catInputRef}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {catDialog?.mode === "rename" ? tr("local.categoryRename") : tr("local.categoryAdd")}
-            </DialogTitle>
-          </DialogHeader>
-          <Input
-            ref={catInputRef}
-            value={catName}
-            onChange={(e) => setCatName(e.target.value)}
-            placeholder={tr("local.categoryNamePlaceholder")}
-            maxLength={32}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                submitCategory()
-              }
-            }}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCatDialog(null)}>
-              {tr("common.cancel")}
-            </Button>
-            <Button disabled={!catName.trim()} onClick={submitCategory}>
-              {tr("common.confirm")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
     </div>
   )
 }

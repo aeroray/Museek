@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Heart,
@@ -12,24 +12,15 @@ import {
   ArrowDownUp,
   ListFilter,
   Search,
-  Plus,
   Tags,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
@@ -43,14 +34,21 @@ import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type { OnlineSource, Quality } from "@/types/music"
+import {
+  categoryNameMap,
+  filterByCategoryId,
+  findActiveCategory,
+  labelForCategoryFilter,
+  type CategoryFilter,
+} from "@/lib/songCategories"
+import { CategoryAssignItems } from "@/components/songCategories/CategoryAssignItems"
+import { CategoryAssignMenu } from "@/components/songCategories/CategoryAssignMenu"
+import { CategoryFilterMenu } from "@/components/songCategories/CategoryFilterMenu"
+import { CategoryNameDialog } from "@/components/songCategories/CategoryNameDialog"
+import { useCategoryDialog } from "@/components/songCategories/useCategoryDialog"
 
 const PLATFORMS: OnlineSource[] = ["wy", "kw", "kg", "tx", "mg"]
 const SORTS = ["added", "name"] as const
-type CategoryFilter = "all" | "none" | string
-type CatDialog =
-  | { mode: "create" }
-  | { mode: "rename"; id: string; name: string }
-  | null
 
 export function Favorites() {
   const favorites = usePlaylistStore((s) => s.favorites)
@@ -80,26 +78,27 @@ export function Favorites() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
-  const [catDialog, setCatDialog] = useState<CatDialog>(null)
-  const [catName, setCatName] = useState("")
-  const [assignAfterCreate, setAssignAfterCreate] = useState(false)
-  const catInputRef = useRef<HTMLInputElement>(null)
+  const categoryDialog = useCategoryDialog({
+    addCategory: addFavoriteCategory,
+    renameCategory: renameFavoriteCategory,
+    onExists: () => notify({ message: t("local.categoryExists"), variant: "error" }),
+    onCreated: (cat, assignSelected) => {
+      if (assignSelected && selected.size > 0) {
+        setFavoritesCategory([...selected], cat.id)
+        exitEdit()
+      } else {
+        setCategoryFilter(cat.id)
+      }
+    },
+  })
 
   const isSongs = tab === "songs"
 
-  const categoryNameById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const c of favoriteCategories) map.set(c.id, c.name)
-    return map
-  }, [favoriteCategories])
+  const categoryNameById = useMemo(() => categoryNameMap(favoriteCategories), [favoriteCategories])
 
   const displayedSongs = useMemo(() => {
     let list = favoritesPlatform === "all" ? favorites : favorites.filter((f) => f.source === favoritesPlatform)
-    if (categoryFilter === "none") {
-      list = list.filter((f) => !favoriteSongCategories[f.id])
-    } else if (categoryFilter !== "all") {
-      list = list.filter((f) => favoriteSongCategories[f.id] === categoryFilter)
-    }
+    list = filterByCategoryId(list, categoryFilter, (song) => favoriteSongCategories[song.id])
     const q = query.trim().toLowerCase()
     if (q) list = list.filter((f) => f.name.toLowerCase().includes(q) || f.singer.toLowerCase().includes(q))
     if (favoritesSort === "name") list = [...list].sort((a, b) => a.name.localeCompare(b.name, "zh"))
@@ -126,17 +125,11 @@ export function Favorites() {
   const currentKeys = isSongs ? displayedSongs.map((s) => s.id) : displayedPlaylists.map((p) => `${p.source}:${p.id}`)
   const allSelected = currentKeys.length > 0 && currentKeys.every((k) => selected.has(k))
 
-  const categoryFilterLabel =
-    categoryFilter === "all"
-      ? t("local.categoryAll")
-      : categoryFilter === "none"
-        ? t("local.categoryNone")
-        : (categoryNameById.get(categoryFilter) ?? t("local.categoryAll"))
-
-  const activeCategory =
-    categoryFilter !== "all" && categoryFilter !== "none"
-      ? favoriteCategories.find((c) => c.id === categoryFilter)
-      : undefined
+  const categoryFilterLabel = labelForCategoryFilter(categoryFilter, categoryNameById, {
+    all: t("local.categoryAll"),
+    none: t("local.categoryNone"),
+  })
+  const activeCategory = findActiveCategory(favoriteCategories, categoryFilter)
 
   const toggleOne = (key: string) =>
     setSelected((s) => {
@@ -175,37 +168,6 @@ export function Favorites() {
     exitEdit()
   }
 
-  const openCreateCategory = (assignSelected = false) => {
-    setAssignAfterCreate(assignSelected)
-    setCatName("")
-    setCatDialog({ mode: "create" })
-  }
-  const openRenameCategory = (id: string, name: string) => {
-    setAssignAfterCreate(false)
-    setCatName(name)
-    setCatDialog({ mode: "rename", id, name })
-  }
-  const submitCategory = () => {
-    const name = catName.trim()
-    if (!name || !catDialog) return
-    if (catDialog.mode === "create") {
-      const cat = addFavoriteCategory(name)
-      if (!cat) {
-        notify({ message: t("local.categoryExists"), variant: "error" })
-        return
-      }
-      if (assignAfterCreate && selected.size > 0) {
-        setFavoritesCategory([...selected], cat.id)
-        exitEdit()
-      } else {
-        setCategoryFilter(cat.id)
-      }
-    } else {
-      renameFavoriteCategory(catDialog.id, name)
-    }
-    setCatDialog(null)
-    setAssignAfterCreate(false)
-  }
   const deleteCategory = (id: string) => {
     removeFavoriteCategory(id)
     if (categoryFilter === id) setCategoryFilter("all")
@@ -290,66 +252,23 @@ export function Favorites() {
               </DropdownMenu>
 
               {isSongs && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5">
-                      <Tags size={14} />
-                      <span className="hidden sm:inline max-w-28 truncate">{categoryFilterLabel}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
-                    <DropdownMenuItem onClick={() => setCategoryFilter("all")}>
-                      <Check
-                        size={14}
-                        className={cn("mr-2", categoryFilter === "all" ? "opacity-100" : "opacity-0")}
-                      />
-                      {t("local.categoryAll")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setCategoryFilter("none")}>
-                      <Check
-                        size={14}
-                        className={cn("mr-2", categoryFilter === "none" ? "opacity-100" : "opacity-0")}
-                      />
-                      {t("local.categoryNone")}
-                    </DropdownMenuItem>
-                    {favoriteCategories.length > 0 && <DropdownMenuSeparator />}
-                    {favoriteCategories.map((cat) => (
-                      <DropdownMenuItem key={cat.id} onClick={() => setCategoryFilter(cat.id)}>
-                        <Check
-                          size={14}
-                          className={cn(
-                            "mr-2",
-                            categoryFilter === cat.id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {cat.name}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => openCreateCategory()}>
-                      <Plus size={14} className="mr-2" />
-                      {t("local.categoryAdd")}
-                    </DropdownMenuItem>
-                    {activeCategory && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => openRenameCategory(activeCategory.id, activeCategory.name)}
-                        >
-                          <Pencil size={14} className="mr-2" />
-                          {t("local.categoryRename")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => deleteCategory(activeCategory.id)}
-                        >
-                          <Trash2 size={14} className="mr-2" />
-                          {t("local.categoryDelete")}
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <CategoryFilterMenu
+                  categories={favoriteCategories}
+                  filter={categoryFilter}
+                  filterLabel={categoryFilterLabel}
+                  activeCategory={activeCategory}
+                  onFilter={setCategoryFilter}
+                  onCreate={categoryDialog.openCreate}
+                  onRename={categoryDialog.openRename}
+                  onDelete={deleteCategory}
+                  labels={{
+                    all: t("local.categoryAll"),
+                    none: t("local.categoryNone"),
+                    add: t("local.categoryAdd"),
+                    rename: t("local.categoryRename"),
+                    delete: t("local.categoryDelete"),
+                  }}
+                />
               )}
 
               <div className="relative min-w-0 flex-1">
@@ -382,30 +301,17 @@ export function Favorites() {
                 </Button>
                 {isSongs && (
                   <>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8" disabled={selected.size === 0}>
-                          <Tags size={14} className="mr-1.5" />
-                          {t("local.batchMove")}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
-                        <DropdownMenuItem onClick={() => batchMove(null)}>
-                          {t("local.categoryNone")}
-                        </DropdownMenuItem>
-                        {favoriteCategories.length > 0 && <DropdownMenuSeparator />}
-                        {favoriteCategories.map((cat) => (
-                          <DropdownMenuItem key={cat.id} onClick={() => batchMove(cat.id)}>
-                            {cat.name}
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => openCreateCategory(true)}>
-                          <Plus size={14} className="mr-2" />
-                          {t("local.categoryAdd")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <CategoryAssignMenu
+                      categories={favoriteCategories}
+                      disabled={selected.size === 0}
+                      onAssign={batchMove}
+                      onCreate={() => categoryDialog.openCreate(true)}
+                      labels={{
+                        move: t("local.batchMove"),
+                        none: t("local.categoryNone"),
+                        add: t("local.categoryAdd"),
+                      }}
+                    />
                     <Button
                       variant="outline"
                       size="sm"
@@ -536,39 +442,18 @@ export function Favorites() {
                             className="max-h-72 overflow-y-auto"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <DropdownMenuItem onClick={() => setFavoritesCategory([song.id], null)}>
-                              <Check
-                                size={14}
-                                className={cn("mr-2", !catId ? "opacity-100" : "opacity-0")}
-                              />
-                              {t("local.categoryNone")}
-                            </DropdownMenuItem>
-                            {favoriteCategories.length > 0 && <DropdownMenuSeparator />}
-                            {favoriteCategories.map((cat) => (
-                              <DropdownMenuItem
-                                key={cat.id}
-                                onClick={() => setFavoritesCategory([song.id], cat.id)}
-                              >
-                                <Check
-                                  size={14}
-                                  className={cn(
-                                    "mr-2",
-                                    catId === cat.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                {cat.name}
-                              </DropdownMenuItem>
-                            ))}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => {
+                            <CategoryAssignItems
+                              categories={favoriteCategories}
+                              onAssign={(categoryId) => setFavoritesCategory([song.id], categoryId)}
+                              onCreate={() => {
                                 setSelected(new Set([song.id]))
-                                openCreateCategory(true)
+                                categoryDialog.openCreate(true)
                               }}
-                            >
-                              <Plus size={14} className="mr-2" />
-                              {t("local.categoryAdd")}
-                            </DropdownMenuItem>
+                              labels={{
+                                none: t("local.categoryNone"),
+                                add: t("local.categoryAdd"),
+                              }}
+                            />
                           </DropdownMenuContent>
                         </DropdownMenu>
                         <DropdownMenu>
@@ -645,44 +530,21 @@ export function Favorites() {
         </ScrollArea>
       )}
 
-      <Dialog
-        open={!!catDialog}
-        onOpenChange={(open) => {
-          if (!open) setCatDialog(null)
+      <CategoryNameDialog
+        dialog={categoryDialog.catDialog}
+        name={categoryDialog.catName}
+        onNameChange={categoryDialog.setCatName}
+        inputRef={categoryDialog.catInputRef}
+        onClose={categoryDialog.close}
+        onSubmit={categoryDialog.submit}
+        labels={{
+          add: t("local.categoryAdd"),
+          rename: t("local.categoryRename"),
+          placeholder: t("local.categoryNamePlaceholder"),
+          cancel: t("common.cancel"),
+          confirm: t("common.confirm"),
         }}
-      >
-        <DialogContent
-          className="sm:max-w-sm"
-          initialFocus={catInputRef}
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {catDialog?.mode === "rename" ? t("local.categoryRename") : t("local.categoryAdd")}
-            </DialogTitle>
-          </DialogHeader>
-          <Input
-            ref={catInputRef}
-            value={catName}
-            onChange={(e) => setCatName(e.target.value)}
-            placeholder={t("local.categoryNamePlaceholder")}
-            maxLength={32}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                submitCategory()
-              }
-            }}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCatDialog(null)}>
-              {t("common.cancel")}
-            </Button>
-            <Button disabled={!catName.trim()} onClick={submitCategory}>
-              {t("common.confirm")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
     </div>
   )
 }

@@ -12,7 +12,7 @@ import {
   exitLyricsFullscreen,
   isLyricsFullscreenSession,
   syncLyricsFullscreenState,
-} from "@/lib/lyricsFullscreen"
+} from "@/lib/lyrics"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 

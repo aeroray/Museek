@@ -1,6 +1,5 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
-import * as md5Lib from "js-md5"
-import * as aesjs from "aes-js"
+import { eapi } from "@/lib/platforms/wy/eapi"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
@@ -15,42 +14,9 @@ import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 // (which returns playlist.tracks fully populated, so no second song/detail
 // call is needed). Song normalization mirrors src/lib/charts/wy.ts.
 
-// js-md5 CommonJS/ESM interop (same pattern as src/lib/search/wy.ts)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const md5 = ((md5Lib as any).default ?? md5Lib) as (str: string) => string
-
 const LIMIT_LIST = 30
 // Reference asks for n: 100000; playlists are far smaller, but keep it generous.
 const LIMIT_SONG = 100000
-
-// --- eapi encryption, ported from wy/utils/crypto.js (same as src/lib/search/wy.ts) ---
-const EAPI_KEY = "e82ckenh8dichen8"
-
-function bytesToHexUpper(buf: Uint8Array): string {
-  return Array.from(buf)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .toUpperCase()
-}
-
-// AES-128-ECB encrypt with PKCS7 padding (matches Node crypto aes-128-ecb).
-function aesEcbEncrypt(text: string, key: string): Uint8Array {
-  const keyBytes = aesjs.utils.utf8.toBytes(key)
-  const cipher = new aesjs.ModeOfOperation.ecb(keyBytes)
-  const padded = aesjs.padding.pkcs7.pad(aesjs.utils.utf8.toBytes(text))
-  return cipher.encrypt(padded)
-}
-
-function eapi(url: string, object: unknown): { params: string } {
-  const text = typeof object === "object" ? JSON.stringify(object) : String(object)
-  const message = `nobody${url}use${text}md5forencrypt`
-  const digest = md5(message)
-  const data = `${url}-36cd479b6b5-${text}-36cd479b6b5-${digest}`
-  return {
-    params: bytesToHexUpper(aesEcbEncrypt(data, EAPI_KEY)),
-  }
-}
-// --- end eapi ---
 
 async function eapiPost<T>(apiPath: string, payload: unknown, label: string): Promise<T> {
   const form = eapi(apiPath, payload)

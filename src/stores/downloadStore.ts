@@ -4,9 +4,8 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import { writeFile } from "@tauri-apps/plugin-fs"
 import type { MusicInfo, Quality } from "@/types/music"
 import { resolveAdaptiveUrl } from "@/lib/playback"
-import { notify } from "@/lib/notify"
+import { notify, promptDownloadLocation } from "@/lib/notify"
 import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore"
-import { useUiStore } from "@/stores/uiStore"
 import { readData, writeData } from "@/lib/db"
 import { t } from "@/lib/i18n"
 
@@ -103,7 +102,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     // No download location set yet → prompt the user (with a shortcut to Settings)
     // instead of silently saving somewhere. downloadDir is a device-local setting.
     if (!useSettingsStore.getState().downloadDir) {
-      useUiStore.getState().setDownloadLocationPrompt(true)
+      promptDownloadLocation()
       return
     }
     const q = quality ?? useSettingsStore.getState().downloadQuality
