@@ -3,6 +3,14 @@ import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
 import { useUpdateStore } from "@/stores/updateStore"
 import { useUiStore } from "@/stores/uiStore"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 /** Circular progress ring — percent or indeterminate spin. */
 function ProgressRing({
@@ -54,6 +62,56 @@ function ProgressRing({
   )
 }
 
+function CollapsedUpdateTrigger({
+  updating,
+  percent,
+  indeterminate,
+  version,
+}: {
+  updating: boolean
+  percent: number | null
+  indeterminate: boolean
+  version?: string
+}) {
+  const t = useT()
+
+  if (updating) {
+    return (
+      <div
+        className="relative mx-auto flex size-10 items-center justify-center"
+        title={
+          percent != null
+            ? t("update.downloadPercent", { percent })
+            : t("update.downloading")
+        }
+      >
+        <ProgressRing percent={percent} size={36} stroke={3} indeterminate={indeterminate} />
+        <span className="absolute inset-0 flex items-center justify-center text-[9px] font-semibold tabular-nums text-primary">
+          {percent != null ? percent : "…"}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <span
+      className={cn(
+        "relative mx-auto flex size-10 items-center justify-center rounded-xl",
+        "bg-primary/10 text-primary ring-1 ring-primary/15",
+        "transition-[background-color,transform] duration-200 ease-out",
+        "group-hover:bg-primary/15 group-data-[state=open]:bg-primary/15",
+      )}
+      title={version ? t("update.cardTitle", { version }) : undefined}
+    >
+      <ArrowDownToLine size={16} strokeWidth={2.25} className="shrink-0" />
+      <span
+        aria-hidden
+        className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary ring-2 ring-sidebar"
+      />
+    </span>
+  )
+}
+
 /** Compact banner above Settings — available update or live install progress. */
 export function SidebarUpdateCard() {
   const t = useT()
@@ -72,17 +130,58 @@ export function SidebarUpdateCard() {
   const percent = progress?.percent ?? null
   const indeterminate = updating && percent == null
 
-  if (updating) {
-    if (collapsed) {
+  if (collapsed) {
+    // Downloading: show ring only (no click needed). Available: menu with install / dismiss.
+    if (updating) {
       return (
-        <div className="w-full pb-1" title={t("update.downloading")}>
-          <div className="mx-auto flex size-10 items-center justify-center">
-            <ProgressRing percent={percent} size={32} stroke={3} indeterminate={indeterminate} />
-          </div>
+        <div className="w-full pb-1">
+          <CollapsedUpdateTrigger
+            updating
+            percent={percent}
+            indeterminate={indeterminate}
+            version={available?.version}
+          />
         </div>
       )
     }
 
+    return (
+      <div className="w-full pb-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="group flex w-full items-center justify-center rounded-xl outline-none active:scale-[0.96]"
+              aria-label={t("update.cardTitle", { version: available!.version })}
+            >
+              <CollapsedUpdateTrigger
+                updating={false}
+                percent={null}
+                indeterminate={false}
+                version={available!.version}
+              />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="end" sideOffset={10} className="w-52">
+            <DropdownMenuLabel className="font-normal text-foreground">
+              {t("update.cardTitle", { version: available!.version })}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => void install()}>
+              <ArrowDownToLine size={14} className="mr-2" />
+              {t("update.installNow")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={dismiss}>
+              <X size={14} className="mr-2" />
+              {t("update.dismiss")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    )
+  }
+
+  if (updating) {
     return (
       <div className="w-full pb-1">
         <div
@@ -111,27 +210,6 @@ export function SidebarUpdateCard() {
             </div>
           </div>
         </div>
-      </div>
-    )
-  }
-
-  // Available — not yet installing
-  if (collapsed) {
-    return (
-      <div className="w-full pb-1">
-        <button
-          type="button"
-          onClick={() => void install()}
-          title={t("update.cardTitle", { version: available!.version })}
-          className={cn(
-            "flex size-10 mx-auto items-center justify-center rounded-xl",
-            "bg-primary/10 text-primary ring-1 ring-primary/15",
-            "transition-[background-color,transform] duration-200 ease-out",
-            "hover:bg-primary/15 active:scale-[0.96]",
-          )}
-        >
-          <ArrowDownToLine size={16} strokeWidth={2.25} className="shrink-0" />
-        </button>
       </div>
     )
   }

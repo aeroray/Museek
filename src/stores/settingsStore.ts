@@ -6,6 +6,7 @@ import type { OnlineSource, Quality } from "@/types/music"
 
 export type NamingScheme = "singer-name" | "name-singer" | "name"
 export type FavoritesSort = "added" | "name"
+export type LocalSort = FavoritesSort
 export type FavoritesPlatform = OnlineSource | "all"
 // Close-button behavior: quit the app outright, or hide to the system tray.
 export type CloseBehavior = "exit" | "tray"
@@ -35,6 +36,8 @@ interface Persisted {
   // Favorites list view preferences.
   favoritesSort: FavoritesSort
   favoritesPlatform: FavoritesPlatform
+  // Local music list sort (added / name).
+  localSort: LocalSort
   closeBehavior: CloseBehavior
   closeConfirmDismissed: boolean
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
@@ -62,6 +65,7 @@ interface SettingsState extends Persisted {
   setPreventSleepWhilePlaying: (v: boolean) => void
   setFavoritesSort: (s: FavoritesSort) => void
   setFavoritesPlatform: (p: FavoritesPlatform) => void
+  setLocalSort: (s: LocalSort) => void
   setCloseBehavior: (b: CloseBehavior) => void
   setCloseConfirmDismissed: (v: boolean) => void
   setSyncFolder: (dir: string | null) => void
@@ -85,6 +89,7 @@ const DEFAULTS: Persisted = {
   preventSleepWhilePlaying: true,
   favoritesSort: "added",
   favoritesPlatform: "all",
+  localSort: "added",
   closeBehavior: "exit",
   closeConfirmDismissed: false,
   syncFolder: null,
@@ -116,6 +121,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       preventSleepWhilePlaying,
       favoritesSort,
       favoritesPlatform,
+      localSort,
       closeBehavior,
       closeConfirmDismissed,
       syncFolder,
@@ -137,6 +143,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       preventSleepWhilePlaying,
       favoritesSort,
       favoritesPlatform,
+      localSort,
       closeBehavior,
       closeConfirmDismissed,
       syncFolder,
@@ -199,6 +206,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setFavoritesPlatform(p) {
       set({ favoritesPlatform: p })
+      persist()
+    },
+    setLocalSort(s) {
+      set({ localSort: s })
       persist()
     },
     setCloseBehavior(b) {
@@ -270,6 +281,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         favoritesPlatform: FAV_PLATFORMS.includes(data.favoritesPlatform as FavoritesPlatform)
           ? (data.favoritesPlatform as FavoritesPlatform)
           : DEFAULTS.favoritesPlatform,
+        localSort: SORTS.includes(data.localSort as LocalSort)
+          ? (data.localSort as LocalSort)
+          : DEFAULTS.localSort,
         closeBehavior: CLOSE_BEHAVIORS.includes(data.closeBehavior as CloseBehavior)
           ? (data.closeBehavior as CloseBehavior)
           : DEFAULTS.closeBehavior,

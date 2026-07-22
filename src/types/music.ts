@@ -40,7 +40,18 @@ export interface LocalTrack {
   id: string
   filePath: string
   addedAt: number
+  /** One category at most; null / omitted = uncategorized. */
+  categoryId?: string | null
+  /** File missing/moved/unreadable — set after a failed play attempt. */
+  unavailable?: boolean
   song: MusicInfo
+}
+
+/** User-defined local library category (one track → one category). */
+export interface LocalCategory {
+  id: string
+  name: string
+  createdAt: number
 }
 
 export interface SearchResult {

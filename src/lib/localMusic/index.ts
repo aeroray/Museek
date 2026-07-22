@@ -9,4 +9,4 @@ export {
 export { pickLocalAudioFiles, pickLocalAudioFolder } from "./scan"
 export { normalizeLocalScanDepth, isUnlimitedLocalScanDepth } from "./depth"
 export { enrichLocalSong } from "./enrich"
-export { localFileToObjectUrl, revealLocalFile } from "./playback"
+export { localFileToObjectUrl, revealLocalFile, mapLocalPlayError } from "./playback"

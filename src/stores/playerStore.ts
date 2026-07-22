@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { audioPlayer } from "@/lib/audio"
 import { sourceRunner } from "@/lib/sourceRunner"
 import { loadLyric } from "@/lib/lyric/loadLyric"
-import { localFileToObjectUrl } from "@/lib/localMusic"
+import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic"
 import {
   applyAudioSource,
   beginPlayGeneration,
@@ -14,6 +14,7 @@ import {
 import { notify } from "@/lib/notify"
 import { updateMediaControls, attachMediaControls } from "@/lib/smtc"
 import { setPreventSleep } from "@/lib/power"
+import { useLocalMusicStore } from "@/stores/localMusicStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { t } from "@/lib/i18n"
 import type { MusicInfo, LyricLine, Quality } from "@/types/music"
@@ -190,6 +191,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           if (!isPlayGenerationCurrent(gen)) return
           lastMediaPlaying = true
           updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
+          useLocalMusicStore.getState().setTrackUnavailable(song.id, false)
           get()._loadLyric(song)
           get()._loadPic(song)
           return
@@ -249,6 +251,46 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       } catch (err) {
         if (!isPlayGenerationCurrent(gen)) return
         const raw = (err as Error).message || t("player.err.unknown")
+        // Local missing/unreadable files: clear copy, not "播放失败：File not found".
+        // Also reset the player bar — leaving the broken track as "current" looks paused.
+        if (isLocal) {
+          if (raw === t("player.err.playTimeout")) {
+            set({ status: "error", error: raw, lyricsLoading: false })
+            notify({ message: raw, variant: "error" })
+            return
+          }
+          const message = mapLocalPlayError(err)
+          useLocalMusicStore.getState().setTrackUnavailable(song.id, true)
+          const failed = get().currentSong
+          audioPlayer.stop()
+          revokeCurrentObjectUrl()
+          lastMediaPlaying = false
+          if (failed) {
+            updateMediaControls(
+              failed.name,
+              failed.singer,
+              failed.albumName ?? "",
+              get().currentPicUrl ?? failed.meta.picUrl ?? null,
+              false,
+            )
+          }
+          set({
+            currentSong: null,
+            queueIndex: -1,
+            isPlaying: false,
+            status: "idle",
+            error: null,
+            currentTime: 0,
+            duration: 0,
+            lyricLines: [],
+            currentLyricIndex: -1,
+            lyricsLoading: false,
+            currentPicUrl: null,
+            showLyrics: false,
+          })
+          notify({ message, variant: "error" })
+          return
+        }
         const isTimeout = raw === t("player.err.playTimeout")
         // Transport-level failures from the source's HTTP request (DNS/TLS/connection)
         // surface as cryptic reqwest strings — give a clearer hint that it's a

@@ -28,10 +28,11 @@ export function Controls() {
 
   const loading = status === "loading"
   const canPlay = status !== "idle"
-  const fav = !!currentSong && favorites.some((f) => f.id === currentSong.id)
+  const isLocal = currentSong?.source === "local"
+  const fav = !!currentSong && !isLocal && favorites.some((f) => f.id === currentSong.id)
 
   const toggleFav = () => {
-    if (!currentSong) return
+    if (!currentSong || isLocal) return
     if (fav) removeFromFavorites(currentSong.id)
     else addToFavorites(currentSong)
   }
@@ -115,8 +116,8 @@ export function Controls() {
         size="icon"
         className={cn("h-9 w-9 icon-hover-heart", fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground")}
         onClick={toggleFav}
-        disabled={!currentSong}
-        title={t("common.favorite")}
+        disabled={!currentSong || isLocal}
+        title={isLocal ? t("local.favoriteDisabled") : t("common.favorite")}
       >
         <Heart
           key={fav ? "on" : "off"}

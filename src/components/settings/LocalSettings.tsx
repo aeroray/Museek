@@ -15,7 +15,8 @@ export function LocalSettings() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="pr-3 pb-4">
+      <div className="pr-3 pb-4 space-y-3">
+        <p className="px-1 text-xs text-muted-foreground">{t("local.settings.localOnlyNote")}</p>
         <SettingsCard>
           <SettingRow title={t("local.settings.depthTitle")} desc={t("local.settings.depthDesc")}>
             <div className="flex flex-wrap gap-2">

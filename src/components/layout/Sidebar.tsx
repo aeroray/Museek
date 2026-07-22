@@ -42,7 +42,8 @@ export function Sidebar() {
       className={cn(
         "shrink-0 flex flex-col h-full bg-sidebar transition-[width] duration-200 ease-out",
         "border-r border-border/60",
-        collapsed ? "w-16" : "w-56"
+        // Collapsed: w-20 so macOS Overlay traffic lights fit inside the rail.
+        collapsed ? "w-20" : "w-56"
       )}
     >
       {/* macOS: reserve space for native traffic lights (titleBarStyle Overlay). */}

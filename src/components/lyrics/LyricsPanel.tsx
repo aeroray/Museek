@@ -37,7 +37,9 @@ export function LyricsPanel() {
   const seek = usePlayerStore((s) => s.seek)
   const togglePlay = usePlayerStore((s) => s.togglePlay)
   const fav = usePlaylistStore((s) =>
-    currentSong ? s.favorites.some((f) => f.id === currentSong.id) : false,
+    currentSong && currentSong.source !== "local"
+      ? s.favorites.some((f) => f.id === currentSong.id)
+      : false,
   )
   const addToFavorites = usePlaylistStore((s) => s.addToFavorites)
   const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites)
@@ -288,12 +290,16 @@ export function LyricsPanel() {
             fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground/55 hover:text-muted-foreground",
           )}
           onClick={() => {
-            if (!currentSong) return
+            if (!currentSong || currentSong.source === "local") return
             if (fav) removeFromFavorites(currentSong.id)
             else addToFavorites(currentSong)
           }}
-          disabled={!currentSong}
-          title={t(fav ? "common.unfavorite" : "common.favorite")}
+          disabled={!currentSong || currentSong.source === "local"}
+          title={
+            currentSong?.source === "local"
+              ? t("local.favoriteDisabled")
+              : t(fav ? "common.unfavorite" : "common.favorite")
+          }
         >
           <Heart
             key={fav ? "on" : "off"}
