@@ -650,10 +650,7 @@ export function LocalMusic() {
       >
         <DialogContent
           className="sm:max-w-sm"
-          onOpenAutoFocus={(e) => {
-            e.preventDefault()
-            catInputRef.current?.focus()
-          }}
+          initialFocus={catInputRef}
         >
           <DialogHeader>
             <DialogTitle>
