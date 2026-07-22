@@ -7,8 +7,10 @@
     "core:default",
     "core:window:allow-start-dragging",
     "core:window:allow-show",
+    "core:window:allow-hide",
     "core:window:allow-set-focus",
     "core:window:allow-minimize",
+    "core:window:allow-unminimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-maximize",
     "core:window:allow-unmaximize",
@@ -16,6 +18,7 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-set-size",
     "core:window:allow-set-position",
+    "core:window:allow-set-skip-taskbar",
     "http:default",
     {
       "identifier": "http:allow-fetch",

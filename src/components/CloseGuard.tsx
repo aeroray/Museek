@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { backupToFolder } from "@/lib/sync"
+import { hideToTray } from "@/lib/power"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useUpdateStore } from "@/stores/updateStore"
 import { notify } from "@/lib/notify"
@@ -62,7 +63,11 @@ export function CloseGuard() {
     const canSync = !!st.syncFolder
 
     if (fromClose && st.closeBehavior === "tray") {
-      await winRef.current?.hide()
+      try {
+        await hideToTray(winRef.current)
+      } catch (e) {
+        notify({ message: t("close.trayHideFailed", { msg: String(e) }), variant: "error" })
+      }
       return
     }
 

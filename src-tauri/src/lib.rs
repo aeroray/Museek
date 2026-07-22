@@ -1,6 +1,6 @@
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
 use std::sync::Mutex;
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
@@ -45,8 +45,23 @@ fn media_update(
     // Reflect the play/pause state on the Windows taskbar thumbnail toolbar too.
     #[cfg(target_os = "windows")]
     taskbar::set_playing(&app, playing);
-    #[cfg(not(target_os = "windows"))]
-    let _ = &app;
+    // Keep the tray tooltip in sync with Now Playing (when the tray is shown).
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let tip = if title.trim().is_empty() {
+            "Museek".to_string()
+        } else if artist.trim().is_empty() {
+            format!("{title} — Museek")
+        } else {
+            format!("{artist} - {title}")
+        };
+        // Windows tray tooltips are short; truncate gracefully.
+        let tip = if tip.chars().count() > 120 {
+            format!("{}…", tip.chars().take(119).collect::<String>())
+        } else {
+            tip
+        };
+        let _ = tray.set_tooltip(Some(tip));
+    }
 }
 
 // Keep-awake: prevent the system from *sleeping* while music plays, but still let
@@ -110,6 +125,7 @@ fn quit_app(app: tauri::AppHandle) {
 // Bring the main window back from hidden / minimized and focus it.
 fn show_main(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
+        let _ = w.set_skip_taskbar(false);
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
@@ -117,14 +133,38 @@ fn show_main(app: &tauri::AppHandle) {
 }
 
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
+    let prev_item = MenuItem::with_id(app, "prev", "上一首", true, None::<&str>)?;
+    let toggle_item = MenuItem::with_id(app, "toggle", "播放 / 暂停", true, None::<&str>)?;
+    let next_item = MenuItem::with_id(app, "next", "下一首", true, None::<&str>)?;
+    let sep = PredefinedMenuItem::separator(app)?;
     let show_item = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &prev_item,
+            &toggle_item,
+            &next_item,
+            &sep,
+            &show_item,
+            &quit_item,
+        ],
+    )?;
     let mut builder = TrayIconBuilder::with_id("main-tray")
         .tooltip("Museek")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
+            // Same channel as SMTC / taskbar buttons → playerStore.attachMediaControls.
+            "prev" => {
+                let _ = app.emit("media-control", "previous");
+            }
+            "toggle" => {
+                let _ = app.emit("media-control", "toggle");
+            }
+            "next" => {
+                let _ = app.emit("media-control", "next");
+            }
             "show" => show_main(app),
             // Route quit through the frontend so it can back up to the sync folder
             // first; the frontend then calls the quit_app command.
