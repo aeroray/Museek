@@ -53,7 +53,7 @@
 | --- | --- | --- |
 | **Discover · 发现** | Search songs, playlists, and users across five platforms; browse charts and hot playlists; trending word cloud on empty search. | 五平台搜索单曲 / 歌单 / 用户；排行榜与热门歌单；空搜索页热词云。 |
 | **Sources · 音源** | Import lx-music scripts by URL or local `.js` file (paste several URLs at once). Multi-source failover (parallel waves by list order); skips short VIP trial clips. | 链接或本地 `.js` 导入音源（可一次粘贴多条链接）。多源失败转移（按列表顺序分批并行）；跳过 VIP 试听提示音。 |
-| **Player · 播放器** | Queue, shuffle / repeat, quality auto-downgrade, immersive synced lyrics, Windows SMTC / macOS Now Playing, keyboard shortcuts. | 队列与循环模式、音质自动降级、沉浸歌词、系统媒体控制、键盘快捷键。 |
+| **Player · 播放器** | Queue, shuffle / repeat, quality auto-downgrade, immersive synced lyrics, mini player (edge-dock + vinyl peek, toggle with `P`), Windows SMTC / macOS Now Playing, keyboard shortcuts. | 队列与循环模式、音质自动降级、沉浸歌词、迷你播放（贴边收成唱片，`P` 键开关）、系统媒体控制、键盘快捷键。 |
 | **Library · 收藏库** | Favorite songs & whole playlists; batch download; disk cache for audio / lyrics / covers. | 收藏单曲与歌单；批量下载；音频 / 歌词 / 封面本地缓存。 |
 | **Desktop · 桌面** | Light / dark / system themes, EN / 简体中文, tray close behavior, prevent-sleep while playing, encrypted cloud-folder sync. | 主题与中英界面、托盘关闭、播放防休眠、网盘文件夹加密同步。 |
 
@@ -144,8 +144,8 @@ Tag a release (`git tag vX.Y.Z && git push origin vX.Y.Z`). The Release workflow
    **设置 → 音源管理** — 粘贴音源链接或导入本地 `.js`，开启多个可自动失败转移（按列表顺序分批并行探测）。
 2. Search, or open **Charts** / **Playlists**.  
    搜索，或打开**排行榜** / **歌单**。
-3. Play, favorite, open lyrics, download at your preferred quality.  
-   播放、收藏、看歌词、按首选音质下载。
+3. Play, favorite, open lyrics, download at your preferred quality. Optional: open the **mini player** from the player bar (or press `P`) for an always-on-top bar that docks to a screen edge.  
+   播放、收藏、看歌词、按首选音质下载。可选：从播放栏进入**迷你播放**（或按 `P`），置顶长条可贴边收成唱片。
 4. Optional: **Settings → Data** — JSON export/import, or a cloud-synced folder for encrypted multi-device sync.  
    可选：**设置 → 数据** — JSON 导入导出，或指定网盘同步文件夹。
 

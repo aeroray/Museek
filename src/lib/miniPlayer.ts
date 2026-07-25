@@ -209,7 +209,7 @@ function barHeight(): number {
   return queueExpanded ? MINI_HEIGHT + MINI_QUEUE_HEIGHT : MINI_HEIGHT
 }
 
-/** Top-right mini target in physical pixels for the current monitor. */
+/** Right-edge center mini target in physical pixels for the current monitor. */
 async function miniTargetPhysical(win: Window): Promise<PhysRect> {
   const { currentMonitor } = await import("@tauri-apps/api/window")
   const scale = (await win.scaleFactor()) || 1
@@ -222,8 +222,13 @@ async function miniTargetPhysical(win: Window): Promise<PhysRect> {
       const wa = monitor.workArea
       const pad = Math.round(EDGE_INSET * scale)
       const x = wa.position.x + wa.size.width - w - pad
-      const y = wa.position.y + pad
-      return { x: Math.max(wa.position.x, x), y, w, h }
+      const y = wa.position.y + Math.round((wa.size.height - h) / 2)
+      return {
+        x: Math.max(wa.position.x, x),
+        y: Math.min(Math.max(y, wa.position.y + pad), wa.position.y + wa.size.height - h - pad),
+        w,
+        h,
+      }
     }
   } catch {
     /* fall through */
