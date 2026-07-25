@@ -8,14 +8,19 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { getWhatsNew, setSeenVersion, shouldShowWhatsNew } from "@/lib/whatsNew"
+import {
+  getWhatsNew,
+  setSeenVersion,
+  shouldShowWhatsNew,
+  subscribeWhatsNewOpen,
+} from "@/lib/whatsNew"
 import { useLangStore, useT } from "@/lib/i18n"
 
 const SHOW_DELAY_MS = 1200
 
 /**
- * After an upgrade, shows built-in bilingual notes once.
- * Fresh installs are silent (seen version written without a dialog).
+ * What's New dialog — auto-opens once after an upgrade, and anytime via
+ * `openWhatsNew()` (About → view release notes).
  */
 export function WhatsNewDialog() {
   const t = useT()
@@ -29,6 +34,8 @@ export function WhatsNewDialog() {
     }, SHOW_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [version])
+
+  useEffect(() => subscribeWhatsNewOpen(() => setOpen(true)), [])
 
   const copy = getWhatsNew(version, lang)
 
@@ -46,9 +53,7 @@ export function WhatsNewDialog() {
     >
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>
-            {t("whatsNew.title", { version })}
-          </DialogTitle>
+          <DialogTitle>{t("whatsNew.title", { version })}</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="max-h-[min(24rem,50vh)] pr-3">

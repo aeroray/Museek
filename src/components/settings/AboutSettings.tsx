@@ -1,10 +1,11 @@
 import type { ReactNode } from "react"
-import { RefreshCw, Loader2, Download, Github, Globe, ChevronRight } from "lucide-react"
+import { RefreshCw, Loader2, Download, Github, Globe, ChevronRight, ScrollText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SettingsCard } from "@/components/settings/SettingsCard"
 import { useUpdateStore } from "@/stores/updateStore"
+import { openWhatsNew } from "@/lib/whatsNew"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -137,28 +138,34 @@ export function AboutSettings() {
               )}
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <Button
-                variant={canShowInstall ? "default" : "outline"}
-                size="sm"
-                onClick={onPrimary}
-                disabled={checking || isUpdating}
-                className="shrink-0"
-              >
-                {checking || isUpdating ? (
-                  <Loader2 size={15} className="mr-2 animate-spin" />
-                ) : canShowInstall ? (
-                  <Download size={15} className="mr-2" />
-                ) : (
-                  <RefreshCw size={15} className="mr-2" />
-                )}
-                {isUpdating
-                  ? progress?.percent != null
-                    ? t("about.updatingPercent", { percent: progress.percent })
-                    : t("about.updating")
-                  : canShowInstall
-                    ? t("about.installUpdate")
-                    : t("about.checkUpdate")}
-              </Button>
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <Button variant="secondary" size="sm" className="shrink-0" onClick={() => openWhatsNew()}>
+                  <ScrollText size={15} className="mr-2" />
+                  {t("about.whatsNew")}
+                </Button>
+                <Button
+                  variant={canShowInstall ? "default" : "outline"}
+                  size="sm"
+                  onClick={onPrimary}
+                  disabled={checking || isUpdating}
+                  className="shrink-0"
+                >
+                  {checking || isUpdating ? (
+                    <Loader2 size={15} className="mr-2 animate-spin" />
+                  ) : canShowInstall ? (
+                    <Download size={15} className="mr-2" />
+                  ) : (
+                    <RefreshCw size={15} className="mr-2" />
+                  )}
+                  {isUpdating
+                    ? progress?.percent != null
+                      ? t("about.updatingPercent", { percent: progress.percent })
+                      : t("about.updating")
+                    : canShowInstall
+                      ? t("about.installUpdate")
+                      : t("about.checkUpdate")}
+                </Button>
+              </div>
               {lastCheckedAt != null && (
                 <p className="text-[11px] text-muted-foreground/80 tabular-nums">
                   {t("about.lastChecked", { time: formatCheckedAt(lastCheckedAt, locale) })}
