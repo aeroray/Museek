@@ -24,8 +24,25 @@ export const useLangStore = create<LangState>((set) => ({
   setLang(lang) {
     localStorage.setItem(STORAGE_KEY, lang);
     set({ lang });
+    void syncWindowTitle(lang);
   },
 }));
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/** Keep the OS window / taskbar title in sync with the UI language. */
+export async function syncWindowTitle(lang?: Lang): Promise<void> {
+  const resolved = lang ?? useLangStore.getState().lang;
+  const title = translate(resolved, "app.name");
+  if (typeof document !== "undefined") document.title = title;
+  if (!isTauri) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setTitle(title);
+  } catch {
+    /* optional */
+  }
+}
 
 /**
  * Flat translation dictionary. Keys use dotted namespaces (e.g. `nav.search`).
@@ -281,7 +298,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.about.version": "版本 {version}",
     "settings.about.description": "多平台音乐聚合软件",
     "about.checkUpdate": "检查更新",
-    "about.whatsNew": "更新内容",
+    "about.whatsNew": "更新日志",
     "about.installUpdate": "安装更新",
     "about.lastChecked": "上次检查：{time}",
     "about.upToDate": "已是最新版本",
@@ -310,9 +327,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "update.downloading": "正在下载更新…",
     "update.installing": "正在安装，即将重启…",
     "update.downloadPercent": "{percent}%",
-    "whatsNew.title": "Museek v{version} · 更新内容",
+    "whatsNew.title": "更新日志",
     "whatsNew.gotIt": "知道了",
     "whatsNew.fallback": "已更新到 v{version}。",
+    "whatsNew.current": "当前",
+    "whatsNew.earlier": "历史版本",
     "update.busyQuit": "正在安装更新，请稍候再退出",
 
     // Quality labels
@@ -740,7 +759,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.about.version": "Version {version}",
     "settings.about.description": "A cross-platform music aggregator",
     "about.checkUpdate": "Check for updates",
-    "about.whatsNew": "What's New",
+    "about.whatsNew": "Changelog",
     "about.installUpdate": "Install update",
     "about.lastChecked": "Last checked: {time}",
     "about.upToDate": "You're on the latest version",
@@ -769,9 +788,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "update.downloading": "Downloading update…",
     "update.installing": "Installing — restarting soon…",
     "update.downloadPercent": "{percent}%",
-    "whatsNew.title": "Museek v{version} · What's New",
+    "whatsNew.title": "Changelog",
     "whatsNew.gotIt": "Got it",
     "whatsNew.fallback": "Updated to v{version}.",
+    "whatsNew.current": "Current",
+    "whatsNew.earlier": "Earlier releases",
     "update.busyQuit": "Installing update — please wait before quitting",
 
     // Quality labels

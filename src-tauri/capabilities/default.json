@@ -26,6 +26,7 @@
     "core:window:allow-set-shadow",
     "core:window:allow-set-resizable",
     "core:window:allow-set-title-bar-style",
+    "core:window:allow-set-title",
     "http:default",
     {
       "identifier": "http:allow-fetch",

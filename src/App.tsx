@@ -27,6 +27,7 @@ import { WhatsNewDialog } from "@/components/whatsNew/WhatsNewDialog"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useLocalMusicStore } from "@/stores/localMusicStore"
 import { useUpdateStore } from "@/stores/updateStore"
+import { syncWindowTitle } from "@/lib/i18n"
 
 // Wire UI ports once — stores/lib never import uiStore.
 bindNotify((payload) => useUiStore.getState().notify(payload))
@@ -46,6 +47,9 @@ function AppInit() {
   useGlobalShortcuts()
 
   useEffect(() => {
+    // Match the Windows taskbar / window title to the saved UI language ASAP.
+    void syncWindowTitle()
+
     // First: silent sync-folder import. If a newer config is found it applies it
     // and reloads, so skip the rest of init in that case.
     maybeAutoImport().then((reloading) => {

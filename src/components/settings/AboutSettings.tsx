@@ -139,7 +139,7 @@ export function AboutSettings() {
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
               <div className="flex flex-wrap items-center justify-end gap-1.5">
-                <Button variant="secondary" size="sm" className="shrink-0" onClick={() => openWhatsNew()}>
+                <Button variant="ghost" size="sm" className="shrink-0" onClick={() => openWhatsNew()}>
                   <ScrollText size={15} className="mr-2" />
                   {t("about.whatsNew")}
                 </Button>
