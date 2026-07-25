@@ -634,6 +634,17 @@ export function isMiniPlayerSession(): boolean {
   return sessionActive
 }
 
+/** Same shortcut for enter / exit. Enter needs a non-empty queue. */
+export async function toggleMiniPlayer(): Promise<void> {
+  if (transitioning || peekBusy) return
+  if (sessionActive || usePlayerStore.getState().miniMode) {
+    await exitMiniPlayer()
+    return
+  }
+  if (usePlayerStore.getState().queue.length === 0) return
+  await enterMiniPlayer()
+}
+
 /**
  * Shrink main into a frameless always-on-top mini bar (identical chrome on Win/Mac).
  * Veil → swap chrome → morph geometry → reveal → soft dock peek.
@@ -717,7 +728,9 @@ export async function enterMiniPlayer(): Promise<void> {
     }
     await bindMovedListener(win)
     await revealAfterMorph()
-    // Don't flash dock chrome before the auto vinyl peek — hint is for drag only.
+    dockEdge = "right"
+    setDockHint("right")
+    // Settle on the bar with dock chrome, then fold into the vinyl peek.
     scheduleMiniPeekCollapse(320)
   } catch {
     setMorphing(false)

@@ -11,6 +11,7 @@ export function ShortcutsSettings() {
     { keys: ["↑", "↓"], action: t("shortcuts.volume") },
     { keys: ["M"], action: t("shortcuts.mute") },
     { keys: ["L"], action: t("shortcuts.lyrics") },
+    { keys: ["P"], action: t("shortcuts.mini") },
   ]
 
   return (

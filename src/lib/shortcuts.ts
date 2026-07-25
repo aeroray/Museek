@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { usePlayerStore } from "@/stores/playerStore"
+import { toggleMiniPlayer } from "@/lib/miniPlayer"
 
 const SEEK_STEP = 5 // seconds
 const VOL_STEP = 0.05
@@ -20,6 +21,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
  *  ↑ / ↓            volume up / down
  *  M                mute toggle
  *  L                lyrics view toggle
+ *  P                mini player toggle
  */
 export function useGlobalShortcuts(): void {
   useEffect(() => {
@@ -51,12 +53,28 @@ export function useGlobalShortcuts(): void {
           break
         case "m":
         case "M":
+          if (mod) {
+            handled = false
+            break
+          }
           p.setMuted(!p.muted)
           break
         case "l":
         case "L":
+          if (mod) {
+            handled = false
+            break
+          }
           if (p.currentSong) p.setShowLyrics(!p.showLyrics)
           else handled = false
+          break
+        case "p":
+        case "P":
+          if (mod) {
+            handled = false
+            break
+          }
+          void toggleMiniPlayer()
           break
         default:
           handled = false

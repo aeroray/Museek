@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Expand,
   Music,
@@ -27,6 +27,8 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
 function ModeIcon({ playMode }: { playMode: string }) {
   const common = { size: 14 as const }
@@ -68,12 +70,71 @@ export function MiniPlayer() {
   const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites)
 
   const [queueOpen, setQueueOpen] = useState(false)
+  const queueScrollTopRef = useRef(0)
+  const queuePanelRef = useRef<HTMLDivElement>(null)
 
   const loading = status === "loading"
   const canPlay = status !== "idle"
   const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null
   const isLocal = currentSong?.source === "local"
   const fav = !!currentSong && !isLocal && favorites.some((f) => f.id === currentSong.id)
+
+  const saveQueueScroll = () => {
+    const vp = queuePanelRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement | null
+    if (vp) queueScrollTopRef.current = vp.scrollTop
+  }
+
+  const closeQueue = () => {
+    setQueueOpen((open) => {
+      if (!open) return open
+      saveQueueScroll()
+      void setMiniQueueExpanded(false)
+      return false
+    })
+  }
+
+  // Auto-collapse the queue when the mini window loses focus.
+  useEffect(() => {
+    if (!queueOpen) return
+    const onBlur = () => closeQueue()
+    window.addEventListener("blur", onBlur)
+    let unlisten: (() => void) | undefined
+    if (isTauri) {
+      void (async () => {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window")
+        unlisten = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+          if (!focused) closeQueue()
+        })
+      })()
+    }
+    return () => {
+      window.removeEventListener("blur", onBlur)
+      unlisten?.()
+    }
+  }, [queueOpen])
+
+  // Restore the last scroll offset after the queue panel remounts.
+  useEffect(() => {
+    if (!queueOpen || queue.length === 0) return
+    let cancelled = false
+    const restore = () => {
+      if (cancelled) return
+      const vp = queuePanelRef.current?.querySelector(
+        "[data-radix-scroll-area-viewport]",
+      ) as HTMLElement | null
+      if (vp) vp.scrollTop = queueScrollTopRef.current
+    }
+    // Double rAF: wait until Radix viewport has laid out after expand.
+    const outer = requestAnimationFrame(() => {
+      requestAnimationFrame(restore)
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(outer)
+    }
+  }, [queueOpen, queue.length])
 
   const toggleFav = () => {
     if (!currentSong || isLocal) return
@@ -88,9 +149,14 @@ export function MiniPlayer() {
   }
 
   const toggleQueue = () => {
-    const nextOpen = !queueOpen
-    setQueueOpen(nextOpen)
-    void setMiniQueueExpanded(nextOpen)
+    if (queueOpen) {
+      saveQueueScroll()
+      setQueueOpen(false)
+      void setMiniQueueExpanded(false)
+    } else {
+      setQueueOpen(true)
+      void setMiniQueueExpanded(true)
+    }
   }
 
   const removeAt = (i: number) => {
@@ -185,7 +251,10 @@ export function MiniPlayer() {
         miniDockHint === "bottom" && "mini-dock-hint-bottom",
       )}
       onMouseEnter={() => notifyMiniPointerEnter()}
-      onMouseLeave={() => notifyMiniPointerLeave()}
+      onMouseLeave={() => {
+        if (queueOpen) closeQueue()
+        notifyMiniPointerLeave()
+      }}
     >
       {/* Transport bar */}
       <div className="flex h-[72px] shrink-0 items-center gap-2 px-2.5" data-tauri-drag-region>
@@ -302,13 +371,21 @@ export function MiniPlayer() {
       </div>
 
       {queueOpen && (
-        <div className="flex min-h-0 flex-1 flex-col border-t border-border/50">
+        <div ref={queuePanelRef} className="flex min-h-0 flex-1 flex-col border-t border-border/50">
           {queue.length === 0 ? (
             <div className="flex flex-1 items-center justify-center px-3 text-xs text-muted-foreground">
               {t("queue.empty")}
             </div>
           ) : (
-            <ScrollArea className="h-full">
+            <ScrollArea
+              className="h-full"
+              onScrollCapture={(e) => {
+                const t = e.target as HTMLElement
+                if (t.getAttribute("data-radix-scroll-area-viewport") != null) {
+                  queueScrollTopRef.current = t.scrollTop
+                }
+              }}
+            >
               <ul className="flex flex-col gap-0.5 p-1.5">
                 {queue.map((item, i) => {
                   const active = i === queueIndex
