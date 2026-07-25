@@ -10,5 +10,7 @@ Terms used by architecture reviews and refactors. Prefer these names in code com
 | **Source registry** | Seam between persisted scripts and the runtime runner. |
 | **Lyrics** | Load → parse LRC → active line from time → fullscreen chrome. |
 | **Local library** | Device-local tracks + categories (not synced). |
+| **Player prefs** | Device-local volume / mute (`player.json`, not synced). |
+| **What's New** | Built-in bilingual notes shown once after upgrade (`museek.whatsNew.seenVersion`). |
 | **Favorites** | Synced liked songs / playlists; song categories sync with playlists.json. |
 | **Platform SDK** | Per-source (wy / kg / tx / mg / kw) search, charts, playlists, hot-search helpers. |

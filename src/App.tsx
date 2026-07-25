@@ -23,6 +23,7 @@ import { maybeAutoImport } from "@/lib/sync"
 import { useGlobalShortcuts } from "@/lib/shortcuts"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { CloseGuard } from "@/components/CloseGuard"
+import { WhatsNewDialog } from "@/components/whatsNew/WhatsNewDialog"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useLocalMusicStore } from "@/stores/localMusicStore"
 import { useUpdateStore } from "@/stores/updateStore"
@@ -39,6 +40,7 @@ function AppInit() {
   const { loadFromDisk: loadSettings } = useSettingsStore()
   const { loadFromDisk: loadDownloads } = useDownloadStore()
   const { loadFromDisk: loadLocalMusic } = useLocalMusicStore()
+  const { loadFromDisk: loadPlayerPrefs } = usePlayerStore()
 
   // Global media keyboard shortcuts (space / arrows / M / L), gated by settings.
   useGlobalShortcuts()
@@ -51,6 +53,8 @@ function AppInit() {
       loadSources()
       loadPlaylists()
       loadHistory()
+      // Device-local volume/mute — restore ASAP so the first play uses it.
+      void loadPlayerPrefs()
       // After settings load, trim the cache in case the limit was lowered.
       // Downloads need downloadDir from settings before unfinished tasks resume.
       loadSettings().then(() => {
@@ -78,6 +82,7 @@ export default function App() {
   return (
     <TooltipProvider>
       <CloseGuard />
+      <WhatsNewDialog />
       <BrowserRouter>
         <AppInit />
         <Routes>

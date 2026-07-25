@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react"
-import { Play, Plus, Heart, Download, Music } from "lucide-react"
+import { Play, Plus, Heart, Download, Music, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CoverImage } from "@/components/common/CoverImage"
 import {
@@ -29,12 +29,18 @@ export const TrackRow = memo(function TrackRow({
   song,
   rank,
   fallbackImg,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   song: MusicInfo
   rank?: number
   /** Shown when the song itself has no cover (e.g. kw/kg playlist songs inherit
    *  the playlist's cover). Display only — never written back to the song. */
   fallbackImg?: string | null
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelect?: () => void
 }) {
   const play = usePlayerStore((s) => s.play)
   const addToQueue = usePlayerStore((s) => s.addToQueue)
@@ -48,9 +54,26 @@ export const TrackRow = memo(function TrackRow({
 
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2 rounded-xl group group/row cursor-pointer transition-[background-color,transform] duration-200 ease-out hover:bg-accent/55 active:scale-[0.995]"
-      onDoubleClick={() => play(song)}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-xl group group/row cursor-pointer transition-[background-color,transform] duration-200 ease-out hover:bg-accent/55 active:scale-[0.995]",
+        selectable && selected && "bg-primary/10",
+      )}
+      onClick={selectable ? onToggleSelect : undefined}
+      onDoubleClick={selectable ? undefined : () => play(song)}
     >
+      {selectable && (
+        <span
+          className={cn(
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-muted-foreground/40 text-transparent",
+          )}
+        >
+          <Check size={12} strokeWidth={3} />
+        </span>
+      )}
+
       {rank != null && (
         <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0 font-medium">{rank}</span>
       )}
@@ -63,12 +86,14 @@ export const TrackRow = memo(function TrackRow({
             <Music size={16} />
           </div>
         )}
-        <button
-          onClick={() => play(song)}
-          className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-        >
-          <Play size={16} className="ml-0.5 text-white icon-play-pop" fill="currentColor" strokeWidth={0} />
-        </button>
+        {!selectable && (
+          <button
+            onClick={() => play(song)}
+            className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+          >
+            <Play size={16} className="ml-0.5 text-white icon-play-pop" fill="currentColor" strokeWidth={0} />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -84,68 +109,70 @@ export const TrackRow = memo(function TrackRow({
 
       <span className="text-xs text-muted-foreground w-12 text-right shrink-0 tabular-nums">{song.interval}</span>
 
-      <div className="flex items-center gap-0.5 shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
-          onClick={(e) => {
-            e.stopPropagation()
-            addToQueue([song])
-          }}
-          title={t("common.addToQueue")}
-        >
-          <Plus size={14} />
-        </Button>
+      {!selectable && (
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
+            onClick={(e) => {
+              e.stopPropagation()
+              addToQueue([song])
+            }}
+            title={t("common.addToQueue")}
+          >
+            <Plus size={14} />
+          </Button>
 
-        {song.source !== "local" && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-8 w-8 icon-hover-heart", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (fav) removeFromFavorites(song.id)
-                else addToFavorites(song)
-              }}
-              title={t(fav ? "common.unfavorite" : "common.favorite")}
-            >
-              <Heart
-                key={fav ? "on" : "off"}
-                size={14}
-                className={cn(fav && "fill-red-500 text-red-500 icon-heart-burst")}
-              />
-            </Button>
+          {song.source !== "local" && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("h-8 w-8 icon-hover-heart", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (fav) removeFromFavorites(song.id)
+                  else addToFavorites(song)
+                }}
+                title={t(fav ? "common.unfavorite" : "common.favorite")}
+              >
+                <Heart
+                  key={fav ? "on" : "off"}
+                  size={14}
+                  className={cn(fav && "fill-red-500 text-red-500 icon-heart-burst")}
+                />
+              </Button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
-                  onClick={(e) => e.stopPropagation()}
-                  title={t("common.download")}
-                >
-                  <Download size={14} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[11rem]">
-                {song.meta.qualitys.map((q) => (
-                  <DropdownMenuItem
-                    key={q.type}
-                    onClick={() => addTask(song, q.type as Quality)}
-                    className="justify-between gap-8"
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
+                    onClick={(e) => e.stopPropagation()}
+                    title={t("common.download")}
                   >
-                    <span>{t("search.download", { quality: q.type })}</span>
-                    {q.size && <span className="text-muted-foreground text-xs tabular-nums">{q.size}</span>}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        )}
-      </div>
+                    <Download size={14} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[11rem]">
+                  {song.meta.qualitys.map((q) => (
+                    <DropdownMenuItem
+                      key={q.type}
+                      onClick={() => addTask(song, q.type as Quality)}
+                      className="justify-between gap-8"
+                    >
+                      <span>{t("search.download", { quality: q.type })}</span>
+                      {q.size && <span className="text-muted-foreground text-xs tabular-nums">{q.size}</span>}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 })

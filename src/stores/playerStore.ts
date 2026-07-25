@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { audioPlayer } from "@/lib/audio"
+import { readData, writeData } from "@/lib/db"
 import { sourceRunner } from "@/lib/sourceRunner"
 import { findActiveLyricIndex, loadLyric } from "@/lib/lyrics"
 import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic"
@@ -24,6 +25,22 @@ import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player"
 let lastMediaPlaying = false
 
 const PLAY_START_TIMEOUT_MS = 10_000
+/** Device-local volume/mute — deliberately excluded from config sync. */
+const PLAYER_PREFS_FILE = "player.json"
+
+type PlayerPrefs = {
+  volume: number
+  muted: boolean
+}
+
+function clampVolume(v: number): number {
+  if (!Number.isFinite(v)) return 1
+  return Math.max(0, Math.min(1, v))
+}
+
+function persistPlayerPrefs(volume: number, muted: boolean) {
+  writeData(PLAYER_PREFS_FILE, { volume, muted } satisfies PlayerPrefs)
+}
 
 function playWithTimeout(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -76,6 +93,8 @@ interface PlayerState {
   setPlayMode: (mode: PlayMode) => void
   setShowQueue: (v: boolean) => void
   setShowLyrics: (v: boolean) => void
+  /** Restore volume/mute from device-local prefs (not synced). */
+  loadFromDisk: () => Promise<void>
 
   // Internal
   _syncFromAudio: () => void
@@ -382,18 +401,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     setVolume(v) {
-      audioPlayer.setVolume(v)
-      set({ volume: v })
+      const volume = clampVolume(v)
+      audioPlayer.setVolume(volume)
+      set({ volume })
+      persistPlayerPrefs(volume, get().muted)
     },
 
     setMuted(m) {
       audioPlayer.setMuted(m)
       set({ muted: m })
+      persistPlayerPrefs(get().volume, m)
     },
 
     setPlayMode: (mode) => set({ playMode: mode }),
     setShowQueue: (v) => set({ showQueue: v }),
     setShowLyrics: (v) => set({ showLyrics: v }),
+
+    async loadFromDisk() {
+      const data = await readData<Partial<PlayerPrefs>>(PLAYER_PREFS_FILE, {})
+      const volume = typeof data.volume === "number" ? clampVolume(data.volume) : 1
+      const muted = typeof data.muted === "boolean" ? data.muted : false
+      audioPlayer.setVolume(volume)
+      audioPlayer.setMuted(muted)
+      set({ volume, muted })
+    },
 
     _syncFromAudio() {
       const state = audioPlayer.getState()

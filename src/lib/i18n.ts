@@ -228,6 +228,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "playlist.addToQueue": "加入队列",
     "playlist.delete": "删除歌单",
     "playlist.empty": "歌单还没有歌曲",
+    "playlist.batchEdit": "批量编辑",
+    "playlist.batchDownload": "下载",
+    "playlist.selectedCount": "已选 {count} 项",
+    "playlist.removeSong": "从歌单移除",
     "playlists.openEmpty": "请粘贴歌单链接或 ID",
     "playlists.openInvalid": "无法识别歌单，请检查平台和链接",
 
@@ -299,6 +303,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "update.downloading": "正在下载更新…",
     "update.installing": "正在安装，即将重启…",
     "update.downloadPercent": "{percent}%",
+    "whatsNew.title": "Museek v{version} · 更新内容",
+    "whatsNew.gotIt": "知道了",
+    "whatsNew.fallback": "已更新到 v{version}。",
     "update.busyQuit": "正在安装更新，请稍候再退出",
 
     // Quality labels
@@ -672,6 +679,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "playlist.addToQueue": "Add to queue",
     "playlist.delete": "Delete playlist",
     "playlist.empty": "This playlist has no songs yet",
+    "playlist.batchEdit": "Select",
+    "playlist.batchDownload": "Download",
+    "playlist.selectedCount": "{count} selected",
+    "playlist.removeSong": "Remove from playlist",
     "playlists.openEmpty": "Paste a playlist link or ID",
     "playlists.openInvalid": "Couldn't recognize the playlist — check the platform and link",
 
@@ -743,6 +754,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "update.downloading": "Downloading update…",
     "update.installing": "Installing — restarting soon…",
     "update.downloadPercent": "{percent}%",
+    "whatsNew.title": "Museek v{version} · What's New",
+    "whatsNew.gotIt": "Got it",
+    "whatsNew.fallback": "Updated to v{version}.",
     "update.busyQuit": "Installing update — please wait before quitting",
 
     // Quality labels

@@ -4,7 +4,8 @@ import { readData, writeData } from "@/lib/db"
 // devices. Covers the db.ts JSON files (settings, sources, favorites, history)
 // plus the direct-localStorage prefs (language, theme, sidebar, lyric font,
 // top-bar lyrics). Deliberately excludes the on-disk audio/lyric cache,
-// downloaded files, and localMusic.json — those are device-local.
+// downloaded files, localMusic.json, downloads.json, player.json (volume/
+// mute), and museek.whatsNew.seenVersion — those are device-local.
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 

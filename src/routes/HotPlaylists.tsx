@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { ListMusic, Play, ChevronLeft, RotateCw, Heart, Search, X, Link2, Loader2 } from "lucide-react"
+import { ListMusic, Play, ChevronLeft, RotateCw, Heart, Search, X, Link2, Loader2, Pencil, CheckCheck, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -28,6 +28,7 @@ import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
+import { useDownloadStore } from "@/stores/downloadStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -36,6 +37,7 @@ import type { MusicInfo, OnlineSource } from "@/types/music"
 export function HotPlaylists() {
   const t = useT()
   const playAll = usePlayerStore((s) => s.playAll)
+  const addTask = useDownloadStore((s) => s.addTask)
   const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
   const addFavoritePlaylist = usePlaylistStore((s) => s.addFavoritePlaylist)
   const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)
@@ -81,6 +83,8 @@ export function HotPlaylists() {
   const [openInput, setOpenInput] = useState("")
   const [openBusy, setOpenBusy] = useState(false)
   const [openError, setOpenError] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   // Bind the Radix viewport once mounted (needed for virtualization + scroll reset).
   useEffect(() => {
@@ -122,6 +126,8 @@ export function HotPlaylists() {
 
   useEffect(() => {
     setFilter("")
+    setEditing(false)
+    setSelectedIds(new Set())
   }, [selected])
 
   // Reset scroll to the top when drilling into a playlist or going back.
@@ -236,6 +242,27 @@ export function HotPlaylists() {
     .map((song, i) => ({ song, rank: i + 1 }))
     .filter(({ song }) => !q || `${song.name} ${song.singer}`.toLowerCase().includes(q))
 
+  const downloadableShown = shownSongs.filter(({ song }) => song.source !== "local")
+  const currentKeys = downloadableShown.map(({ song }) => song.id)
+  const allSelected = currentKeys.length > 0 && currentKeys.every((k) => selectedIds.has(k))
+
+  const toggleOne = (id: string) =>
+    setSelectedIds((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(currentKeys))
+  const exitEdit = () => {
+    setEditing(false)
+    setSelectedIds(new Set())
+  }
+  const batchDownload = () => {
+    songs.filter((s) => selectedIds.has(s.id) && s.source !== "local").forEach((s) => addTask(s))
+    exitEdit()
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border space-y-3">
@@ -277,7 +304,7 @@ export function HotPlaylists() {
                 <Heart size={14} className="mr-1.5" fill={playlistFav ? "currentColor" : "none"} />
                 {t(playlistFav ? "hotPlaylists.favorited" : "hotPlaylists.favorite")}
               </Button>
-              {songs.length > 0 && !detailLoading && !detailError && (
+              {songs.length > 0 && !detailLoading && !detailError && !editing && (
                 <Button variant="secondary" size="sm" className="h-8 shrink-0" onClick={() => playAll(songs)}>
                   <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
                   {t("common.playAll")}
@@ -352,22 +379,60 @@ export function HotPlaylists() {
         )}
 
         {selected && !detailLoading && !detailError && songs.length > 0 && (
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9 pr-9 h-9"
-              placeholder={t("hotPlaylists.searchInList")}
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            />
-            {filter && (
-              <button
-                onClick={() => setFilter("")}
-                title={t("search.clear")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X size={14} />
-              </button>
+          <div className="flex h-9 min-h-9 max-h-9 items-center gap-2 overflow-hidden">
+            {!editing ? (
+              <>
+                <div className="relative min-w-0 flex-1">
+                  <Search
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    className="h-8 py-0 pl-9 pr-9"
+                    placeholder={t("hotPlaylists.searchInList")}
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                  />
+                  {filter && (
+                    <button
+                      onClick={() => setFilter("")}
+                      title={t("search.clear")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" className="h-8 shrink-0" onClick={() => setEditing(true)}>
+                  <Pencil size={14} className="mr-1.5" />
+                  {t("playlist.batchEdit")}
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="truncate text-sm leading-8 text-muted-foreground">
+                  {t("playlist.selectedCount", { count: selectedIds.size })}
+                </span>
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                  <Button variant="ghost" size="sm" className="h-8" onClick={toggleAll}>
+                    <CheckCheck size={14} className="mr-1.5" />
+                    {allSelected ? t("favorites.deselectAll") : t("favorites.selectAll")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={selectedIds.size === 0}
+                    onClick={batchDownload}
+                  >
+                    <Download size={14} className="mr-1.5" />
+                    {t("playlist.batchDownload")}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8" onClick={exitEdit}>
+                    {t("common.cancel")}
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -403,7 +468,14 @@ export function HotPlaylists() {
                   getKey={(row) => row.song.id}
                 >
                   {(row) => (
-                    <TrackRow song={row.song} rank={row.rank} fallbackImg={selected?.img} />
+                    <TrackRow
+                      song={row.song}
+                      rank={row.rank}
+                      fallbackImg={selected?.img}
+                      selectable={editing && row.song.source !== "local"}
+                      selected={selectedIds.has(row.song.id)}
+                      onToggleSelect={() => toggleOne(row.song.id)}
+                    />
                   )}
                 </VirtualList>
               )}
