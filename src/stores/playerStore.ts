@@ -77,6 +77,14 @@ interface PlayerState {
   lyricsLoading: boolean
   showQueue: boolean
   showLyrics: boolean
+  /** True while the main window is morphing into the mini player shell. */
+  miniMode: boolean
+  /** True while enter/exit mini is animating — content stays blurred until done. */
+  miniMorphing: boolean
+  /** Mini bar collapsed to cover-only while docked at a screen edge. */
+  miniPeek: boolean
+  /** Which edge is in the magnetic dock zone (hint while dragging / before peek). */
+  miniDockHint: "left" | "right" | "top" | "bottom" | null
   currentPicUrl: string | null
 
   play: (song: MusicInfo, quality?: Quality) => Promise<void>
@@ -140,6 +148,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     lyricsLoading: false,
     showQueue: false,
     showLyrics: false,
+    miniMode: false,
+    miniMorphing: false,
+    miniPeek: false,
+    miniDockHint: null,
     currentPicUrl: null,
 
     async play(song, quality) {

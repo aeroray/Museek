@@ -9,7 +9,7 @@ import { formatDuration, cn } from "@/lib/utils"
  * Custom track (not Radix): fill + thumb share the same %, so the range never
  * lags the thumb. Smooth time comes from the playback-clock seam.
  */
-export function ProgressSlider() {
+export function ProgressSlider({ className }: { className?: string }) {
   const duration = usePlayerStore((s) => s.duration)
   const status = usePlayerStore((s) => s.status)
   const currentSong = usePlayerStore((s) => s.currentSong)
@@ -74,7 +74,7 @@ export function ProgressSlider() {
   }
 
   return (
-    <div className={cn("flex items-center gap-3 w-full px-4 pt-3 pb-1", disabled && "opacity-50")}>
+    <div className={cn("flex items-center gap-3 w-full px-4 pt-3 pb-1", className, disabled && "opacity-50")}>
       <span className="text-[11px] text-muted-foreground/80 tabular-nums w-10 text-right shrink-0 font-medium tracking-wide">
         {formatDuration(time)}
       </span>

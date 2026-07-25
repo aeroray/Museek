@@ -29,6 +29,18 @@ export function setTrayVisible(visible: boolean): void {
 
 /** Hide the main window and keep the process alive via the tray icon. */
 export async function hideToTray(win: Window | null | undefined): Promise<void> {
+  // Dynamic imports avoid a cycle: playerStore → power → miniPlayer → playerStore.
+  try {
+    const [{ exitMiniPlayer, isMiniPlayerSession }, { usePlayerStore }] = await Promise.all([
+      import("@/lib/miniPlayer"),
+      import("@/stores/playerStore"),
+    ])
+    if (isMiniPlayerSession() || usePlayerStore.getState().miniMode) {
+      await exitMiniPlayer()
+    }
+  } catch {
+    /* best-effort */
+  }
   // Recreate the icon if settings said tray but creation failed earlier.
   setTrayVisible(true)
   if (!win) return

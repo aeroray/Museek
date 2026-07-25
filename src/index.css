@@ -197,6 +197,163 @@ html[data-maximized="true"] .app-shell {
   box-shadow: none;
 }
 
+/* Mini player: same CSS radius on Win + Mac (Mac normally uses system radius). */
+html[data-mini="true"] .app-shell {
+  --window-radius: 12px;
+  border-radius: var(--window-radius);
+  clip-path: inset(0 round var(--window-radius));
+  box-shadow: inset 0 0 0 1px hsl(30 12% 10% / 0.1);
+}
+html[data-mini="true"].dark .app-shell {
+  box-shadow: inset 0 0 0 1px hsl(40 12% 100% / 0.12);
+}
+
+/* Dock hint: theme-color ring on the rounded shell (bar only — never on vinyl peek).
+   Inset-only so clip-path doesn't eat the stroke at the corners. */
+html[data-mini="true"][data-mini-dock]:not([data-mini-peek]) .app-shell {
+  box-shadow:
+    inset 0 0 0 1.5px hsl(var(--primary) / 0.88),
+    inset 0 0 12px -2px hsl(var(--primary) / 0.22);
+  transition: box-shadow 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Mini ↔ main / peek morph: soft veil, GPU-friendly filter only. */
+.mini-morph-veil {
+  filter: blur(10px) saturate(0.94);
+  opacity: 0.78;
+  pointer-events: none;
+  will-change: filter, opacity;
+  transform: translateZ(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mini-morph-veil {
+    filter: blur(5px);
+    opacity: 0.88;
+    will-change: auto;
+  }
+}
+
+/* Mini peek (cover-only at screen edge): fully clear chrome — only the disc paints. */
+html[data-mini-peek="true"] .app-shell {
+  background: transparent !important;
+  box-shadow: none !important;
+  clip-path: none;
+  border-radius: 0;
+  overflow: visible;
+}
+html[data-mini-peek="true"] .app-shell::before {
+  display: none;
+}
+html[data-mini-peek="true"] .app-shell > * {
+  background: transparent !important;
+  overflow: visible;
+  box-shadow: none;
+}
+
+/* Vinyl disc peek */
+.mini-vinyl {
+  background: radial-gradient(circle at 35% 28%, hsl(0 0% 28%), hsl(0 0% 7%) 55%, hsl(0 0% 4%));
+  /* Edge definition stays on the disc — avoid outer shadows (veil in transparent corners). */
+  box-shadow: inset 0 0 0 1px hsl(0 0% 100% / 0.08);
+}
+.mini-vinyl-grooves {
+  background:
+    radial-gradient(circle at 32% 26%, hsl(0 0% 100% / 0.14), transparent 42%),
+    radial-gradient(
+      circle at center,
+      transparent 29%,
+      hsl(0 0% 6% / 0.7) 30%,
+      hsl(0 0% 16%) 31%,
+      hsl(0 0% 9%) 100%
+    ),
+    repeating-radial-gradient(
+      circle at center,
+      hsl(0 0% 20% / 0.9) 0 0.7px,
+      hsl(0 0% 8%) 0.7px 2.4px
+    );
+  box-shadow: inset 0 0 0 1px hsl(0 0% 100% / 0.06);
+}
+.mini-vinyl-label {
+  box-shadow:
+    inset 0 0 0 1px hsl(0 0% 100% / 0.14),
+    0 0 0 2px hsl(0 0% 0% / 0.35);
+}
+@keyframes mini-vinyl-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes mini-vinyl-in {
+  from {
+    opacity: 0.55;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.mini-vinyl-spin {
+  animation: mini-vinyl-spin 7.2s linear infinite;
+  will-change: transform;
+}
+.mini-vinyl-enter {
+  animation: mini-vinyl-in 280ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mini-vinyl-spin,
+  .mini-vinyl-enter {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+/* Magnetic dock zone hint — accent strip on the near edge.
+   Outer ring lives on .app-shell (follows CSS corner radius). */
+.mini-dock-hint {
+  border-radius: inherit;
+}
+.mini-dock-hint-left::after,
+.mini-dock-hint-right::after,
+.mini-dock-hint-top::after,
+.mini-dock-hint-bottom::after {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: hsl(var(--primary));
+  border-radius: 999px;
+  opacity: 0.9;
+  box-shadow: 0 0 10px hsl(var(--primary) / 0.45);
+}
+.mini-dock-hint-left::after {
+  left: 3px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+}
+.mini-dock-hint-right::after {
+  right: 3px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+}
+.mini-dock-hint-top::after {
+  top: 3px;
+  left: 12px;
+  right: 12px;
+  height: 3px;
+}
+.mini-dock-hint-bottom::after {
+  bottom: 3px;
+  left: 12px;
+  right: 12px;
+  height: 3px;
+}
+
 /* Film grain — clipped inside the rounded shell */
 .app-shell::before {
   content: "";
@@ -550,6 +707,18 @@ html[data-maximized="true"] .app-shell {
     transform: scale(1.15);
   }
 }
+@keyframes iconPip {
+  0%,
+  100% {
+    transform: scale(1) translate(0, 0);
+  }
+  35% {
+    transform: scale(0.88) translate(1.5px, 1.5px);
+  }
+  65% {
+    transform: scale(1.08) translate(-0.5px, -0.5px);
+  }
+}
 @keyframes iconCaptions {
   0%,
   100% {
@@ -696,6 +865,9 @@ html[data-maximized="true"] .app-shell {
   }
   .icon-hover-maximize:hover svg {
     animation: iconMaximize 360ms ease;
+  }
+  .icon-hover-pip:hover svg {
+    animation: iconPip 420ms ease;
   }
   .icon-hover-captions:hover svg {
     animation: iconCaptions 400ms ease;

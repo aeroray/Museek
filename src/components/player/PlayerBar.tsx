@@ -1,4 +1,4 @@
-import { Music, ListMusic, MicVocal, Search, Maximize2, Loader2 } from "lucide-react"
+import { Music, ListMusic, MicVocal, Search, Maximize2, Loader2, PictureInPicture2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { Controls } from "./Controls"
 import { ProgressSlider } from "./ProgressSlider"
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { PlatformBadge, QualityBadge, PLATFORM_BRAND } from "@/components/common/MetaBadges"
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
+import { enterMiniPlayer } from "@/lib/miniPlayer"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -123,7 +124,7 @@ export function PlayerBar() {
           <Controls />
         </div>
 
-        {/* Right: Volume + Lyrics + Queue */}
+        {/* Right: Volume + Lyrics + Queue + Mini */}
         <div className="flex items-center gap-1 w-72 justify-end shrink-0">
           <VolumeControl />
           <DropdownMenu>
@@ -169,6 +170,16 @@ export function PlayerBar() {
             title={t("player.queue")}
           >
             <ListMusic size={16} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 icon-hover-pip"
+            onClick={() => void enterMiniPlayer()}
+            disabled={queue.length === 0}
+            title={t("player.miniMode")}
+          >
+            <PictureInPicture2 size={16} />
           </Button>
         </div>
       </div>

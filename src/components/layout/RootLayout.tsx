@@ -5,10 +5,13 @@ import { TopBar } from "./TopBar"
 import { PlayerBar } from "@/components/player/PlayerBar"
 import { PlayQueue } from "@/components/queue/PlayQueue"
 import { LyricsPanel } from "@/components/lyrics/LyricsPanel"
+import { MiniPlayer } from "@/components/miniPlayer/MiniPlayer"
 import { Toaster } from "@/components/ui/toaster"
 import { DownloadLocationDialog } from "@/components/DownloadLocationDialog"
 import { isMacOs } from "@/lib/os"
 import { showMainWindow } from "@/lib/showWindow"
+import { usePlayerStore } from "@/stores/playerStore"
+import { cn } from "@/lib/utils"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
@@ -16,7 +19,10 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 function useWindowChrome() {
   useEffect(() => {
     // macOS Overlay windows use system corner radius; Windows/Linux stay CSS-clipped.
-    document.documentElement.dataset.os = isMacOs() ? "macos" : "other"
+    // Mini mode overrides this via data-mini (see index.css).
+    if (!document.documentElement.dataset.mini) {
+      document.documentElement.dataset.os = isMacOs() ? "macos" : "other"
+    }
 
     // Windows: show after first paint (avoids decorated/white flash).
     // macOS: already shown from Rust; this is a no-op focus ensure.
@@ -50,22 +56,38 @@ function useWindowChrome() {
 
 export function RootLayout() {
   useWindowChrome()
+  const miniMode = usePlayerStore((s) => s.miniMode)
+  const miniMorphing = usePlayerStore((s) => s.miniMorphing)
+  const miniPeek = usePlayerStore((s) => s.miniPeek)
 
   return (
     <div className="app-shell">
-      <div className="relative flex flex-col h-full overflow-hidden bg-background">
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-hidden flex flex-col app-ambient min-w-0">
-            <TopBar />
-            <div className="flex-1 min-h-0 flex flex-col">
-              <Outlet />
+      <div
+        className={cn(
+          "relative flex h-full flex-col",
+          miniPeek ? "overflow-visible bg-transparent" : "overflow-hidden bg-background",
+          "transition-[filter,opacity] duration-300 ease-out",
+          miniMorphing && "mini-morph-veil",
+        )}
+      >
+        {miniMode ? (
+          <MiniPlayer />
+        ) : (
+          <>
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+              <Sidebar />
+              <main className="app-ambient flex min-w-0 flex-1 flex-col overflow-hidden">
+                <TopBar />
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <Outlet />
+                </div>
+              </main>
             </div>
-          </main>
-        </div>
-        <PlayerBar />
-        <PlayQueue />
-        <LyricsPanel />
+            <PlayerBar />
+            <PlayQueue />
+            <LyricsPanel />
+          </>
+        )}
         <Toaster />
         <DownloadLocationDialog />
       </div>
