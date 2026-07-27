@@ -23,8 +23,10 @@ const PATTERNS: Record<
     primary: /\/playlist(?:_detail)?\/(\d+)(?:\?.*|&.*$|#.*$|$)/,
   },
   // https://www.kugou.com/yy/special/single/1067062.html
+  // Also handled specially in matchKgPlaylistId (collections / gcid / share).
   kg: {
-    primary: /\/(\d+)\.html(?:\?.*|&.*$|#.*$|$)/,
+    primary: /\/special\/single\/(\d+)/i,
+    secondary: /\/(\d+)\.html(?:\?.*|&.*$|#.*$|$)/,
     format: (id) => (id.startsWith("id_") ? id : `id_${id}`),
   },
   // https://music.163.com/#/playlist?id=11332
@@ -41,16 +43,51 @@ const PATTERNS: Record<
 
 function isPlainId(s: string, source: OnlineSource): boolean {
   const trimmed = s.trim()
-  if (source === "kg" && /^id_\d+$/i.test(trimmed)) return true
+  if (source === "kg") {
+    if (/^id_\d+$/i.test(trimmed)) return true
+    if (/^rank_\d+$/i.test(trimmed)) return true
+    if (/^collection_[\w]+$/i.test(trimmed)) return true
+    if (/^gcid_\w+$/i.test(trimmed)) return true
+  }
   return /^\d+$/.test(trimmed)
 }
 
 function normalizePlainId(s: string, source: OnlineSource): string {
   const trimmed = s.trim()
   if (source === "kg") {
-    return trimmed.startsWith("id_") ? trimmed : `id_${trimmed}`
+    if (
+      trimmed.startsWith("id_") ||
+      trimmed.startsWith("rank_") ||
+      trimmed.startsWith("collection_") ||
+      trimmed.startsWith("gcid_")
+    ) {
+      return trimmed
+    }
+    return `id_${trimmed}`
   }
   return trimmed
+}
+
+/** KuGou share / collection / rank forms beyond classic special/single/<id>.html. */
+function matchKgPlaylistId(input: string): string | null {
+  // https://www.kugou.com/yy/rank/home/1-6666.html → rankid 6666
+  const rank = /\/rank\/home\/\d+-(\d+)\.html/i.exec(input)?.[1] ?? null
+  if (rank) return `rank_${rank}`
+
+  const global =
+    /(?:global_collection_id|global_specialid)=([\w]+)/i.exec(input)?.[1] ?? null
+  if (global) return global
+
+  const gcid = /gcid_\w+/i.exec(input)?.[0] ?? null
+  if (gcid) return gcid
+
+  const chain = /[?&]chain=(\w+)/i.exec(input)?.[1] ?? null
+  if (chain) return `chain_${chain}`
+
+  // Keep full songlist / share URLs — getKgPlaylistDetail scrapes them.
+  if (/kugou\.com\/(?:songlist|share|zlist)/i.test(input)) return input
+
+  return null
 }
 
 /** Follow one redirect hop when the paste is a short/share link. */
@@ -82,6 +119,10 @@ async function resolveRedirect(link: string, tryNum = 0): Promise<string> {
 }
 
 function matchId(input: string, source: OnlineSource): string | null {
+  if (source === "kg") {
+    const kg = matchKgPlaylistId(input)
+    if (kg) return kg
+  }
   const { primary, secondary, format } = PATTERNS[source]
   let m = primary.exec(input)
   if (!m && secondary) m = secondary.exec(input)
@@ -113,6 +154,9 @@ export async function parsePlaylistLink(source: OnlineSource, raw: string): Prom
     // Short links / share pages often need one redirect before the id appears.
     const resolved = await resolveRedirect(input)
     id = matchId(resolved, source)
+    // KuGou share pages may only expose the collection id after fetch — hand
+    // the resolved URL to getKgPlaylistDetail.
+    if (!id && source === "kg" && /kugou\.com/i.test(resolved)) id = resolved
   }
 
   if (!id) throw new Error(t("playlists.openInvalid"))

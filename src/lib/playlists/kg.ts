@@ -1,21 +1,33 @@
+import * as md5Lib from "js-md5"
 import { httpFetch as tauriFetch } from "@/lib/http"
+import { getKgBoardSongs, kgBoards } from "@/lib/charts/kg"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
-import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
+import type { Playlist, PlaylistDetail, PlaylistDetailInfo, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kg/songList.js
 // Hot playlists use the unsigned v9 getSpecial endpoint with t=5 (推荐 — the
 // default sort, sortList[0]), which returns special_db[] directly.
-// Detail is the hard part: the reference scrapes the special "single" HTML page
-// for a `global.data = [...]` array of { hash } objects, then resolves full song
-// info by batch-POSTing those hashes to the gateway album_audio/audio endpoint
-// (static key + KG-* headers, no per-request signature). Both steps are ported
-// here. Song normalization mirrors src/lib/search/kg.ts / src/lib/charts/kg.ts.
+// Detail prefers mobilecdn special/song (+ special/info). User collections use
+// signed mobiles song_v2 / info_v2. HTML scrape is a last-resort fallback.
 
 const LIMIT_LIST = 30
 // 推荐 sort id (sortList[0] in the reference).
 const SORT_RECOMMEND = 5
+
+// js-md5 CommonJS/ESM interop (same pattern as src/lib/search/mg.ts)
+const md5 = ((md5Lib as any).default ?? md5Lib) as (str: string) => string
+
+const KG_WEB_KEY = "NVPh5oo715z5DIWAeQlhMDsWXXQV4hwt"
+const KG_ANDROID_KEY = "OIlwieks28dk2k092lksi2UIkp"
+
+/** KuGou request signature (lx-music kg/util.js signatureParams). */
+function signatureParams(params: string, platform: "web" | "android" = "web", body = ""): string {
+  const key = platform === "web" ? KG_WEB_KEY : KG_ANDROID_KEY
+  const sorted = params.split("&").sort().join("")
+  return md5(`${key}${sorted}${body}${key}`)
+}
 
 // Mirrors src/lib/search/kg.ts sizeFormate
 function sizeFormate(size: number): string {
@@ -41,6 +53,11 @@ function formatPlayCount(num: number): string {
   if (num > 10000) return `${Math.trunc(num / 1000) / 10}万`
   return String(num)
 }
+
+const KG_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+const KG_MOBILE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1"
 
 // --- hot list ---
 interface KgSpecialRaw {
@@ -100,7 +117,7 @@ export async function getKgPlaylistTags(): Promise<PlaylistTag[]> {
     method: "GET",
     headers: {
       Referer: "https://www.kugou.com/",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "User-Agent": KG_UA,
     },
   })
   if (!res.ok) throw new Error(`KuGou playlist tags failed: ${res.status}`)
@@ -134,7 +151,7 @@ export async function getKgHotPlaylists(page = 1, tagId?: string | null): Promis
     method: "GET",
     headers: {
       Referer: "https://www.kugou.com/",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "User-Agent": KG_UA,
     },
   })
 
@@ -149,17 +166,47 @@ export async function getKgHotPlaylists(page = 1, tagId?: string | null): Promis
 }
 
 // --- detail ---
-// Step 1: scrape the special "single" HTML page for `global.data = [...]`
-// and playlist name/cover from `global = { name, pic }` (lx-music listInfo).
-const listDataRx = /global\.data = (\[.+?\]);/
-const listInfoRx = /global = \{[\s\S]+?name: "(.+)"[\s\S]+?pic: "(.+)"[\s\S]+?\};/
-const htmlLinkRx = /^.+\/(\d+)\.html(?:\?.*|&.*$|#.*$|$)/
 
-interface KgGlobalSong {
+interface KgSpecialSongRaw {
+  hash?: string
+  filename?: string
+  album_id?: string | number
+  album_audio_id?: string | number
+  audio_id?: string | number
+  duration?: number
+  filesize?: number
+  "320filesize"?: number
+  sqfilesize?: number
+  filesize_high?: number
+  remark?: string
+  trans_param?: { union_cover?: string }
+}
+
+interface KgSpecialSongResponse {
+  status?: number
+  errcode?: number
+  data?: {
+    total?: number
+    info?: KgSpecialSongRaw[]
+  }
+}
+
+interface KgSpecialInfoResponse {
+  status?: number
+  errcode?: number
+  data?: {
+    specialname?: string
+    imgurl?: string
+    nickname?: string
+    songcount?: number
+    global_specialid?: string
+  }
+}
+
+interface KgGlobalSongRaw {
   hash?: string
 }
 
-// Step 2 response: gateway album_audio/audio returns nested arrays of audio info.
 interface KgAudioInfoRaw {
   audio_id?: string | number
   hash?: string
@@ -180,6 +227,52 @@ interface KgGatewaySong {
   album_info?: KgAlbumInfoRaw
 }
 
+const listDataRx = /global\.data\s*=\s*(\[[\s\S]*?\]);/
+const listInfoRx = /global = \{[\s\S]+?name: "(.+)"[\s\S]+?pic: "(.+)"[\s\S]+?\};/
+const htmlLinkRx = /^.+\/(\d+)\.html(?:\?.*|&.*$|#.*$|$)/
+
+function normalizeKgSpecialSong(raw: KgSpecialSongRaw): MusicInfo | null {
+  const songId = String(raw.album_audio_id ?? raw.audio_id ?? "")
+  if (!songId || songId === "undefined" || !raw.hash) return null
+
+  const qualitys: MusicQuality[] = []
+  if (raw.filesize) qualitys.push({ type: "128k", size: sizeFormate(raw.filesize) })
+  if (raw["320filesize"]) qualitys.push({ type: "320k", size: sizeFormate(raw["320filesize"]) })
+  if (raw.sqfilesize) qualitys.push({ type: "flac", size: sizeFormate(raw.sqfilesize) })
+  if (raw.filesize_high) qualitys.push({ type: "flac24bit", size: sizeFormate(raw.filesize_high) })
+  if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
+
+  const _qualitys = indexQualitySizes(qualitys)
+
+  const filename = decodeName(raw.filename)
+  let singer = ""
+  let name = filename
+  const sep = filename.indexOf(" - ")
+  if (sep > 0) {
+    singer = filename.slice(0, sep)
+    name = filename.slice(sep + 3)
+  }
+
+  const cover = raw.trans_param?.union_cover
+
+  return {
+    id: `kg_${songId}`,
+    name,
+    singer,
+    source: "kg",
+    interval: formatDuration(raw.duration || 0),
+    albumName: decodeName(raw.remark),
+    meta: {
+      songId,
+      albumId: raw.album_id != null ? String(raw.album_id) : "",
+      picUrl: cover ? cover.replace("{size}", "240") : null,
+      hash: raw.hash,
+      qualitys,
+      _qualitys,
+    },
+  }
+}
+
 function normalizeKgGatewaySong(raw: KgGatewaySong): MusicInfo | null {
   const audio = raw.audio_info
   if (!audio?.audio_id) return null
@@ -197,7 +290,6 @@ function normalizeKgGatewaySong(raw: KgGatewaySong): MusicInfo | null {
 
   const _qualitys = indexQualitySizes(qualitys)
 
-  // songId is the album_audio_id (audio_id); hash is the standard FileHash.
   const songId = String(audio.audio_id)
   const duration = parseInt(String(audio.timelength ?? "0"))
 
@@ -219,8 +311,19 @@ function normalizeKgGatewaySong(raw: KgGatewaySong): MusicInfo | null {
   }
 }
 
-// Resolve full song info for a batch of hashes via the gateway (mirrors
-// kg/songList.js createTask: static key + KG-* headers, no signature param).
+function mapSpecialSongs(rawList: KgSpecialSongRaw[]): MusicInfo[] {
+  const seen = new Set<string>()
+  const list: MusicInfo[] = []
+  for (const raw of rawList) {
+    const song = normalizeKgSpecialSong(raw)
+    if (!song) continue
+    if (seen.has(song.meta.songId)) continue
+    seen.add(song.meta.songId)
+    list.push(song)
+  }
+  return list
+}
+
 async function resolveHashes(hashes: string[]): Promise<KgGatewaySong[]> {
   const body = {
     area_code: "1",
@@ -252,25 +355,203 @@ async function resolveHashes(hashes: string[]): Promise<KgGatewaySong[]> {
 
   if (!res.ok) throw new Error(`KuGou playlist detail failed: ${res.status}`)
 
-  // Response data is an array of single-element arrays ([s] -> s[0]).
   const json = (await res.json()) as { data?: KgGatewaySong[][] }
   return (json.data ?? []).map((group) => group?.[0]).filter(Boolean) as KgGatewaySong[]
 }
 
-export async function getKgPlaylistDetail(id: string, _page = 1): Promise<PlaylistDetail> {
-  // Accept the id_<specialid> form produced by getKgHotPlaylists, a bare numeric
-  // id, or a www.kugou.com/.../<id>.html link.
-  let specialId = id
-  if (specialId.startsWith("id_")) specialId = specialId.slice(3)
-  else if (htmlLinkRx.test(specialId)) specialId = specialId.replace(htmlLinkRx, "$1")
+/** Classic editorial / public special via unsigned mobilecdn APIs. */
+async function getDetailBySpecialId(specialId: string): Promise<PlaylistDetail | null> {
+  const songUrl =
+    `http://mobilecdn.kugou.com/api/v3/special/song` +
+    `?plat=0&specialid=${encodeURIComponent(specialId)}&page=1&pagesize=-1&version=9108`
+  const infoUrl =
+    `http://mobilecdn.kugou.com/api/v3/special/info` +
+    `?specialid=${encodeURIComponent(specialId)}&plat=0&version=9108`
 
-  // Step 1: fetch the special "single" page and extract the hash list.
+  const headers = {
+    Referer: "https://m.kugou.com/",
+    "User-Agent": KG_UA,
+  }
+
+  const [songRes, infoRes] = await Promise.all([
+    tauriFetch(songUrl, { method: "GET", headers }),
+    tauriFetch(infoUrl, { method: "GET", headers }),
+  ])
+
+  if (!songRes.ok) return null
+
+  const songJson = (await songRes.json()) as KgSpecialSongResponse
+  if (!songJson || (songJson.errcode != null && songJson.errcode !== 0 && songJson.status !== 1)) {
+    return null
+  }
+
+  const rawList = songJson.data?.info ?? []
+  if (rawList.length === 0) return null
+
+  let info: PlaylistDetailInfo = { name: "", img: null }
+  if (infoRes.ok) {
+    const infoJson = (await infoRes.json()) as KgSpecialInfoResponse
+    const d = infoJson?.data
+    if (d) {
+      info = {
+        name: d.specialname ?? "",
+        img: d.imgurl ? d.imgurl.replace("{size}", "240") : null,
+        author: d.nickname || undefined,
+      }
+    }
+  }
+
+  return { info, list: mapSpecialSongs(rawList) }
+}
+
+/** Resolve global_specialid for a numeric special (fallback path). */
+async function getGlobalIdFromSpecial(specialId: string): Promise<string | null> {
+  const url =
+    `http://mobilecdn.kugou.com/api/v3/special/info` +
+    `?specialid=${encodeURIComponent(specialId)}&plat=0&version=9108`
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: { Referer: "https://m.kugou.com/", "User-Agent": KG_UA },
+  })
+  if (!res.ok) return null
+  const json = (await res.json()) as KgSpecialInfoResponse
+  return json?.data?.global_specialid || null
+}
+
+async function fetchGlobalInfo(globalId: string): Promise<{
+  specialname?: string
+  imgurl?: string
+  intro?: string
+  nickname?: string
+  playcount?: number
+  songcount?: number
+} | null> {
+  const params =
+    `appid=1058&specialid=0&global_specialid=${globalId}` +
+    `&format=jsonp&srcappid=2919&clientver=20000&clienttime=1586163242519` +
+    `&mid=1586163242519&uuid=1586163242519&dfid=-`
+  const url =
+    `https://mobiles.kugou.com/api/v5/special/info_v2?${params}` +
+    `&signature=${signatureParams(params, "web")}`
+
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: {
+      mid: "1586163242519",
+      Referer: "https://m3ws.kugou.com/share/index.php",
+      "User-Agent": KG_MOBILE_UA,
+      dfid: "-",
+      clienttime: "1586163242519",
+    },
+  })
+  if (!res.ok) return null
+  const json = (await res.json()) as { status?: number; errcode?: number; data?: Record<string, unknown> }
+  if (!json?.data || (json.errcode != null && json.errcode !== 0 && json.status === 0)) return null
+  return json.data as {
+    specialname?: string
+    imgurl?: string
+    intro?: string
+    nickname?: string
+    playcount?: number
+    songcount?: number
+  }
+}
+
+async function fetchGlobalSongs(globalId: string, songcount: number): Promise<KgSpecialSongRaw[]> {
+  const total = Math.max(songcount || 0, 1)
+  const tasks: Promise<KgSpecialSongRaw[]>[] = []
+  let remaining = total
+  let page = 0
+  while (remaining > 0) {
+    const limit = remaining > 300 ? 300 : remaining
+    remaining -= limit
+    page += 1
+    const params =
+      `appid=1058&global_specialid=${globalId}&specialid=0&plat=0&version=8000` +
+      `&page=${page}&pagesize=${limit}&srcappid=2919&clientver=20000` +
+      `&clienttime=1586163263991&mid=1586163263991&uuid=1586163263991&dfid=-`
+    const url =
+      `https://mobiles.kugou.com/api/v5/special/song_v2?${params}` +
+      `&signature=${signatureParams(params, "web")}`
+    tasks.push(
+      tauriFetch(url, {
+        method: "GET",
+        headers: {
+          mid: "1586163263991",
+          Referer: "https://m3ws.kugou.com/share/index.php",
+          "User-Agent": KG_MOBILE_UA,
+          dfid: "-",
+          clienttime: "1586163263991",
+        },
+      }).then(async (res) => {
+        if (!res.ok) return []
+        const json = (await res.json()) as KgSpecialSongResponse
+        return json.data?.info ?? []
+      }),
+    )
+  }
+  const pages = await Promise.all(tasks)
+  return pages.flat()
+}
+
+/** User / shared collection via signed mobiles APIs. */
+async function getDetailByGlobalId(globalId: string): Promise<PlaylistDetail> {
+  if (globalId.length > 1000) throw new Error("KuGou playlist detail failed: invalid collection id")
+
+  const meta = await fetchGlobalInfo(globalId)
+  if (!meta) throw new Error("KuGou playlist detail failed: collection info not found")
+
+  const rawList = await fetchGlobalSongs(globalId, meta.songcount ?? 0)
+  return {
+    info: {
+      name: meta.specialname ?? "",
+      img: meta.imgurl ? meta.imgurl.replace("{size}", "240") : null,
+      author: meta.nickname || undefined,
+    },
+    list: mapSpecialSongs(rawList),
+  }
+}
+
+async function decodeGcid(gcid: string): Promise<string | null> {
+  const params = "dfid=-&appid=1005&mid=0&clientver=20109&clienttime=640612895&uuid=-"
+  const body = {
+    ret_info: 1,
+    data: [{ id: gcid, id_type: 2 }],
+  }
+  const bodyStr = JSON.stringify(body)
+  const url =
+    `https://t.kugou.com/v1/songlist/batch_decode?${params}` +
+    `&signature=${signatureParams(params, "android", bodyStr)}`
+
+  const res = await tauriFetch(url, {
+    method: "POST",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Linux; Android 10; HUAWEI HMA-AL00) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.106 Mobile Safari/537.36",
+      Referer: "https://m.kugou.com/",
+      "Content-Type": "application/json",
+    },
+    body: bodyStr,
+  })
+  if (!res.ok) return null
+  const json = (await res.json()) as {
+    errcode?: number
+    data?: { list?: Array<{ global_collection_id?: string }> }
+    list?: Array<{ global_collection_id?: string }>
+  }
+  // createHttp in lx returns body.data; raw response may nest under data.
+  const list = json.data?.list ?? json.list
+  return list?.[0]?.global_collection_id ?? null
+}
+
+/** Last resort: scrape special single HTML + gateway hash resolve. */
+async function getDetailByHtml(specialId: string): Promise<PlaylistDetail> {
   const pageUrl = `http://www2.kugou.kugou.com/yueku/v9/special/single/${specialId}-5-9999.html`
   const pageRes = await tauriFetch(pageUrl, {
     method: "GET",
     headers: {
       Referer: "https://www.kugou.com/",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "User-Agent": KG_UA,
     },
   })
   if (!pageRes.ok) throw new Error(`KuGou playlist detail failed: ${pageRes.status}`)
@@ -280,12 +561,12 @@ export async function getKgPlaylistDetail(id: string, _page = 1): Promise<Playli
   if (!match) throw new Error("KuGou playlist detail failed: list data not found")
 
   const infoMatch = html.match(listInfoRx)
-  const info = {
+  const info: PlaylistDetailInfo = {
     name: infoMatch?.[1] ?? "",
     img: infoMatch?.[2] ? infoMatch[2].replace("{size}", "240") : null,
   }
 
-  const songs = JSON.parse(match[1]) as KgGlobalSong[]
+  const songs = JSON.parse(match[1]) as KgGlobalSongRaw[]
   const hashes: string[] = []
   const seenHash = new Set<string>()
   for (const s of songs) {
@@ -295,7 +576,6 @@ export async function getKgPlaylistDetail(id: string, _page = 1): Promise<Playli
   }
   if (hashes.length === 0) return { info, list: [] }
 
-  // Step 2: resolve hashes via the gateway in batches of 100.
   const groups: KgGatewaySong[][] = []
   for (let i = 0; i < hashes.length; i += 100) {
     groups.push(await resolveHashes(hashes.slice(i, i + 100)))
@@ -311,4 +591,164 @@ export async function getKgPlaylistDetail(id: string, _page = 1): Promise<Playli
     list.push(song)
   }
   return { info, list }
+}
+
+async function getDetailFromShareChain(chain: string): Promise<PlaylistDetail> {
+  const url =
+    `http://m.kugou.com/schain/transfer?pagesize=10000&chain=${encodeURIComponent(chain)}` +
+    `&su=1&page=1&n=0.7928855356604456`
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: { "User-Agent": KG_MOBILE_UA },
+  })
+  if (!res.ok) throw new Error(`KuGou playlist detail failed: ${res.status}`)
+
+  const json = (await res.json()) as {
+    list?: KgSpecialSongRaw[]
+    global_collection_id?: string
+    info?: { name?: string; img?: string; username?: string }
+  }
+
+  if (json.global_collection_id && !json.list) {
+    return getDetailByGlobalId(json.global_collection_id)
+  }
+
+  if (json.list?.length) {
+    return {
+      info: {
+        name: json.info?.name ?? "",
+        img: json.info?.img ? json.info.img.replace("{size}", "240") : null,
+        author: json.info?.username || undefined,
+      },
+      list: mapSpecialSongs(json.list),
+    }
+  }
+
+  throw new Error("KuGou playlist detail failed: share chain empty")
+}
+
+/** Rank / chart page opened via「外部歌单」. */
+async function getDetailByRankId(rankId: string): Promise<PlaylistDetail> {
+  const board = kgBoards.find((b) => b.id === `kg__${rankId}`)
+  const list = await getKgBoardSongs(`kg__${rankId}`, 1)
+  return {
+    info: {
+      name: board?.name ?? `酷狗榜 ${rankId}`,
+      img: list[0]?.meta.picUrl ?? null,
+    },
+    list,
+  }
+}
+
+/** Resolve songlist / share / rank pages. */
+async function getDetailFromLink(link: string): Promise<PlaylistDetail> {
+  let url = link.replace(/#.*$/, "")
+  const rankId = /\/rank\/home\/\d+-(\d+)\.html/i.exec(url)?.[1]
+  if (rankId) return getDetailByRankId(rankId)
+  if (url.includes("global_collection_id=") || url.includes("global_specialid=")) {
+    const m = url.match(/(?:global_collection_id|global_specialid)=([\w]+)/i)
+    if (m?.[1]) return getDetailByGlobalId(m[1])
+  }
+  if (url.includes("gcid_")) {
+    const gcid = url.match(/gcid_\w+/i)?.[0]
+    if (gcid) {
+      const globalId = await decodeGcid(gcid)
+      if (globalId) return getDetailByGlobalId(globalId)
+    }
+  }
+  if (url.includes("chain=")) {
+    const chain = url.match(/[?&]chain=(\w+)/i)?.[1]
+    if (chain) return getDetailFromShareChain(chain)
+  }
+
+  // Follow redirects / scrape page body for embedded collection id.
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: {
+      "User-Agent": KG_MOBILE_UA,
+      Referer: url,
+    },
+  })
+  const finalUrl = (res as Response & { url?: string }).url || url
+  if (finalUrl !== url) {
+    if (/(?:global_collection_id|global_specialid)=([\w]+)/i.test(finalUrl)) {
+      return getDetailFromLink(finalUrl)
+    }
+    if (/[?&]chain=(\w+)/i.test(finalUrl)) {
+      return getDetailFromLink(finalUrl)
+    }
+  }
+
+  if (!res.ok) throw new Error(`KuGou playlist detail failed: ${res.status}`)
+
+  const body = await res.text()
+  let globalId = body.match(/"global_collection_id"\s*:\s*"(\w+)"/)?.[1]
+  if (!globalId) {
+    let gcid = body.match(/"encode_gic"\s*:\s*"(\w+)"/)?.[1]
+    if (!gcid) gcid = body.match(/"encode_src_gid"\s*:\s*"(\w+)"/)?.[1]
+    if (gcid) globalId = (await decodeGcid(gcid)) ?? undefined
+  }
+  if (globalId) return getDetailByGlobalId(globalId)
+
+  // Share short code in path: /share/xxxx.html
+  const chain = finalUrl.match(/\/share\/(\w+)\.html/i)?.[1]
+  if (chain) return getDetailFromShareChain(chain)
+
+  throw new Error("KuGou playlist detail failed: list data not found")
+}
+
+function parseKgPlaylistId(id: string): {
+  kind: "special" | "global" | "gcid" | "chain" | "rank" | "link"
+  value: string
+} {
+  const raw = id.trim()
+  if (/^https?:\/\//i.test(raw) || /kugou\.com/i.test(raw)) {
+    return { kind: "link", value: raw.replace(/^.*?http/i, "http") }
+  }
+  if (raw.startsWith("rank_")) return { kind: "rank", value: raw.slice(5) }
+  if (raw.startsWith("gcid_")) return { kind: "gcid", value: raw }
+  if (raw.startsWith("collection_")) return { kind: "global", value: raw }
+  if (raw.startsWith("chain_")) return { kind: "chain", value: raw.slice(6) }
+
+  let specialId = raw
+  if (specialId.startsWith("id_")) specialId = specialId.slice(3)
+  else if (htmlLinkRx.test(specialId)) specialId = specialId.replace(htmlLinkRx, "$1")
+  return { kind: "special", value: specialId }
+}
+
+export async function getKgPlaylistDetail(id: string, _page = 1): Promise<PlaylistDetail> {
+  const parsed = parseKgPlaylistId(id)
+
+  if (parsed.kind === "link") {
+    return getDetailFromLink(parsed.value)
+  }
+  if (parsed.kind === "rank") {
+    return getDetailByRankId(parsed.value)
+  }
+  if (parsed.kind === "gcid") {
+    const globalId = await decodeGcid(parsed.value)
+    if (!globalId) throw new Error("KuGou playlist detail failed: gcid decode failed")
+    return getDetailByGlobalId(globalId)
+  }
+  if (parsed.kind === "global") {
+    return getDetailByGlobalId(parsed.value)
+  }
+  if (parsed.kind === "chain") {
+    return getDetailFromShareChain(parsed.value)
+  }
+
+  // Classic specialid: mobilecdn first, then global_specialid, then HTML.
+  const byApi = await getDetailBySpecialId(parsed.value)
+  if (byApi) return byApi
+
+  const globalId = await getGlobalIdFromSpecial(parsed.value)
+  if (globalId) {
+    try {
+      return await getDetailByGlobalId(globalId)
+    } catch {
+      /* fall through to HTML */
+    }
+  }
+
+  return getDetailByHtml(parsed.value)
 }

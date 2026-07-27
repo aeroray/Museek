@@ -97,7 +97,10 @@ export function CloseGuard() {
     if (st.syncFolder) {
       if (st.autoBackupOnExit || (showBackupChoice && backupChecked)) await safeBackup()
     }
-    if (showDontRemind && dontRemind) st.setCloseConfirmDismissed(true)
+    // Persist "don't remind" before quitting — otherwise the process exits mid-write.
+    if (showDontRemind && dontRemind) {
+      await Promise.resolve(st.setCloseConfirmDismissed(true))
+    }
     await invoke("quit_app")
   }
 

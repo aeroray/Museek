@@ -70,7 +70,7 @@ interface SettingsState extends Persisted {
   setFavoritesPlatform: (p: FavoritesPlatform) => void
   setLocalSort: (s: LocalSort) => void
   setCloseBehavior: (b: CloseBehavior) => void
-  setCloseConfirmDismissed: (v: boolean) => void
+  setCloseConfirmDismissed: (v: boolean) => void | Promise<void>
   setOpenAtLogin: (v: boolean) => void
   setSyncFolder: (dir: string | null) => void
   setSyncPassphrase: (p: string | null) => void
@@ -135,7 +135,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       autoBackupOnExit,
       syncLastAt,
     } = get()
-    writeData("settings.json", {
+    return writeData("settings.json", {
       playQuality,
       downloadQuality,
       downloadDir,
@@ -226,7 +226,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setCloseConfirmDismissed(v) {
       set({ closeConfirmDismissed: v })
-      persist()
+      // Must be awaitable: CloseGuard quits right after this, and a fire-and-forget
+      // write can be killed before it hits disk (so "don't remind" never sticks).
+      return persist()
     },
     setOpenAtLogin(v) {
       set({ openAtLogin: v })

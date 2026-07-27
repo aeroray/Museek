@@ -17,6 +17,40 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.3.2": {
+    zh: {
+      sections: [
+        {
+          title: "🎵 歌单",
+          bullets: [
+            "修复酷狗外部歌单加载失败；支持榜单链接（如 /yy/rank/home/1-6666.html）",
+          ],
+        },
+        {
+          title: "🪟 窗口",
+          bullets: [
+            "修复关闭确认里勾选「不再提醒」后仍会再次弹出的问题",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎵 Playlists",
+          bullets: [
+            "Fix KuGou external playlist loading; chart links like /yy/rank/home/… now work",
+          ],
+        },
+        {
+          title: "🪟 Window",
+          bullets: [
+            "Fix: “Don’t remind me” on the close dialog may not stick",
+          ],
+        },
+      ],
+    },
+  },
   "2.3.1": {
     zh: {
       sections: [

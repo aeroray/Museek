@@ -89,7 +89,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "hotPlaylists.title": "歌单",
     "hotPlaylists.open": "打开外部歌单",
     "hotPlaylists.openTitle": "打开外部歌单",
-    "hotPlaylists.openHint": "粘贴与所选平台一致的歌单链接或 ID；QQ「我喜欢」需将主页设为公开。",
+    "hotPlaylists.openHint":
+      "粘贴与所选平台一致的歌单链接或 ID；酷狗也支持榜单链接（如 /yy/rank/home/…）。QQ「我喜欢」需将主页设为公开。",
     "hotPlaylists.openPlaceholder": "歌单链接或 ID…",
     "hotPlaylists.openConfirm": "打开",
     "hotPlaylists.openOpening": "正在打开…",
@@ -551,7 +552,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "hotPlaylists.open": "Open external playlist",
     "hotPlaylists.openTitle": "Open external playlist",
     "hotPlaylists.openHint":
-      "Paste a playlist link or ID for the selected platform. QQ Liked lists need a public profile.",
+      "Paste a playlist link or ID for the selected platform. KuGou also accepts chart links (/yy/rank/home/…). QQ Liked lists need a public profile.",
     "hotPlaylists.openPlaceholder": "Playlist link or ID…",
     "hotPlaylists.openConfirm": "Open",
     "hotPlaylists.openOpening": "Opening…",
