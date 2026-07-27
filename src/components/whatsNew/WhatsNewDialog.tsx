@@ -54,10 +54,17 @@ export function WhatsNewDialog() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     const timer = window.setTimeout(() => {
-      if (shouldShowWhatsNew(version)) setOpen(true)
+      void (async () => {
+        const show = await shouldShowWhatsNew(version)
+        if (!cancelled && show) setOpen(true)
+      })()
     }, SHOW_DELAY_MS)
-    return () => window.clearTimeout(timer)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [version])
 
   useEffect(() => subscribeWhatsNewOpen(() => setOpen(true)), [])
@@ -69,7 +76,7 @@ export function WhatsNewDialog() {
   const currentCopy = current?.copy ?? getWhatsNew(version, lang)
 
   const dismiss = () => {
-    setSeenVersion(version)
+    void setSeenVersion(version)
     setOpen(false)
   }
 

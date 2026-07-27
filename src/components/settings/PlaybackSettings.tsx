@@ -13,9 +13,11 @@ export function PlaybackSettings() {
     playQuality,
     preventSleepWhilePlaying,
     closeBehavior,
+    openAtLogin,
     setPlayQuality,
     setPreventSleepWhilePlaying,
     setCloseBehavior,
+    setOpenAtLogin,
   } = useSettingsStore()
   const t = useT()
 
@@ -42,6 +44,12 @@ export function PlaybackSettings() {
             title={t("playback.preventSleepTitle")}
             desc={t("playback.preventSleepDesc")}
             control={<Switch checked={preventSleepWhilePlaying} onCheckedChange={setPreventSleepWhilePlaying} />}
+          />
+
+          <SettingRow
+            title={t("playback.openAtLoginTitle")}
+            desc={t("playback.openAtLoginDesc")}
+            control={<Switch checked={openAtLogin} onCheckedChange={setOpenAtLogin} />}
           />
 
           <SettingRow title={t("close.behaviorTitle")} desc={t("close.behaviorDesc")}>

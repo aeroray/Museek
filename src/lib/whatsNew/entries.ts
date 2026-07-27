@@ -17,6 +17,40 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.3.1": {
+    zh: {
+      sections: [
+        {
+          title: "📜 更新日志",
+          bullets: [
+            "修复 Mac 应用内更新后启动不弹出更新日志的问题",
+          ],
+        },
+        {
+          title: "⚙️ 设置",
+          bullets: [
+            "新增开机自启动开关（默认关闭，Windows / macOS 均可用）",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📜 Changelog",
+          bullets: [
+            "Fix: changelog may not appear after an in-app update on Mac",
+          ],
+        },
+        {
+          title: "⚙️ Settings",
+          bullets: [
+            "New open-at-login toggle (off by default; Windows and macOS)",
+          ],
+        },
+      ],
+    },
+  },
   "2.3.0": {
     zh: {
       sections: [

@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { readData, writeData } from "@/lib/db"
 import { normalizeLocalScanDepth } from "@/lib/localMusic/depth"
 import { setTrayVisible } from "@/lib/power"
+import { syncOpenAtLogin } from "@/lib/autostart"
 import type { OnlineSource, Quality } from "@/types/music"
 
 export type NamingScheme = "singer-name" | "name-singer" | "name"
@@ -40,6 +41,8 @@ interface Persisted {
   localSort: LocalSort
   closeBehavior: CloseBehavior
   closeConfirmDismissed: boolean
+  /** Launch Museek when the OS signs in (Win + macOS). Default off. */
+  openAtLogin: boolean
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
   syncFolder: string | null
   // Stored so auto-sync can run silently; the cloud file stays encrypted regardless.
@@ -68,6 +71,7 @@ interface SettingsState extends Persisted {
   setLocalSort: (s: LocalSort) => void
   setCloseBehavior: (b: CloseBehavior) => void
   setCloseConfirmDismissed: (v: boolean) => void
+  setOpenAtLogin: (v: boolean) => void
   setSyncFolder: (dir: string | null) => void
   setSyncPassphrase: (p: string | null) => void
   setAutoBackupOnExit: (v: boolean) => void
@@ -92,6 +96,7 @@ const DEFAULTS: Persisted = {
   localSort: "added",
   closeBehavior: "exit",
   closeConfirmDismissed: false,
+  openAtLogin: false,
   syncFolder: null,
   syncPassphrase: null,
   autoBackupOnExit: true,
@@ -124,6 +129,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localSort,
       closeBehavior,
       closeConfirmDismissed,
+      openAtLogin,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -146,6 +152,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localSort,
       closeBehavior,
       closeConfirmDismissed,
+      openAtLogin,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -221,6 +228,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       set({ closeConfirmDismissed: v })
       persist()
     },
+    setOpenAtLogin(v) {
+      set({ openAtLogin: v })
+      persist()
+      void syncOpenAtLogin(v)
+    },
     setSyncFolder(dir) {
       set({ syncFolder: dir })
       persist()
@@ -291,12 +303,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.closeConfirmDismissed === "boolean"
             ? data.closeConfirmDismissed
             : DEFAULTS.closeConfirmDismissed,
+        openAtLogin: typeof data.openAtLogin === "boolean" ? data.openAtLogin : DEFAULTS.openAtLogin,
         syncFolder: typeof data.syncFolder === "string" ? data.syncFolder : null,
         syncPassphrase: typeof data.syncPassphrase === "string" ? data.syncPassphrase : null,
         autoBackupOnExit:
           typeof data.autoBackupOnExit === "boolean" ? data.autoBackupOnExit : DEFAULTS.autoBackupOnExit,
         syncLastAt: typeof data.syncLastAt === "string" ? data.syncLastAt : null,
       })
+      // Keep the OS login item in sync with the saved preference.
+      void syncOpenAtLogin(get().openAtLogin)
       // Persist the one-time download-location reset so it doesn't repeat next launch.
       if (!dlLocalized) {
         localStorage.setItem("museek.downloadDir.localized", "1")
