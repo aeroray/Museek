@@ -546,6 +546,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         set({ currentPicUrl: song.meta.picUrl })
         return
       }
+      // Local embedded covers are stored under AppData; resolve if we only have the rel path.
+      if (song.source === "local" && song.meta.localCoverRel) {
+        const { resolveLocalCoverUrl } = await import("@/lib/localMusic")
+        const localUrl = await resolveLocalCoverUrl(song.meta.localCoverRel)
+        if (localUrl) {
+          set({ currentPicUrl: localUrl })
+          return
+        }
+      }
       const picUrl = await sourceRunner.getPic({ source: song.source, action: "pic", info: song })
       if (picUrl) set({ currentPicUrl: picUrl })
     },

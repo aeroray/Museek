@@ -17,6 +17,44 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.3.4": {
+    zh: {
+      sections: [
+        {
+          title: "📂 打开方式",
+          bullets: [
+            "修复右键用拾音打开时误报「无法读取本地文件」的权限问题",
+            "重新打开已导入的歌会刷新封面；补全的封面会同步到正在播放",
+            "打开文件时将窗口拉到前台，避免只在后台播放却看不见",
+          ],
+        },
+        {
+          title: "🪟 迷你播放器",
+          bullets: [
+            "播放列表高度随歌曲数量伸缩，最多约显示 4 首，超出可滚动",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📂 Open with",
+          bullets: [
+            "Fix false “couldn’t read local file / check permissions” when opening via Open with",
+            "Re-opening an imported track refreshes artwork; enriched covers sync to the player",
+            "Bring Museek to the foreground when opening files so playback isn’t hidden in the background",
+          ],
+        },
+        {
+          title: "🪟 Mini player",
+          bullets: [
+            "Queue panel height follows the number of tracks (max ~4 rows, then scroll)",
+          ],
+        },
+      ],
+    },
+  },
   "2.3.3": {
     zh: {
       sections: [

@@ -2,7 +2,7 @@ import { listen } from "@tauri-apps/api/event"
 import { invoke } from "@tauri-apps/api/core"
 import { t } from "@/lib/i18n"
 import { notify } from "@/lib/notify"
-import { extOf } from "@/lib/localMusic"
+import { extOf, mapLocalPlayError } from "@/lib/localMusic"
 import { useLocalMusicStore } from "@/stores/localMusicStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import type { MusicInfo } from "@/types/music"
@@ -15,6 +15,21 @@ const pendingBatches: string[][] = []
 
 function pathKey(filePath: string): string {
   return filePath.replace(/\\/g, "/").toLowerCase()
+}
+
+/** Raise Museek above Explorer / other apps when OS "Open with" fires. */
+async function bringAppToFront() {
+  if (!isTauri) return
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window")
+    const win = getCurrentWindow()
+    await win.setSkipTaskbar(false).catch(() => {})
+    await win.show()
+    await win.unminimize().catch(() => {})
+    await win.setFocus().catch(() => {})
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Resolve opened paths to library songs, preserving open order. */
@@ -36,6 +51,7 @@ function playOpenedSongs(songs: MusicInfo[]) {
   const player = usePlayerStore.getState()
   player.clearQueue()
   player.addToQueue(songs)
+  // Local play errors are toasted inside playerStore via mapLocalPlayError.
   void player.play(songs[0])
 }
 
@@ -61,6 +77,7 @@ async function importOpenedPaths(paths: string[]) {
   if (paths.length) pendingBatches.push(paths)
   if (importing) return
   importing = true
+  void bringAppToFront()
   try {
     // One OS open = one batch. Do not flatten concurrent opens into one list —
     // otherwise "open A, then open B" would play A (first) instead of B (latest).
@@ -69,7 +86,11 @@ async function importOpenedPaths(paths: string[]) {
       const unique = [...new Set(batch)]
       if (!unique.length) continue
       try {
-        const n = await useLocalMusicStore.getState().importPaths(unique)
+        const n = await useLocalMusicStore.getState().importPaths(unique, {
+          // Re-read tags/covers — earlier open-with attempts may have imported
+          // without FS scope and left rows with no artwork.
+          refreshExisting: true,
+        })
         const songs = songsForPaths(unique)
         if (songs.length) {
           playOpenedSongs(songs)
@@ -89,7 +110,7 @@ async function importOpenedPaths(paths: string[]) {
         }
       } catch (e) {
         notify({
-          message: t("local.importFailed", { msg: String(e) }),
+          message: mapLocalPlayError(e),
           variant: "error",
         })
       }
@@ -114,7 +135,10 @@ async function drainOpenedLocalFiles() {
 async function drainUnsupportedOpens() {
   try {
     const paths = await invoke<string[]>("take_opened_unsupported_files")
-    if (paths?.length) notifyUnsupportedPaths(paths)
+    if (paths?.length) {
+      void bringAppToFront()
+      notifyUnsupportedPaths(paths)
+    }
   } catch {
     /* command missing in browser preview */
   }

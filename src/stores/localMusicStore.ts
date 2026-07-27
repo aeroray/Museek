@@ -46,8 +46,7 @@ interface LocalMusicState {
   loadFromDisk: () => Promise<void>
   importFiles: () => Promise<number>
   importFolder: () => Promise<number>
-  /** Import absolute filesystem paths (OS "Open with" / file association). */
-  importPaths: (paths: string[]) => Promise<number>
+  importPaths: (paths: string[], opts?: { refreshExisting?: boolean }) => Promise<number>
   remove: (id: string) => Promise<void>
   removeMany: (ids: string[]) => Promise<void>
   updateSong: (id: string, song: MusicInfo) => void
@@ -201,10 +200,14 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     schedulePersist()
   }
 
-  async function ingestPaths(paths: string[]): Promise<number> {
+  async function ingestPaths(
+    paths: string[],
+    opts?: { refreshExisting?: boolean }
+  ): Promise<number> {
     const byPath = new Map(get().tracks.map((t) => [pathKey(t.filePath), t]))
     const toImport: string[] = []
     const toRestore: LocalTrack[] = []
+    const toRefresh: LocalTrack[] = []
     const seen = new Set<string>()
 
     for (const filePath of paths) {
@@ -215,12 +218,13 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       if (existing) {
         // Same path again: if it was marked missing, clear that on successful re-read.
         if (existing.unavailable) toRestore.push(existing)
+        else if (opts?.refreshExisting) toRefresh.push(existing)
         continue
       }
       toImport.push(filePath)
     }
 
-    const total = toImport.length + toRestore.length
+    const total = toImport.length + toRestore.length + toRefresh.length
     if (total === 0) {
       set({ importProgress: null })
       return 0
@@ -235,7 +239,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       set({ importProgress: { done, total, current } })
     }
 
-    await mapPool(toRestore, IMPORT_CONCURRENCY, async (existing) => {
+    const applyParsed = async (existing: LocalTrack, countAsAdded: boolean) => {
       const current = fileBasename(existing.filePath)
       try {
         const tags = await parseLocalFile(existing.filePath, existing.id)
@@ -245,16 +249,20 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
           unavailable: false,
           song,
         })
-        added += 1
+        if (countAsAdded) added += 1
         void enrichLocalSong(song, tags).then((enriched) => {
           if (enriched !== song) get().updateSong(existing.id, enriched)
         })
       } catch {
-        /* still missing / unreadable — leave unavailable as-is */
+        /* still missing / unreadable — leave as-is */
       } finally {
         bumpProgress(current)
       }
-    })
+    }
+
+    await mapPool(toRestore, IMPORT_CONCURRENCY, (existing) => applyParsed(existing, true))
+    // Open-with re-read: recover covers/tags after a prior failed (scoped) import.
+    await mapPool(toRefresh, IMPORT_CONCURRENCY, (existing) => applyParsed(existing, false))
 
     await mapPool(toImport, IMPORT_CONCURRENCY, async (filePath) => {
       const current = fileBasename(filePath)
@@ -356,12 +364,12 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       }
     },
 
-    async importPaths(paths) {
+    async importPaths(paths, opts) {
       const filtered = paths.filter((p) => typeof p === "string" && isLocalAudioPath(p))
       if (!filtered.length) return 0
       set({ importing: true, importProgress: null })
       try {
-        return await ingestPaths(filtered)
+        return await ingestPaths(filtered, opts)
       } finally {
         set({ importing: false, importProgress: null })
       }
@@ -388,6 +396,31 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       const tracks = get().tracks.map((t) => (t.id === id ? { ...t, song } : t))
       set({ tracks })
       persist(tracks, get().categories)
+      // Enrich/cover refresh often finishes after playback already started — push
+      // into the player without a static import cycle.
+      queueMicrotask(() => {
+        void import("@/stores/playerStore").then(({ usePlayerStore }) => {
+          const p = usePlayerStore.getState()
+          if (p.currentSong?.id !== id) return
+          const picUrl = song.meta.picUrl ?? p.currentPicUrl
+          usePlayerStore.setState({
+            currentSong: song,
+            currentPicUrl: picUrl,
+            queue: p.queue.map((item) =>
+              item.music.id === id ? { ...item, music: song } : item
+            ),
+          })
+          void import("@/lib/smtc").then(({ updateMediaControls }) => {
+            updateMediaControls(
+              song.name,
+              song.singer,
+              song.albumName ?? "",
+              picUrl,
+              p.isPlaying
+            )
+          })
+        })
+      })
     },
 
     setTrackUnavailable(id, unavailable) {

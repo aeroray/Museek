@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
+use tauri_plugin_fs::FsExt;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod update_race;
@@ -129,6 +130,65 @@ fn show_main(app: &tauri::AppHandle) {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
+        // Windows blocks SetForegroundWindow unless we attach to the current
+        // foreground thread — plain set_focus() often no-ops when Explorer
+        // just handed us an "Open with" activation.
+        #[cfg(target_os = "windows")]
+        if let Ok(hwnd) = w.hwnd() {
+            force_foreground_hwnd(hwnd.0 as *mut std::ffi::c_void);
+        }
+        // Fallback: flash the taskbar if focus still didn't stick.
+        let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn force_foreground_hwnd(hwnd_ptr: *mut std::ffi::c_void) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
+        SetWindowPos, ShowWindow, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+        SWP_SHOWWINDOW, SW_RESTORE,
+    };
+
+    if hwnd_ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let hwnd = HWND(hwnd_ptr);
+        let _ = ShowWindow(hwnd, SW_RESTORE);
+
+        let fg = GetForegroundWindow();
+        let fg_tid = GetWindowThreadProcessId(fg, None);
+        let cur_tid = GetCurrentThreadId();
+        if fg_tid != 0 && fg_tid != cur_tid {
+            let _ = AttachThreadInput(cur_tid, fg_tid, true);
+        }
+        let _ = BringWindowToTop(hwnd);
+        let _ = SetForegroundWindow(hwnd);
+        // Brief TOPMOST toggle forces Z-order above the file manager.
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        );
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_NOTOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        );
+        if fg_tid != 0 && fg_tid != cur_tid {
+            let _ = AttachThreadInput(cur_tid, fg_tid, false);
+        }
     }
 }
 
@@ -192,6 +252,12 @@ struct PendingUnsupportedOpens(Mutex<Vec<String>>);
 fn queue_open_local_files(app: &tauri::AppHandle, paths: Vec<String>) {
     if paths.is_empty() {
         return;
+    }
+    // Open-with / argv paths never go through the dialog picker, so expand the
+    // fs ACL for each file or exists()/readFile() will deny and surface as a
+    // fake "permission" error in the UI.
+    for p in &paths {
+        let _ = app.fs_scope().allow_file(std::path::Path::new(p));
     }
     if let Ok(mut guard) = app.state::<PendingLocalFiles>().0.lock() {
         for p in &paths {

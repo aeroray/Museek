@@ -22,6 +22,7 @@ import {
   notifyMiniPointerEnter,
   notifyMiniPointerLeave,
   setMiniQueueExpanded,
+  syncMiniQueueWindowSize,
 } from "@/lib/miniPlayer"
 import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
@@ -134,6 +135,12 @@ export function MiniPlayer() {
       cancelled = true
       cancelAnimationFrame(outer)
     }
+  }, [queueOpen, queue.length])
+
+  // Keep the mini window height in sync with queue length (1–4 rows).
+  useEffect(() => {
+    if (!queueOpen) return
+    void syncMiniQueueWindowSize()
   }, [queueOpen, queue.length])
 
   const toggleFav = () => {

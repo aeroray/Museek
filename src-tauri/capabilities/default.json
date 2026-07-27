@@ -43,7 +43,8 @@
         { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
-        { "path": "$DOWNLOAD/**" }
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" }
       ]
     },
     {
@@ -53,14 +54,48 @@
         { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
-        { "path": "$DOWNLOAD/**" }
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" }
       ]
     },
-    "fs:allow-read-file",
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [
+        { "path": "**" },
+        { "path": "**/*" },
+        { "path": "$HOME/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        { "path": "**" },
+        { "path": "**/*" },
+        { "path": "$HOME/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        { "path": "**" },
+        { "path": "**/*" },
+        { "path": "$HOME/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" }
+      ]
+    },
     "fs:allow-mkdir",
-    "fs:allow-read-dir",
     "fs:allow-remove",
-    "fs:allow-exists",
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
     {

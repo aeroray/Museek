@@ -9,8 +9,27 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 /** Horizontal mini bar — compact width for cover + transport + actions. */
 export const MINI_WIDTH = 400
 export const MINI_HEIGHT = 72
-/** Compact queue panel under the bar — keep short. */
-export const MINI_QUEUE_HEIGHT = 168
+/** Max visible rows in the mini queue panel before scrolling. */
+export const MINI_QUEUE_MAX_ROWS = 4
+/**
+ * One queue row: py-1.5 + title (text-xs) + singer (10px) + leading-tight.
+ * Tuned so 4 rows ≈ the old fixed 168px panel.
+ */
+const MINI_QUEUE_ROW = 38
+const MINI_QUEUE_GAP = 2
+const MINI_QUEUE_PAD = 12
+/** Empty-queue placeholder height. */
+const MINI_QUEUE_EMPTY = 40
+
+/** Compact queue panel height for `trackCount` songs (capped at 4). */
+export function miniQueuePanelHeight(trackCount: number): number {
+  if (trackCount <= 0) return MINI_QUEUE_EMPTY
+  const n = Math.min(trackCount, MINI_QUEUE_MAX_ROWS)
+  return MINI_QUEUE_PAD + n * MINI_QUEUE_ROW + Math.max(0, n - 1) * MINI_QUEUE_GAP
+}
+
+/** @deprecated Prefer miniQueuePanelHeight — kept as the 4-row max for callers. */
+export const MINI_QUEUE_HEIGHT = miniQueuePanelHeight(MINI_QUEUE_MAX_ROWS)
 /** Cover-only peek when docked to a screen edge. */
 export const MINI_PEEK_SIZE = 64
 
@@ -206,7 +225,9 @@ async function lockLogicalSize(win: Window, width: number, height: number): Prom
 }
 
 function barHeight(): number {
-  return queueExpanded ? MINI_HEIGHT + MINI_QUEUE_HEIGHT : MINI_HEIGHT
+  if (!queueExpanded) return MINI_HEIGHT
+  const n = usePlayerStore.getState().queue.length
+  return MINI_HEIGHT + miniQueuePanelHeight(n)
 }
 
 /** Right-edge center mini target in physical pixels for the current monitor. */
@@ -619,6 +640,19 @@ export async function setMiniQueueExpanded(expanded: boolean): Promise<void> {
   }
   setDockHint(null)
 
+  await applyMiniBarSize()
+
+  if (!expanded) scheduleMiniPeekCollapse(500)
+}
+
+/** Re-apply window size while the queue panel is open (e.g. songs added/removed). */
+export async function syncMiniQueueWindowSize(): Promise<void> {
+  if (!queueExpanded) return
+  if ((!sessionActive && !usePlayerStore.getState().miniMode) || transitioning) return
+  await applyMiniBarSize()
+}
+
+async function applyMiniBarSize(): Promise<void> {
   const win = await getWin()
   if (!win) return
 
@@ -631,8 +665,6 @@ export async function setMiniQueueExpanded(expanded: boolean): Promise<void> {
   } catch {
     /* best-effort */
   }
-
-  if (!expanded) scheduleMiniPeekCollapse(500)
 }
 
 export function isMiniPlayerSession(): boolean {
