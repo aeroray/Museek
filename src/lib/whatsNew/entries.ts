@@ -17,6 +17,58 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.3.3": {
+    zh: {
+      sections: [
+        {
+          title: "📂 打开方式",
+          bullets: [
+            "设为默认打开后保持单实例：再双击歌曲会导入本地并立即播放，而不是再开一个窗口",
+            "不支持的格式（如 wma）会明确提示，不再只亮窗口却无反馈",
+          ],
+        },
+        {
+          title: "💿 本地音乐",
+          bullets: [
+            "导入更快：并发扫描、进度显示；音质按实际编码识别（不再只看扩展名）",
+            "同路径重新导入可清除「文件缺失」；内嵌封面与歌词（同目录 .lrc / 标签）更稳",
+            "大文件播放改用资源协议，减少卡顿",
+          ],
+        },
+        {
+          title: "🎙 顶栏歌词",
+          bullets: [
+            "字号加大，并避免下行字母被裁切",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📂 Open with",
+          bullets: [
+            "Single-instance: opening more songs imports them locally and plays immediately instead of spawning new windows",
+            "Unsupported formats (e.g. wma) show a clear toast instead of a silent focus-only open",
+          ],
+        },
+        {
+          title: "💿 Local music",
+          bullets: [
+            "Faster imports with concurrency + progress; quality from real encoding (not just extension)",
+            "Re-importing the same path clears “file missing”; embedded covers and lyrics (.lrc / tags) are more reliable",
+            "Large local files play via the asset protocol to reduce hitching",
+          ],
+        },
+        {
+          title: "🎙 Top-bar lyrics",
+          bullets: [
+            "Larger type and no clipped descenders",
+          ],
+        },
+      ],
+    },
+  },
   "2.3.2": {
     zh: {
       sections: [

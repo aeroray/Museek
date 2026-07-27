@@ -1,23 +1,6 @@
 import { t } from "@/lib/i18n"
-import { extOf } from "./tags"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
-
-function mimeForExt(ext: string): string {
-  switch (ext) {
-    case "flac":
-      return "audio/flac"
-    case "m4a":
-    case "aac":
-      return "audio/mp4"
-    case "ogg":
-      return "audio/ogg"
-    case "wav":
-      return "audio/wav"
-    default:
-      return "audio/mpeg"
-  }
-}
 
 /** Map raw FS / path errors to a short user-facing local-playback message. */
 export function mapLocalPlayError(err: unknown): string {
@@ -44,15 +27,16 @@ export function mapLocalPlayError(err: unknown): string {
 }
 
 /**
- * Load a local audio file into a blob: URL for the HTML audio element.
+ * Resolve a local audio path to a WebView-loadable URL via Tauri's asset protocol.
+ * Streams from disk — no full-file copy into JS memory (unlike the old blob path).
  */
 export async function localFileToObjectUrl(filePath: string): Promise<string> {
   if (!isTauri) throw new Error(t("local.desktopOnly"))
-  const { readFile, exists } = await import("@tauri-apps/plugin-fs")
   try {
+    const { exists } = await import("@tauri-apps/plugin-fs")
+    const { convertFileSrc } = await import("@tauri-apps/api/core")
     if (!(await exists(filePath))) throw new Error(t("local.fileMissing"))
-    const bytes = await readFile(filePath)
-    return URL.createObjectURL(new Blob([bytes], { type: mimeForExt(extOf(filePath)) }))
+    return convertFileSrc(filePath)
   } catch (err) {
     if (err instanceof Error && err.message === t("local.fileMissing")) throw err
     if (err instanceof Error && err.message === t("local.desktopOnly")) throw err

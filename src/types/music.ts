@@ -23,6 +23,8 @@ export interface MusicInfoMeta {
   filePath?: string
   /** AppData-relative cover extracted from tags, e.g. museek/localCovers/….jpg */
   localCoverRel?: string
+  /** Timed LRC text extracted from tags at import (local only). */
+  embeddedLyric?: string
 }
 
 export interface MusicInfo {

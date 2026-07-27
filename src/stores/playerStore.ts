@@ -207,10 +207,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           const filePath = song.meta.filePath
           if (!filePath) throw new Error(t("local.missingPath"))
           const src = await localFileToObjectUrl(filePath)
-          if (!isPlayGenerationCurrent(gen)) {
-            URL.revokeObjectURL(src)
-            return
-          }
+          if (!isPlayGenerationCurrent(gen)) return
           const best = song.meta.qualitys[0]?.type ?? preferred
           set((s) => {
             const q = [...s.queue]

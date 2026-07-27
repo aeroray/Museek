@@ -28,6 +28,7 @@ import { useDownloadStore } from "@/stores/downloadStore"
 import { useLocalMusicStore } from "@/stores/localMusicStore"
 import { useUpdateStore } from "@/stores/updateStore"
 import { syncWindowTitle } from "@/lib/i18n"
+import { startOpenLocalFilesListener } from "@/lib/openLocalFiles"
 
 // Wire UI ports once — stores/lib never import uiStore.
 bindNotify((payload) => useUiStore.getState().notify(payload))
@@ -50,10 +51,13 @@ function AppInit() {
     // Match the Windows taskbar / window title to the saved UI language ASAP.
     void syncWindowTitle()
 
+    let cancelled = false
+    let stopOpenFiles: (() => void) | undefined
+
     // First: silent sync-folder import. If a newer config is found it applies it
     // and reloads, so skip the rest of init in that case.
     maybeAutoImport().then((reloading) => {
-      if (reloading) return
+      if (cancelled || reloading) return
       loadSources()
       loadPlaylists()
       loadHistory()
@@ -62,12 +66,18 @@ function AppInit() {
       // After settings load, trim the cache in case the limit was lowered.
       // Downloads need downloadDir from settings before unfinished tasks resume.
       loadSettings().then(() => {
+        if (cancelled) return
         const s = useSettingsStore.getState()
         enforceLimit(s.maxCacheMB * 1024 * 1024)
         // Show the tray icon only if the saved close-behavior is "hide to tray".
         setTrayVisible(s.closeBehavior === "tray")
         void loadDownloads()
-        void loadLocalMusic()
+        // Local library must be hydrated before OS "Open with" imports, otherwise
+        // a parallel loadFromDisk can wipe tracks just imported into memory.
+        void loadLocalMusic().then(() => {
+          if (cancelled) return
+          stopOpenFiles = startOpenLocalFilesListener()
+        })
       })
     })
 
@@ -75,7 +85,11 @@ function AppInit() {
     const timer = window.setTimeout(() => {
       void useUpdateStore.getState().checkOnStartup()
     }, 2500)
-    return () => window.clearTimeout(timer)
+    return () => {
+      cancelled = true
+      stopOpenFiles?.()
+      window.clearTimeout(timer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

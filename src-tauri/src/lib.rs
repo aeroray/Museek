@@ -132,6 +132,117 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
+/// Audio extensions Museek can import as local library tracks.
+fn is_local_audio_path(path: &std::path::Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .as_deref(),
+        Some("mp3" | "flac" | "m4a" | "ogg" | "wav" | "aac")
+    )
+}
+
+fn normalize_open_arg(raw: &str) -> Option<std::path::PathBuf> {
+    let trimmed = raw.trim().trim_matches('"');
+    if trimmed.is_empty() || trimmed.starts_with('-') {
+        return None;
+    }
+    // Only parse real URLs. `Url::parse("C:/Users/a.mp3")` succeeds with scheme
+    // "C" and would drop valid Windows forward-slash paths if we treated any
+    // successful parse as a URL.
+    let looks_like_url = trimmed.contains("://") || trimmed.to_ascii_lowercase().starts_with("file:");
+    if looks_like_url {
+        if let Ok(url) = url::Url::parse(trimmed) {
+            if url.scheme() == "file" {
+                return url.to_file_path().ok();
+            }
+            // Skip custom protocols / http(s).
+            return None;
+        }
+    }
+    Some(std::path::PathBuf::from(trimmed))
+}
+
+fn audio_paths_from_args(args: &[String]) -> Vec<String> {
+    args.iter()
+        .skip(1) // argv[0] is the executable
+        .filter_map(|a| normalize_open_arg(a))
+        .filter(|p| is_local_audio_path(p))
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
+}
+
+/// File-like argv entries that are not supported local-audio extensions (e.g. .wma).
+fn unsupported_open_paths_from_args(args: &[String]) -> Vec<String> {
+    args.iter()
+        .skip(1)
+        .filter_map(|a| normalize_open_arg(a))
+        .filter(|p| {
+            p.extension().and_then(|e| e.to_str()).is_some() && !is_local_audio_path(p)
+        })
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect()
+}
+
+/// Cold-start / concurrent opens may arrive before the webview listens.
+struct PendingLocalFiles(Mutex<Vec<String>>);
+struct PendingUnsupportedOpens(Mutex<Vec<String>>);
+
+fn queue_open_local_files(app: &tauri::AppHandle, paths: Vec<String>) {
+    if paths.is_empty() {
+        return;
+    }
+    if let Ok(mut guard) = app.state::<PendingLocalFiles>().0.lock() {
+        for p in &paths {
+            if !guard.iter().any(|x| x == p) {
+                guard.push(p.clone());
+            }
+        }
+    }
+    // Payload is unused — frontend always drains via `take_opened_local_files`
+    // so event + cold-start take cannot double-import the same paths.
+    let _ = app.emit("open-local-files", ());
+}
+
+fn queue_unsupported_opens(app: &tauri::AppHandle, paths: Vec<String>) {
+    if paths.is_empty() {
+        return;
+    }
+    if let Ok(mut guard) = app.state::<PendingUnsupportedOpens>().0.lock() {
+        for p in &paths {
+            if !guard.iter().any(|x| x == p) {
+                guard.push(p.clone());
+            }
+        }
+    }
+    let _ = app.emit("open-local-unsupported", ());
+}
+
+fn handle_os_open_args(app: &tauri::AppHandle, args: &[String]) {
+    queue_open_local_files(app, audio_paths_from_args(args));
+    queue_unsupported_opens(app, unsupported_open_paths_from_args(args));
+}
+
+/// Drain paths queued before the frontend subscribed to `open-local-files`.
+#[tauri::command]
+fn take_opened_local_files(app: tauri::AppHandle) -> Vec<String> {
+    app.state::<PendingLocalFiles>()
+        .0
+        .lock()
+        .map(|mut g| std::mem::take(&mut *g))
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn take_opened_unsupported_files(app: tauri::AppHandle) -> Vec<String> {
+    app.state::<PendingUnsupportedOpens>()
+        .0
+        .lock()
+        .map(|mut g| std::mem::take(&mut *g))
+        .unwrap_or_default()
+}
+
 fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
     let prev_item = MenuItem::with_id(app, "prev", "上一首", true, None::<&str>)?;
     let toggle_item = MenuItem::with_id(app, "toggle", "播放 / 暂停", true, None::<&str>)?;
@@ -221,7 +332,19 @@ async fn race_download_and_install(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Single-instance must register early: a second "Open with" should forward
+    // file paths into the running app instead of spawning another Museek.
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            handle_os_open_args(app, &argv);
+            show_main(app);
+        }));
+    }
+
+    let app = builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -234,9 +357,18 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(PendingLocalFiles(Mutex::new(Vec::new())))
+        .manage(PendingUnsupportedOpens(Mutex::new(Vec::new())))
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.manage(KeepAwakeState(Mutex::new(None)));
+
+            // Windows/Linux: cold-start "Open with" passes paths as argv.
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                let args: Vec<String> = std::env::args().collect();
+                handle_os_open_args(app.handle(), &args);
+            }
 
             let app_handle = app.handle().clone();
             if let Some(window) = app.get_webview_window("main") {
@@ -336,10 +468,39 @@ pub fn run() {
             set_prevent_sleep,
             quit_app,
             set_tray_visible,
-            race_download_and_install
+            race_download_and_install,
+            take_opened_local_files,
+            take_opened_unsupported_files
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        // macOS "Open with" delivers file URLs here (not always as argv).
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let tauri::RunEvent::Opened { urls } = &event {
+            let paths = urls
+                .iter()
+                .filter_map(|u| u.to_file_path().ok())
+                .collect::<Vec<_>>();
+            let audio = paths
+                .iter()
+                .filter(|p| is_local_audio_path(p))
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            let unsupported = paths
+                .iter()
+                .filter(|p| {
+                    p.extension().and_then(|e| e.to_str()).is_some() && !is_local_audio_path(p)
+                })
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            queue_open_local_files(app_handle, audio);
+            queue_unsupported_opens(app_handle, unsupported);
+            show_main(app_handle);
+        }
+        let _ = (app_handle, &event);
+    });
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { formatDuration } from "@/lib/utils"
 import { indexQualitySizes } from "@/lib/quality"
 import { t } from "@/lib/i18n"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
+import { lyricTextFromTags } from "./lyrics"
 
 // js-md5 CommonJS/ESM interop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,9 +43,87 @@ export function guessFromFilename(path: string): { name: string; singer: string 
   return { name: raw || t("local.unknownTitle"), singer: "" }
 }
 
-function qualityForExt(ext: string): MusicQuality[] {
-  const type: Quality = ext === "flac" ? "flac" : ext === "wav" ? "flac" : "320k"
-  return [{ type, size: null }]
+function sizeFormate(size: number): string {
+  if (!size) return "0 B"
+  const units = ["B", "KB", "MB", "GB", "TB"]
+  const number = Math.floor(Math.log(size) / Math.log(1024))
+  return `${(size / Math.pow(1024, Math.floor(number))).toFixed(2)} ${units[number]}`
+}
+
+/** Extension-only fallback when format tags are missing. */
+function qualityForExt(ext: string, fileSize?: number): MusicQuality[] {
+  const size = fileSize ? sizeFormate(fileSize) : null
+  if (ext === "flac" || ext === "wav") return [{ type: "flac", size }]
+  return [{ type: "320k", size }]
+}
+
+function isLosslessFormat(
+  ext: string,
+  format: { lossless?: boolean; codec?: string; container?: string }
+): boolean {
+  if (format.lossless === true) return true
+  if (format.lossless === false) return false
+  const codec = (format.codec ?? "").toLowerCase()
+  const container = (format.container ?? "").toLowerCase()
+  const blob = `${codec} ${container}`
+  if (/\b(flac|alac|pcm|wav|wave|ape|wavpack|dsd)\b/.test(blob)) return true
+  return ext === "flac" || ext === "wav"
+}
+
+/** Hi-Res: ≥24-bit or sample rate above 48 kHz (common streaming definition). */
+function isHiRes(bitsPerSample?: number, sampleRate?: number): boolean {
+  if (typeof bitsPerSample === "number" && bitsPerSample >= 24) return true
+  if (typeof sampleRate === "number" && sampleRate > 48000) return true
+  return false
+}
+
+/**
+ * Map music-metadata `format` (+ file size) to Museek quality tiers.
+ * Avoids the old ext-only guess (every MP3/M4A → 320k, every FLAC → flac).
+ */
+function qualityFromFormat(
+  ext: string,
+  format: {
+    lossless?: boolean
+    codec?: string
+    container?: string
+    bitrate?: number
+    bitsPerSample?: number
+    sampleRate?: number
+  } | undefined,
+  fileSize?: number
+): MusicQuality[] {
+  const size = fileSize ? sizeFormate(fileSize) : null
+
+  if (format && isLosslessFormat(ext, format)) {
+    const type: Quality = isHiRes(format.bitsPerSample, format.sampleRate)
+      ? "flac24bit"
+      : "flac"
+    return [{ type, size }]
+  }
+
+  // Lossy: music-metadata bitrate is bits/sec.
+  const bps = format?.bitrate
+  if (typeof bps === "number" && bps > 0) {
+    const kbps = bps / 1000
+    return [{ type: kbps >= 256 ? "320k" : "128k", size }]
+  }
+
+  return qualityForExt(ext, fileSize)
+}
+
+/** Re-read only container/bitrate/bit-depth for quality badge fixes (no cover I/O). */
+export async function peekLocalQuality(filePath: string): Promise<MusicQuality[] | null> {
+  if (!isTauri) return null
+  try {
+    const ext = extOf(filePath)
+    const { readFile } = await import("@tauri-apps/plugin-fs")
+    const bytes = await readFile(filePath)
+    const meta = await parseBuffer(bytes, { mimeType: mimeForExt(ext), size: bytes.byteLength })
+    return qualityFromFormat(ext, meta.format, bytes.byteLength)
+  } catch {
+    return null
+  }
 }
 
 function mimeForExt(ext: string): string {
@@ -73,15 +152,69 @@ async function saveEmbeddedCover(
     const { writeFile, mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs")
     const { appDataDir, join } = await import("@tauri-apps/api/path")
     const { convertFileSrc } = await import("@tauri-apps/api/core")
-    const ext = format?.includes("png") ? "png" : "jpg"
+    const mime = (format ?? "").toLowerCase()
+    let ext = "jpg"
+    if (mime.includes("png")) ext = "png"
+    else if (mime.includes("webp")) ext = "webp"
+    else if (mime.includes("gif")) ext = "gif"
+    else if (mime.includes("bmp")) ext = "bmp"
     await mkdir("museek/localCovers", { baseDir: BaseDirectory.AppData, recursive: true })
     const rel = `museek/localCovers/${id}.${ext}`
-    await writeFile(rel, data, { baseDir: BaseDirectory.AppData })
+    // Copy into a tight buffer — some parsers hand back a view into a larger tag block.
+    const bytes = data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
+      ? data
+      : data.slice()
+    await writeFile(rel, bytes, { baseDir: BaseDirectory.AppData })
     const abs = await join(await appDataDir(), rel)
     return { rel, picUrl: convertFileSrc(abs) }
   } catch {
     return null
   }
+}
+
+type PictureLike = {
+  format?: string
+  type?: string
+  name?: string
+  description?: string
+  data?: Uint8Array
+}
+
+/**
+ * Prefer a real album cover over file icons / artist photos.
+ * music-metadata's own `selectCover` is unreliable (broken `in` check on an array),
+ * and using `picture[0]` alone misses files where the front cover isn't first.
+ */
+function pickCoverPicture(pictures: PictureLike[] | undefined): PictureLike | null {
+  if (!pictures?.length) return null
+
+  const rank = (p: PictureLike): number => {
+    const len = p.data?.byteLength ?? p.data?.length ?? 0
+    if (len < 64) return -1 // empty / tiny stub
+    const type = `${p.type ?? ""} ${p.name ?? ""} ${p.description ?? ""}`.toLowerCase()
+    const mime = (p.format ?? "").toLowerCase()
+    let score = Math.min(len, 5_000_000) // size as weak signal
+    if (/cover\s*\(front\)|front\s*cover|^3$|\bfront\b/.test(type)) score += 1e12
+    else if (/\bcover\b|\balbum\b|^4$/.test(type)) score += 1e11
+    else if (!type.trim() || /\bother\b|^0$/.test(type)) score += 1e9
+    if (/icon|leaflet|media|conductor|composer|lyricist|artist|band|publisher|video/.test(type)) {
+      score -= 1e11
+    }
+    if (/jpeg|jpg|png|webp/.test(mime)) score += 1e8
+    else if (/gif|bmp/.test(mime)) score += 1e7
+    return score
+  }
+
+  let best: PictureLike | null = null
+  let bestScore = -1
+  for (const p of pictures) {
+    const score = rank(p)
+    if (score > bestScore) {
+      best = p
+      bestScore = score
+    }
+  }
+  return bestScore >= 0 ? best : null
 }
 
 /** Rebuild convertFileSrc URL for a stored relative cover path. */
@@ -106,6 +239,8 @@ export interface ParsedLocalTags {
   qualitys: MusicQuality[]
   localCoverRel?: string
   picUrl?: string | null
+  /** Timed LRC from tags, when present. */
+  embeddedLyric?: string
   /** True when title/artist came from tags (not filename/placeholder). */
   hasTitleTag: boolean
   hasArtistTag: boolean
@@ -119,7 +254,6 @@ export interface ParsedLocalTags {
 export async function parseLocalFile(filePath: string, id: string): Promise<ParsedLocalTags> {
   const ext = extOf(filePath)
   const guessed = guessFromFilename(filePath)
-  const qualitys = qualityForExt(ext)
   const placeholderTitle = t("local.unknownTitle")
   const placeholderArtist = t("local.unknownArtist")
 
@@ -127,8 +261,10 @@ export async function parseLocalFile(filePath: string, id: string): Promise<Pars
   let singer = ""
   let albumName = ""
   let interval = "0:00"
+  let qualitys = qualityForExt(ext)
   let localCoverRel: string | undefined
   let picUrl: string | null = null
+  let embeddedLyric: string | undefined
   let hasTitleTag = false
   let hasArtistTag = false
   let hasAlbumTag = false
@@ -158,10 +294,16 @@ export async function parseLocalFile(filePath: string, id: string): Promise<Pars
       const dur = meta.format.duration
       if (typeof dur === "number" && dur > 0) interval = formatDuration(dur)
 
-      const pic = common.picture?.[0]
-      if (pic?.data?.length) {
-        const data = pic.data instanceof Uint8Array ? pic.data : new Uint8Array(pic.data)
-        const saved = await saveEmbeddedCover(id, data, pic.format)
+      qualitys = qualityFromFormat(ext, meta.format, bytes.byteLength)
+
+      const fromTags = lyricTextFromTags(common.lyrics)
+      if (fromTags) embeddedLyric = fromTags
+
+      const pic = pickCoverPicture(common.picture)
+      const raw = pic?.data
+      if (raw && raw.length > 0) {
+        const data = raw instanceof Uint8Array ? raw : new Uint8Array(raw as ArrayLike<number>)
+        const saved = await saveEmbeddedCover(id, data, pic?.format)
         if (saved) {
           localCoverRel = saved.rel
           picUrl = saved.picUrl
@@ -186,6 +328,7 @@ export async function parseLocalFile(filePath: string, id: string): Promise<Pars
     qualitys,
     localCoverRel,
     picUrl,
+    embeddedLyric,
     hasTitleTag,
     hasArtistTag,
     hasAlbumTag,
@@ -214,6 +357,7 @@ export function buildLocalSong(
       _qualitys,
       filePath,
       localCoverRel: tags.localCoverRel,
+      embeddedLyric: tags.embeddedLyric,
     },
   }
 }

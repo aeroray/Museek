@@ -1,6 +1,7 @@
 import { createAsyncCache } from "@/lib/cache"
 import { getBuiltinLyric } from "@/lib/lyric"
 import { getWyLyric } from "@/lib/lyric/extra"
+import { fetchLocalFileLyric } from "@/lib/localMusic"
 import { parseLrc } from "@/lib/lyrics/parser"
 import { getCachedLyric, putCachedLyric } from "@/lib/mediaCache"
 import { searchWangyi } from "@/lib/search/wy"
@@ -11,8 +12,8 @@ import type { LyricInfo, LyricLine, MusicInfo } from "@/types/music"
 // (no disk) and rapid A→B→A / double-play before disk write finishes.
 const lyricCache = createAsyncCache<LyricLine[]>(30 * 60_000, 80)
 
-/** Local files have no platform id — search NetEase by title/artist and pull lyrics. */
-async function fetchLocalLyric(song: MusicInfo): Promise<LyricInfo | null> {
+/** Fallback when no sidecar / embedded timed lyric: NetEase search by title/artist. */
+async function fetchLocalLyricOnline(song: MusicInfo): Promise<LyricInfo | null> {
   const q = [song.name, song.singer].filter(Boolean).join(" ").trim()
   if (!q) return null
   try {
@@ -26,10 +27,22 @@ async function fetchLocalLyric(song: MusicInfo): Promise<LyricInfo | null> {
 }
 
 async function fetchLyricLines(song: MusicInfo): Promise<LyricLine[]> {
+  // Local: prefer file-side sources every time (.lrc may appear after import).
+  if (song.source === "local") {
+    const fromFile = await fetchLocalFileLyric({
+      filePath: song.meta.filePath,
+      embeddedLyric: song.meta.embeddedLyric,
+    })
+    if (fromFile?.lyric) {
+      putCachedLyric(song.source, song.meta.songId, fromFile)
+      return parseLrc(fromFile.lyric, fromFile.tlyric ?? undefined)
+    }
+  }
+
   let lyricInfo: LyricInfo | null = await getCachedLyric(song.source, song.meta.songId)
   if (!lyricInfo?.lyric) {
     if (song.source === "local") {
-      lyricInfo = await fetchLocalLyric(song)
+      lyricInfo = await fetchLocalLyricOnline(song)
     } else {
       lyricInfo = await getBuiltinLyric(song)
       if (!lyricInfo?.lyric) {
@@ -48,7 +61,7 @@ async function fetchLyricLines(song: MusicInfo): Promise<LyricLine[]> {
 
 /**
  * Cache → builtin platform APIs → source script → parse.
- * Local: cache → NetEase search by name/artist → wy lyric.
+ * Local: sidecar .lrc / embedded tags → cache → NetEase search.
  * Returns [] when nothing is available (caller owns loading UI).
  */
 export async function loadLyric(song: MusicInfo): Promise<LyricLine[]> {

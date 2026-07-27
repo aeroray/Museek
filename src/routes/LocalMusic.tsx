@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { CoverImage } from "@/components/common/CoverImage"
 import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges"
@@ -57,6 +58,7 @@ export function LocalMusic() {
   const tracks = useLocalMusicStore((s) => s.tracks)
   const categories = useLocalMusicStore((s) => s.categories)
   const importing = useLocalMusicStore((s) => s.importing)
+  const importProgress = useLocalMusicStore((s) => s.importProgress)
   const importFiles = useLocalMusicStore((s) => s.importFiles)
   const importFolder = useLocalMusicStore((s) => s.importFolder)
   const remove = useLocalMusicStore((s) => s.remove)
@@ -186,18 +188,35 @@ export function LocalMusic() {
         <div className="min-w-0">
           <h2 className="text-lg font-semibold leading-tight">{tr("local.title")}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {tracks.length === 0
-              ? tr("local.summaryEmpty")
-              : tr("local.summary", { n: tracks.length })}
+            {importing && importProgress && importProgress.total > 0
+              ? tr("local.importProgress", {
+                  done: importProgress.done,
+                  total: importProgress.total,
+                })
+              : tracks.length === 0
+                ? tr("local.summaryEmpty")
+                : tr("local.summary", { n: tracks.length })}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {importing && importProgress && importProgress.total > 0 && (
+            <div className="hidden sm:flex items-center gap-2 min-w-0 max-w-[200px]">
+              <Progress
+                value={Math.round((importProgress.done / importProgress.total) * 100)}
+                className="h-1.5 w-24 shrink-0"
+              />
+              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                {importProgress.done}/{importProgress.total}
+              </span>
+            </div>
+          )}
           {tracks.length > 0 && !editing && (
             <Button
               variant="secondary"
               size="sm"
               className="h-8"
               onClick={() => playAll(displayed.map((x) => x.song))}
+              disabled={importing}
             >
               <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
               {tr("common.playAll")}
@@ -331,10 +350,36 @@ export function LocalMusic() {
       {tracks.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
           <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
-            <HardDrive size={28} className="text-muted-foreground" />
+            {importing ? (
+              <Loader2 size={28} className="text-muted-foreground animate-spin" />
+            ) : (
+              <HardDrive size={28} className="text-muted-foreground" />
+            )}
           </div>
-          <p className="text-base font-medium">{tr("local.empty")}</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm">{tr("local.emptyHint")}</p>
+          {importing && importProgress && importProgress.total > 0 ? (
+            <>
+              <p className="text-base font-medium">
+                {tr("local.importProgress", {
+                  done: importProgress.done,
+                  total: importProgress.total,
+                })}
+              </p>
+              <Progress
+                value={Math.round((importProgress.done / importProgress.total) * 100)}
+                className="h-1.5 w-48 mt-3"
+              />
+              {importProgress.current ? (
+                <p className="text-xs text-muted-foreground mt-2 max-w-sm truncate">
+                  {importProgress.current}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="text-base font-medium">{tr("local.empty")}</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm">{tr("local.emptyHint")}</p>
+            </>
+          )}
         </div>
       ) : (
         <ScrollArea className="flex-1">

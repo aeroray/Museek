@@ -55,7 +55,8 @@ function TopBarLyrics() {
       title={t("player.lyrics")}
       className={cn(
         "pointer-events-auto group relative mx-2 min-w-0 flex-1",
-        "flex h-7 items-center justify-center rounded-md px-3",
+        // Stay inside the h-10 top bar; leave room for descenders (g/y/p).
+        "flex h-8 items-center justify-center rounded-md px-3",
         "transition-[background-color,color] duration-200 ease-out",
         "hover:bg-accent/60 disabled:pointer-events-none disabled:opacity-50",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -65,7 +66,7 @@ function TopBarLyrics() {
       <span
         key={`${currentSong?.id ?? "none"}-${currentLyricIndex}-${text}`}
         className={cn(
-          "block max-w-full truncate text-center text-sm tracking-tight",
+          "block max-w-full truncate text-center text-base leading-tight tracking-tight",
           "animate-in fade-in duration-300",
           muted ? "text-muted-foreground/70 font-normal" : "text-primary font-medium",
         )}

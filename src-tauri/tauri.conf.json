@@ -35,7 +35,24 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "requireLiteralLeadingDot": false,
+          "allow": [
+            "**/*",
+            "$HOME/**/*",
+            "$DESKTOP/**/*",
+            "$DOCUMENT/**/*",
+            "$DOWNLOAD/**/*",
+            "$AUDIO/**/*",
+            "$APPDATA/**/*",
+            "$APPLOCALDATA/**/*",
+            "$RESOURCE/**/*"
+          ]
+        }
+      }
     }
   },
   "bundle": {
@@ -59,6 +76,56 @@
         "displayLanguageSelector": false
       }
     },
+    "fileAssociations": [
+      {
+        "ext": ["mp3"],
+        "mimeType": "audio/mpeg",
+        "name": "MP3 Audio",
+        "description": "MP3 Audio",
+        "role": "Viewer",
+        "rank": "Default"
+      },
+      {
+        "ext": ["flac"],
+        "mimeType": "audio/flac",
+        "name": "FLAC Audio",
+        "description": "FLAC Audio",
+        "role": "Viewer",
+        "rank": "Default"
+      },
+      {
+        "ext": ["m4a"],
+        "mimeType": "audio/mp4",
+        "name": "M4A Audio",
+        "description": "M4A Audio",
+        "role": "Viewer",
+        "rank": "Default"
+      },
+      {
+        "ext": ["aac"],
+        "mimeType": "audio/aac",
+        "name": "AAC Audio",
+        "description": "AAC Audio",
+        "role": "Viewer",
+        "rank": "Default"
+      },
+      {
+        "ext": ["ogg"],
+        "mimeType": "audio/ogg",
+        "name": "Ogg Audio",
+        "description": "Ogg Audio",
+        "role": "Viewer",
+        "rank": "Default"
+      },
+      {
+        "ext": ["wav"],
+        "mimeType": "audio/wav",
+        "name": "WAV Audio",
+        "description": "WAV Audio",
+        "role": "Viewer",
+        "rank": "Default"
+      }
+    ],
     "macOS": {
       "minimumSystemVersion": "11.0",
       "hardenedRuntime": true,
