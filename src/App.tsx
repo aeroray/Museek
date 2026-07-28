@@ -70,7 +70,7 @@ function AppInit() {
         const s = useSettingsStore.getState()
         enforceLimit(s.maxCacheMB * 1024 * 1024)
         // Show the tray icon only if the saved close-behavior is "hide to tray".
-        setTrayVisible(s.closeBehavior === "tray")
+        setTrayVisible(s.closeBehavior === "tray" || s.startHiddenToTray)
         void loadDownloads()
         // Local library must be hydrated before OS "Open with" imports, otherwise
         // a parallel loadFromDisk can wipe tracks just imported into memory.

@@ -9,7 +9,7 @@ import { MiniPlayer } from "@/components/miniPlayer/MiniPlayer"
 import { Toaster } from "@/components/ui/toaster"
 import { DownloadLocationDialog } from "@/components/DownloadLocationDialog"
 import { isMacOs } from "@/lib/os"
-import { showMainWindow } from "@/lib/showWindow"
+import { revealOrHideOnLaunch } from "@/lib/showWindow"
 import { usePlayerStore } from "@/stores/playerStore"
 import { cn } from "@/lib/utils"
 
@@ -24,9 +24,10 @@ function useWindowChrome() {
       document.documentElement.dataset.os = isMacOs() ? "macos" : "other"
     }
 
-    // Windows: show after first paint (avoids decorated/white flash).
-    // macOS: already shown from Rust; this is a no-op focus ensure.
-    void showMainWindow()
+    // Windows: show after first paint (avoids decorated/white flash), unless
+    // silent login autostart — then stay in the tray.
+    // macOS: already shown from Rust when not silent; this ensures focus or hide.
+    void revealOrHideOnLaunch()
 
     if (!isTauri) return
     let unlisten: (() => void) | undefined
@@ -66,7 +67,7 @@ export function RootLayout() {
         className={cn(
           "relative flex h-full flex-col",
           miniPeek ? "overflow-visible bg-transparent" : "overflow-hidden bg-background",
-          "transition-[filter,opacity] duration-300 ease-out",
+          "transition-opacity duration-150 ease-out",
           miniMorphing && "mini-morph-veil",
         )}
       >

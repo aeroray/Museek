@@ -697,8 +697,133 @@ async function getDetailFromLink(link: string): Promise<PlaylistDetail> {
   throw new Error("KuGou playlist detail failed: list data not found")
 }
 
+/** 酷狗码 → collection / song list (lx-music getUserListDetailByCode). */
+async function getDetailByCode(code: string): Promise<PlaylistDetail> {
+  const res = await tauriFetch("http://t.kugou.com/command/", {
+    method: "POST",
+    headers: {
+      "KG-RC": "1",
+      "KG-THash": "network_super_call.cpp:3676261689:379",
+      "User-Agent": "",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      appid: 1001,
+      clientver: 9020,
+      mid: "21511157a05844bd085308bc76ef3343",
+      clienttime: 640612895,
+      key: "36164c4015e704673c588ee202b9ecb8",
+      data: code,
+    }),
+  })
+  if (!res.ok) throw new Error(`KuGou playlist detail failed: ${res.status}`)
+
+  const json = (await res.json()) as {
+    status?: number
+    data?: {
+      info?: {
+        type?: number
+        id?: string | number
+        name?: string
+        username?: string
+        img?: string
+        img_size?: string
+        count?: number
+        global_collection_id?: string
+        userid?: string | number
+      }
+      list?: KgSpecialSongRaw[]
+    }
+  }
+
+  const payload = json.data
+  const info = payload?.info
+  if (!json.status || !info) {
+    throw new Error("KuGou playlist detail failed: invalid share code")
+  }
+
+  // type: 1单曲 2歌单 3电台 4酷狗码 5别人的播放队列
+  if (info.type === 2 && !info.global_collection_id) {
+    const bySpecial = await getDetailBySpecialId(String(info.id))
+    if (bySpecial) return bySpecial
+  }
+
+  if (info.global_collection_id) {
+    return getDetailByGlobalId(info.global_collection_id)
+  }
+
+  let rawList = payload?.list ?? []
+  if (info.userid != null && rawList.length === 0) {
+    const shareRes = await tauriFetch("http://www2.kugou.kugou.com/apps/kucodeAndShare/app/", {
+      method: "POST",
+      headers: {
+        "KG-RC": "1",
+        "KG-THash": "network_super_call.cpp:3676261689:379",
+        "User-Agent": "",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        appid: 1001,
+        clientver: 9020,
+        mid: "21511157a05844bd085308bc76ef3343",
+        clienttime: 640612895,
+        key: "36164c4015e704673c588ee202b9ecb8",
+        data: {
+          id: info.id,
+          type: 3,
+          userid: info.userid,
+          collect_type: 0,
+          page: 1,
+          pagesize: info.count ?? 500,
+        },
+      }),
+    })
+    if (shareRes.ok) {
+      const shareJson = (await shareRes.json()) as {
+        data?: KgSpecialSongRaw[] | { list?: KgSpecialSongRaw[] }
+        list?: KgSpecialSongRaw[]
+      }
+      if (Array.isArray(shareJson.data)) {
+        rawList = shareJson.data
+      } else if (shareJson.data && Array.isArray(shareJson.data.list)) {
+        rawList = shareJson.data.list
+      } else if (Array.isArray(shareJson.list)) {
+        rawList = shareJson.list
+      }
+    }
+  }
+
+  // Prefer hash→gateway resolve when rows lack album_audio_id (share payloads).
+  const hashes = rawList.map((s) => s.hash).filter((h): h is string => Boolean(h))
+  let list: MusicInfo[] = []
+  if (hashes.length > 0) {
+    const groups: KgGatewaySong[][] = []
+    const unique = [...new Set(hashes)]
+    for (let i = 0; i < unique.length; i += 100) {
+      groups.push(await resolveHashes(unique.slice(i, i + 100)))
+    }
+    const seen = new Set<string>()
+    for (const raw of groups.flat()) {
+      const song = normalizeKgGatewaySong(raw)
+      if (!song || seen.has(song.meta.songId)) continue
+      seen.add(song.meta.songId)
+      list.push(song)
+    }
+  }
+  if (list.length === 0) list = mapSpecialSongs(rawList)
+
+  return {
+    info: {
+      name: info.name ?? "",
+      img: (info.img_size || info.img)?.replace("{size}", "240") ?? null,
+      author: info.username || undefined,
+    },
+    list,
+  }
+}
+
 function parseKgPlaylistId(id: string): {
-  kind: "special" | "global" | "gcid" | "chain" | "rank" | "link"
+  kind: "special" | "global" | "gcid" | "chain" | "rank" | "link" | "code"
   value: string
 } {
   const raw = id.trim()
@@ -709,11 +834,33 @@ function parseKgPlaylistId(id: string): {
   if (raw.startsWith("gcid_")) return { kind: "gcid", value: raw }
   if (raw.startsWith("collection_")) return { kind: "global", value: raw }
   if (raw.startsWith("chain_")) return { kind: "chain", value: raw.slice(6) }
+  if (raw.startsWith("code_")) return { kind: "code", value: raw.slice(5) }
+
+  // Bare digits are 酷狗码 (share codes), not editorial special ids.
+  // Explicit `id_<n>` (from special/single URLs) stays on the special path.
+  if (/^\d+$/.test(raw)) return { kind: "code", value: raw }
 
   let specialId = raw
   if (specialId.startsWith("id_")) specialId = specialId.slice(3)
   else if (htmlLinkRx.test(specialId)) specialId = specialId.replace(htmlLinkRx, "$1")
   return { kind: "special", value: specialId }
+}
+
+/** Resolve classic editorial / public specialid with API → global → HTML fallbacks. */
+async function getDetailBySpecialIdWithFallback(specialId: string): Promise<PlaylistDetail> {
+  const byApi = await getDetailBySpecialId(specialId)
+  if (byApi) return byApi
+
+  const globalId = await getGlobalIdFromSpecial(specialId)
+  if (globalId) {
+    try {
+      return await getDetailByGlobalId(globalId)
+    } catch {
+      /* fall through to HTML */
+    }
+  }
+
+  return getDetailByHtml(specialId)
 }
 
 export async function getKgPlaylistDetail(id: string, _page = 1): Promise<PlaylistDetail> {
@@ -736,19 +883,14 @@ export async function getKgPlaylistDetail(id: string, _page = 1): Promise<Playli
   if (parsed.kind === "chain") {
     return getDetailFromShareChain(parsed.value)
   }
-
-  // Classic specialid: mobilecdn first, then global_specialid, then HTML.
-  const byApi = await getDetailBySpecialId(parsed.value)
-  if (byApi) return byApi
-
-  const globalId = await getGlobalIdFromSpecial(parsed.value)
-  if (globalId) {
+  if (parsed.kind === "code") {
     try {
-      return await getDetailByGlobalId(globalId)
+      return await getDetailByCode(parsed.value)
     } catch {
-      /* fall through to HTML */
+      // Editorial special ids are also bare digits — fall back if not a 酷狗码.
+      return getDetailBySpecialIdWithFallback(parsed.value)
     }
   }
 
-  return getDetailByHtml(parsed.value)
+  return getDetailBySpecialIdWithFallback(parsed.value)
 }

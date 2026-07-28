@@ -17,6 +17,76 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.4.0": {
+    zh: {
+      sections: [
+        {
+          title: "🔇 静默启动",
+          bullets: [
+            "开机自启时可只留托盘图标，不弹出主窗口",
+          ],
+        },
+        {
+          title: "⬇️ 下载",
+          bullets: [
+            "底部播放栏与歌词页可为当前歌曲一键下载（可选音质）",
+          ],
+        },
+        {
+          title: "💾 播放缓存",
+          bullets: [
+            "已缓存歌曲再次播放更接近秒开；后台写入更稳，音质切换也能命中已有缓存",
+          ],
+        },
+        {
+          title: "🐶 酷狗歌单",
+          bullets: [
+            "支持用酷狗码导入自建歌单；打开外部歌单的说明改为各平台简短提示",
+          ],
+        },
+        {
+          title: "🪟 迷你播放 / 唱片",
+          bullets: [
+            "进出迷你窗与贴边唱片的过渡更流畅，卡顿更少",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🔇 Silent start",
+          bullets: [
+            "Optionally launch to the tray only at login — no main window popup",
+          ],
+        },
+        {
+          title: "⬇️ Download",
+          bullets: [
+            "Download the current track from the player bar or lyrics page (pick quality)",
+          ],
+        },
+        {
+          title: "💾 Playback cache",
+          bullets: [
+            "Cached tracks restart closer to instantly; warmer writes and quality-aware cache hits",
+          ],
+        },
+        {
+          title: "🐶 KuGou playlists",
+          bullets: [
+            "Import playlists via KuGou share codes; external-open hints moved into per-platform placeholders",
+          ],
+        },
+        {
+          title: "🪟 Mini player / vinyl",
+          bullets: [
+            "Smoother enter/exit morphs for the mini bar and docked vinyl peek",
+          ],
+        },
+      ],
+    },
+  },
   "2.3.4": {
     zh: {
       sections: [

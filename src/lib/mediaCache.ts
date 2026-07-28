@@ -128,31 +128,83 @@ export async function putCachedLyric(source: Source, songId: string, data: Lyric
 }
 
 // ---------- audio ----------
-// Returns an object URL playing from the cached file, or null on miss.
-export async function getCachedAudioUrl(source: Source, songId: string, quality: Quality): Promise<string | null> {
+
+async function dropCacheEntry(key: string, path: string): Promise<void> {
+  try {
+    const { remove, BaseDirectory } = await import("@tauri-apps/plugin-fs")
+    await remove(path, { baseDir: BaseDirectory.AppData })
+  } catch {
+    /* file may already be gone */
+  }
+  index = index.filter((e) => e.key !== key)
+  persistIndex()
+}
+
+/**
+ * Qualities already on disk for a song (best → worst). Used when preferred
+ * quality isn't cached but a higher/other tier is (e.g. flac after switching
+ * play quality down to 320k).
+ */
+export async function listCachedAudioQualities(
+  source: Source,
+  songId: string,
+): Promise<Quality[]> {
+  if (!isTauri) return []
+  await ensureLoaded()
+  const prefix = `audio:${source}:${songId}:`
+  const found = new Set<string>()
+  for (const e of index) {
+    if (e.type !== "audio" || !e.key.startsWith(prefix)) continue
+    found.add(e.key.slice(prefix.length))
+  }
+  const ladder: Quality[] = ["flac24bit", "flac", "320k", "128k"]
+  return ladder.filter((q) => found.has(q))
+}
+
+/**
+ * Playable URL for a cached audio file, or null on miss.
+ * Streams via asset protocol (same as local music) — no full-file IPC → Blob.
+ */
+export async function getCachedAudioUrl(
+  source: Source,
+  songId: string,
+  quality: Quality,
+): Promise<string | null> {
   if (!isTauri) return null
   await ensureLoaded()
   const key = `audio:${source}:${songId}:${quality}`
   const entry = index.find((e) => e.key === key)
   if (!entry) return null
   try {
-    const { readFile, remove, BaseDirectory } = await import("@tauri-apps/plugin-fs")
-    const bytes = await readFile(entry.path, { baseDir: BaseDirectory.AppData })
-    // Drop corrupt cache entries (e.g. HTML 403 pages stored as .mp3).
-    if (looksLikeNonAudioBytes(bytes)) {
-      try {
-        await remove(entry.path, { baseDir: BaseDirectory.AppData })
-      } catch {
-        /* ignore */
-      }
+    const { open, exists, BaseDirectory } = await import("@tauri-apps/plugin-fs")
+    const { appDataDir, join } = await import("@tauri-apps/api/path")
+    const { convertFileSrc } = await import("@tauri-apps/api/core")
+
+    if (!(await exists(entry.path, { baseDir: BaseDirectory.AppData }))) {
       index = index.filter((e) => e.key !== key)
       persistIndex()
       return null
     }
+
+    // Sniff head only — drop corrupt cache (e.g. HTML 403 pages stored as .mp3).
+    const file = await open(entry.path, { baseDir: BaseDirectory.AppData })
+    let corrupt = false
+    try {
+      const buf = new Uint8Array(512)
+      const n = await file.read(buf)
+      const head = n && n > 0 ? buf.subarray(0, n) : new Uint8Array(0)
+      corrupt = looksLikeNonAudioBytes(head)
+    } finally {
+      await file.close().catch(() => {})
+    }
+    if (corrupt) {
+      await dropCacheEntry(key, entry.path)
+      return null
+    }
+
     entry.lastUsed = Date.now()
     persistIndex()
-    const type = entry.path.endsWith(".flac") ? "audio/flac" : "audio/mpeg"
-    return URL.createObjectURL(new Blob([bytes], { type }))
+    return convertFileSrc(await join(await appDataDir(), entry.path))
   } catch {
     return null
   }

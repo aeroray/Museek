@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { CoverImage } from "@/components/common/CoverImage"
 import { SpecularFrame } from "@/components/common/SpecularFrame"
+import { DownloadSongButton } from "@/components/common/DownloadSongButton"
 import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { hiResCover } from "@/lib/cover"
@@ -308,6 +309,12 @@ export function LyricsPanel() {
             className={fav ? "icon-heart-burst" : undefined}
           />
         </Button>
+        <DownloadSongButton
+          song={currentSong}
+          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
+          side="left"
+          align="center"
+        />
       </div>
 
       <div className="relative z-10 flex h-full min-h-0">

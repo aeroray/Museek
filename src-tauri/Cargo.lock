@@ -2523,6 +2523,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tokio",
  "url",
  "windows 0.61.3",
 ]

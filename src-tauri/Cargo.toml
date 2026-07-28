@@ -24,6 +24,7 @@ souvlaki = "0.7.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-process = "2"
+tokio = { version = "1", default-features = false, features = ["time"] }
 
 # Windows taskbar thumbnail toolbar (hover-over-taskbar media buttons). Reuses the
 # same `windows` crate version Tauri already pulls in, just with extra features.

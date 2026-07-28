@@ -5,7 +5,7 @@
       "name": "museek-ui",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
-      "port": 1420
+      "port": 1425
     },
     {
       "name": "museek-landing",

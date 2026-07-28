@@ -14,10 +14,12 @@ export function PlaybackSettings() {
     preventSleepWhilePlaying,
     closeBehavior,
     openAtLogin,
+    startHiddenToTray,
     setPlayQuality,
     setPreventSleepWhilePlaying,
     setCloseBehavior,
     setOpenAtLogin,
+    setStartHiddenToTray,
   } = useSettingsStore()
   const t = useT()
 
@@ -50,6 +52,18 @@ export function PlaybackSettings() {
             title={t("playback.openAtLoginTitle")}
             desc={t("playback.openAtLoginDesc")}
             control={<Switch checked={openAtLogin} onCheckedChange={setOpenAtLogin} />}
+          />
+
+          <SettingRow
+            title={t("playback.startHiddenToTrayTitle")}
+            desc={t("playback.startHiddenToTrayDesc")}
+            control={
+              <Switch
+                checked={startHiddenToTray}
+                disabled={!openAtLogin}
+                onCheckedChange={setStartHiddenToTray}
+              />
+            }
           />
 
           <SettingRow title={t("close.behaviorTitle")} desc={t("close.behaviorDesc")}>

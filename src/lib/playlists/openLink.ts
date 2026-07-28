@@ -59,11 +59,14 @@ function normalizePlainId(s: string, source: OnlineSource): string {
       trimmed.startsWith("id_") ||
       trimmed.startsWith("rank_") ||
       trimmed.startsWith("collection_") ||
-      trimmed.startsWith("gcid_")
+      trimmed.startsWith("gcid_") ||
+      trimmed.startsWith("chain_") ||
+      trimmed.startsWith("code_")
     ) {
       return trimmed
     }
-    return `id_${trimmed}`
+    // Bare digits = 酷狗码 (handled by getKgPlaylistDetail), not editorial id_.
+    return trimmed
   }
   return trimmed
 }
@@ -140,6 +143,12 @@ export async function parsePlaylistLink(source: OnlineSource, raw: string): Prom
 
   // Strip accidental wrapping quotes / whitespace from share sheets.
   input = input.replace(/^['"]+|['"]+$/g, "").trim()
+
+  // KuGou share sheets often paste "酷狗码：38417661" — keep the digits.
+  if (source === "kg") {
+    const codeLabel = input.match(/^(?:酷狗码|酷狗号|分享码)\s*[:：]?\s*(\d+)\s*$/i)
+    if (codeLabel?.[1]) input = codeLabel[1]
+  }
 
   if (isPlainId(input, source)) {
     return normalizePlainId(input, source)

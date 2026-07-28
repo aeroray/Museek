@@ -60,6 +60,7 @@ export function MiniPlayer() {
   const queue = usePlayerStore((s) => s.queue)
   const queueIndex = usePlayerStore((s) => s.queueIndex)
   const miniPeek = usePlayerStore((s) => s.miniPeek)
+  const miniMorphing = usePlayerStore((s) => s.miniMorphing)
   const miniDockHint = usePlayerStore((s) => s.miniDockHint)
   const togglePlay = usePlayerStore((s) => s.togglePlay)
   const next = usePlayerStore((s) => s.next)
@@ -179,10 +180,9 @@ export function MiniPlayer() {
   const cover = miniPeek ? (
     <div
       className={cn(
-        // No outer drop-shadow — in a transparent Tauri window it paints as a
-        // faint black square veil in the corners around the disc.
-        "mini-vinyl relative h-full w-full shrink-0 overflow-hidden rounded-full",
-        isPlaying && !loading ? "mini-vinyl-spin" : "mini-vinyl-enter",
+        // Fixed 64px circle — stays round while the window morphs bar ↔ peek.
+        "mini-vinyl relative shrink-0 overflow-hidden rounded-full",
+        isPlaying && !loading ? "mini-vinyl-spin" : !miniMorphing && "mini-vinyl-enter",
       )}
       data-tauri-drag-region
     >

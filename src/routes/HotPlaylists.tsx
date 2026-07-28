@@ -532,7 +532,9 @@ export function HotPlaylists() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("hotPlaylists.openTitle")}</DialogTitle>
-            <DialogDescription>{t("hotPlaylists.openHint")}</DialogDescription>
+            <DialogDescription className="sr-only">
+              {t("hotPlaylists.openTitle")}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <PlatformTabs
@@ -545,7 +547,7 @@ export function HotPlaylists() {
             <div className="relative">
               <textarea
                 className="flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-2 pr-9 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                placeholder={t("hotPlaylists.openPlaceholder")}
+                placeholder={t(`hotPlaylists.openPlaceholder.${openSource}`)}
                 value={openInput}
                 onChange={(e) => {
                   setOpenInput(e.target.value)

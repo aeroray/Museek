@@ -123,6 +123,41 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+/// Login-item / silent-start flags resolved once in setup.
+struct LaunchFlags {
+    #[allow(dead_code)]
+    autostart: bool,
+    /// Autostart + startHiddenToTray pref + no open-with audio → stay in tray.
+    start_hidden: bool,
+}
+
+#[tauri::command]
+fn is_autostart_launch(flags: tauri::State<'_, LaunchFlags>) -> bool {
+    flags.autostart
+}
+
+#[tauri::command]
+fn should_start_hidden(flags: tauri::State<'_, LaunchFlags>) -> bool {
+    flags.start_hidden
+}
+
+/// Read `startHiddenToTray` from the same AppData settings.json the frontend uses.
+fn read_start_hidden_to_tray(app: &tauri::AppHandle) -> bool {
+    let Ok(dir) = app.path().app_data_dir() else {
+        return false;
+    };
+    let path = dir.join("museek").join("settings.json");
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return false;
+    };
+    v.get("startHiddenToTray")
+        .and_then(|x| x.as_bool())
+        .unwrap_or(false)
+}
+
 // Bring the main window back from hidden / minimized and focus it.
 fn show_main(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
@@ -379,6 +414,113 @@ fn set_tray_visible(app: tauri::AppHandle, visible: bool) {
     }
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OuterRectDto {
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+}
+
+fn ease_out_expo(t: f64) -> f64 {
+    if t >= 1.0 {
+        1.0
+    } else {
+        1.0 - 2f64.powf(-10.0 * t)
+    }
+}
+
+fn ease_in_out_cubic(t: f64) -> f64 {
+    if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    }
+}
+
+fn ease_out_cubic(t: f64) -> f64 {
+    1.0 - (1.0 - t).powi(3)
+}
+
+/// Morph the main window outer rect in-process (size+position per step, one IPC).
+/// Avoids the JS rAF loop flooding `set_size`/`set_position` separately each frame.
+#[tauri::command]
+async fn animate_window_outer_rect(
+    app: tauri::AppHandle,
+    to: OuterRectDto,
+    duration_ms: u32,
+    ease: String,
+) -> Result<(), String> {
+    let win = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window missing".to_string())?;
+
+    let from_size = win.outer_size().map_err(|e| e.to_string())?;
+    let from_pos = win.outer_position().map_err(|e| e.to_string())?;
+    let from = OuterRectDto {
+        x: from_pos.x,
+        y: from_pos.y,
+        w: from_size.width,
+        h: from_size.height,
+    };
+
+    let apply = |r: &OuterRectDto| {
+        let _ = win.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+            width: r.w.max(1),
+            height: r.h.max(1),
+        }));
+        let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+            x: r.x,
+            y: r.y,
+        }));
+    };
+
+    if (from.x - to.x).abs() < 2
+        && (from.y - to.y).abs() < 2
+        && (from.w as i32 - to.w as i32).abs() < 2
+        && (from.h as i32 - to.h as i32).abs() < 2
+    {
+        apply(&to);
+        return Ok(());
+    }
+
+    if duration_ms == 0 {
+        apply(&to);
+        return Ok(());
+    }
+
+    // Fixed keyframe count (~28ms) — predictable load on the OS compositor.
+    let steps = ((duration_ms as f64 / 28.0).ceil() as u32).clamp(8, 12);
+    let step_ms = (duration_ms / steps).max(1) as u64;
+    let ease_fn = match ease.as_str() {
+        "exit" => ease_in_out_cubic as fn(f64) -> f64,
+        "peek" => ease_out_cubic as fn(f64) -> f64,
+        _ => ease_out_expo as fn(f64) -> f64,
+    };
+
+    for i in 1..=steps {
+        let t = i as f64 / steps as f64;
+        let e = ease_fn(t);
+        let r = OuterRectDto {
+            x: (from.x as f64 + (to.x - from.x) as f64 * e).round() as i32,
+            y: (from.y as f64 + (to.y - from.y) as f64 * e).round() as i32,
+            w: (from.w as f64 + (to.w as f64 - from.w as f64) * e)
+                .round()
+                .max(1.0) as u32,
+            h: (from.h as f64 + (to.h as f64 - from.h as f64) * e)
+                .round()
+                .max(1.0) as u32,
+        };
+        apply(&r);
+        if i < steps {
+            tokio::time::sleep(std::time::Duration::from_millis(step_ms)).await;
+        }
+    }
+    apply(&to);
+    Ok(())
+}
+
 /// Concurrent mirror race for the updater artifact, then signature-verified quiet install.
 #[tauri::command]
 async fn race_download_and_install(
@@ -415,7 +557,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None::<Vec<&'static str>>,
+            // Marks login-item launches so the frontend can optionally stay in tray.
+            Some(vec!["--autostart"]),
         ))
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
@@ -429,12 +572,24 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.manage(KeepAwakeState(Mutex::new(None)));
 
+            let args: Vec<String> = std::env::args().collect();
+            let is_autostart = args.iter().any(|a| a == "--autostart");
+
             // Windows/Linux: cold-start "Open with" passes paths as argv.
             #[cfg(any(windows, target_os = "linux"))]
             {
-                let args: Vec<String> = std::env::args().collect();
                 handle_os_open_args(app.handle(), &args);
             }
+
+            let open_audio = audio_paths_from_args(&args);
+            // Autostart + pref + no files to open → stay in tray (no window flash).
+            let start_hidden = is_autostart
+                && open_audio.is_empty()
+                && read_start_hidden_to_tray(app.handle());
+            app.manage(LaunchFlags {
+                autostart: is_autostart,
+                start_hidden,
+            });
 
             let app_handle = app.handle().clone();
             if let Some(window) = app.get_webview_window("main") {
@@ -458,8 +613,11 @@ pub fn run() {
                     let _ = window.set_shadow(true);
                     // macOS Overlay chrome has no Windows-style decorated flash —
                     // show immediately so cold start feels instant again.
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    // Silent autostart: keep hidden until the user opens the tray.
+                    if !start_hidden {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
                 }
                 // Non-macOS: frameless + custom WindowControls (conf uses
                 // decorations:true only so macOS Overlay traffic lights exist).
@@ -475,9 +633,9 @@ pub fn run() {
                 }
 
                 // Windows/Linux fallback if the frontend never calls show().
-                // macOS is already shown above.
+                // macOS is already shown above (unless silent autostart).
                 #[cfg(not(target_os = "macos"))]
-                {
+                if !start_hidden {
                     let w = window.clone();
                     std::thread::spawn(move || {
                         std::thread::sleep(std::time::Duration::from_millis(4000));
@@ -534,9 +692,12 @@ pub fn run() {
             set_prevent_sleep,
             quit_app,
             set_tray_visible,
+            animate_window_outer_rect,
             race_download_and_install,
             take_opened_local_files,
-            take_opened_unsupported_files
+            take_opened_unsupported_files,
+            is_autostart_launch,
+            should_start_hidden
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

@@ -43,6 +43,11 @@ interface Persisted {
   closeConfirmDismissed: boolean
   /** Launch Museek when the OS signs in (Win + macOS). Default off. */
   openAtLogin: boolean
+  /**
+   * When opened via the login item (`--autostart`), hide to tray instead of
+   * showing the main window. Requires openAtLogin; forces closeBehavior tray.
+   */
+  startHiddenToTray: boolean
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
   syncFolder: string | null
   // Stored so auto-sync can run silently; the cloud file stays encrypted regardless.
@@ -72,6 +77,7 @@ interface SettingsState extends Persisted {
   setCloseBehavior: (b: CloseBehavior) => void
   setCloseConfirmDismissed: (v: boolean) => void | Promise<void>
   setOpenAtLogin: (v: boolean) => void
+  setStartHiddenToTray: (v: boolean) => void
   setSyncFolder: (dir: string | null) => void
   setSyncPassphrase: (p: string | null) => void
   setAutoBackupOnExit: (v: boolean) => void
@@ -97,6 +103,7 @@ const DEFAULTS: Persisted = {
   closeBehavior: "exit",
   closeConfirmDismissed: false,
   openAtLogin: false,
+  startHiddenToTray: false,
   syncFolder: null,
   syncPassphrase: null,
   autoBackupOnExit: true,
@@ -130,6 +137,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       closeBehavior,
       closeConfirmDismissed,
       openAtLogin,
+      startHiddenToTray,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -153,6 +161,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       closeBehavior,
       closeConfirmDismissed,
       openAtLogin,
+      startHiddenToTray,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -220,7 +229,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       persist()
     },
     setCloseBehavior(b) {
-      set({ closeBehavior: b })
+      if (b === "exit" && get().startHiddenToTray) {
+        set({ closeBehavior: b, startHiddenToTray: false })
+      } else {
+        set({ closeBehavior: b })
+      }
       persist()
       setTrayVisible(b === "tray")
     },
@@ -231,9 +244,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       return persist()
     },
     setOpenAtLogin(v) {
-      set({ openAtLogin: v })
+      set({
+        openAtLogin: v,
+        // Silent start only makes sense with login autostart.
+        ...(v ? {} : { startHiddenToTray: false }),
+      })
       persist()
       void syncOpenAtLogin(v)
+    },
+    setStartHiddenToTray(v) {
+      if (v) {
+        // Need a tray icon to recover the window after a silent login launch.
+        set({ startHiddenToTray: true, openAtLogin: true, closeBehavior: "tray" })
+        setTrayVisible(true)
+        void syncOpenAtLogin(true)
+      } else {
+        set({ startHiddenToTray: false })
+      }
+      persist()
     },
     setSyncFolder(dir) {
       set({ syncFolder: dir })
@@ -306,6 +334,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
             ? data.closeConfirmDismissed
             : DEFAULTS.closeConfirmDismissed,
         openAtLogin: typeof data.openAtLogin === "boolean" ? data.openAtLogin : DEFAULTS.openAtLogin,
+        startHiddenToTray:
+          typeof data.startHiddenToTray === "boolean"
+            ? data.startHiddenToTray
+            : DEFAULTS.startHiddenToTray,
         syncFolder: typeof data.syncFolder === "string" ? data.syncFolder : null,
         syncPassphrase: typeof data.syncPassphrase === "string" ? data.syncPassphrase : null,
         autoBackupOnExit:
@@ -313,7 +345,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         syncLastAt: typeof data.syncLastAt === "string" ? data.syncLastAt : null,
       })
       // Keep the OS login item in sync with the saved preference.
-      void syncOpenAtLogin(get().openAtLogin)
+      const openAtLogin = get().openAtLogin
+      // Silent start without openAtLogin is invalid after load.
+      if (get().startHiddenToTray && !openAtLogin) {
+        set({ startHiddenToTray: false })
+        persist()
+      }
+      // Opening silent start implies tray close mode.
+      if (get().startHiddenToTray && get().closeBehavior !== "tray") {
+        set({ closeBehavior: "tray" })
+        persist()
+        setTrayVisible(true)
+      }
+      void syncOpenAtLogin(openAtLogin)
       // Persist the one-time download-location reset so it doesn't repeat next launch.
       if (!dlLocalized) {
         localStorage.setItem("museek.downloadDir.localized", "1")

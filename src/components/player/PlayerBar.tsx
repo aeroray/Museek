@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { PlatformBadge, QualityBadge, PLATFORM_BRAND } from "@/components/common/MetaBadges"
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
+import { DownloadSongButton } from "@/components/common/DownloadSongButton"
 import { enterMiniPlayer } from "@/lib/miniPlayer"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useT } from "@/lib/i18n"
@@ -124,9 +125,10 @@ export function PlayerBar() {
           <Controls />
         </div>
 
-        {/* Right: Volume + Lyrics + Queue + Mini */}
+        {/* Right: Volume + Download + Lyrics + Queue + Mini */}
         <div className="flex items-center gap-1 w-72 justify-end shrink-0">
           <VolumeControl />
+          <DownloadSongButton song={currentSong} className="h-9 w-9" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

@@ -2,9 +2,21 @@ import type { Window } from "@tauri-apps/api/window"
 import type { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi"
 import { isMacOs } from "@/lib/os"
 import { exitLyricsFullscreen, isLyricsFullscreenSession } from "@/lib/lyricsFullscreen"
+import { readData, writeData } from "@/lib/db"
 import { usePlayerStore } from "@/stores/playerStore"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+
+/**
+ * Device-local mini-bar position (physical px). Deliberately not in config sync
+ * (see configIO DB_FILES — this file is never exported).
+ */
+const MINI_POS_FILE = "miniPlayer.json"
+
+type MiniPosPrefs = {
+  x: number
+  y: number
+}
 
 /** Horizontal mini bar — compact width for cover + transport + actions. */
 export const MINI_WIDTH = 400
@@ -42,14 +54,20 @@ const EDGE_INSET = 14
 const EDGE_THRESHOLD_LOGICAL = 40
 /** When already docking one edge, also pin the orthogonal axis if this close. */
 const CORNER_PIN_LOGICAL = 48
-/** Main ↔ mini window morph. */
-const TRANSITION_MS = 280
-/** Peek ↔ bar morph (shorter = snappier dock). */
-const PEEK_MS = 200
+/** Main → mini enter morph (ease-out; ≤400ms per motion guidance). */
+const TRANSITION_ENTER_MS = 300
+/** Mini → main exit morph (~65% of enter — exit-faster-than-enter). */
+const TRANSITION_EXIT_MS = 200
+/** Bar ↔ vinyl peek morph. */
+const PEEK_MS = 240
 const COLLAPSE_DELAY_MS = 360
 const MOVE_SETTLE_MS = 200
-/** Let the veiled layout paint before clearing blur. */
-const REVEAL_HOLD_MS = 72
+/** Brief hold so the veiled target chrome paints before clearing the veil. */
+const REVEAL_HOLD_MS = 36
+/** Brief hold so soft peek veil can paint. */
+const VEIL_IN_MS = 32
+/** Wait for full morph content to fade out before resizing (matches CSS). */
+const VEIL_IN_FULL_MS = 120
 
 /** Matches tauri.conf.json main window mins — restored on exit. */
 const MAIN_MIN_WIDTH = 1200
@@ -65,6 +83,7 @@ type SavedChrome = {
 
 type PhysRect = { x: number; y: number; w: number; h: number }
 export type DockEdge = "left" | "right" | "top" | "bottom"
+type MorphEase = "enter" | "exit" | "peek"
 
 let saved: SavedChrome | null = null
 let sessionActive = false
@@ -85,10 +104,24 @@ async function getWin(): Promise<Window | null> {
   return getCurrentWindow()
 }
 
-function setMorphing(on: boolean) {
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  } catch {
+    return false
+  }
+}
+
+function setMorphing(on: boolean, soft = false) {
   usePlayerStore.setState({ miniMorphing: on })
-  if (on) document.documentElement.dataset.miniMorphing = "true"
-  else delete document.documentElement.dataset.miniMorphing
+  if (on) {
+    document.documentElement.dataset.miniMorphing = "true"
+    if (soft) document.documentElement.dataset.miniMorphSoft = "true"
+    else delete document.documentElement.dataset.miniMorphSoft
+  } else {
+    delete document.documentElement.dataset.miniMorphing
+    delete document.documentElement.dataset.miniMorphSoft
+  }
 }
 
 async function revealAfterMorph(): Promise<void> {
@@ -106,9 +139,25 @@ function applyMiniCss(on: boolean) {
   }
 }
 
-/** Smooth deceleration — softer than cubic for large window morphs. */
-function easeOutQuint(t: number): number {
-  return 1 - (1 - t) ** 5
+/** Ease-out expo — snappy start, soft settle (spring-like without overshoot). */
+function easeOutExpo(t: number): number {
+  return t >= 1 ? 1 : 1 - 2 ** (-10 * t)
+}
+
+/** Ease-in-out cubic — balanced for exit / large restores. */
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+}
+
+/** Soft ease-out for peek (disc stays readable while the shell moves). */
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3
+}
+
+function morphEase(kind: MorphEase, t: number): number {
+  if (kind === "exit") return easeInOutCubic(t)
+  if (kind === "peek") return easeOutCubic(t)
+  return easeOutExpo(t)
 }
 
 function sleep(ms: number): Promise<void> {
@@ -150,43 +199,64 @@ async function readRect(win: Window): Promise<PhysRect> {
 
 /**
  * Interpolate outer size + position in physical pixels.
- * Fires IPC updates without awaiting each frame (awaiting caused stutter);
- * snaps to the exact target on the last frame.
+ * Prefer the Rust one-shot morph (size+pos per step, single invoke) so the
+ * WebView isn't also driving a rAF/IPC storm during resize.
  */
-async function animateWindowRect(win: Window, to: PhysRect, durationMs = TRANSITION_MS): Promise<void> {
+async function animateWindowRect(
+  win: Window,
+  to: PhysRect,
+  durationMs: number,
+  ease: MorphEase = "enter",
+): Promise<void> {
+  const ms = prefersReducedMotion() ? 0 : durationMs
+  try {
+    const { invoke } = await import("@tauri-apps/api/core")
+    await invoke("animate_window_outer_rect", {
+      to: { x: to.x, y: to.y, w: to.w, h: to.h },
+      durationMs: ms,
+      ease,
+    })
+    return
+  } catch {
+    /* fall through to JS path (browser preview / older builds) */
+  }
+
   const { PhysicalSize, PhysicalPosition } = await import("@tauri-apps/api/dpi")
   const from = await readRect(win)
+  const apply = async (r: PhysRect) => {
+    await win.setSize(new PhysicalSize(r.w, r.h))
+    await win.setPosition(new PhysicalPosition(r.x, r.y))
+  }
+
   if (
     Math.abs(from.x - to.x) < 2 &&
     Math.abs(from.y - to.y) < 2 &&
     Math.abs(from.w - to.w) < 2 &&
     Math.abs(from.h - to.h) < 2
   ) {
-    await win.setSize(new PhysicalSize(to.w, to.h))
-    await win.setPosition(new PhysicalPosition(to.x, to.y))
+    await apply(to)
     return
   }
 
-  await new Promise<void>((resolve) => {
-    const start = performance.now()
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs)
-      const e = easeOutQuint(t)
-      const w = Math.max(1, Math.round(from.w + (to.w - from.w) * e))
-      const h = Math.max(1, Math.round(from.h + (to.h - from.h) * e))
-      const x = Math.round(from.x + (to.x - from.x) * e)
-      const y = Math.round(from.y + (to.y - from.y) * e)
-      // Don't await — overlapping awaits stacked frames and felt choppy.
-      void win.setSize(new PhysicalSize(w, h))
-      void win.setPosition(new PhysicalPosition(x, y))
-      if (t < 1) requestAnimationFrame(tick)
-      else resolve()
-    }
-    requestAnimationFrame(tick)
-  })
+  if (ms <= 0) {
+    await apply(to)
+    return
+  }
 
-  await win.setSize(new PhysicalSize(to.w, to.h))
-  await win.setPosition(new PhysicalPosition(to.x, to.y))
+  const steps = Math.min(12, Math.max(8, Math.ceil(ms / 28)))
+  const stepMs = Math.max(1, Math.floor(ms / steps))
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const e = morphEase(ease, t)
+    await apply({
+      w: Math.max(1, Math.round(from.w + (to.w - from.w) * e)),
+      h: Math.max(1, Math.round(from.h + (to.h - from.h) * e)),
+      x: Math.round(from.x + (to.x - from.x) * e),
+      y: Math.round(from.y + (to.y - from.y) * e),
+    })
+    if (i < steps) await sleep(stepMs)
+  }
+  await apply(to)
 }
 
 async function unlockSizeConstraints(win: Window): Promise<void> {
@@ -256,6 +326,64 @@ async function miniTargetPhysical(win: Window): Promise<PhysRect> {
   }
   const cur = await readRect(win)
   return { x: Math.max(0, cur.x + cur.w - w), y: Math.max(0, cur.y), w, h }
+}
+
+async function loadSavedMiniPos(): Promise<MiniPosPrefs | null> {
+  if (!isTauri) return null
+  try {
+    const data = await readData<Partial<MiniPosPrefs>>(MINI_POS_FILE, {})
+    if (typeof data.x === "number" && typeof data.y === "number" && Number.isFinite(data.x) && Number.isFinite(data.y)) {
+      return { x: Math.round(data.x), y: Math.round(data.y) }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function persistMiniPos(x: number, y: number): void {
+  if (!isTauri) return
+  void writeData(MINI_POS_FILE, { x: Math.round(x), y: Math.round(y) } satisfies MiniPosPrefs)
+}
+
+/** Save current bar top-left (skip while in cover peek). */
+async function persistCurrentMiniBarPos(win: Window): Promise<void> {
+  if (usePlayerStore.getState().miniPeek) return
+  try {
+    const r = await readRect(win)
+    persistMiniPos(r.x, r.y)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Prefer last dragged position; fall back to default right-edge center. */
+async function resolveMiniEnterTarget(win: Window): Promise<PhysRect> {
+  const scale = (await win.scaleFactor()) || 1
+  const w = Math.round(MINI_WIDTH * scale)
+  const h = Math.round(MINI_HEIGHT * scale)
+  const savedPos = await loadSavedMiniPos()
+  if (!savedPos) return miniTargetPhysical(win)
+
+  let x = savedPos.x
+  let y = savedPos.y
+  try {
+    const { currentMonitor } = await import("@tauri-apps/api/window")
+    const monitor = await currentMonitor()
+    if (monitor) {
+      const wa = monitor.workArea
+      const pad = Math.round(EDGE_INSET * scale)
+      const minX = wa.position.x + pad
+      const minY = wa.position.y + pad
+      const maxX = wa.position.x + wa.size.width - w - pad
+      const maxY = wa.position.y + wa.size.height - h - pad
+      x = Math.round(Math.min(Math.max(x, minX), Math.max(minX, maxX)))
+      y = Math.round(Math.min(Math.max(y, minY), Math.max(minY, maxY)))
+    }
+  } catch {
+    /* keep saved */
+  }
+  return { x, y, w, h }
 }
 
 /**
@@ -478,10 +606,11 @@ export async function setMiniPeek(peek: boolean): Promise<void> {
   }
 
   peekBusy = true
-  setMorphing(true)
+  // Soft veil: opacity only — blur during resize is the main stutter source.
+  setMorphing(true, true)
   clearSettleTimer()
   setDockHint(null)
-  await sleep(36)
+  await sleep(VEIL_IN_MS)
 
   try {
     await unlockSizeConstraints(win)
@@ -496,17 +625,21 @@ export async function setMiniPeek(peek: boolean): Promise<void> {
       }
       dockEdge = edge
       const target = await peekTarget(win, edge)
-      await animateWindowRect(win, target, PEEK_MS)
+      // Swap to vinyl *before* geometry so the disc stays a true circle while
+      // the bar shell collapses around it (spatial continuity).
       setDockHint(null)
       delete document.documentElement.dataset.miniDock
       usePlayerStore.setState({ miniPeek: true, miniDockHint: null })
       document.documentElement.dataset.miniPeek = "true"
+      await sleep(16)
+      await animateWindowRect(win, target, PEEK_MS, "peek")
       await lockLogicalSize(win, MINI_PEEK_SIZE, MINI_PEEK_SIZE)
     } else {
       const edge = dockEdge ?? (await detectDockEdge(win)) ?? "right"
       dockEdge = edge
       const target = await expandedTargetFromPeek(win, edge)
-      await animateWindowRect(win, target, PEEK_MS)
+      // Keep vinyl through the expand, then reveal the bar chrome.
+      await animateWindowRect(win, target, PEEK_MS, "peek")
       clearSettleTimer()
       setDockHint(null)
       delete document.documentElement.dataset.miniDock
@@ -612,10 +745,12 @@ async function onMiniMoveSettled(win: Window): Promise<void> {
   dockEdge = edge
   // Stay lit while docked — tells the user the magnetic edge is active.
   setDockHint(edge)
+  await persistCurrentMiniBarPos(win)
 
   if (!edge || queueExpanded || pointerInside) return
 
   await magneticSnapToEdge(win, edge)
+  await persistCurrentMiniBarPos(win)
   scheduleMiniPeekCollapse(COLLAPSE_DELAY_MS)
 }
 
@@ -691,7 +826,7 @@ export async function enterMiniPlayer(): Promise<void> {
   transitioning = true
   setMorphing(true)
   queueExpanded = false
-  dockEdge = "right"
+  dockEdge = null
   pointerInside = false
   clearCollapseTimer()
   clearSettleTimer()
@@ -704,8 +839,8 @@ export async function enterMiniPlayer(): Promise<void> {
     delete document.documentElement.dataset.miniPeek
     delete document.documentElement.dataset.miniDock
 
-    // Brief hold so the veil is visible on the full layout before the swap.
-    await sleep(48)
+    // Brief hold so the veil hides content before the shell starts resizing.
+    await sleep(VEIL_IN_FULL_MS)
 
     const win = await getWin()
     if (!win) {
@@ -722,7 +857,7 @@ export async function enterMiniPlayer(): Promise<void> {
     }
     if (maximized) {
       await win.unmaximize()
-      await sleep(32)
+      await sleep(24)
     }
 
     saved = {
@@ -751,11 +886,11 @@ export async function enterMiniPlayer(): Promise<void> {
     delete document.documentElement.dataset.miniPeek
     delete document.documentElement.dataset.miniDock
     sessionActive = true
-    await sleep(24)
+    await sleep(16)
 
     await unlockSizeConstraints(win)
-    const target = await miniTargetPhysical(win)
-    await animateWindowRect(win, target, TRANSITION_MS)
+    const target = await resolveMiniEnterTarget(win)
+    await animateWindowRect(win, target, TRANSITION_ENTER_MS, "enter")
     await lockLogicalSize(win, MINI_WIDTH, MINI_HEIGHT)
     await win.setAlwaysOnTop(true)
     try {
@@ -765,10 +900,11 @@ export async function enterMiniPlayer(): Promise<void> {
     }
     await bindMovedListener(win)
     await revealAfterMorph()
-    dockEdge = "right"
-    setDockHint("right")
-    // Settle on the bar with dock chrome, then fold into the vinyl peek.
-    scheduleMiniPeekCollapse(320)
+    const edge = await detectDockEdge(win)
+    dockEdge = edge
+    setDockHint(edge)
+    // Only auto-peek when restored/snapped near an edge — free-floating stays as the bar.
+    if (edge) scheduleMiniPeekCollapse(320)
   } catch {
     setMorphing(false)
   } finally {
@@ -778,7 +914,7 @@ export async function enterMiniPlayer(): Promise<void> {
 
 /**
  * Restore main window geometry and platform chrome.
- * One continuous veil covers peek→bar→main so the layout never flashes mid-size.
+ * Vinyl exits in one morph (disc → main) — no bar intermediate under the veil.
  */
 export async function exitMiniPlayer(): Promise<void> {
   if (transitioning || peekBusy) return
@@ -786,6 +922,7 @@ export async function exitMiniPlayer(): Promise<void> {
     applyMiniCss(false)
     usePlayerStore.setState({ miniMode: false, miniMorphing: false, miniPeek: false, miniDockHint: null })
     delete document.documentElement.dataset.miniMorphing
+    delete document.documentElement.dataset.miniMorphSoft
     delete document.documentElement.dataset.miniPeek
     delete document.documentElement.dataset.miniDock
     return
@@ -801,7 +938,6 @@ export async function exitMiniPlayer(): Promise<void> {
   saved = null
   queueExpanded = false
   const wasPeek = usePlayerStore.getState().miniPeek
-  const edgeForExpand = dockEdge ?? "right"
   dockEdge = null
 
   try {
@@ -815,18 +951,15 @@ export async function exitMiniPlayer(): Promise<void> {
       return
     }
 
-    await sleep(36)
+    await sleep(VEIL_IN_FULL_MS)
     await unlockSizeConstraints(win)
 
-    // Under the same veil: vinyl → bar footprint, then bar → main.
     if (wasPeek) {
-      const barTarget = await expandedTargetFromPeek(win, edgeForExpand)
-      await animateWindowRect(win, barTarget, PEEK_MS)
-      usePlayerStore.setState({ miniPeek: false, miniDockHint: null })
-      delete document.documentElement.dataset.miniPeek
-      delete document.documentElement.dataset.miniDock
-      await lockLogicalSize(win, MINI_WIDTH, MINI_HEIGHT)
-      await unlockSizeConstraints(win)
+      // Remember disc position; stay on vinyl chrome through the single expand.
+      const cur = await readRect(win)
+      persistMiniPos(cur.x, cur.y)
+    } else {
+      await persistCurrentMiniBarPos(win)
     }
 
     try {
@@ -849,7 +982,8 @@ export async function exitMiniPlayer(): Promise<void> {
           w: snapshot.size.width,
           h: snapshot.size.height,
         },
-        TRANSITION_MS,
+        TRANSITION_EXIT_MS,
+        "exit",
       )
     }
 
