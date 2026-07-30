@@ -1,31 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { ListMusic, Play, ChevronLeft, RotateCw, Heart, Search, X, Link2, Loader2, Pencil, CheckCheck, Download } from "lucide-react"
+import { Disc3, Play, ChevronLeft, RotateCw, Heart, Search, X, Pencil, CheckCheck, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { TrackRow } from "@/components/common/TrackRow"
 import { PlaylistCardSkeleton, TrackRowSkeleton } from "@/components/common/ListSkeletons"
 import { VirtualList } from "@/components/common/VirtualList"
-import {
-  getHotPlaylists,
-  getPlaylistDetail,
-  getPlaylistTags,
-  playlistKind,
-  type Playlist,
-  type PlaylistTag,
-} from "@/lib/playlists"
-import { getAlbumDetail, type Album } from "@/lib/albums"
-import { parsePlaylistLink } from "@/lib/playlists/openLink"
-import { playPlaylist } from "@/lib/playlists/play"
+import { getHotAlbums, getAlbumTags, getAlbumDetail, type Album, type AlbumTag } from "@/lib/albums"
+import { playAlbum } from "@/lib/albums/play"
+import { playlistKind, type Playlist } from "@/lib/playlists"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -34,7 +18,7 @@ import { useDownloadStore } from "@/stores/downloadStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { MusicInfo, OnlineSource } from "@/types/music"
+import type { MusicInfo } from "@/types/music"
 
 function albumToPlaylist(album: Album): Playlist {
   return {
@@ -49,7 +33,7 @@ function albumToPlaylist(album: Album): Playlist {
   }
 }
 
-export function HotPlaylists() {
+export function HotAlbums() {
   const t = useT()
   const playAll = usePlayerStore((s) => s.playAll)
   const addTask = useDownloadStore((s) => s.addTask)
@@ -57,42 +41,28 @@ export function HotPlaylists() {
   const addFavoritePlaylist = usePlaylistStore((s) => s.addFavoritePlaylist)
   const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)
   const navState = useLocation().state as {
-    openPlaylist?: Playlist
     openAlbum?: Album
     fromFavorites?: boolean
     fromSearch?: boolean
   } | null
-  const openFromNav = navState?.openPlaylist
   const openAlbumFromNav = navState?.openAlbum
   const fromFavorites = navState?.fromFavorites
   const fromSearch = navState?.fromSearch
   const navigate = useNavigate()
-  // Selected platform lives in the UI store so it survives leaving and returning.
-  const source = useUiStore((s) => s.playlistSource)
-  const setSource = useUiStore((s) => s.setPlaylistSource)
-  const [playlists, setPlaylists] = useState<Playlist[]>([])
-  // Seed the detail view straight from the nav state so the very first render
-  // already shows the detail skeleton (no flash of the empty grid before the
-  // auto-open effect runs).
+  const source = useUiStore((s) => s.albumSource)
+  const setSource = useUiStore((s) => s.setAlbumSource)
+
+  const [albums, setAlbums] = useState<Album[]>([])
   const [selected, setSelected] = useState<Playlist | null>(
-    openFromNav ?? (openAlbumFromNav ? albumToPlaylist(openAlbumFromNav) : null),
-  )
-  const [detailKind, setDetailKind] = useState<"playlist" | "album">(
-    openAlbumFromNav ? "album" : "playlist",
+    openAlbumFromNav ? albumToPlaylist(openAlbumFromNav) : null,
   )
   const [songs, setSongs] = useState<MusicInfo[]>([])
-  // Grid (hot list) and detail have SEPARATE loading/error so the cached hot-list
-  // fetch can't flip the detail view out of its skeleton mid-load (which showed a
-  // blank "empty" flash when opening a favorited playlist).
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
-  const [detailLoading, setDetailLoading] = useState(!!openFromNav || !!openAlbumFromNav)
+  const [detailLoading, setDetailLoading] = useState(!!openAlbumFromNav)
   const [detailError, setDetailError] = useState<string | null>(null)
-  // Category filter: null = "全部" (platform default recommend). Hide the bar
-  // when tags fail or come back empty (e.g. transient API outage).
-  const [tags, setTags] = useState<PlaylistTag[]>([])
+  const [tags, setTags] = useState<AlbumTag[]>([])
   const [tagId, setTagId] = useState<string | null>(null)
-  // Keep tag state in sync with the platform tab without a one-frame stale load.
   const [tagSource, setTagSource] = useState(source)
   if (tagSource !== source) {
     setTagSource(source)
@@ -104,68 +74,42 @@ export function HotPlaylists() {
   const [tagCanScrollRight, setTagCanScrollRight] = useState(false)
   const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
   const [filter, setFilter] = useState("")
-  const [openDialog, setOpenDialog] = useState(false)
-  // Dialog platform is local so switching tabs here doesn't reload the page grid.
-  const [openSource, setOpenSource] = useState<OnlineSource>(source)
-  const [openInput, setOpenInput] = useState("")
-  const [openBusy, setOpenBusy] = useState(false)
-  const [openError, setOpenError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  // Bind the Radix viewport once mounted (needed for virtualization + scroll reset).
   useEffect(() => {
     const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
     setViewportEl(vp instanceof HTMLElement ? vp : null)
   }, [selected, detailLoading])
 
-  // Category chips: vertical wheel → horizontal scroll; fade when more tags exist to the right.
   useEffect(() => {
     const el = tagScrollRef.current
     if (!el || tags.length === 0) {
       setTagCanScrollRight(false)
       return
     }
-
-    const updateFade = () => {
-      setTagCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
-    }
-    updateFade()
-
+    const update = () => setTagCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+    update()
+    el.addEventListener("scroll", update, { passive: true })
     const onWheel = (e: WheelEvent) => {
-      if (el.scrollWidth <= el.clientWidth) return
-      // Prefer converting vertical wheel to horizontal when the strip overflows.
-      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return
-      e.preventDefault()
-      el.scrollLeft += e.deltaY
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        el.scrollLeft += e.deltaY
+        e.preventDefault()
+      }
     }
-
     el.addEventListener("wheel", onWheel, { passive: false })
-    el.addEventListener("scroll", updateFade, { passive: true })
-    const ro = new ResizeObserver(updateFade)
+    const ro = new ResizeObserver(update)
     ro.observe(el)
     return () => {
+      el.removeEventListener("scroll", update)
       el.removeEventListener("wheel", onWheel)
-      el.removeEventListener("scroll", updateFade)
       ro.disconnect()
     }
-  }, [tags])
+  }, [tags, source])
 
-  useEffect(() => {
-    setFilter("")
-    setEditing(false)
-    setSelectedIds(new Set())
-  }, [selected])
-
-  // Reset scroll to the top when drilling into a playlist or going back.
-  useEffect(() => {
-    if (viewportEl) viewportEl.scrollTop = 0
-  }, [selected, viewportEl])
-
-  // Load category chips for the current platform; hide bar on failure / empty.
   useEffect(() => {
     let cancelled = false
-    getPlaylistTags(source)
+    getAlbumTags(source)
       .then((list) => {
         if (!cancelled) setTags(list)
       })
@@ -177,14 +121,13 @@ export function HotPlaylists() {
     }
   }, [source])
 
-  // Load the platform's hot playlists. Extracted so the retry button can re-run it.
   const loadList = useCallback(() => {
     setListLoading(true)
     setListError(null)
     setSelected(null)
     setSongs([])
-    getHotPlaylists(source, 1, tagId)
-      .then(setPlaylists)
+    getHotAlbums(source, 1, tagId)
+      .then(setAlbums)
       .catch((e) => setListError((e as Error).message))
       .finally(() => setListLoading(false))
   }, [source, tagId])
@@ -193,36 +136,8 @@ export function HotPlaylists() {
     loadList()
   }, [loadList])
 
-  const openPlaylist = (pl: Playlist) => {
-    const entry = { ...pl, kind: "playlist" as const }
-    setDetailKind("playlist")
-    setSelected(entry)
-    setDetailLoading(true)
-    setDetailError(null)
-    setSongs([])
-    // Use the playlist's own platform (so opening from Favorites works regardless
-    // of the currently-selected platform tab).
-    getPlaylistDetail(pl.source, pl.id)
-      .then(({ info, list }) => {
-        setSelected((prev) =>
-          prev && prev.source === entry.source && prev.id === entry.id && playlistKind(prev) === "playlist"
-            ? {
-                ...prev,
-                name: info.name || prev.name,
-                img: info.img ?? prev.img,
-                author: info.author ?? prev.author,
-              }
-            : prev,
-        )
-        setSongs(list)
-      })
-      .catch((e) => setDetailError((e as Error).message))
-      .finally(() => setDetailLoading(false))
-  }
-
   const openAlbum = (album: Album) => {
     const pl = albumToPlaylist(album)
-    setDetailKind("album")
     setSelected(pl)
     setDetailLoading(true)
     setDetailError(null)
@@ -230,7 +145,7 @@ export function HotPlaylists() {
     getAlbumDetail(album.source, album.id)
       .then(({ info, list }) => {
         setSelected((prev) =>
-          prev && prev.source === pl.source && prev.id === pl.id && playlistKind(prev) === "album"
+          prev && prev.source === pl.source && prev.id === pl.id
             ? {
                 ...prev,
                 name: info.name || prev.name,
@@ -245,66 +160,40 @@ export function HotPlaylists() {
       .finally(() => setDetailLoading(false))
   }
 
-  const openByLink = async () => {
-    setOpenError(null)
-    setOpenBusy(true)
-    try {
-      const id = await parsePlaylistLink(openSource, openInput)
-      setOpenDialog(false)
-      setOpenInput("")
-      openPlaylist({
-        id,
-        name: t("hotPlaylists.openName", { id }),
-        img: null,
-        source: openSource,
-      })
-    } catch (e) {
-      setOpenError((e as Error).message)
-    } finally {
-      setOpenBusy(false)
-    }
-  }
-
-  // Retry the last failed action: a playlist/album detail if one is open, else the list.
   const retry = () => {
-    if (selected) {
-      if (detailKind === "album" && selected.source !== "local") {
-        openAlbum({
-          id: selected.id,
-          name: selected.name,
-          img: selected.img,
-          author: selected.author,
-          source: selected.source,
-        })
-      } else {
-        openPlaylist(selected)
-      }
+    if (selected && selected.source !== "local") {
+      openAlbum({
+        id: selected.id,
+        name: selected.name,
+        img: selected.img,
+        author: selected.author,
+        publishTime: selected.publishTime,
+        songCount: selected.songCount,
+        source: selected.source,
+      })
     } else loadList()
   }
 
   const isPlFav = (pl: Playlist) =>
     favoritePlaylists.some(
-      (p) => p.source === pl.source && p.id === pl.id && playlistKind(p) === playlistKind(pl),
+      (p) => p.source === pl.source && p.id === pl.id && playlistKind(p) === "album",
     )
   const toggleFavFor = (pl: Playlist) => {
-    if (isPlFav(pl)) removeFavoritePlaylist(pl.source, pl.id, playlistKind(pl))
-    else addFavoritePlaylist(pl)
+    if (isPlFav(pl)) removeFavoritePlaylist(pl.source, pl.id, "album")
+    else addFavoritePlaylist({ ...pl, kind: "album" })
   }
 
-  // Auto-open a playlist/album passed from Search or Favorites (one-time on mount).
   useEffect(() => {
     if (openAlbumFromNav) openAlbum(openAlbumFromNav)
-    else if (openFromNav) openPlaylist(openFromNav)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const playlistFav = !!selected && isPlFav(selected)
-  const togglePlaylistFav = () => {
+  const albumFav = !!selected && isPlFav(selected)
+  const toggleAlbumFav = () => {
     if (!selected) return
     toggleFavFor(selected)
   }
 
-  // Filter the opened playlist's tracks (keeping each track's original rank).
   const q = filter.trim().toLowerCase()
   const shownSongs = songs
     .map((song, i) => ({ song, rank: i + 1 }))
@@ -342,15 +231,12 @@ export function HotPlaylists() {
                 size="icon"
                 className="h-7 w-7 -ml-1"
                 onClick={() => {
-                  // Opened from Search / Favorites → pop back to that page;
-                  // opened from this page's own grid → return to the grid.
                   if (fromFavorites || fromSearch) {
                     navigate(-1)
                     return
                   }
                   setSelected(null)
                   setSongs([])
-                  setDetailKind("playlist")
                 }}
               >
                 <ChevronLeft size={18} />
@@ -368,25 +254,13 @@ export function HotPlaylists() {
                 size="sm"
                 className={cn(
                   "h-8 shrink-0",
-                  playlistFav ? "text-red-500 hover:text-red-500" : "text-muted-foreground",
+                  albumFav ? "text-red-500 hover:text-red-500" : "text-muted-foreground",
                 )}
-                onClick={togglePlaylistFav}
-                title={t(
-                  playlistFav
-                    ? "hotPlaylists.favorited"
-                    : detailKind === "album"
-                      ? "hotPlaylists.favoriteAlbum"
-                      : "hotPlaylists.favorite",
-                )}
+                onClick={toggleAlbumFav}
+                title={t(albumFav ? "hotPlaylists.favorited" : "hotPlaylists.favoriteAlbum")}
               >
-                <Heart size={14} className="mr-1.5" fill={playlistFav ? "currentColor" : "none"} />
-                {t(
-                  playlistFav
-                    ? "hotPlaylists.favorited"
-                    : detailKind === "album"
-                      ? "hotPlaylists.favoriteAlbum"
-                      : "hotPlaylists.favorite",
-                )}
+                <Heart size={14} className="mr-1.5" fill={albumFav ? "currentColor" : "none"} />
+                {t(albumFav ? "hotPlaylists.favorited" : "hotPlaylists.favoriteAlbum")}
               </Button>
               {songs.length > 0 && !detailLoading && !detailError && !editing && (
                 <Button variant="secondary" size="sm" className="h-8 shrink-0" onClick={() => playAll(songs)}>
@@ -397,22 +271,9 @@ export function HotPlaylists() {
             </>
           ) : (
             <>
-              <ListMusic size={20} />
-              <h2 className="text-lg font-semibold">{t("hotPlaylists.title")}</h2>
+              <Disc3 size={20} />
+              <h2 className="text-lg font-semibold">{t("hotAlbums.title")}</h2>
               <div className="flex-1" />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 shrink-0"
-                onClick={() => {
-                  setOpenSource(source)
-                  setOpenError(null)
-                  setOpenDialog(true)
-                }}
-              >
-                <Link2 size={14} className="mr-1.5" />
-                {t("hotPlaylists.open")}
-              </Button>
             </>
           )}
         </div>
@@ -474,7 +335,7 @@ export function HotPlaylists() {
                   />
                   <Input
                     className="h-8 py-0 pl-9 pr-9"
-                    placeholder={t("hotPlaylists.searchInList")}
+                    placeholder={t("hotAlbums.searchInList")}
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                   />
@@ -525,7 +386,6 @@ export function HotPlaylists() {
 
       <ScrollArea ref={scrollRef} className="flex-1">
         {selected ? (
-          // --- Playlist detail ---
           detailLoading ? (
             <div className="px-2 py-2">
               {Array.from({ length: 12 }).map((_, i) => (
@@ -534,18 +394,18 @@ export function HotPlaylists() {
             </div>
           ) : detailError ? (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3 px-4">
-              <p className="text-sm text-destructive">{t("hotPlaylists.failed", { msg: detailError })}</p>
+              <p className="text-sm text-destructive">{t("hotAlbums.failed", { msg: detailError })}</p>
               <Button variant="outline" size="sm" onClick={retry}>
                 <RotateCw size={14} className="mr-1.5" />
                 {t("common.retry")}
               </Button>
             </div>
           ) : songs.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">{t("library.empty")}</div>
+            <div className="text-center py-16 text-muted-foreground">{t("hotAlbums.albumEmpty")}</div>
           ) : (
             <div className="px-2 py-2">
               {shownSongs.length === 0 ? (
-                <div className="text-center py-16 text-sm text-muted-foreground">{t("hotPlaylists.noMatch")}</div>
+                <div className="text-center py-16 text-sm text-muted-foreground">{t("hotAlbums.noMatch")}</div>
               ) : (
                 <VirtualList
                   items={shownSongs}
@@ -566,8 +426,7 @@ export function HotPlaylists() {
               )}
             </div>
           )
-        ) : // --- Hot-playlist grid ---
-        listLoading ? (
+        ) : listLoading ? (
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
             {Array.from({ length: 10 }).map((_, i) => (
               <PlaylistCardSkeleton key={i} />
@@ -575,106 +434,37 @@ export function HotPlaylists() {
           </div>
         ) : listError ? (
           <div className="flex flex-col items-center justify-center py-16 text-center gap-3 px-4">
-            <p className="text-sm text-destructive">{t("hotPlaylists.failed", { msg: listError })}</p>
+            <p className="text-sm text-destructive">{t("hotAlbums.failed", { msg: listError })}</p>
             <Button variant="outline" size="sm" onClick={retry}>
               <RotateCw size={14} className="mr-1.5" />
               {t("common.retry")}
             </Button>
           </div>
-        ) : playlists.length === 0 ? (
+        ) : albums.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
             <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
-              <ListMusic size={28} />
+              <Disc3 size={28} />
             </div>
-            <p className="text-sm">{t("hotPlaylists.empty")}</p>
+            <p className="text-sm">{t("hotAlbums.empty")}</p>
           </div>
         ) : (
           <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
-            {playlists.map((pl) => (
-              <PlaylistCard
-                key={pl.id}
-                playlist={pl}
-                onOpen={() => openPlaylist(pl)}
-                onPlay={() => playPlaylist(pl)}
-                onToggleFavorite={() => toggleFavFor(pl)}
-                favorited={isPlFav(pl)}
-              />
-            ))}
+            {albums.map((album) => {
+              const pl = albumToPlaylist(album)
+              return (
+                <PlaylistCard
+                  key={`${album.source}:${album.id}`}
+                  playlist={pl}
+                  onOpen={() => openAlbum(album)}
+                  onPlay={() => playAlbum(album)}
+                  onToggleFavorite={() => toggleFavFor(pl)}
+                  favorited={isPlFav(pl)}
+                />
+              )
+            })}
           </div>
         )}
       </ScrollArea>
-
-      <Dialog
-        open={openDialog}
-        onOpenChange={(open) => {
-          setOpenDialog(open)
-          if (!open) {
-            setOpenError(null)
-            setOpenBusy(false)
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("hotPlaylists.openTitle")}</DialogTitle>
-            <DialogDescription className="sr-only">
-              {t("hotPlaylists.openTitle")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <PlatformTabs
-              value={openSource}
-              onChange={(s) => {
-                setOpenSource(s)
-                if (openError) setOpenError(null)
-              }}
-            />
-            <div className="relative">
-              <textarea
-                className="flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-2 pr-9 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                placeholder={t(`hotPlaylists.openPlaceholder.${openSource}`)}
-                value={openInput}
-                onChange={(e) => {
-                  setOpenInput(e.target.value)
-                  if (openError) setOpenError(null)
-                }}
-                disabled={openBusy}
-                autoFocus
-              />
-              {openInput && !openBusy && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenInput("")
-                    if (openError) setOpenError(null)
-                  }}
-                  title={t("search.clear")}
-                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            {openError && <p className="text-sm text-destructive">{openError}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenDialog(false)} disabled={openBusy}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={openByLink} disabled={openBusy || !openInput.trim()}>
-              {openBusy ? (
-                <>
-                  <Loader2 size={14} className="mr-1.5 animate-spin" />
-                  {t("hotPlaylists.openOpening")}
-                </>
-              ) : (
-                t("hotPlaylists.openConfirm")
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
     </div>
   )
 }

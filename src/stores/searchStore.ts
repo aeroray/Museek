@@ -8,10 +8,12 @@ import { readData, writeData } from "@/lib/db"
 import { createAsyncCache } from "@/lib/cache"
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
 import { searchPlaylists } from "@/lib/playlists/search"
+import { searchAlbums } from "@/lib/albums"
+import type { Album } from "@/lib/albums"
 import type { Playlist } from "@/lib/playlists"
 import type { MusicInfo, OnlineSource, SearchResult } from "@/types/music"
 
-export type SearchScope = "song" | "playlist"
+export type SearchScope = "song" | "album" | "playlist"
 
 type SearchFn = (query: string, page?: number, limit?: number) => Promise<SearchResult>
 
@@ -34,6 +36,7 @@ interface SearchState {
   scope: SearchScope
   results: MusicInfo[]
   playlistResults: Playlist[]
+  albumResults: Album[]
   total: number
   page: number
   allPage: number
@@ -61,6 +64,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   scope: "song",
   results: [],
   playlistResults: [],
+  albumResults: [],
   total: 0,
   page: 1,
   allPage: 1,
@@ -76,7 +80,13 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const q = query.trim()
       if (scope === "playlist") {
         const list = await searchPlaylists(platform, q, page)
-        set({ playlistResults: list, isLoading: false, page, allPage: 1 })
+        set({ playlistResults: list, albumResults: [], isLoading: false, page, allPage: 1 })
+        get().addToHistory(q)
+        return
+      }
+      if (scope === "album") {
+        const list = await searchAlbums(platform, q, page)
+        set({ albumResults: list, playlistResults: [], isLoading: false, page, allPage: 1 })
         get().addToHistory(q)
         return
       }
@@ -108,7 +118,15 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
   setScope(scope) {
     if (scope === get().scope) return
-    set({ scope, results: [], playlistResults: [], page: 1, allPage: 1, error: null })
+    set({
+      scope,
+      results: [],
+      playlistResults: [],
+      albumResults: [],
+      page: 1,
+      allPage: 1,
+      error: null,
+    })
     const q = get().query
     if (q.trim()) get().search(q, 1)
   },
@@ -121,7 +139,16 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   },
 
   clearResults() {
-    set({ results: [], playlistResults: [], total: 0, page: 1, allPage: 1, query: "", error: null })
+    set({
+      results: [],
+      playlistResults: [],
+      albumResults: [],
+      total: 0,
+      page: 1,
+      allPage: 1,
+      query: "",
+      error: null,
+    })
   },
 
   addToHistory(query) {

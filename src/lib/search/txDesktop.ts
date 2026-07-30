@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 
 // Shared QQ Music Desktop search (signed musics.fcg).
-// search_type: 0 song · 3 playlist — mirrors lx-music after Mobile wind-control fixes.
+// search_type: 0 song · 2 album · 3 playlist — mirrors lx-music after Mobile wind-control fixes.
 
 const PART_1_INDEXES = [23, 14, 6, 36, 16, 40, 7, 19]
 const PART_2_INDEXES = [16, 1, 32, 12, 19, 27, 8, 5]
@@ -62,13 +62,13 @@ const MAX_RETRIES = 5
 
 /**
  * Signed Desktop search. Retries on wind-control / bad envelopes (lx-music pattern).
- * @param searchType 0 = songs, 3 = playlists
+ * @param searchType 0 = songs, 2 = albums, 3 = playlists
  */
 export async function qqDesktopSearch(
   query: string,
   page: number,
   limit: number,
-  searchType: 0 | 3,
+  searchType: 0 | 2 | 3,
   retryNum = 0
 ): Promise<QqSearchData> {
   if (retryNum > MAX_RETRIES) throw new Error("QQ search failed")

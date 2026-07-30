@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { readData, writeData } from "@/lib/db"
 import { normalizeCategoryName } from "@/lib/songCategories"
 import type { MusicInfo, Source } from "@/types/music"
-import type { Playlist as SourcePlaylist } from "@/lib/playlists"
+import { playlistKind, type Playlist as SourcePlaylist } from "@/lib/playlists"
 
 // A user-created playlist (distinct from a favorited platform playlist).
 export interface Playlist {
@@ -32,10 +32,10 @@ interface PlaylistState extends PersistShape {
   addToFavorites: (song: MusicInfo) => void
   removeFromFavorites: (songId: string) => void
   isFavorite: (songId: string) => boolean
-  // Favorite a whole platform playlist (from the 歌单 page).
+  // Favorite a whole platform playlist / album (from 歌单 or 专辑详情).
   addFavoritePlaylist: (pl: SourcePlaylist) => void
-  removeFavoritePlaylist: (source: Source, id: string) => void
-  isFavoritePlaylist: (source: Source, id: string) => boolean
+  removeFavoritePlaylist: (source: Source, id: string, kind?: "playlist" | "album") => void
+  isFavoritePlaylist: (source: Source, id: string, kind?: "playlist" | "album") => boolean
   createPlaylist: (name: string) => Playlist
   renamePlaylist: (id: string, name: string) => void
   deletePlaylist: (id: string) => void
@@ -101,20 +101,32 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => {
     },
 
     addFavoritePlaylist(pl) {
-      if (get().favoritePlaylists.some((p) => p.source === pl.source && p.id === pl.id)) return
-      set((s) => ({ favoritePlaylists: [pl, ...s.favoritePlaylists] }))
-      persist()
-    },
-
-    removeFavoritePlaylist(source, id) {
+      const kind = playlistKind(pl)
+      if (
+        get().favoritePlaylists.some(
+          (p) => p.source === pl.source && p.id === pl.id && playlistKind(p) === kind,
+        )
+      )
+        return
       set((s) => ({
-        favoritePlaylists: s.favoritePlaylists.filter((p) => !(p.source === source && p.id === id)),
+        favoritePlaylists: [{ ...pl, kind }, ...s.favoritePlaylists],
       }))
       persist()
     },
 
-    isFavoritePlaylist(source, id) {
-      return get().favoritePlaylists.some((p) => p.source === source && p.id === id)
+    removeFavoritePlaylist(source, id, kind = "playlist") {
+      set((s) => ({
+        favoritePlaylists: s.favoritePlaylists.filter(
+          (p) => !(p.source === source && p.id === id && playlistKind(p) === kind),
+        ),
+      }))
+      persist()
+    },
+
+    isFavoritePlaylist(source, id, kind = "playlist") {
+      return get().favoritePlaylists.some(
+        (p) => p.source === source && p.id === id && playlistKind(p) === kind,
+      )
     },
 
     createPlaylist(name) {

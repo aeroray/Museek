@@ -31,13 +31,15 @@ interface UiState {
   chartSource: OnlineSource
   chartBoardId: string
   playlistSource: OnlineSource
+  albumSource: OnlineSource
   setChartSource: (s: OnlineSource) => void
   setChartBoardId: (id: string) => void
   setPlaylistSource: (s: OnlineSource) => void
+  setAlbumSource: (s: OnlineSource) => void
   // Which Favorites tab is active — kept here so leaving (e.g. opening a
   // favorited playlist) and coming back restores the same tab.
-  favoritesTab: "songs" | "playlists"
-  setFavoritesTab: (tab: "songs" | "playlists") => void
+  favoritesTab: "songs" | "playlists" | "albums"
+  setFavoritesTab: (tab: "songs" | "playlists" | "albums") => void
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -61,9 +63,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   chartSource: "wy",
   chartBoardId: "",
   playlistSource: "wy",
+  albumSource: "wy",
   setChartSource: (s) => set({ chartSource: s }),
   setChartBoardId: (id) => set({ chartBoardId: id }),
   setPlaylistSource: (s) => set({ playlistSource: s }),
+  setAlbumSource: (s) => set({ albumSource: s }),
   favoritesTab: "songs",
   setFavoritesTab: (tab) => set({ favoritesTab: tab }),
 }))

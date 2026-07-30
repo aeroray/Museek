@@ -1,4 +1,4 @@
-import { Play, Music, X, Heart, User, Headphones, Check } from "lucide-react"
+import { Play, Music, X, Heart, User, Headphones, Check, Calendar } from "lucide-react"
 import { CoverImage } from "@/components/common/CoverImage"
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
@@ -13,7 +13,7 @@ import type { Playlist } from "@/lib/playlists"
  * (un)favoriting are *separate* affordances so the semantics are clear:
  *  - `onPlay`           → a circular play button (does NOT open the detail)
  *  - `onToggleFavorite` → a heart toggle (pass `favorited` for its state)
- *  - `onRemove`         → a hover ✕ (used in Favorites to unfavorite)
+ *  - `onRemove`         → optional hover ✕ (legacy; prefer heart toggle)
  *
  * In `selectable` mode (batch edit) the card click toggles selection instead of
  * opening, a checkbox is shown, and the per-card action buttons are hidden.
@@ -96,7 +96,13 @@ export function PlaylistCard({
                 e.stopPropagation()
                 onToggleFavorite()
               }}
-              title={t(favorited ? "hotPlaylists.favorited" : "hotPlaylists.favorite")}
+              title={t(
+                favorited
+                  ? "common.unfavorite"
+                  : playlist.kind === "album"
+                    ? "hotPlaylists.favoriteAlbum"
+                    : "hotPlaylists.favorite",
+              )}
               className={cn(
                 "absolute top-2 left-2 h-8 w-8 rounded-full flex items-center justify-center transition-[opacity,background-color,transform] duration-150 ease-out bg-black/45 text-white hover:bg-black/65 active:scale-[0.96]",
                 favorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -104,7 +110,11 @@ export function PlaylistCard({
             >
               <Heart
                 size={14}
-                className={cn(favorited ? "text-red-500 icon-heart-burst" : "")}
+                className={cn(
+                  // Lucide heart path is optically top-left heavy inside a circle.
+                  "block shrink-0 translate-x-px translate-y-px",
+                  favorited ? "text-red-500 icon-heart-burst" : "",
+                )}
                 fill={favorited ? "currentColor" : "none"}
                 key={favorited ? "on" : "off"}
               />
@@ -141,7 +151,7 @@ export function PlaylistCard({
         <p className="text-sm mt-2.5 leading-snug line-clamp-2 min-h-[2.5rem] text-pretty font-medium tracking-tight" title={playlist.name}>
           {playlist.name}
         </p>
-        {(playlist.author || playlist.playCount) && (
+        {(playlist.author || playlist.playCount || playlist.publishTime) && (
           <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
             {playlist.author && (
               <span className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden" title={playlist.author}>
@@ -149,7 +159,18 @@ export function PlaylistCard({
                 <span className="truncate">{playlist.author}</span>
               </span>
             )}
-            {playlist.playCount && (
+            {playlist.kind === "album" && playlist.publishTime && (
+              <span
+                className="flex shrink-0 items-center gap-1"
+                title={playlist.publishTime}
+              >
+                <Calendar size={11} className="shrink-0" />
+                {/^\d{4}-\d{2}/.test(playlist.publishTime)
+                  ? playlist.publishTime.slice(0, 7)
+                  : playlist.publishTime}
+              </span>
+            )}
+            {playlist.kind !== "album" && playlist.playCount && (
               <span className="flex shrink-0 items-center gap-1" title={t("hotPlaylists.playCountTip")}>
                 <Headphones size={11} className="shrink-0" />
                 {playlist.playCount}

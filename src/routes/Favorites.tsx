@@ -26,6 +26,8 @@ import {
 import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { PlatformBadge } from "@/components/common/MetaBadges"
 import { playPlaylist } from "@/lib/playlists/play"
+import { playAlbum } from "@/lib/albums/play"
+import { playlistFavKey, playlistKind } from "@/lib/playlists"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useDownloadStore } from "@/stores/downloadStore"
@@ -93,6 +95,7 @@ export function Favorites() {
   })
 
   const isSongs = tab === "songs"
+  const isAlbums = tab === "albums"
 
   const categoryNameById = useMemo(() => categoryNameMap(favoriteCategories), [favoriteCategories])
 
@@ -112,17 +115,40 @@ export function Favorites() {
     favoriteSongCategories,
   ])
 
-  const displayedPlaylists = useMemo(() => {
+  const favoritePlaylistsOnly = useMemo(
+    () => favoritePlaylists.filter((p) => playlistKind(p) === "playlist"),
+    [favoritePlaylists],
+  )
+  const favoriteAlbumsOnly = useMemo(
+    () => favoritePlaylists.filter((p) => playlistKind(p) === "album"),
+    [favoritePlaylists],
+  )
+
+  const displayedLists = useMemo(() => {
+    const sourceList = isAlbums ? favoriteAlbumsOnly : favoritePlaylistsOnly
     let list =
-      favoritesPlatform === "all" ? favoritePlaylists : favoritePlaylists.filter((p) => p.source === favoritesPlatform)
+      favoritesPlatform === "all" ? sourceList : sourceList.filter((p) => p.source === favoritesPlatform)
     const q = query.trim().toLowerCase()
     if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.author ?? "").toLowerCase().includes(q))
     if (favoritesSort === "name") list = [...list].sort((a, b) => a.name.localeCompare(b.name, "zh"))
     return list
-  }, [favoritePlaylists, favoritesPlatform, favoritesSort, query])
+  }, [
+    isAlbums,
+    favoriteAlbumsOnly,
+    favoritePlaylistsOnly,
+    favoritesPlatform,
+    favoritesSort,
+    query,
+  ])
 
-  const total = isSongs ? favorites.length : favoritePlaylists.length
-  const currentKeys = isSongs ? displayedSongs.map((s) => s.id) : displayedPlaylists.map((p) => `${p.source}:${p.id}`)
+  const tabTotal = isSongs
+    ? favorites.length
+    : isAlbums
+      ? favoriteAlbumsOnly.length
+      : favoritePlaylistsOnly.length
+  const currentKeys = isSongs
+    ? displayedSongs.map((s) => s.id)
+    : displayedLists.map((p) => playlistFavKey(p))
   const allSelected = currentKeys.length > 0 && currentKeys.every((k) => selected.has(k))
 
   const categoryFilterLabel = labelForCategoryFilter(categoryFilter, categoryNameById, {
@@ -143,7 +169,7 @@ export function Favorites() {
     setEditing(false)
     setSelected(new Set())
   }
-  const switchTab = (id: "songs" | "playlists") => {
+  const switchTab = (id: "songs" | "playlists" | "albums") => {
     setTab(id)
     setCategoryFilter("all")
     exitEdit()
@@ -157,9 +183,9 @@ export function Favorites() {
     if (isSongs) {
       selected.forEach((id) => removeFromFavorites(id))
     } else {
-      favoritePlaylists
-        .filter((p) => selected.has(`${p.source}:${p.id}`))
-        .forEach((p) => removeFavoritePlaylist(p.source, p.id))
+      displayedLists
+        .filter((p) => selected.has(playlistFavKey(p)))
+        .forEach((p) => removeFavoritePlaylist(p.source, p.id, playlistKind(p)))
     }
     exitEdit()
   }
@@ -173,6 +199,22 @@ export function Favorites() {
     if (categoryFilter === id) setCategoryFilter("all")
   }
 
+  const emptyTitleKey = isSongs
+    ? "favorites.empty"
+    : isAlbums
+      ? "favorites.emptyAlbums"
+      : "favorites.emptyPlaylists"
+  const emptyHintKey = isSongs
+    ? "favorites.emptyHint"
+    : isAlbums
+      ? "favorites.emptyAlbumsHint"
+      : "favorites.emptyPlaylistsHint"
+  const searchPlaceholderKey = isSongs
+    ? "favorites.searchPlaceholder"
+    : isAlbums
+      ? "favorites.searchAlbumsPlaceholder"
+      : "favorites.searchPlaylistsPlaceholder"
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border flex items-center gap-3">
@@ -180,7 +222,11 @@ export function Favorites() {
         <div className="min-w-0">
           <h2 className="text-lg font-semibold leading-tight">{t("favorites.title")}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {t("favorites.summary", { songs: favorites.length, playlists: favoritePlaylists.length })}
+            {t("favorites.summary", {
+              songs: favorites.length,
+              playlists: favoritePlaylistsOnly.length,
+              albums: favoriteAlbumsOnly.length,
+            })}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -191,7 +237,7 @@ export function Favorites() {
             </Button>
           )}
           <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
-            {(["songs", "playlists"] as const).map((id) => (
+            {(["songs", "playlists", "albums"] as const).map((id) => (
               <button
                 key={id}
                 onClick={() => switchTab(id)}
@@ -200,14 +246,18 @@ export function Favorites() {
                   tab === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {id === "songs" ? t("favorites.tabSongs") : t("favorites.tabPlaylists")}
+                {id === "songs"
+                  ? t("favorites.tabSongs")
+                  : id === "albums"
+                    ? t("favorites.tabAlbums")
+                    : t("favorites.tabPlaylists")}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {total > 0 && (
+      {tabTotal > 0 && (
         <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
           {!editing ? (
             <>
@@ -278,7 +328,7 @@ export function Favorites() {
                 />
                 <Input
                   className="h-8 py-0 pl-9"
-                  placeholder={t(isSongs ? "favorites.searchPlaceholder" : "favorites.searchPlaylistsPlaceholder")}
+                  placeholder={t(searchPlaceholderKey)}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -343,7 +393,7 @@ export function Favorites() {
         </div>
       )}
 
-      {total === 0 ? (
+      {tabTotal === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
           <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
             {isSongs ? (
@@ -352,10 +402,8 @@ export function Favorites() {
               <Music size={28} className="text-muted-foreground" />
             )}
           </div>
-          <p className="text-base font-medium">{t(isSongs ? "favorites.empty" : "favorites.emptyPlaylists")}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t(isSongs ? "favorites.emptyHint" : "favorites.emptyPlaylistsHint")}
-          </p>
+          <p className="text-base font-medium">{t(emptyTitleKey)}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t(emptyHintKey)}</p>
         </div>
       ) : isSongs ? (
         <ScrollArea className="flex-1">
@@ -504,21 +552,52 @@ export function Favorites() {
         </ScrollArea>
       ) : (
         <ScrollArea className="flex-1">
-          {displayedPlaylists.length === 0 ? (
+          {displayedLists.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-12">{t("favorites.noMatch")}</p>
           ) : (
             <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
-              {displayedPlaylists.map((pl) => {
-                const key = `${pl.source}:${pl.id}`
+              {displayedLists.map((pl) => {
+                const key = playlistFavKey(pl)
+                const isAlbum = playlistKind(pl) === "album"
                 return (
                   <PlaylistCard
                     key={key}
                     playlist={pl}
                     onOpen={() =>
-                      navigate("/hot-playlists", { state: { openPlaylist: pl, fromFavorites: true } })
+                      isAlbum
+                        ? navigate("/hot-albums", {
+                            state: {
+                              openAlbum: {
+                                id: pl.id,
+                                name: pl.name,
+                                img: pl.img,
+                                author: pl.author,
+                                publishTime: pl.publishTime,
+                                songCount: pl.songCount,
+                                source: pl.source as OnlineSource,
+                              },
+                              fromFavorites: true,
+                            },
+                          })
+                        : navigate("/hot-playlists", {
+                            state: { openPlaylist: pl, fromFavorites: true },
+                          })
                     }
-                    onPlay={() => playPlaylist(pl)}
-                    onRemove={() => removeFavoritePlaylist(pl.source, pl.id)}
+                    onPlay={() =>
+                      isAlbum
+                        ? playAlbum({
+                            id: pl.id,
+                            name: pl.name,
+                            img: pl.img,
+                            author: pl.author,
+                            source: pl.source as OnlineSource,
+                          })
+                        : playPlaylist(pl)
+                    }
+                    favorited
+                    onToggleFavorite={() =>
+                      removeFavoritePlaylist(pl.source, pl.id, playlistKind(pl))
+                    }
                     selectable={editing}
                     selected={selected.has(key)}
                     onSelect={() => toggleOne(key)}

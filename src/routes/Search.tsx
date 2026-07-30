@@ -10,12 +10,29 @@ import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { HotSearchCloud } from "@/components/search/HotSearchCloud"
 import { playPlaylist } from "@/lib/playlists/play"
-import { useSearchStore } from "@/stores/searchStore"
+import { playAlbum } from "@/lib/albums/play"
+import { useSearchStore, type SearchScope } from "@/stores/searchStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { Playlist } from "@/lib/playlists"
+import type { Album } from "@/lib/albums"
+import { playlistKind, type Playlist } from "@/lib/playlists"
 import type { OnlineSource } from "@/types/music"
+
+const SCOPES: SearchScope[] = ["song", "playlist", "album"]
+
+function albumAsPlaylist(album: Album): Playlist {
+  return {
+    id: album.id,
+    name: album.name,
+    img: album.img,
+    author: album.author,
+    publishTime: album.publishTime,
+    songCount: album.songCount,
+    source: album.source,
+    kind: "album",
+  }
+}
 
 export function Search() {
   // Seed the input from the store so returning to the page keeps the last query
@@ -24,10 +41,26 @@ export function Search() {
   const [focused, setFocused] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const {
-    results, playlistResults, isLoading, error, page, allPage, search, searchHistory,
-    platform, setPlatform, scope, setScope, searchOnPlatform, removeHistoryItem, clearHistory, clearResults,
+    results,
+    playlistResults,
+    albumResults,
+    isLoading,
+    error,
+    page,
+    allPage,
+    search,
+    searchHistory,
+    platform,
+    setPlatform,
+    scope,
+    setScope,
+    searchOnPlatform,
+    removeHistoryItem,
+    clearHistory,
+    clearResults,
   } = useSearchStore()
-  const navSearch = (useLocation().state as { searchSong?: { platform: OnlineSource; query: string } } | null)?.searchSong
+  const navSearch = (useLocation().state as { searchSong?: { platform: OnlineSource; query: string } } | null)
+    ?.searchSong
   const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
   const addFavoritePlaylist = usePlaylistStore((s) => s.addFavoritePlaylist)
   const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)
@@ -36,9 +69,12 @@ export function Search() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const composingRef = useRef(false)
 
-  const isPlFav = (pl: Playlist) => favoritePlaylists.some((p) => p.source === pl.source && p.id === pl.id)
+  const isPlFav = (pl: Playlist) =>
+    favoritePlaylists.some(
+      (p) => p.source === pl.source && p.id === pl.id && playlistKind(p) === playlistKind(pl),
+    )
   const toggleFavFor = (pl: Playlist) => {
-    if (isPlFav(pl)) removeFavoritePlaylist(pl.source, pl.id)
+    if (isPlFav(pl)) removeFavoritePlaylist(pl.source, pl.id, playlistKind(pl))
     else addFavoritePlaylist(pl)
   }
 
@@ -85,11 +121,13 @@ export function Search() {
   // Landing state (nothing typed) → show the hot-search word cloud in the middle
   // instead of the empty placeholder. Hides as soon as the user types.
   const nothingSearched = !inputValue.trim()
-  const showHotCloud =
-    nothingSearched &&
-    !isLoading &&
-    !error &&
-    (scope === "song" ? results.length === 0 : playlistResults.length === 0)
+  const listEmpty =
+    scope === "song"
+      ? results.length === 0
+      : scope === "album"
+        ? albumResults.length === 0
+        : playlistResults.length === 0
+  const showHotCloud = nothingSearched && !isLoading && !error && listEmpty
 
   // Only NetEase resolves an exact nickname to that user's playlists.
   const playlistSupportsUser = platform === "wy"
@@ -98,6 +136,16 @@ export function Search() {
     : "search.placeholderPlaylist"
   const playlistHint = playlistSupportsUser ? "search.playlistHintUser" : "search.playlistHint"
 
+  const placeholderKey =
+    scope === "song"
+      ? "search.placeholder"
+      : scope === "album"
+        ? "search.placeholderAlbum"
+        : playlistPlaceholder
+
+  const scopeLabel = (s: SearchScope) =>
+    t(s === "song" ? "search.scopeSong" : s === "album" ? "search.scopeAlbum" : "search.scopePlaylist")
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border">
@@ -105,10 +153,12 @@ export function Search() {
           <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10" />
           <Input
             className="pl-9 pr-9"
-            placeholder={t(scope === "song" ? "search.placeholder" : playlistPlaceholder)}
+            placeholder={t(placeholderKey)}
             value={inputValue}
             onChange={(e) => handleChange(e.target.value)}
-            onCompositionStart={() => { composingRef.current = true }}
+            onCompositionStart={() => {
+              composingRef.current = true
+            }}
             onCompositionEnd={(e) => {
               composingRef.current = false
               handleChange((e.target as HTMLInputElement).value)
@@ -192,19 +242,21 @@ export function Search() {
           )}
         </div>
 
-        {/* Search scope (songs / playlists) + platform selector */}
+        {/* Search scope (songs / albums / playlists) + platform selector */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
-            {(["song", "playlist"] as const).map((s) => (
+            {SCOPES.map((s) => (
               <button
                 key={s}
                 onClick={() => setScope(s)}
                 className={cn(
                   "px-3 py-1 rounded-full text-xs font-medium transition-colors",
-                  scope === s ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  scope === s
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {t(s === "song" ? "search.scopeSong" : "search.scopePlaylist")}
+                {scopeLabel(s)}
               </button>
             ))}
           </div>
@@ -222,19 +274,23 @@ export function Search() {
             runSearch(kw)
           }}
         />
-      ) : scope === "playlist" ? (
-        playlistResults.length === 0 && !isLoading && !error ? (
+      ) : scope === "playlist" || scope === "album" ? (
+        listEmpty && !isLoading && !error ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
             <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
               <SearchIcon size={28} className="text-muted-foreground" />
             </div>
-            <p className="text-base font-medium">{t("search.emptyTitlePlaylist")}</p>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">{t(playlistHint)}</p>
+            <p className="text-base font-medium">
+              {t(scope === "album" ? "search.emptyTitleAlbum" : "search.emptyTitlePlaylist")}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+              {t(scope === "album" ? "search.albumHint" : playlistHint)}
+            </p>
           </div>
         ) : (
           <ScrollArea className="flex-1">
             <div className="p-4">
-              {isLoading && playlistResults.length === 0 ? (
+              {isLoading && listEmpty ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
                   {Array.from({ length: 10 }).map((_, i) => (
                     <PlaylistCardSkeleton key={i} />
@@ -242,13 +298,30 @@ export function Search() {
                 </div>
               ) : error ? (
                 <div className="text-center py-12 text-destructive">{t("search.failed", { msg: error })}</div>
+              ) : scope === "album" ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
+                  {albumResults.map((album) => (
+                    <PlaylistCard
+                      key={`${album.source}:album:${album.id}`}
+                      playlist={albumAsPlaylist(album)}
+                      onOpen={() =>
+                        navigate("/hot-albums", { state: { openAlbum: album, fromSearch: true } })
+                      }
+                      onPlay={() => playAlbum(album)}
+                      onToggleFavorite={() => toggleFavFor(albumAsPlaylist(album))}
+                      favorited={isPlFav(albumAsPlaylist(album))}
+                    />
+                  ))}
+                </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
                   {playlistResults.map((pl) => (
                     <PlaylistCard
                       key={`${pl.source}:${pl.id}`}
                       playlist={pl}
-                      onOpen={() => navigate("/hot-playlists", { state: { openPlaylist: pl } })}
+                      onOpen={() =>
+                        navigate("/hot-playlists", { state: { openPlaylist: pl, fromSearch: true } })
+                      }
                       onPlay={() => playPlaylist(pl)}
                       onToggleFavorite={() => toggleFavFor(pl)}
                       favorited={isPlFav(pl)}

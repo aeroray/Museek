@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { RootLayout } from "@/components/layout/RootLayout"
 import { Search } from "@/routes/Search"
 import { HotPlaylists } from "@/routes/HotPlaylists"
+import { HotAlbums } from "@/routes/HotAlbums"
 import { Library } from "@/routes/Library"
 import { Favorites } from "@/routes/Favorites"
 import { LocalMusic } from "@/routes/LocalMusic"
@@ -108,6 +109,7 @@ export default function App() {
             <Route index element={<Navigate to="/search" replace />} />
             <Route path="/search" element={<Search />} />
             <Route path="/hot-playlists" element={<HotPlaylists />} />
+            <Route path="/hot-albums" element={<HotAlbums />} />
             <Route path="/library" element={<Library />} />
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/local" element={<LocalMusic />} />

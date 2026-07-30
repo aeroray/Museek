@@ -17,6 +17,46 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.5.0": {
+    zh: {
+      sections: [
+        {
+          title: "💿 专辑",
+          bullets: [
+            "搜索支持专辑范围；侧栏新增专辑广场（平台切换 + 分类）",
+            "收藏拆出专辑页签；详情可收藏，并显示发行月份",
+            "从搜索进入详情后返回，会回到搜索结果",
+          ],
+        },
+        {
+          title: "✨ 体验",
+          bullets: [
+            "封面加载前显示柔和模糊占位，避免空白闪烁",
+            "切换平台时分类栏始终保留「全部」，减少列表抖动",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "💿 Albums",
+          bullets: [
+            "Search albums; new Albums hub in the sidebar with platforms and categories",
+            "Separate Favorites tab for albums; favorite from detail; show release month",
+            "Back from an album opened via search returns to your search results",
+          ],
+        },
+        {
+          title: "✨ Polish",
+          bullets: [
+            "Soft blur placeholder while covers load",
+            "Category bar keeps “All” when switching platforms — less layout jump",
+          ],
+        },
+      ],
+    },
+  },
   "2.4.0": {
     zh: {
       sections: [

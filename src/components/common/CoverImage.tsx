@@ -9,8 +9,8 @@ function isCached(src: string): boolean {
 }
 
 /**
- * Cover image with a shared blur-up load effect:
- * muted pulse while the bytes arrive → paint blurred → ease to sharp.
+ * Cover image with blur-up load:
+ * soft pulsing placeholder → paint blurred → ease to sharp.
  * Already-decoded URLs (session cache) paint sharp immediately.
  *
  * Render your own fallback when `src` is empty — this returns null then.
@@ -73,6 +73,14 @@ export function CoverImage({
   if (!src) return null
 
   const markDecoded = () => {
+    // Failed loads still leave the placeholder (don't pretend we have a cover).
+    const el = ref.current
+    if (el && el.naturalWidth === 0) {
+      setDecoded(false)
+      setSharp(false)
+      onLoaded?.(false)
+      return
+    }
     readySrcs.add(src)
     setDecoded(true)
     // Two frames so the browser paints the blurred frame before unblurring.
@@ -85,13 +93,29 @@ export function CoverImage({
   }
 
   return (
-    <div className={cn("relative h-full w-full overflow-hidden bg-muted/50", className)}>
-      {!decoded && (
+    <div className={cn("relative h-full w-full overflow-hidden bg-muted", className)}>
+      {/* Soft blur stand-in until the real cover is sharp — avoids an empty hole. */}
+      <div
+        aria-hidden
+        className={cn(
+          "absolute inset-0 z-[1] transition-opacity duration-500 ease-out",
+          sharp ? "opacity-0 pointer-events-none" : "opacity-100",
+        )}
+      >
         <div
-          aria-hidden
-          className="absolute inset-0 animate-pulse bg-muted-foreground/[0.08]"
+          className={cn(
+            "absolute inset-0 bg-gradient-to-br from-muted-foreground/[0.14] via-muted to-muted-foreground/[0.08]",
+            !decoded && "animate-pulse",
+          )}
         />
-      )}
+        <div
+          className={cn(
+            "absolute inset-[-20%] scale-110 bg-gradient-to-tr from-background/40 via-transparent to-muted-foreground/10 blur-2xl",
+            !decoded && "animate-pulse",
+          )}
+        />
+      </div>
+
       <img
         ref={ref}
         src={src}
@@ -101,12 +125,12 @@ export function CoverImage({
         onLoad={markDecoded}
         onError={markDecoded}
         className={cn(
-          "h-full w-full object-cover transition-[opacity,filter] duration-500 ease-out",
+          "relative z-0 h-full w-full object-cover transition-[opacity,filter] duration-500 ease-out",
           showOutline &&
             "outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
-          !decoded && "opacity-0 blur-lg",
-          decoded && !sharp && "opacity-100 blur-lg",
-          sharp && "opacity-100 blur-0",
+          !decoded && "opacity-0 blur-2xl scale-105",
+          decoded && !sharp && "opacity-100 blur-md scale-[1.02]",
+          sharp && "opacity-100 blur-0 scale-100",
         )}
       />
     </div>

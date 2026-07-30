@@ -17,7 +17,21 @@ export interface Playlist {
   img: string | null
   playCount?: string
   author?: string
+  /** Album search / favorites: release date (e.g. 2020-06-12). */
+  publishTime?: string
+  /** Album search / favorites: number of tracks. */
+  songCount?: number
   source: Source
+  /** Favorited albums share this list; omit / "playlist" = normal 歌单. */
+  kind?: "playlist" | "album"
+}
+
+export function playlistKind(pl: Pick<Playlist, "kind">): "playlist" | "album" {
+  return pl.kind === "album" ? "album" : "playlist"
+}
+
+export function playlistFavKey(pl: Pick<Playlist, "source" | "id" | "kind">): string {
+  return `${pl.source}:${playlistKind(pl)}:${pl.id}`
 }
 
 /** Category / tag chip for filtering the hot-playlist grid. */
