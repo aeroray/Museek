@@ -51,8 +51,22 @@ function DrawerTrigger({ ...props }: DrawerPrimitive.Trigger.Props) {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
 }
 
-function DrawerPortal({ ...props }: DrawerPrimitive.Portal.Props) {
-  return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />
+function DrawerPortal({ container, ...props }: DrawerPrimitive.Portal.Props) {
+  // Keep drawer layers inside the rounded app shell. The default body portal
+  // would let the fixed backdrop paint square corners over the transparent
+  // Windows window chrome.
+  const appShell =
+    typeof document !== "undefined"
+      ? document.querySelector<HTMLElement>(".app-shell")
+      : null
+
+  return (
+    <DrawerPrimitive.Portal
+      data-slot="drawer-portal"
+      container={container ?? appShell}
+      {...props}
+    />
+  )
 }
 
 function DrawerClose({ ...props }: DrawerPrimitive.Close.Props) {

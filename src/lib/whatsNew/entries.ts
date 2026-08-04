@@ -17,6 +17,42 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.5.1": {
+    zh: {
+      sections: [
+        {
+          title: "💬 顶栏问候",
+          bullets: [
+            "没有播放歌曲时，顶部歌词栏会显示温馨话语",
+            "话语按时间段准备并随机切换，进入搜索、清空搜索或切换页面时也会更新",
+          ],
+        },
+        {
+          title: "✨ 体验",
+          bullets: [
+            "播放队列的遮罩会跟随主窗口圆角裁切，不再露出方形边角",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "💬 Warm welcome",
+          bullets: [
+            "Show a warm message in the top lyric bar when no song is playing",
+            "Messages rotate by time of day and refresh when entering Search, clearing a search, or changing pages",
+          ],
+        },
+        {
+          title: "✨ Polish",
+          bullets: [
+            "The playback queue backdrop now follows the rounded app window instead of showing square corners",
+          ],
+        },
+      ],
+    },
+  },
   "2.5.0": {
     zh: {
       sections: [

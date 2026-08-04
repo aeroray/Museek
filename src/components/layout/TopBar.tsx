@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,14 +9,17 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { WindowControls } from "./WindowControls"
+import { WarmWelcome } from "@/components/search/SearchWelcome"
 import { useUiStore } from "@/stores/uiStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { useSearchStore } from "@/stores/searchStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-/** Current lyric line for the top bar — opens the full lyrics panel on click. */
+/** Current lyric line for the top bar, or a warm welcome when no song is loaded. */
 function TopBarLyrics() {
   const t = useT()
+  const location = useLocation()
   const enabled = useUiStore((s) => s.topBarLyrics)
   const currentSong = usePlayerStore((s) => s.currentSong)
   const lyricLines = usePlayerStore((s) => s.lyricLines)
@@ -24,16 +27,19 @@ function TopBarLyrics() {
   const lyricsLoading = usePlayerStore((s) => s.lyricsLoading)
   const showLyrics = usePlayerStore((s) => s.showLyrics)
   const setShowLyrics = usePlayerStore((s) => s.setShowLyrics)
+  const searchContext = useSearchStore((s) => `${s.query.trim() ? "searched" : "landing"}:${s.platform}`)
 
   if (!enabled) {
     return <div className="mx-2 min-w-0 flex-1" aria-hidden />
   }
 
+  if (!currentSong) {
+    return <WarmWelcome refreshKey={`${location.pathname}:${searchContext}`} />
+  }
+
   let text = ""
   let muted = true
-  if (!currentSong) {
-    text = ""
-  } else if (lyricsLoading && lyricLines.length === 0) {
+  if (lyricsLoading && lyricLines.length === 0) {
     text = t("lyrics.loading")
   } else if (lyricLines.length === 0) {
     text = currentSong.name
