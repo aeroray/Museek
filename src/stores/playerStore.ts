@@ -367,12 +367,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       set({ queue: [], queueIndex: -1 })
     },
 
-    // Replace the queue with `songs` and start playing. In shuffle mode it starts
-    // from a RANDOM track — otherwise "play all" always begins at track 1 and
-    // only shuffles from the second song onward.
+    // Append `songs` to the current queue (deduped) and start playing. In shuffle
+    // mode it starts from a RANDOM track of the selection — otherwise the first.
     playAll(songs) {
       if (!songs.length) return
-      get().clearQueue()
       get().addToQueue(songs)
       const startIdx = get().playMode === "shuffle" ? Math.floor(Math.random() * songs.length) : 0
       get().play(songs[startIdx])

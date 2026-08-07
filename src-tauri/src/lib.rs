@@ -395,9 +395,23 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
                 show_main(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
+
+    // macOS menu bar: template glyph (black + alpha) auto-inverts for light/dark.
+    // Windows / Linux keep the branded window icon — template tinting is macOS-only.
+    #[cfg(target_os = "macos")]
+    {
+        // Prefer @2x for Retina menu bars; fall back to 1x if missing.
+        let bytes = include_bytes!("../icons/tray-template@2x.png");
+        let icon = tauri::image::Image::from_bytes(bytes)?;
+        builder = builder.icon(icon).icon_as_template(true);
     }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(icon) = app.default_window_icon() {
+            builder = builder.icon(icon.clone());
+        }
+    }
+
     builder.build(app)
 }
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import {
   Heart,
   Play,
+  Plus,
   Trash2,
   Music,
   Download,
@@ -65,6 +66,7 @@ export function Favorites() {
   const setFavoritesCategory = usePlaylistStore((s) => s.setFavoritesCategory)
   const play = usePlayerStore((s) => s.play)
   const playAll = usePlayerStore((s) => s.playAll)
+  const addToQueue = usePlayerStore((s) => s.addToQueue)
   const addTask = useDownloadStore((s) => s.addTask)
   const favoritesSort = useSettingsStore((s) => s.favoritesSort)
   const favoritesPlatform = useSettingsStore((s) => s.favoritesPlatform)
@@ -231,10 +233,22 @@ export function Favorites() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           {isSongs && favorites.length > 0 && !editing && (
-            <Button variant="secondary" size="sm" className="h-8" onClick={() => playAll(displayedSongs)}>
-              <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
-              {t("favorites.playAll")}
-            </Button>
+            <>
+              <Button variant="secondary" size="sm" className="h-8" onClick={() => playAll(displayedSongs)}>
+                <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
+                {t("favorites.playAll")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => addToQueue(displayedSongs)}
+                disabled={displayedSongs.length === 0}
+              >
+                <Plus size={14} className="mr-1.5" />
+                {t("common.addToQueue")}
+              </Button>
+            </>
           )}
           <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
             {(["songs", "playlists", "albums"] as const).map((id) => (
@@ -473,6 +487,18 @@ export function Favorites() {
 
                     {!editing && (
                       <div className="flex items-center gap-0.5 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 icon-hover-plus"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            addToQueue([song])
+                          }}
+                          title={t("common.addToQueue")}
+                        >
+                          <Plus size={13} />
+                        </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button

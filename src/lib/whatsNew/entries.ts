@@ -17,6 +17,42 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.5.2": {
+    zh: {
+      sections: [
+        {
+          title: "▶️ 播放队列",
+          bullets: [
+            "「播放全部」改为追加到现有队列，不再清空",
+            "收藏单曲与本地音乐支持加入当前播放队列",
+          ],
+        },
+        {
+          title: "🖥 托盘图标",
+          bullets: [
+            "macOS 菜单栏托盘图标适配浅色 / 深色外观（自动反白）",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "▶️ Play queue",
+          bullets: [
+            "“Play all” appends to the current queue instead of replacing it",
+            "Add to queue from Favorites songs and Local Music",
+          ],
+        },
+        {
+          title: "🖥 Tray icon",
+          bullets: [
+            "macOS menu-bar tray icon adapts to light / dark appearance",
+          ],
+        },
+      ],
+    },
+  },
   "2.5.1": {
     zh: {
       sections: [

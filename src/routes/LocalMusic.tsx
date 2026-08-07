@@ -11,6 +11,7 @@ import {
   Trash2,
   Search,
   Play,
+  Plus,
   Loader2,
   ChevronDown,
   ArrowDownUp,
@@ -69,6 +70,7 @@ export function LocalMusic() {
   const setTracksCategory = useLocalMusicStore((s) => s.setTracksCategory)
   const play = usePlayerStore((s) => s.play)
   const playAll = usePlayerStore((s) => s.playAll)
+  const addToQueue = usePlayerStore((s) => s.addToQueue)
   const localSort = useSettingsStore((s) => s.localSort)
   const setLocalSort = useSettingsStore((s) => s.setLocalSort)
   const notify = useUiStore((s) => s.notify)
@@ -211,16 +213,28 @@ export function LocalMusic() {
             </div>
           )}
           {tracks.length > 0 && !editing && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8"
-              onClick={() => playAll(displayed.map((x) => x.song))}
-              disabled={importing}
-            >
-              <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
-              {tr("common.playAll")}
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8"
+                onClick={() => playAll(displayed.map((x) => x.song))}
+                disabled={importing || displayed.length === 0}
+              >
+                <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
+                {tr("common.playAll")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => addToQueue(displayed.map((x) => x.song))}
+                disabled={importing || displayed.length === 0}
+              >
+                <Plus size={14} className="mr-1.5" />
+                {tr("common.addToQueue")}
+              </Button>
+            </>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -497,6 +511,20 @@ export function LocalMusic() {
 
                     {!editing && (
                       <div className="flex items-center gap-0.5 shrink-0">
+                        {!missing && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              addToQueue([track.song])
+                            }}
+                            title={tr("common.addToQueue")}
+                          >
+                            <Plus size={14} />
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
