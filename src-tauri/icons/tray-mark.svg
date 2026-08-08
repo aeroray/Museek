@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- macOS menu-bar tray template source.
-       Black glyph + transparent background; system tints for light/dark.
-       Geometry matches app-icon.svg EQ bars (no rounded mark background).
-       Rasterize with: python scripts/gen-tray-template.py -->
+  <!-- macOS menu-bar tray mark source (dark-menu variant shown).
+       light: black rounded square + white bars
+       dark:  white rounded square + black bars (matches in-app dark BrandMark)
+       Rasterize with: python scripts/gen-tray-icons.py -->
+  <rect class="mark-bg" width="1024" height="1024" rx="256" fill="#ffffff"/>
   <g class="eq" fill="#000000" transform="scale(1.185185185) translate(-80 -80)">
     <rect x="220" y="467" width="64" height="90" rx="32"/>
     <rect x="324" y="347" width="64" height="330" rx="32"/>

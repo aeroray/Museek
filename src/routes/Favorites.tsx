@@ -233,22 +233,10 @@ export function Favorites() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           {isSongs && favorites.length > 0 && !editing && (
-            <>
-              <Button variant="secondary" size="sm" className="h-8" onClick={() => playAll(displayedSongs)}>
-                <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
-                {t("favorites.playAll")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => addToQueue(displayedSongs)}
-                disabled={displayedSongs.length === 0}
-              >
-                <Plus size={14} className="mr-1.5" />
-                {t("common.addToQueue")}
-              </Button>
-            </>
+            <Button variant="secondary" size="sm" className="h-8" onClick={() => playAll(displayedSongs)}>
+              <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
+              {t("favorites.playAll")}
+            </Button>
           )}
           <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
             {(["songs", "playlists", "albums"] as const).map((id) => (
@@ -376,6 +364,16 @@ export function Favorites() {
                         add: t("local.categoryAdd"),
                       }}
                     />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      disabled={selected.size === 0}
+                      onClick={() => addToQueue(favorites.filter((f) => selected.has(f.id)))}
+                    >
+                      <Plus size={14} className="mr-1.5" />
+                      {t("common.addToQueue")}
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

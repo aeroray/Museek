@@ -158,6 +158,16 @@ fn read_start_hidden_to_tray(app: &tauri::AppHandle) -> bool {
         .unwrap_or(false)
 }
 
+/// macOS transparent + Overlay windows often keep `hasShadow` true but never
+/// paint the shadow layer if it was set while the window was still invisible
+/// (conf uses `shadow: false` for Windows). Toggle after `show()` forces AppKit
+/// to rebuild it — same effect as hide-to-tray then reopen.
+#[cfg(target_os = "macos")]
+fn refresh_macos_window_shadow(window: &tauri::WebviewWindow) {
+    let _ = window.set_shadow(false);
+    let _ = window.set_shadow(true);
+}
+
 // Bring the main window back from hidden / minimized and focus it.
 fn show_main(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
@@ -165,6 +175,8 @@ fn show_main(app: &tauri::AppHandle) {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
+        #[cfg(target_os = "macos")]
+        refresh_macos_window_shadow(&w);
         // Windows blocks SetForegroundWindow unless we attach to the current
         // foreground thread — plain set_focus() often no-ops when Explorer
         // just handed us an "Open with" activation.
@@ -396,23 +408,66 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
             }
         });
 
-    // macOS menu bar: template glyph (black + alpha) auto-inverts for light/dark.
-    // Windows / Linux keep the branded window icon — template tinting is macOS-only.
-    #[cfg(target_os = "macos")]
-    {
-        // Prefer @2x for Retina menu bars; fall back to 1x if missing.
-        let bytes = include_bytes!("../icons/tray-template@2x.png");
-        let icon = tauri::image::Image::from_bytes(bytes)?;
-        builder = builder.icon(icon).icon_as_template(true);
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        if let Some(icon) = app.default_window_icon() {
-            builder = builder.icon(icon.clone());
+    // Prefer the theme-colored mark from the frontend (matches BrandMark /
+    // --primary). Fall back to graphite light/dark or the window icon.
+    if let Some(icon) = tray_mark_from_cache(app) {
+        builder = builder.icon(icon);
+    } else {
+        #[cfg(target_os = "macos")]
+        {
+            builder = builder.icon(macos_graphite_tray_icon(current_system_theme(app))?);
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            if let Some(icon) = app.default_window_icon() {
+                builder = builder.icon(icon.clone());
+            }
         }
     }
 
     builder.build(app)
+}
+
+/// Last tray PNG painted by the frontend from the active theme palette.
+struct TrayMarkCache(Mutex<Option<Vec<u8>>>);
+
+fn tray_mark_from_cache(app: &tauri::AppHandle) -> Option<tauri::image::Image<'static>> {
+    let state = app.try_state::<TrayMarkCache>()?;
+    let guard = state.0.lock().ok()?;
+    let bytes = guard.as_ref()?;
+    tauri::image::Image::from_bytes(bytes).ok()
+}
+
+#[tauri::command]
+fn set_tray_mark_icon(app: tauri::AppHandle, png: Vec<u8>) -> Result<(), String> {
+    if png.is_empty() {
+        return Err("empty tray mark".into());
+    }
+    let icon = tauri::image::Image::from_bytes(&png).map_err(|e| e.to_string())?;
+    if let Ok(mut guard) = app.state::<TrayMarkCache>().0.lock() {
+        *guard = Some(png);
+    }
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn current_system_theme(app: &tauri::AppHandle) -> tauri::Theme {
+    app.get_webview_window("main")
+        .and_then(|w| w.theme().ok())
+        .unwrap_or(tauri::Theme::Light)
+}
+
+#[cfg(target_os = "macos")]
+fn macos_graphite_tray_icon(theme: tauri::Theme) -> tauri::Result<tauri::image::Image<'static>> {
+    // Fallback before the frontend has synced palette colors.
+    let bytes: &[u8] = match theme {
+        tauri::Theme::Dark => include_bytes!("../icons/tray-dark@2x.png"),
+        _ => include_bytes!("../icons/tray-light@2x.png"),
+    };
+    tauri::image::Image::from_bytes(bytes)
 }
 
 // Show/hide the tray icon to match the "hide to tray" close-behavior setting.
@@ -582,6 +637,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(PendingLocalFiles(Mutex::new(Vec::new())))
         .manage(PendingUnsupportedOpens(Mutex::new(Vec::new())))
+        .manage(TrayMarkCache(Mutex::new(None)))
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.manage(KeepAwakeState(Mutex::new(None)));
@@ -624,13 +680,22 @@ pub fn run() {
                 //   macOS can show traffic lights at create-time).
                 #[cfg(target_os = "macos")]
                 {
-                    let _ = window.set_shadow(true);
                     // macOS Overlay chrome has no Windows-style decorated flash —
                     // show immediately so cold start feels instant again.
                     // Silent autostart: keep hidden until the user opens the tray.
+                    //
+                    // Do NOT set_shadow while still invisible: AppKit often skips
+                    // drawing the shadow until a later hide→show (tray reopen).
+                    // Apply after show, then again shortly after first composite.
                     if !start_hidden {
                         let _ = window.show();
                         let _ = window.set_focus();
+                        refresh_macos_window_shadow(&window);
+                        let w = window.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_millis(120));
+                            refresh_macos_window_shadow(&w);
+                        });
                     }
                 }
                 // Non-macOS: frameless + custom WindowControls (conf uses
@@ -706,6 +771,7 @@ pub fn run() {
             set_prevent_sleep,
             quit_app,
             set_tray_visible,
+            set_tray_mark_icon,
             animate_window_outer_rect,
             race_download_and_install,
             take_opened_local_files,
@@ -739,6 +805,19 @@ pub fn run() {
             queue_open_local_files(app_handle, audio);
             queue_unsupported_opens(app_handle, unsupported);
             show_main(app_handle);
+        }
+        // macOS: Dock click while all windows are hidden (e.g. close-to-tray)
+        // fires applicationShouldHandleReopen → Reopen. Without this, the Dock
+        // icon appears active but the main window stays hidden.
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } = &event
+        {
+            if !has_visible_windows {
+                show_main(app_handle);
+            }
         }
         let _ = (app_handle, &event);
     });

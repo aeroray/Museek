@@ -24,7 +24,13 @@ export function setPreventSleep(enabled: boolean): void {
 // users who pick "quit on close" don't get an unexpected tray icon. Idempotent.
 export function setTrayVisible(visible: boolean): void {
   if (!isTauri) return
-  invoke("set_tray_visible", { visible }).catch(() => {})
+  invoke("set_tray_visible", { visible })
+    .then(() => {
+      if (!visible) return
+      // Newly created tray should pick up the current BrandMark colors.
+      void import("@/lib/trayMark").then((m) => m.syncTrayMarkForce())
+    })
+    .catch(() => {})
 }
 
 /** Hide the main window and keep the process alive via the tray icon. */

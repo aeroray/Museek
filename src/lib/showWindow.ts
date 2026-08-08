@@ -11,7 +11,8 @@ export async function showMainWindow(): Promise<void> {
     const { getCurrentWindow } = await import("@tauri-apps/api/window")
     const win = getCurrentWindow()
 
-    // macOS: already shown in Rust setup — just ensure focus, no paint gate.
+    // macOS: already shown in Rust setup — ensure focus + re-assert shadow after
+    // first paint (transparent Overlay windows can miss the cold-start shadow).
     if (isMacOs()) {
       await win.show().catch(() => {
         /* ignore */
@@ -19,6 +20,12 @@ export async function showMainWindow(): Promise<void> {
       await win.setFocus().catch(() => {
         /* ignore */
       })
+      try {
+        await win.setShadow(false)
+        await win.setShadow(true)
+      } catch {
+        /* ignore */
+      }
       return
     }
 

@@ -534,7 +534,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "palette.blue": "海蓝",
     "palette.emerald": "翡翠",
     "palette.rose": "玫瑰",
-    "palette.amber": "琥珀金",
+    "palette.teal": "青石",
 
     // Language switcher
     "lang.title": "语言 / Language",
@@ -1037,7 +1037,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "palette.blue": "Ocean",
     "palette.emerald": "Emerald",
     "palette.rose": "Rose",
-    "palette.amber": "Amber",
+    "palette.teal": "Teal",
 
     // Language switcher
     "lang.title": "语言 / Language",

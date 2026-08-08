@@ -17,6 +17,58 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "2.5.3": {
+    zh: {
+      sections: [
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "冷启动时正确显示窗口阴影（不必再关窗后从托盘重开）",
+            "「关闭时最小化到托盘」后，点击 Dock 图标可重新打开窗口",
+            "菜单栏托盘图标跟随当前主题强调色（不仅是石墨深浅）",
+          ],
+        },
+        {
+          title: "🎨 外观与设置",
+          bullets: [
+            "设置侧栏各项增加语义图标",
+            "主题配色「琥珀金」替换为「青石」，强调色文字对比更清晰",
+          ],
+        },
+        {
+          title: "▶️ 播放队列",
+          bullets: [
+            "收藏单曲与本地音乐的「加入队列」移至批量编辑工具栏，并对勾选项生效",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "Window shadow appears correctly on cold start (no need to hide and reopen from the tray)",
+            "After close-to-tray, clicking the Dock icon restores the main window",
+            "Menu-bar tray icon follows the active accent palette (not only Graphite light/dark)",
+          ],
+        },
+        {
+          title: "🎨 Appearance & settings",
+          bullets: [
+            "Settings sidebar tabs now have semantic icons",
+            "Replaced Amber accent with Teal for cleaner contrast on primary surfaces",
+          ],
+        },
+        {
+          title: "▶️ Play queue",
+          bullets: [
+            "Favorites songs and Local Music: “Add to queue” lives in batch-edit and applies to the selection",
+          ],
+        },
+      ],
+    },
+  },
   "2.5.2": {
     zh: {
       sections: [

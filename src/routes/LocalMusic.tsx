@@ -213,28 +213,16 @@ export function LocalMusic() {
             </div>
           )}
           {tracks.length > 0 && !editing && (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-8"
-                onClick={() => playAll(displayed.map((x) => x.song))}
-                disabled={importing || displayed.length === 0}
-              >
-                <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
-                {tr("common.playAll")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => addToQueue(displayed.map((x) => x.song))}
-                disabled={importing || displayed.length === 0}
-              >
-                <Plus size={14} className="mr-1.5" />
-                {tr("common.addToQueue")}
-              </Button>
-            </>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8"
+              onClick={() => playAll(displayed.map((x) => x.song))}
+              disabled={importing || displayed.length === 0}
+            >
+              <Play size={14} className="mr-1.5" fill="currentColor" strokeWidth={0} />
+              {tr("common.playAll")}
+            </Button>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -342,6 +330,18 @@ export function LocalMusic() {
                       add: tr("local.categoryAdd"),
                     }}
                   />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={selected.size === 0}
+                    onClick={() =>
+                      addToQueue(displayed.filter((x) => selected.has(x.id)).map((x) => x.song))
+                    }
+                  >
+                    <Plus size={14} className="mr-1.5" />
+                    {tr("common.addToQueue")}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

@@ -1,7 +1,7 @@
 import { create } from "zustand"
 
 export type ThemeMode = "light" | "dark" | "system"
-export type Palette = "default" | "violet" | "blue" | "emerald" | "rose" | "amber"
+export type Palette = "default" | "violet" | "blue" | "emerald" | "rose" | "teal"
 
 export const PALETTES: { id: Palette; name: string; color: string }[] = [
   { id: "default", name: "石墨", color: "hsl(30 10% 14%)" },
@@ -9,7 +9,7 @@ export const PALETTES: { id: Palette; name: string; color: string }[] = [
   { id: "blue", name: "海蓝", color: "hsl(212 52% 48%)" },
   { id: "emerald", name: "翡翠", color: "hsl(158 42% 36%)" },
   { id: "rose", name: "玫瑰", color: "hsl(350 48% 48%)" },
-  { id: "amber", name: "琥珀金", color: "hsl(34 68% 46%)" },
+  { id: "teal", name: "青石", color: "hsl(186 42% 36%)" },
 ]
 
 const MODE_KEY = "museek.theme.mode"
@@ -25,6 +25,8 @@ function applyToDom(mode: ThemeMode, palette: Palette) {
   root.classList.toggle("dark", dark)
   if (palette === "default") root.removeAttribute("data-palette")
   else root.setAttribute("data-palette", palette)
+  // Tray mark uses computed --primary / --primary-foreground (all palettes).
+  void import("@/lib/trayMark").then((m) => m.syncTrayMark())
 }
 
 function readMode(): ThemeMode {
@@ -33,8 +35,13 @@ function readMode(): ThemeMode {
 }
 
 function readPalette(): Palette {
-  const v = localStorage.getItem(PALETTE_KEY) as Palette | null
-  return v && PALETTES.some((p) => p.id === v) ? v : "default"
+  const v = localStorage.getItem(PALETTE_KEY)
+  // Former "琥珀金" (amber) used dark-on-gold text that looked muddy; map to teal.
+  if (v === "amber") {
+    localStorage.setItem(PALETTE_KEY, "teal")
+    return "teal"
+  }
+  return v && PALETTES.some((p) => p.id === v) ? (v as Palette) : "default"
 }
 
 interface ThemeState {

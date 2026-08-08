@@ -96,10 +96,10 @@
     --primary-foreground: 0 0% 100%;
     --ring: 350 48% 48%;
   }
-  [data-palette="amber"] {
-    --primary: 34 68% 46%;
-    --primary-foreground: 30 40% 10%;
-    --ring: 34 68% 46%;
+  [data-palette="teal"] {
+    --primary: 186 42% 36%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 186 42% 36%;
   }
 }
 
