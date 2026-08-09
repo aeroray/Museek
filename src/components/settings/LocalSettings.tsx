@@ -1,24 +1,34 @@
-import { Infinity as InfinityIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
-import { useSettingsStore } from "@/stores/settingsStore"
-import { useT } from "@/lib/i18n"
+import { Infinity as InfinityIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useT } from "@/lib/i18n";
 
 /** 0–2 finite; -1 = unlimited */
-const DEPTHS = [0, 1, 2, -1] as const
+const DEPTHS = [0, 1, 2, -1] as const;
 
 export function LocalSettings() {
-  const { localScanDepth, deleteLocalFiles, setLocalScanDepth, setDeleteLocalFiles } = useSettingsStore()
-  const t = useT()
+  const {
+    localScanDepth,
+    deleteLocalFiles,
+    setLocalScanDepth,
+    setDeleteLocalFiles,
+  } = useSettingsStore();
+  const t = useT();
 
   return (
     <ScrollArea className="h-full">
       <div className="pr-3 pb-4 space-y-3">
-        <p className="px-1 text-xs text-muted-foreground">{t("local.settings.localOnlyNote")}</p>
+        <p className="px-1 text-xs text-muted-foreground">
+          {t("local.settings.localOnlyNote")}
+        </p>
         <SettingsCard>
-          <SettingRow title={t("local.settings.depthTitle")} desc={t("local.settings.depthDesc")}>
+          <SettingRow
+            title={t("local.settings.depthTitle")}
+            desc={t("local.settings.depthDesc")}
+          >
             <div className="flex flex-wrap gap-2">
               {DEPTHS.map((d) => (
                 <Button
@@ -26,7 +36,9 @@ export function LocalSettings() {
                   variant={localScanDepth === d ? "default" : "outline"}
                   size="sm"
                   onClick={() => setLocalScanDepth(d)}
-                  aria-label={d < 0 ? t("local.settings.depthUnlimited") : undefined}
+                  aria-label={
+                    d < 0 ? t("local.settings.depthUnlimited") : undefined
+                  }
                 >
                   {d < 0 ? <InfinityIcon size={16} strokeWidth={2} /> : d}
                 </Button>
@@ -34,11 +46,17 @@ export function LocalSettings() {
             </div>
           </SettingRow>
 
-          <SettingRow title={t("local.settings.deleteFilesTitle")} desc={t("local.settings.deleteFilesDesc")}>
-            <Switch checked={deleteLocalFiles} onCheckedChange={setDeleteLocalFiles} />
+          <SettingRow
+            title={t("local.settings.deleteFilesTitle")}
+            desc={t("local.settings.deleteFilesDesc")}
+          >
+            <Switch
+              checked={deleteLocalFiles}
+              onCheckedChange={setDeleteLocalFiles}
+            />
           </SettingRow>
         </SettingsCard>
       </div>
     </ScrollArea>
-  )
+  );
 }

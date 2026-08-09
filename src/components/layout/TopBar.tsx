@@ -1,98 +1,113 @@
-import { useLocation, useNavigate } from "react-router-dom"
+import type { PointerEvent } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
-  Captions,
-  CaptionsOff,
+  Eye,
+  EyeClosed,
   PanelLeftClose,
   PanelLeftOpen,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { WindowControls } from "./WindowControls"
-import { WarmWelcome } from "@/components/search/SearchWelcome"
-import { useUiStore } from "@/stores/uiStore"
-import { usePlayerStore } from "@/stores/playerStore"
-import { useSearchStore } from "@/stores/searchStore"
-import { useT } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { WindowControls } from "./WindowControls";
+import { WarmWelcome } from "@/components/search/SearchWelcome";
+import { useUiStore } from "@/stores/uiStore";
+import { usePlayerStore } from "@/stores/playerStore";
+import { useSearchStore } from "@/stores/searchStore";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 /** Current lyric line for the top bar, or a warm welcome when no song is loaded. */
 function TopBarLyrics() {
-  const t = useT()
-  const location = useLocation()
-  const enabled = useUiStore((s) => s.topBarLyrics)
-  const currentSong = usePlayerStore((s) => s.currentSong)
-  const lyricLines = usePlayerStore((s) => s.lyricLines)
-  const currentLyricIndex = usePlayerStore((s) => s.currentLyricIndex)
-  const lyricsLoading = usePlayerStore((s) => s.lyricsLoading)
-  const showLyrics = usePlayerStore((s) => s.showLyrics)
-  const setShowLyrics = usePlayerStore((s) => s.setShowLyrics)
-  const searchContext = useSearchStore((s) => `${s.query.trim() ? "searched" : "landing"}:${s.platform}`)
+  const t = useT();
+  const location = useLocation();
+  const enabled = useUiStore((s) => s.topBarLyrics);
+  const currentSong = usePlayerStore((s) => s.currentSong);
+  const lyricLines = usePlayerStore((s) => s.lyricLines);
+  const currentLyricIndex = usePlayerStore((s) => s.currentLyricIndex);
+  const lyricsLoading = usePlayerStore((s) => s.lyricsLoading);
+  const searchContext = useSearchStore(
+    (s) => `${s.query.trim() ? "searched" : "landing"}:${s.platform}`,
+  );
+  const startDragging = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    void getCurrentWindow().startDragging();
+  };
 
   if (!enabled) {
-    return <div className="mx-2 min-w-0 flex-1" aria-hidden />
+    return (
+      <div
+        data-tauri-drag-region
+        className="mx-2 min-w-0 flex-1 select-none"
+        aria-hidden
+      />
+    );
   }
 
   if (!currentSong) {
-    return <WarmWelcome refreshKey={`${location.pathname}:${searchContext}`} />
+    return <WarmWelcome refreshKey={`${location.pathname}:${searchContext}`} />;
   }
 
-  let text = ""
-  let muted = true
+  let text = "";
+  let muted = true;
   if (lyricsLoading && lyricLines.length === 0) {
-    text = t("lyrics.loading")
+    text = t("lyrics.loading");
   } else if (lyricLines.length === 0) {
-    text = currentSong.name
+    text = currentSong.name;
   } else {
-    const idx = Math.max(0, currentLyricIndex)
-    text = lyricLines[idx]?.text?.trim() || currentSong.name
-    muted = false
+    const idx = Math.max(0, currentLyricIndex);
+    text = lyricLines[idx]?.text?.trim() || currentSong.name;
+    muted = false;
   }
 
   if (!text) {
-    return <div className="mx-2 min-w-0 flex-1" aria-hidden />
+    return (
+      <div
+        data-tauri-drag-region
+        className="mx-2 min-w-0 flex-1 select-none"
+        aria-hidden
+      />
+    );
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => setShowLyrics(!showLyrics)}
-      disabled={!currentSong}
-      title={t("player.lyrics")}
+    <div
+      data-tauri-drag-region
       className={cn(
-        "pointer-events-auto group relative mx-2 min-w-0 flex-1",
+        "mx-2 min-w-0 flex-1 select-none",
         // Stay inside the h-10 top bar; leave room for descenders (g/y/p).
         "flex h-8 items-center justify-center rounded-md px-3",
-        "transition-[background-color,color] duration-200 ease-out",
-        "hover:bg-accent/60 disabled:pointer-events-none disabled:opacity-50",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        showLyrics && "bg-primary/10",
       )}
+      onPointerDown={startDragging}
     >
       <span
         key={`${currentSong?.id ?? "none"}-${currentLyricIndex}-${text}`}
         className={cn(
           "block max-w-full truncate text-center text-base leading-tight tracking-tight",
           "animate-in fade-in duration-300",
-          muted ? "text-muted-foreground/70 font-normal" : "text-primary font-medium",
+          muted
+            ? "text-muted-foreground/70 font-normal"
+            : "text-primary font-medium",
         )}
       >
         {text}
       </span>
-    </button>
-  )
+    </div>
+  );
 }
 
 /**
  * Slim top toolbar: sidebar toggle, top-bar lyrics toggle, live lyrics, nav + chrome.
  */
 export function TopBar() {
-  const navigate = useNavigate()
-  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
-  const toggleSidebar = useUiStore((s) => s.toggleSidebar)
-  const topBarLyrics = useUiStore((s) => s.topBarLyrics)
-  const toggleTopBarLyrics = useUiStore((s) => s.toggleTopBarLyrics)
-  const t = useT()
+  const navigate = useNavigate();
+  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const topBarLyrics = useUiStore((s) => s.topBarLyrics);
+  const toggleTopBarLyrics = useUiStore((s) => s.toggleTopBarLyrics);
+  const t = useT();
 
   return (
     <div
@@ -107,7 +122,11 @@ export function TopBar() {
         title={sidebarCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
       >
         <span key={sidebarCollapsed ? "open" : "close"} className="icon-pop-in">
-          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          {sidebarCollapsed ? (
+            <PanelLeftOpen size={16} />
+          ) : (
+            <PanelLeftClose size={16} />
+          )}
         </span>
       </Button>
 
@@ -118,8 +137,15 @@ export function TopBar() {
         onClick={toggleTopBarLyrics}
         title={topBarLyrics ? t("topBar.lyricsHide") : t("topBar.lyricsShow")}
       >
-        <span key={topBarLyrics ? "on" : "off"} className="icon-pop-in inline-flex">
-          {topBarLyrics ? <Captions size={18} strokeWidth={2} /> : <CaptionsOff size={18} strokeWidth={2} />}
+        <span
+          key={topBarLyrics ? "on" : "off"}
+          className="icon-pop-in inline-flex"
+        >
+          {topBarLyrics ? (
+            <Eye size={18} strokeWidth={2} />
+          ) : (
+            <EyeClosed size={18} strokeWidth={2} />
+          )}
         </span>
       </Button>
 
@@ -149,5 +175,5 @@ export function TopBar() {
         <WindowControls />
       </div>
     </div>
-  )
+  );
 }

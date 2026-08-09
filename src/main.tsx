@@ -1,18 +1,37 @@
-import React from "react"
-import ReactDOM from "react-dom/client"
-import App from "./App"
-import { initTheme } from "@/stores/themeStore"
-import { installLockdown } from "@/lib/lockdown"
-import "./fonts.css"
-import "./index.css"
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { DesktopLyricsApp } from "@/components/lyrics/DesktopLyricsApp";
+import { initTheme } from "@/stores/themeStore";
+import { installLockdown } from "@/lib/lockdown";
+import "./fonts.css";
+import "./index.css";
+
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+let isDesktopLyricsWindow = false;
+if (isTauri) {
+  try {
+    isDesktopLyricsWindow = getCurrentWindow().label === "lyrics";
+  } catch {
+    /* Fall back to the main application if the Tauri bridge is not ready. */
+  }
+}
 
 // Apply saved theme before first paint to avoid a flash of the wrong theme.
-initTheme()
+initTheme(!isDesktopLyricsWindow);
 // Disable right-click everywhere (and devtools shortcuts in production).
-installLockdown()
+installLockdown();
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-)
+async function bootstrap() {
+  const Root = isDesktopLyricsWindow
+    ? DesktopLyricsApp
+    : (await import("./App")).default;
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>
+      <Root />
+    </React.StrictMode>,
+  );
+}
+
+void bootstrap();

@@ -189,6 +189,53 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
+fn configure_lyrics_interaction(
+    window: &tauri::WebviewWindow,
+    interactive: bool,
+    focus: bool,
+) -> Result<(), String> {
+    window
+        .set_ignore_cursor_events(!interactive)
+        .map_err(|e| e.to_string())?;
+    window
+        .set_focusable(interactive)
+        .map_err(|e| e.to_string())?;
+    if interactive && focus {
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn show_lyrics_window(app: tauri::AppHandle, interactive: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("lyrics")
+        .ok_or_else(|| "lyrics window missing".to_string())?;
+    let _ = window.set_skip_taskbar(true);
+    window.set_always_on_top(true).map_err(|e| e.to_string())?;
+    configure_lyrics_interaction(&window, interactive, false)?;
+    window.show().map_err(|e| e.to_string())?;
+    if interactive {
+        window.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_lyrics_interaction(app: tauri::AppHandle, interactive: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("lyrics")
+        .ok_or_else(|| "lyrics window missing".to_string())?;
+    configure_lyrics_interaction(&window, interactive, false)
+}
+
+#[tauri::command]
+fn hide_lyrics_window(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("lyrics") {
+        let _ = window.hide();
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn force_foreground_hwnd(hwnd_ptr: *mut std::ffi::c_void) {
     use windows::Win32::Foundation::HWND;
@@ -639,6 +686,25 @@ pub fn run() {
         .manage(PendingUnsupportedOpens(Mutex::new(Vec::new())))
         .manage(TrayMarkCache(Mutex::new(None)))
         .setup(|app| {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                use tauri::Emitter;
+                use tauri_plugin_global_shortcut::{Builder, ShortcutState};
+
+                let global_shortcut = Builder::new()
+                    .with_shortcuts(["CommandOrControl+Shift+L"])
+                    .expect("desktop lyrics global shortcut must be valid")
+                    .with_handler(|app, _shortcut, event| {
+                        if event.state == ShortcutState::Pressed {
+                            let _ = app.emit("desktop-lyrics/toggle-interaction", ());
+                        }
+                    })
+                    .build();
+                if let Err(error) = app.handle().plugin(global_shortcut) {
+                    eprintln!("Failed to register desktop lyrics global shortcut: {error}");
+                }
+            }
+
             #[cfg(target_os = "macos")]
             app.manage(KeepAwakeState(Mutex::new(None)));
 
@@ -761,6 +827,12 @@ pub fn run() {
                 app.manage(MediaState(Mutex::new(controls)));
             }
 
+            if let Some(window) = app.get_webview_window("lyrics") {
+                let _ = window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
+                #[cfg(target_os = "windows")]
+                let _ = window.set_shadow(false);
+            }
+
             // The system tray is created on demand (only in "hide to tray" close
             // mode) — the frontend calls set_tray_visible after loading settings.
 
@@ -772,6 +844,9 @@ pub fn run() {
             quit_app,
             set_tray_visible,
             set_tray_mark_icon,
+            show_lyrics_window,
+            set_lyrics_interaction,
+            hide_lyrics_window,
             animate_window_outer_rect,
             race_download_and_install,
             take_opened_local_files,

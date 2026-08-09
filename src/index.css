@@ -34,6 +34,8 @@
     --radius: 0.75rem;
     --sidebar: 40 18% 95.5%;
     --player: 40 20% 98%;
+    --font-lyrics:
+      "Source Serif 4", "Noto Serif SC", "Songti SC", SimSun, Georgia, serif;
 
     /* Hot-search heat scale — warm → cool, desaturated for both themes */
     --heat-1: 350 52% 46%;
@@ -97,9 +99,14 @@
     --ring: 350 48% 48%;
   }
   [data-palette="teal"] {
-    --primary: 186 42% 36%;
+    --primary: 186 52% 34%;
     --primary-foreground: 0 0% 100%;
-    --ring: 186 42% 36%;
+    --ring: 186 52% 34%;
+  }
+  .dark[data-palette="teal"] {
+    --primary: 186 50% 58%;
+    --primary-foreground: 30 10% 12%;
+    --ring: 186 50% 62%;
   }
 }
 
@@ -122,12 +129,23 @@
     overflow: hidden;
     background: transparent !important;
     /* Bundled serifs everywhere — Source Serif 4 (Latin) + Noto Serif SC (CJK) */
-    font-family: "Source Serif 4", "Noto Serif SC", "Songti SC", SimSun, Georgia, serif;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-lyrics);
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
     font-optical-sizing: auto;
     /* Subpixel keeps small UI text sharper than grayscale antialiased in WebView2 */
     -webkit-font-smoothing: auto;
     -moz-osx-font-smoothing: auto;
+  }
+  html:has(.desktop-lyrics-window),
+  body:has(.desktop-lyrics-window) {
+    overflow: visible;
+    scrollbar-width: none;
+  }
+  html:has(.desktop-lyrics-window)::-webkit-scrollbar,
+  body:has(.desktop-lyrics-window)::-webkit-scrollbar {
+    display: none;
   }
   #root {
     height: 100%;
@@ -159,14 +177,11 @@
   }
   .dark {
     --shadow-border:
-      0 0 0 1px hsl(40 12% 100% / 0.07),
-      0 1px 2px hsl(0 0% 0% / 0.35);
+      0 0 0 1px hsl(40 12% 100% / 0.07), 0 1px 2px hsl(0 0% 0% / 0.35);
     --shadow-border-hover:
-      0 0 0 1px hsl(40 12% 100% / 0.12),
-      0 2px 8px hsl(0 0% 0% / 0.4);
+      0 0 0 1px hsl(40 12% 100% / 0.12), 0 2px 8px hsl(0 0% 0% / 0.4);
     --shadow-elevated:
-      0 12px 32px -10px hsl(0 0% 0% / 0.55),
-      0 0 0 1px hsl(40 12% 100% / 0.06);
+      0 12px 32px -10px hsl(0 0% 0% / 0.55), 0 0 0 1px hsl(40 12% 100% / 0.06);
   }
 }
 
@@ -179,6 +194,286 @@
   height: 100%;
   overflow: hidden;
   background: hsl(var(--background));
+}
+
+.desktop-lyrics-window {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-family: var(--font-lyrics);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.desktop-lyrics-heading-group {
+  position: relative;
+  display: flex;
+  width: max-content;
+  max-width: none;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+.desktop-lyrics-toolbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  padding: 0 0 6px;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.desktop-lyrics-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: hsl(var(--foreground) / 0.14);
+}
+
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group[data-lyrics-active="true"]
+  .desktop-lyrics-toolbar,
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group:focus-within
+  .desktop-lyrics-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.desktop-lyrics-window[data-interaction-mode="locked"] .desktop-lyrics-toolbar {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.desktop-lyrics-close,
+.desktop-lyrics-mode {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--background) / 0.82);
+  box-shadow: 0 3px 10px hsl(0 0% 0% / 0.12);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    color 140ms ease-out,
+    transform 140ms ease-out;
+}
+
+.desktop-lyrics-close:hover,
+.desktop-lyrics-mode:hover {
+  color: hsl(var(--accent-foreground));
+  background: hsl(var(--accent));
+}
+
+.desktop-lyrics-mode[aria-pressed="true"] {
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.12);
+}
+
+.desktop-lyrics-mode[aria-pressed="true"]:hover {
+  color: hsl(var(--accent-foreground));
+  background: hsl(var(--accent));
+}
+
+.desktop-lyrics-close:disabled,
+.desktop-lyrics-mode:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.desktop-lyrics-close:active,
+.desktop-lyrics-mode:active {
+  transform: scale(0.96);
+}
+
+.desktop-lyrics-close:focus-visible,
+.desktop-lyrics-mode:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.desktop-lyrics-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.desktop-lyrics-stage {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-lyrics-heading-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  /* Inline styles scale this whitespace with the lyric font size. */
+  padding: 10px 14px 8px;
+  background: transparent;
+  box-shadow: 0 0 0 transparent;
+  transition:
+    background-color 160ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.desktop-lyrics-window[data-capsule-visible="true"]
+  .desktop-lyrics-heading-shell {
+  background: hsl(var(--background) / 0.7);
+  box-shadow: 0 4px 12px hsl(0 0% 0% / 0.08);
+  backdrop-filter: blur(30px) saturate(1.3);
+  -webkit-backdrop-filter: blur(30px) saturate(1.3);
+}
+
+.desktop-lyrics-heading {
+  position: relative;
+  display: grid;
+  width: max-content;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  color: hsl(var(--primary) / 0.48);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  transform: translateY(-0.04em);
+  transform-origin: center;
+  animation: desktop-lyrics-heading-enter 260ms cubic-bezier(0.22, 0.8, 0.24, 1)
+    both;
+  text-wrap: nowrap;
+  user-select: none;
+  text-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.28),
+    0 0 18px hsl(var(--primary) / 0.14);
+}
+
+@keyframes desktop-lyrics-heading-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.1em, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, -0.04em, 0) scale(1);
+  }
+}
+
+.desktop-lyrics-heading-text,
+.desktop-lyrics-heading-sung {
+  grid-area: 1 / 1;
+  display: block;
+  white-space: nowrap;
+}
+
+.desktop-lyrics-heading-word {
+  position: relative;
+  display: inline-block;
+  white-space: pre;
+}
+
+.desktop-lyrics-heading-words {
+  display: inline-flex;
+  white-space: pre;
+}
+
+.desktop-lyrics-heading-word-text,
+.desktop-lyrics-heading-word-sung {
+  display: block;
+  white-space: pre;
+}
+
+.desktop-lyrics-heading-sung,
+.desktop-lyrics-heading-word-sung {
+  color: hsl(var(--primary));
+  text-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.3),
+    0 0 18px hsl(var(--primary) / 0.2);
+}
+
+.desktop-lyrics-heading-word-sung {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.desktop-lyrics-heading-sung {
+  overflow: visible;
+  pointer-events: none;
+  transition: none;
+}
+
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group[data-lyrics-active="true"]
+  .desktop-lyrics-heading-shell {
+  cursor: grab;
+}
+
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group[data-lyrics-dragging="true"]
+  .desktop-lyrics-heading-shell {
+  cursor: grab;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-lyrics-heading {
+    animation: none;
+  }
+
+  .desktop-lyrics-heading-sung,
+  .desktop-lyrics-heading-word-sung {
+    transition: none;
+  }
+}
+
+.desktop-lyrics-message {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  text-align: center;
 }
 html[data-os="other"] .app-shell,
 html:not([data-os]) .app-shell {
@@ -258,7 +553,12 @@ html[data-mini-peek="true"] .app-shell > * {
 .mini-vinyl {
   width: 64px;
   height: 64px;
-  background: radial-gradient(circle at 35% 28%, hsl(0 0% 28%), hsl(0 0% 7%) 55%, hsl(0 0% 4%));
+  background: radial-gradient(
+    circle at 35% 28%,
+    hsl(0 0% 28%),
+    hsl(0 0% 7%) 55%,
+    hsl(0 0% 4%)
+  );
   /* Edge definition stays on the disc — avoid outer shadows (veil in transparent corners). */
   box-shadow: inset 0 0 0 1px hsl(0 0% 100% / 0.08);
 }
@@ -381,14 +681,30 @@ html[data-mini-peek="true"] .app-shell > * {
 /* Soft ambient wash behind main content */
 .app-ambient {
   background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, hsl(var(--primary) / 0.06), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, hsl(var(--primary) / 0.04), transparent 50%),
+    radial-gradient(
+      ellipse 80% 50% at 10% -10%,
+      hsl(var(--primary) / 0.06),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 100% 0%,
+      hsl(var(--primary) / 0.04),
+      transparent 50%
+    ),
     hsl(var(--background));
 }
 .dark .app-ambient {
   background:
-    radial-gradient(ellipse 70% 45% at 8% -8%, hsl(var(--primary) / 0.08), transparent 55%),
-    radial-gradient(ellipse 50% 35% at 100% 0%, hsl(34 50% 40% / 0.05), transparent 50%),
+    radial-gradient(
+      ellipse 70% 45% at 8% -8%,
+      hsl(var(--primary) / 0.08),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 50% 35% at 100% 0%,
+      hsl(34 50% 40% / 0.05),
+      transparent 50%
+    ),
     hsl(var(--background));
 }
 

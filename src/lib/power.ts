@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core"
-import type { Window } from "@tauri-apps/api/window"
+import { invoke } from "@tauri-apps/api/core";
+import type { Window } from "@tauri-apps/api/window";
 
 // Ask the OS to keep the system awake (but allow the display to sleep / lock)
 // while music is playing. Backed by the `set_prevent_sleep` Rust command
@@ -7,54 +7,68 @@ import type { Window } from "@tauri-apps/api/window"
 // Tauri webview and de-dupes redundant calls so it can be invoked freely from
 // the frequent audio time-update handler.
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
-let lastSent: boolean | null = null
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+let lastSent: boolean | null = null;
 
 export function setPreventSleep(enabled: boolean): void {
-  if (!isTauri) return
-  if (lastSent === enabled) return
-  lastSent = enabled
+  if (!isTauri) return;
+  if (lastSent === enabled) return;
+  lastSent = enabled;
   invoke("set_prevent_sleep", { enabled }).catch(() => {
     // Best-effort: clear the dedupe so a later state change retries.
-    lastSent = null
-  })
+    lastSent = null;
+  });
 }
 
 // Show or hide the system tray icon. Only shown in "hide to tray" close mode, so
 // users who pick "quit on close" don't get an unexpected tray icon. Idempotent.
 export function setTrayVisible(visible: boolean): void {
-  if (!isTauri) return
+  if (!isTauri) return;
   invoke("set_tray_visible", { visible })
     .then(() => {
-      if (!visible) return
+      if (!visible) return;
       // Newly created tray should pick up the current BrandMark colors.
-      void import("@/lib/trayMark").then((m) => m.syncTrayMarkForce())
+      void import("@/lib/trayMark").then((m) => m.syncTrayMarkForce());
     })
-    .catch(() => {})
+    .catch(() => {});
 }
 
 /** Hide the main window and keep the process alive via the tray icon. */
-export async function hideToTray(win: Window | null | undefined): Promise<void> {
+export async function hideToTray(
+  win: Window | null | undefined,
+): Promise<void> {
+  if (isTauri) {
+    await invoke<void>("hide_lyrics_window").catch(() => {});
+    try {
+      const { useDesktopLyricsStore } =
+        await import("@/stores/desktopLyricsStore");
+      useDesktopLyricsStore.getState().setVisible(false);
+    } catch {
+      /* best-effort */
+    }
+  }
   // Dynamic imports avoid a cycle: playerStore → power → miniPlayer → playerStore.
   try {
-    const [{ exitMiniPlayer, isMiniPlayerSession }, { usePlayerStore }] = await Promise.all([
-      import("@/lib/miniPlayer"),
-      import("@/stores/playerStore"),
-    ])
+    const [{ exitMiniPlayer, isMiniPlayerSession }, { usePlayerStore }] =
+      await Promise.all([
+        import("@/lib/miniPlayer"),
+        import("@/stores/playerStore"),
+      ]);
     if (isMiniPlayerSession() || usePlayerStore.getState().miniMode) {
-      await exitMiniPlayer()
+      await exitMiniPlayer();
     }
   } catch {
     /* best-effort */
   }
   // Recreate the icon if settings said tray but creation failed earlier.
-  setTrayVisible(true)
-  if (!win) return
+  setTrayVisible(true);
+  if (!win) return;
   try {
     // Drop from the taskbar while hidden so it feels like a real tray app.
-    await win.setSkipTaskbar(true)
+    await win.setSkipTaskbar(true);
   } catch {
     /* optional on some platforms */
   }
-  await win.hide()
+  await win.hide();
 }

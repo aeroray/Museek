@@ -28,7 +28,14 @@ export const useLangStore = create<LangState>((set) => ({
   },
 }));
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+/** Apply a language received from the main window without writing local prefs. */
+export function applyLanguageSnapshot(lang: Lang): void {
+  useLangStore.setState({ lang });
+  void syncWindowTitle(lang);
+}
+
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Keep the OS window / taskbar title in sync with the UI language. */
 export async function syncWindowTitle(lang?: Lang): Promise<void> {
@@ -92,7 +99,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "hotPlaylists.openTitle": "打开外部歌单",
     "hotPlaylists.openPlaceholder.kw": "粘贴歌单链接或 ID…",
     "hotPlaylists.openPlaceholder.kg": "粘贴酷狗码或歌单 / 榜单链接…",
-    "hotPlaylists.openPlaceholder.tx": "粘贴歌单链接或 ID（「我喜欢」需公开主页）…",
+    "hotPlaylists.openPlaceholder.tx":
+      "粘贴歌单链接或 ID（「我喜欢」需公开主页）…",
     "hotPlaylists.openPlaceholder.wy": "粘贴歌单链接或 ID…",
     "hotPlaylists.openPlaceholder.mg": "粘贴歌单链接或 ID…",
     "hotPlaylists.openConfirm": "打开",
@@ -155,7 +163,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "search.clear": "清除",
     "search.hotTitle": "{platform} · 热门搜索",
     "search.hotEmpty": "暂无热搜数据",
-    "search.welcome.morning1": "早安，愿今天的第一首歌，替你把心情调到喜欢的频道。",
+    "search.welcome.morning1":
+      "早安，愿今天的第一首歌，替你把心情调到喜欢的频道。",
     "search.welcome.morning2": "新的一天，慢慢来，喜欢的旋律会在这里等你。",
     "search.welcome.morning3": "早上好，给自己一点音乐时间，再出发也不迟。",
     "search.welcome.noon1": "午间好，忙碌之中，也别忘了给自己留一首歌的时间。",
@@ -203,7 +212,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "favorites.tabSongs": "歌曲",
     "favorites.tabPlaylists": "歌单",
     "favorites.tabAlbums": "专辑",
-    "favorites.summary": "{songs} 首歌曲 · {playlists} 个歌单 · {albums} 张专辑",
+    "favorites.summary":
+      "{songs} 首歌曲 · {playlists} 个歌单 · {albums} 张专辑",
     "favorites.emptyPlaylists": "还没有收藏任何歌单",
     "favorites.emptyPlaylistsHint": "在歌单详情点「收藏歌单」即可",
     "favorites.emptyAlbums": "还没有收藏任何专辑",
@@ -252,6 +262,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.categoryNamePlaceholder": "分类名称",
     "local.categoryExists": "分类已存在",
     "local.favoriteDisabled": "本地音乐不支持收藏",
+    "local.trackOptions": "歌曲选项",
+    "local.trackNameMode": "歌曲名称",
+    "local.categoryLabel": "分类",
+    "local.keepFilename": "显示原文件名",
     "local.empty": "还没有本地音乐",
     "local.emptyHint": "点右上角导入；列表与分类仅保存在本机，不同步",
     "local.noMatch": "没有匹配的歌曲",
@@ -261,7 +275,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.importProgress": "正在导入 {done}/{total}",
     "local.importFailed": "导入失败：{msg}",
     "local.openPlayFailed": "无法打开或播放该文件",
-    "local.openUnsupported": "暂不支持打开 {formats} 格式（支持 mp3 / flac / m4a / aac / ogg / wav）",
+    "local.openUnsupported":
+      "暂不支持打开 {formats} 格式（支持 mp3 / flac / m4a / aac / ogg / wav）",
     "local.openUnsupportedGeneric": "该文件",
     "local.revealFailed": "无法打开目录：{msg}",
     "local.desktopOnly": "仅桌面端可用",
@@ -272,11 +287,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.unknownTitle": "未知歌曲",
     "local.unknownArtist": "未知歌手",
     "local.settings.depthTitle": "扫描深度",
-    "local.settings.depthDesc": "导入文件夹时包含几层子目录，最后一项为不限深度",
+    "local.settings.depthDesc":
+      "导入文件夹时包含几层子目录，最后一项为不限深度",
     "local.settings.depthUnlimited": "不限深度",
     "local.settings.deleteFilesTitle": "同时删除本地文件",
     "local.settings.deleteFilesDesc": "关闭时只从列表移除",
-    "local.settings.localOnlyNote": "本地音乐的曲库、分类与相关设置仅保存在本机，不会随配置同步。",
+    "local.settings.localOnlyNote":
+      "本地音乐的曲库、分类与相关设置仅保存在本机，不会随配置同步。",
 
     // Playlist
     "playlist.notFound": "歌单不存在",
@@ -295,6 +312,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "player.empty": "无播放内容",
     "player.failed": "播放失败",
     "player.lyrics": "歌词",
+    "player.desktopLyrics": "桌面歌词",
+    "player.desktopLyricsClose": "关闭桌面歌词",
+    "player.desktopLyricsLock": "锁定桌面歌词",
+    "player.desktopLyricsUnlock": "取消锁定桌面歌词",
     "player.queue": "播放队列",
     "player.miniMode": "迷你播放",
     "player.exitMini": "还原主窗口",
@@ -322,11 +343,18 @@ const dict: Record<Lang, Record<string, string>> = {
     "lyrics.loading": "歌词加载中…",
     "lyrics.selectSong": "请选择歌曲",
     "lyrics.noCover": "暂无封面",
+    "desktopLyrics.close": "关闭桌面歌词",
+    "desktopLyrics.drag": "拖动桌面歌词",
+    "desktopLyrics.controls": "桌面歌词控制",
+    "desktopLyrics.noSong": "暂无正在播放的歌曲",
+    "desktopLyrics.lock": "锁定桌面歌词",
+    "desktopLyrics.unlock": "取消锁定桌面歌词",
 
     // Settings
     "settings.title": "设置",
     "settings.tab.sources": "音源管理",
     "settings.tab.playback": "播放",
+    "settings.tab.lyrics": "歌词",
     "settings.tab.download": "下载",
     "settings.tab.local": "本地",
     "settings.tab.cache": "缓存",
@@ -386,6 +414,16 @@ const dict: Record<Lang, Record<string, string>> = {
     "playback.downloadQualityDesc": "优先使用的下载音质，不可用时会自动降低。",
     "playback.preventSleepTitle": "播放时阻止休眠",
     "playback.preventSleepDesc": "播放时保持系统唤醒，暂停后恢复。",
+    "playback.autoLockDesktopLyricsTitle": "打开桌面歌词后自动锁定",
+    "playback.autoLockDesktopLyricsDesc":
+      "打开后桌面歌词不响应鼠标；可用快捷键快速解锁。",
+    "lyricsSettings.desc": "调整歌词页与桌面歌词的显示方式。",
+    "lyricsSettings.capsuleTitle": "显示桌面歌词胶囊",
+    "lyricsSettings.capsuleDesc":
+      "始终显示半透明胶囊背景，帮助歌词在复杂桌面背景上保持清晰；关闭后只显示文字。",
+    "lyricsSettings.autoLockTitle": "打开桌面歌词后自动锁定",
+    "lyricsSettings.autoLockDesc":
+      "打开后桌面歌词不响应鼠标；可用快捷键快速解锁。",
     "playback.openAtLoginTitle": "开机自启动",
     "playback.openAtLoginDesc": "登录系统后自动打开拾音（默认关闭）。",
     "playback.startHiddenToTrayTitle": "静默启动",
@@ -407,6 +445,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.volume": "音量 增大 / 减小",
     "shortcuts.mute": "静音切换",
     "shortcuts.lyrics": "歌词页",
+    "shortcuts.desktopLyrics": "显示 / 隐藏桌面歌词",
+    "shortcuts.desktopLyricsMode": "锁定 / 解锁桌面歌词",
+    "shortcuts.desktopLyricsFont": "调节桌面歌词字号",
     "shortcuts.mini": "迷你播放（开关）",
     "download.locationTitle": "下载位置",
     "download.locationDesc": "下载歌曲的保存位置。",
@@ -593,8 +634,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "hotPlaylists.open": "Open external playlist",
     "hotPlaylists.openTitle": "Open external playlist",
     "hotPlaylists.openPlaceholder.kw": "Paste a playlist link or ID…",
-    "hotPlaylists.openPlaceholder.kg": "Paste a KuGou share code or playlist / chart link…",
-    "hotPlaylists.openPlaceholder.tx": "Paste a playlist link or ID (Liked needs a public profile)…",
+    "hotPlaylists.openPlaceholder.kg":
+      "Paste a KuGou share code or playlist / chart link…",
+    "hotPlaylists.openPlaceholder.tx":
+      "Paste a playlist link or ID (Liked needs a public profile)…",
     "hotPlaylists.openPlaceholder.wy": "Paste a playlist link or ID…",
     "hotPlaylists.openPlaceholder.mg": "Paste a playlist link or ID…",
     "hotPlaylists.openConfirm": "Open",
@@ -641,7 +684,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "search.scopeSong": "Songs",
     "search.scopePlaylist": "Playlists",
     "search.scopeAlbum": "Albums",
-    "search.playlistHint": "Search playlists, or paste a link on the Playlists page",
+    "search.playlistHint":
+      "Search playlists, or paste a link on the Playlists page",
     "search.playlistHintUser":
       "Search playlists or a username, or paste a link on the Playlists page",
     "search.albumHint": "Type an album or artist name to search",
@@ -658,21 +702,36 @@ const dict: Record<Lang, Record<string, string>> = {
     "search.clear": "Clear",
     "search.hotTitle": "{platform} · Trending searches",
     "search.hotEmpty": "No trending data",
-    "search.welcome.morning1": "Good morning — let your first song set the tone for the day.",
-    "search.welcome.morning2": "A new day can unfold slowly; the right melody will be here.",
-    "search.welcome.morning3": "Good morning — make a little room for music before you head out.",
-    "search.welcome.noon1": "Good afternoon — even busy days deserve one song for yourself.",
-    "search.welcome.noon2": "Take a lunch break for something you like to eat and something you like to hear.",
-    "search.welcome.noon3": "Let an easy melody recharge the rest of your afternoon.",
-    "search.welcome.afternoon1": "Good afternoon — may this song meet you exactly where you are.",
-    "search.welcome.afternoon2": "If you're tired, stay for a song; the rest can wait a little.",
-    "search.welcome.afternoon3": "Add a little melody to an ordinary afternoon and let it brighten.",
-    "search.welcome.evening1": "Good evening — you've done enough today. Pick a song for yourself.",
-    "search.welcome.evening2": "Set the day's busy thoughts down and let music help you breathe.",
-    "search.welcome.evening3": "The evening is yours; may music make a quiet corner for you.",
-    "search.welcome.night1": "It's late — let music gently put away the day's tiredness.",
-    "search.welcome.night2": "Still awake? Play a favorite song, then let today say goodnight.",
-    "search.welcome.night3": "Even on a quiet night, there's a melody keeping you company.",
+    "search.welcome.morning1":
+      "Good morning — let your first song set the tone for the day.",
+    "search.welcome.morning2":
+      "A new day can unfold slowly; the right melody will be here.",
+    "search.welcome.morning3":
+      "Good morning — make a little room for music before you head out.",
+    "search.welcome.noon1":
+      "Good afternoon — even busy days deserve one song for yourself.",
+    "search.welcome.noon2":
+      "Take a lunch break for something you like to eat and something you like to hear.",
+    "search.welcome.noon3":
+      "Let an easy melody recharge the rest of your afternoon.",
+    "search.welcome.afternoon1":
+      "Good afternoon — may this song meet you exactly where you are.",
+    "search.welcome.afternoon2":
+      "If you're tired, stay for a song; the rest can wait a little.",
+    "search.welcome.afternoon3":
+      "Add a little melody to an ordinary afternoon and let it brighten.",
+    "search.welcome.evening1":
+      "Good evening — you've done enough today. Pick a song for yourself.",
+    "search.welcome.evening2":
+      "Set the day's busy thoughts down and let music help you breathe.",
+    "search.welcome.evening3":
+      "The evening is yours; may music make a quiet corner for you.",
+    "search.welcome.night1":
+      "It's late — let music gently put away the day's tiredness.",
+    "search.welcome.night2":
+      "Still awake? Play a favorite song, then let today say goodnight.",
+    "search.welcome.night3":
+      "Even on a quiet night, there's a melody keeping you company.",
     "search.failed": "Search failed: {msg}",
     "search.loadMore": "Load more",
     "search.loading": "Loading…",
@@ -706,7 +765,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "favorites.tabSongs": "Songs",
     "favorites.tabPlaylists": "Playlists",
     "favorites.tabAlbums": "Albums",
-    "favorites.summary": "{songs} songs · {playlists} playlists · {albums} albums",
+    "favorites.summary":
+      "{songs} songs · {playlists} playlists · {albums} albums",
     "favorites.emptyPlaylists": "No favorited playlists yet",
     "favorites.emptyPlaylistsHint": "Tap “Favorite” on a playlist",
     "favorites.emptyAlbums": "No favorited albums yet",
@@ -719,7 +779,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "downloads.summary.error": "{n} failed",
     "downloads.clearCompleted": "Clear completed",
     "downloads.empty": "No downloads yet",
-    "downloads.emptyHint": "Download from search results and tasks show up here",
+    "downloads.emptyHint":
+      "Download from search results and tasks show up here",
     "downloads.searchPlaceholder": "Search by title or artist…",
     "downloads.batchEdit": "Select",
     "downloads.selectedCount": "{count} selected",
@@ -755,8 +816,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.categoryNamePlaceholder": "Category name",
     "local.categoryExists": "Category already exists",
     "local.favoriteDisabled": "Local tracks can’t be favorited",
+    "local.trackOptions": "Track options",
+    "local.trackNameMode": "Track title",
+    "local.categoryLabel": "Category",
+    "local.keepFilename": "Show original filename",
     "local.empty": "No local music yet",
-    "local.emptyHint": "Import from the top right. Library and categories stay on this device — not synced",
+    "local.emptyHint":
+      "Import from the top right. Library and categories stay on this device — not synced",
     "local.noMatch": "No matching tracks",
     "local.reveal": "Show in folder",
     "local.remove": "Remove",
@@ -764,22 +830,26 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.importProgress": "Importing {done}/{total}",
     "local.importFailed": "Import failed: {msg}",
     "local.openPlayFailed": "Could not open or play this file",
-    "local.openUnsupported": "Cannot open {formats} (supported: mp3 / flac / m4a / aac / ogg / wav)",
+    "local.openUnsupported":
+      "Cannot open {formats} (supported: mp3 / flac / m4a / aac / ogg / wav)",
     "local.openUnsupportedGeneric": "this file",
     "local.revealFailed": "Could not open folder: {msg}",
     "local.desktopOnly": "Desktop only",
     "local.missingPath": "File path missing",
-    "local.fileMissing": "Local file is missing or was moved — please re-import",
+    "local.fileMissing":
+      "Local file is missing or was moved — please re-import",
     "local.fileUnreadable": "Couldn’t read the local file — check permissions",
     "local.fileMissingBadge": "Missing",
     "local.unknownTitle": "Unknown title",
     "local.unknownArtist": "Unknown artist",
     "local.settings.depthTitle": "Scan depth",
-    "local.settings.depthDesc": "Subfolder levels when importing a folder. Last option = unlimited",
+    "local.settings.depthDesc":
+      "Subfolder levels when importing a folder. Last option = unlimited",
     "local.settings.depthUnlimited": "Unlimited",
     "local.settings.deleteFilesTitle": "Also delete files",
     "local.settings.deleteFilesDesc": "When off, only remove from the list",
-    "local.settings.localOnlyNote": "Local music library, categories, and related settings stay on this device and are not synced.",
+    "local.settings.localOnlyNote":
+      "Local music library, categories, and related settings stay on this device and are not synced.",
 
     // Playlist
     "playlist.notFound": "Playlist not found",
@@ -792,12 +862,17 @@ const dict: Record<Lang, Record<string, string>> = {
     "playlist.selectedCount": "{count} selected",
     "playlist.removeSong": "Remove from playlist",
     "playlists.openEmpty": "Paste a playlist link or ID",
-    "playlists.openInvalid": "Couldn't recognize the playlist — check the platform and link",
+    "playlists.openInvalid":
+      "Couldn't recognize the playlist — check the platform and link",
 
     // Player bar
     "player.empty": "Nothing playing",
     "player.failed": "Playback failed",
     "player.lyrics": "Lyrics",
+    "player.desktopLyrics": "Desktop lyrics",
+    "player.desktopLyricsClose": "Close desktop lyrics",
+    "player.desktopLyricsLock": "Lock desktop lyrics",
+    "player.desktopLyricsUnlock": "Unlock desktop lyrics",
     "player.queue": "Play queue",
     "player.miniMode": "Mini player",
     "player.exitMini": "Restore main window",
@@ -825,11 +900,18 @@ const dict: Record<Lang, Record<string, string>> = {
     "lyrics.loading": "Loading lyrics…",
     "lyrics.selectSong": "Select a song",
     "lyrics.noCover": "No cover",
+    "desktopLyrics.close": "Close desktop lyrics",
+    "desktopLyrics.drag": "Drag desktop lyrics",
+    "desktopLyrics.controls": "Desktop lyrics controls",
+    "desktopLyrics.noSong": "No song playing",
+    "desktopLyrics.lock": "Lock desktop lyrics",
+    "desktopLyrics.unlock": "Unlock desktop lyrics",
 
     // Settings
     "settings.title": "Settings",
     "settings.tab.sources": "Sources",
     "settings.tab.playback": "Playback",
+    "settings.tab.lyrics": "Lyrics",
     "settings.tab.download": "Download",
     "settings.tab.local": "Local",
     "settings.tab.cache": "Cache",
@@ -847,7 +929,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "about.checkFailed": "Update check failed: {msg}",
     "about.updateTitle": "Update available",
     "about.updateDesc": "Version v{version} is available — click to download.",
-    "about.updateDescInstall": "Version v{version} is available — update in one click.",
+    "about.updateDescInstall":
+      "Version v{version} is available — update in one click.",
     "about.download": "Download",
     "about.installNow": "Update now",
     "about.later": "Later",
@@ -884,32 +967,52 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Playback & download settings
     "playback.playQualityTitle": "Playback quality",
-    "playback.playQualityDesc": "Preferred quality; steps down automatically if unavailable.",
+    "playback.playQualityDesc":
+      "Preferred quality; steps down automatically if unavailable.",
     "playback.downloadQualityTitle": "Download quality",
-    "playback.downloadQualityDesc": "Preferred quality; steps down automatically if unavailable.",
+    "playback.downloadQualityDesc":
+      "Preferred quality; steps down automatically if unavailable.",
     "playback.preventSleepTitle": "Prevent sleep while playing",
-    "playback.preventSleepDesc": "Keeps the system awake while playing; resumes when paused.",
+    "playback.preventSleepDesc":
+      "Keeps the system awake while playing; resumes when paused.",
+    "playback.autoLockDesktopLyricsTitle": "Auto-lock desktop lyrics on open",
+    "playback.autoLockDesktopLyricsDesc":
+      "Open desktop lyrics without mouse interaction; use the shortcut to unlock.",
+    "lyricsSettings.desc": "Adjust the lyrics view and desktop lyrics display.",
+    "lyricsSettings.capsuleTitle": "Show the desktop lyrics capsule",
+    "lyricsSettings.capsuleDesc":
+      "Keep a translucent capsule behind the lyrics for readability; turn it off for text-only lyrics.",
+    "lyricsSettings.autoLockTitle": "Auto-lock desktop lyrics on open",
+    "lyricsSettings.autoLockDesc":
+      "Open desktop lyrics without mouse interaction; use the shortcut to unlock.",
     "playback.openAtLoginTitle": "Open at login",
-    "playback.openAtLoginDesc": "Launch Museek when you sign in to your computer (off by default).",
+    "playback.openAtLoginDesc":
+      "Launch Museek when you sign in to your computer (off by default).",
     "playback.startHiddenToTrayTitle": "Silent start",
-    "playback.startHiddenToTrayDesc": "After login, stay in the tray — no window.",
+    "playback.startHiddenToTrayDesc":
+      "After login, stay in the tray — no window.",
     "close.behaviorTitle": "Close button behavior",
     "close.behaviorDesc": "Quit on close, or minimize to the tray.",
     "close.opt.exit": "Quit",
     "close.opt.tray": "Minimize to tray",
     "close.trayHideFailed": "Could not minimize to tray: {msg}",
     "close.confirmTitle": "Quit Museek?",
-    "close.confirmDesc": "This will quit the app. You can switch to tray in Settings.",
+    "close.confirmDesc":
+      "This will quit the app. You can switch to tray in Settings.",
     "close.dontRemind": "Don't remind me again",
     "close.exitNow": "Quit",
     "shortcuts.title": "Keyboard shortcuts",
-    "shortcuts.desc": "Control playback from the keyboard (ignored while typing).",
+    "shortcuts.desc":
+      "Control playback from the keyboard (ignored while typing).",
     "shortcuts.playPause": "Play / pause",
     "shortcuts.seek": "Seek back / forward 5s",
     "shortcuts.prevNext": "Previous / next track",
     "shortcuts.volume": "Volume up / down",
     "shortcuts.mute": "Mute toggle",
     "shortcuts.lyrics": "Lyrics view",
+    "shortcuts.desktopLyrics": "Show / hide desktop lyrics",
+    "shortcuts.desktopLyricsMode": "Lock / unlock desktop lyrics",
+    "shortcuts.desktopLyricsFont": "Adjust desktop lyrics font size",
     "shortcuts.mini": "Mini player (toggle)",
     "download.locationTitle": "Download location",
     "download.locationDesc": "Where downloaded songs are saved.",
@@ -927,7 +1030,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "download.namingTitle": "File naming",
     "download.namingDesc": "How downloaded files are named.",
     "download.deleteFilesTitle": "Also delete files when removing tasks",
-    "download.deleteFilesDesc": "Off (default): remove the download record only, keep the file.",
+    "download.deleteFilesDesc":
+      "Off (default): remove the download record only, keep the file.",
     "naming.singer-name": "Artist - Title",
     "naming.name-singer": "Title - Artist",
     "naming.name": "Title",
@@ -940,14 +1044,16 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Cache
     "cache.title": "Cache",
-    "cache.desc": "Caches songs and lyrics for faster replay; clears automatically when over the limit.",
+    "cache.desc":
+      "Caches songs and lyrics for faster replay; clears automatically when over the limit.",
     "cache.audioTitle": "Cache played audio",
     "cache.maxTitle": "Cache limit",
     "cache.maxDesc": "Maximum disk space for the cache.",
     "cache.current": "In use: {size}",
     "cache.clear": "Clear cache",
     "cache.clearConfirmTitle": "Clear cache?",
-    "cache.clearConfirmDesc": "Clears cached audio and lyrics. Favorites and downloads are kept.",
+    "cache.clearConfirmDesc":
+      "Clears cached audio and lyrics. Favorites and downloads are kept.",
     "cache.clearConfirm": "Clear",
 
     // Config import / export
@@ -960,16 +1066,19 @@ const dict: Record<Lang, Record<string, string>> = {
     "data.invalid": "Invalid config file",
     "data.failed": "Operation failed: {msg}",
     "data.importConfirmTitle": "Import config?",
-    "data.importConfirmDesc": "Overwrites current settings and reloads the app.",
+    "data.importConfirmDesc":
+      "Overwrites current settings and reloads the app.",
     "data.importConfirm": "Import & reload",
     "sync.title": "Folder sync",
-    "sync.desc": "Pick a cloud-synced folder to keep settings in sync across devices.",
+    "sync.desc":
+      "Pick a cloud-synced folder to keep settings in sync across devices.",
     "sync.noFolder": "No sync folder selected",
     "sync.choose": "Choose folder",
     "sync.passphrasePlaceholder": "Encryption passphrase",
     "sync.backup": "Back up to folder",
     "sync.restore": "Restore from folder",
-    "sync.note": "Syncs settings and favorites (including song categories) — not downloads, cache, or local music.",
+    "sync.note":
+      "Syncs settings and favorites (including song categories) — not downloads, cache, or local music.",
     "sync.autoBackupOnExit": "Automatically back up to the sync folder on quit",
     "sync.backupBeforeQuit": "Back up to the sync folder before quitting",
     "sync.backupDone": "Backup saved to the sync folder",
@@ -978,7 +1087,8 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Source manager
     "sources.title": "Source management",
-    "sources.hint": "Sources higher in the list are tried first. Drag to reorder.",
+    "sources.hint":
+      "Sources higher in the list are tried first. Drag to reorder.",
     "sources.urlPlaceholder": "Paste source links, one per line",
     "sources.paste": "Paste from clipboard",
     "sources.clear": "Clear",
@@ -1008,7 +1118,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.invalidUrlLines": "These lines are not valid links: {lines}",
     "sources.empty": "No sources imported",
     "sources.gzhTitle": "Follow our WeChat account, reply 音源 for sources",
-    "sources.gzhHint": "Scan to follow for updates on this app and more of our tools.",
+    "sources.gzhHint":
+      "Scan to follow for updates on this app and more of our tools.",
     "sources.emptyHint": "Import a source to start playing",
     "sources.author": "Author: {name}",
     "sources.platforms": "Platforms: {list}",
@@ -1046,9 +1157,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "lang.en": "English",
 
     // Player errors (surfaced in UI)
-    "player.err.network": "Network error — check your connection or switch sources",
+    "player.err.network":
+      "Network error — check your connection or switch sources",
     "player.err.invalidAudio": "Can't play — try another source",
-    "player.err.playTimeout": "Playback timed out — check network or switch sources",
+    "player.err.playTimeout":
+      "Playback timed out — check network or switch sources",
     "player.err.unknown": "Unknown error",
     "player.failedDetail": "Playback failed: {msg}",
     "player.noSource": "No source enabled — can't play",

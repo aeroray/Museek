@@ -1,24 +1,40 @@
-import { Music, ListMusic, MicVocal, Search, Maximize2, Loader2, PictureInPicture2 } from "lucide-react"
-import { useNavigate } from "react-router-dom"
-import { Controls } from "./Controls"
-import { ProgressSlider } from "./ProgressSlider"
-import { VolumeControl } from "./VolumeControl"
-import { Button } from "@/components/ui/button"
+import {
+  Music,
+  ListMusic,
+  MicVocal,
+  Captions,
+  CaptionsOff,
+  Search,
+  Maximize2,
+  Loader2,
+  PictureInPicture2,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Controls } from "./Controls";
+import { ProgressSlider } from "./ProgressSlider";
+import { VolumeControl } from "./VolumeControl";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { PlatformBadge, QualityBadge, PLATFORM_BRAND } from "@/components/common/MetaBadges"
-import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
-import { DownloadSongButton } from "@/components/common/DownloadSongButton"
-import { enterMiniPlayer } from "@/lib/miniPlayer"
-import { usePlayerStore } from "@/stores/playerStore"
-import { useT } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
-import type { OnlineSource } from "@/types/music"
+} from "@/components/ui/dropdown-menu";
+import {
+  PlatformBadge,
+  QualityBadge,
+  PLATFORM_BRAND,
+} from "@/components/common/MetaBadges";
+import { PLATFORM_ORDER } from "@/components/common/PlatformTabs";
+import { DownloadSongButton } from "@/components/common/DownloadSongButton";
+import { enterMiniPlayer } from "@/lib/miniPlayer";
+import { hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
+import { usePlayerStore } from "@/stores/playerStore";
+import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import type { OnlineSource } from "@/types/music";
 
 export function PlayerBar() {
   const {
@@ -31,29 +47,33 @@ export function PlayerBar() {
     status,
     setShowQueue,
     setShowLyrics,
-  } = usePlayerStore()
-  const t = useT()
-  const navigate = useNavigate()
+  } = usePlayerStore();
+  const t = useT();
+  const navigate = useNavigate();
+  const desktopLyricsVisible = useDesktopLyricsStore(
+    (state) => state.isVisible,
+  );
+  const desktopLyricsControlsDisabled = !currentSong && !desktopLyricsVisible;
 
-  const loading = status === "loading"
+  const loading = status === "loading";
   // Prefer the resolved cover; while loading fall back to the song's own pic so
   // the art doesn't blank out — the spinner overlay still signals resolving.
-  const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null
+  const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null;
 
   // Jump to the search page pre-filled with this song on another platform — handy
   // when the current platform's copy is VIP/unavailable.
   const searchOther = (platform: OnlineSource) => {
-    if (!currentSong) return
-    const query = `${currentSong.name} ${currentSong.singer}`.trim()
-    navigate("/search", { state: { searchSong: { platform, query } } })
-  }
+    if (!currentSong) return;
+    const query = `${currentSong.name} ${currentSong.singer}`.trim();
+    navigate("/search", { state: { searchSong: { platform, query } } });
+  };
 
   return (
     <footer
       className={cn(
         "shrink-0 flex flex-col gap-0.5 border-t border-border/50",
         "bg-player/85 backdrop-blur-xl supports-[backdrop-filter]:bg-player/70",
-        "shadow-[0_-8px_24px_-16px_hsl(30_20%_10%/0.12)]"
+        "shadow-[0_-8px_24px_-16px_hsl(30_20%_10%/0.12)]",
       )}
     >
       {/* Full-width progress bar across the top — modern player layout */}
@@ -77,7 +97,7 @@ export function PlayerBar() {
                   alt=""
                   className={cn(
                     "h-full w-full object-cover transition-opacity duration-200",
-                    loading && "opacity-60"
+                    loading && "opacity-60",
                   )}
                 />
                 {loading ? (
@@ -94,7 +114,10 @@ export function PlayerBar() {
           ) : (
             <div className="relative h-12 w-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-[var(--shadow-border)]">
               {loading ? (
-                <Loader2 size={18} className="animate-spin text-muted-foreground" />
+                <Loader2
+                  size={18}
+                  className="animate-spin text-muted-foreground"
+                />
               ) : (
                 <Music size={20} className="text-muted-foreground" />
               )}
@@ -103,13 +126,19 @@ export function PlayerBar() {
           {currentSong ? (
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2 min-w-0">
-                <p className="text-sm font-semibold tracking-tight truncate" title={currentSong.name}>
+                <p
+                  className="text-sm font-semibold tracking-tight truncate"
+                  title={currentSong.name}
+                >
                   {currentSong.name}
                 </p>
                 <PlatformBadge source={currentSong.source} />
               </div>
               <div className="flex items-center gap-2 min-w-0">
-                <p className="text-xs text-muted-foreground truncate min-w-0" title={currentSong.singer}>
+                <p
+                  className="text-xs text-muted-foreground truncate min-w-0"
+                  title={currentSong.singer}
+                >
                   {currentSong.singer}
                 </p>
                 <QualityBadge quality={currentQuality} />
@@ -126,7 +155,7 @@ export function PlayerBar() {
         </div>
 
         {/* Right: Volume + Download + Lyrics + Queue + Mini */}
-        <div className="flex items-center gap-1 w-72 justify-end shrink-0">
+        <div className="flex items-center gap-1 w-80 justify-end shrink-0">
           <VolumeControl />
           <DownloadSongButton song={currentSong} className="h-9 w-9" />
           <DropdownMenu>
@@ -145,18 +174,26 @@ export function PlayerBar() {
               <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
                 {t("player.searchOther")}
               </DropdownMenuLabel>
-              {PLATFORM_ORDER.filter((s) => s !== currentSong?.source).map((s) => (
-                <DropdownMenuItem key={s} onClick={() => searchOther(s)}>
-                  <span className="h-2 w-2 rounded-full mr-2 shrink-0" style={{ backgroundColor: PLATFORM_BRAND[s] }} />
-                  {t(`platform.${s}`)}
-                </DropdownMenuItem>
-              ))}
+              {PLATFORM_ORDER.filter((s) => s !== currentSong?.source).map(
+                (s) => (
+                  <DropdownMenuItem key={s} onClick={() => searchOther(s)}>
+                    <span
+                      className="h-2 w-2 rounded-full mr-2 shrink-0"
+                      style={{ backgroundColor: PLATFORM_BRAND[s] }}
+                    />
+                    {t(`platform.${s}`)}
+                  </DropdownMenuItem>
+                ),
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-9 w-9 shrink-0 icon-hover-mic", showLyrics && "text-primary")}
+            className={cn(
+              "h-9 w-9 shrink-0 icon-hover-mic",
+              showLyrics && "text-primary",
+            )}
             onClick={() => setShowLyrics(!showLyrics)}
             disabled={!currentSong}
             title={t("player.lyrics")}
@@ -166,7 +203,35 @@ export function PlayerBar() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("h-9 w-9 shrink-0 icon-hover-list", showQueue && "text-primary")}
+            className={cn(
+              "h-9 w-9 shrink-0 icon-hover-captions",
+              desktopLyricsVisible && "text-primary",
+            )}
+            onClick={() =>
+              void (desktopLyricsVisible
+                ? hideDesktopLyrics()
+                : openDesktopLyrics())
+            }
+            disabled={desktopLyricsControlsDisabled}
+            title={t(
+              desktopLyricsVisible
+                ? "player.desktopLyricsClose"
+                : "player.desktopLyrics",
+            )}
+          >
+            {desktopLyricsVisible ? (
+              <CaptionsOff size={16} />
+            ) : (
+              <Captions size={16} />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-9 w-9 shrink-0 icon-hover-list",
+              showQueue && "text-primary",
+            )}
             onClick={() => setShowQueue(!showQueue)}
             disabled={queue.length === 0}
             title={t("player.queue")}
@@ -178,7 +243,7 @@ export function PlayerBar() {
             size="icon"
             className="h-9 w-9 shrink-0 icon-hover-pip"
             onClick={() => void enterMiniPlayer()}
-            disabled={queue.length === 0}
+            disabled={!currentSong}
             title={t("player.miniMode")}
           >
             <PictureInPicture2 size={16} />
@@ -186,5 +251,5 @@ export function PlayerBar() {
         </div>
       </div>
     </footer>
-  )
+  );
 }

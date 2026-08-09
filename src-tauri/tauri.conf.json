@@ -32,6 +32,24 @@
           "x": 14,
           "y": 18
         }
+      },
+      {
+        "label": "lyrics",
+        "title": "Museek Desktop Lyrics",
+        "width": 720,
+        "height": 196,
+        "minHeight": 172,
+        "center": true,
+        "visible": false,
+        "focus": true,
+        "focusable": true,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "backgroundColor": [0, 0, 0, 0]
       }
     ],
     "security": {

@@ -1,298 +1,421 @@
-import { create } from "zustand"
-import { readData, writeData } from "@/lib/db"
-import { useSettingsStore } from "@/stores/settingsStore"
+import { create } from "zustand";
+import { readData, writeData } from "@/lib/db";
+import { useSettingsStore } from "@/stores/settingsStore";
 import {
   buildLocalSong,
   enrichLocalSong,
   isLocalAudioPath,
+  localFilenameTitle,
   localTrackId,
   parseLocalFile,
   peekLocalQuality,
   pickLocalAudioFiles,
   pickLocalAudioFolder,
   resolveLocalCoverUrl,
-} from "@/lib/localMusic"
-import { indexQualitySizes } from "@/lib/quality"
-import { normalizeCategoryName } from "@/lib/songCategories"
-import type { LocalCategory, LocalTrack, MusicInfo } from "@/types/music"
+} from "@/lib/localMusic";
+import { indexQualitySizes } from "@/lib/quality";
+import { normalizeCategoryName } from "@/lib/songCategories";
+import type {
+  LocalCategory,
+  LocalNameMode,
+  LocalTrack,
+  MusicInfo,
+} from "@/types/music";
 
-const STORE_FILE = "localMusic.json"
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+const STORE_FILE = "localMusic.json";
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Parallel file reads + tag parse. Keep modest — each file is loaded fully into memory. */
-const IMPORT_CONCURRENCY = 4
-const PERSIST_DEBOUNCE_MS = 400
+const IMPORT_CONCURRENCY = 4;
+const PERSIST_DEBOUNCE_MS = 400;
 /** Bump when local quality detection changes — triggers one-time re-probe on load. */
-const QUALITY_SCHEMA = 1
+const QUALITY_SCHEMA = 1;
+/** Bump when local naming changes from a global setting to per-track overrides. */
+const NAME_MODE_SCHEMA = 1;
 
 export type LocalImportProgress = {
-  done: number
-  total: number
+  done: number;
+  total: number;
   /** Basename of the file most recently finished */
-  current?: string
-}
+  current?: string;
+};
 
 interface LocalMusicPersist {
-  tracks: LocalTrack[]
-  categories: LocalCategory[]
-  qualitySchema?: number
+  tracks: LocalTrack[];
+  categories: LocalCategory[];
+  qualitySchema?: number;
+  nameModeSchema?: number;
 }
 
 interface LocalMusicState {
-  tracks: LocalTrack[]
-  categories: LocalCategory[]
-  importing: boolean
-  importProgress: LocalImportProgress | null
-  loadFromDisk: () => Promise<void>
-  importFiles: () => Promise<number>
-  importFolder: () => Promise<number>
-  importPaths: (paths: string[], opts?: { refreshExisting?: boolean }) => Promise<number>
-  remove: (id: string) => Promise<void>
-  removeMany: (ids: string[]) => Promise<void>
-  updateSong: (id: string, song: MusicInfo) => void
-  setTrackUnavailable: (id: string, unavailable: boolean) => void
-  addCategory: (name: string) => LocalCategory | null
-  renameCategory: (id: string, name: string) => void
-  removeCategory: (id: string) => void
-  setTracksCategory: (ids: string[], categoryId: string | null) => void
+  tracks: LocalTrack[];
+  categories: LocalCategory[];
+  importing: boolean;
+  importProgress: LocalImportProgress | null;
+  loadFromDisk: () => Promise<void>;
+  importFiles: () => Promise<number>;
+  importFolder: () => Promise<number>;
+  importPaths: (
+    paths: string[],
+    opts?: { refreshExisting?: boolean },
+  ) => Promise<number>;
+  remove: (id: string) => Promise<void>;
+  removeMany: (ids: string[]) => Promise<void>;
+  updateSong: (id: string, song: MusicInfo) => void;
+  setTrackNameMode: (id: string, mode: LocalNameMode) => Promise<void>;
+  setTrackUnavailable: (id: string, unavailable: boolean) => void;
+  addCategory: (name: string) => LocalCategory | null;
+  renameCategory: (id: string, name: string) => void;
+  removeCategory: (id: string) => void;
+  setTracksCategory: (ids: string[], categoryId: string | null) => void;
 }
 
 function persist(
   tracks: LocalTrack[],
   categories: LocalCategory[],
-  qualitySchema: number = QUALITY_SCHEMA
+  qualitySchema: number = QUALITY_SCHEMA,
+  nameModeSchema: number = NAME_MODE_SCHEMA,
 ) {
   // Device-local only — deliberately excluded from config sync (see configIO DB_FILES).
-  writeData(STORE_FILE, { tracks, categories, qualitySchema } satisfies LocalMusicPersist)
+  writeData(STORE_FILE, {
+    tracks,
+    categories,
+    qualitySchema,
+    nameModeSchema,
+  } satisfies LocalMusicPersist);
 }
 
 async function deleteFileIfNeeded(filePath: string) {
-  if (!isTauri) return
-  if (!useSettingsStore.getState().deleteLocalFiles) return
+  if (!isTauri) return;
+  if (!useSettingsStore.getState().deleteLocalFiles) return;
   try {
-    const { remove, exists } = await import("@tauri-apps/plugin-fs")
-    if (await exists(filePath)) await remove(filePath)
+    const { remove, exists } = await import("@tauri-apps/plugin-fs");
+    if (await exists(filePath)) await remove(filePath);
   } catch {
     /* ignore — entry still removed from the list */
   }
 }
 
 function isLocalTrack(v: unknown): v is LocalTrack {
-  if (!v || typeof v !== "object") return false
-  const t = v as LocalTrack
+  if (!v || typeof v !== "object") return false;
+  const t = v as LocalTrack;
   return (
     typeof t.id === "string" &&
     typeof t.filePath === "string" &&
     typeof t.addedAt === "number" &&
     !!t.song &&
     typeof t.song === "object" &&
-    t.song.source === "local"
-  )
+    t.song.source === "local" &&
+    (t.nameMode === undefined ||
+      t.nameMode === "filename" ||
+      t.nameMode === "smart")
+  );
 }
 
 function isLocalCategory(v: unknown): v is LocalCategory {
-  if (!v || typeof v !== "object") return false
-  const c = v as LocalCategory
-  return typeof c.id === "string" && typeof c.name === "string" && typeof c.createdAt === "number"
+  if (!v || typeof v !== "object") return false;
+  const c = v as LocalCategory;
+  return (
+    typeof c.id === "string" &&
+    typeof c.name === "string" &&
+    typeof c.createdAt === "number"
+  );
 }
 
 function parseStore(raw: unknown): LocalMusicPersist {
   // Legacy: bare LocalTrack[]
   if (Array.isArray(raw)) {
-    return { tracks: raw.filter(isLocalTrack), categories: [], qualitySchema: 0 }
+    return {
+      tracks: raw.filter(isLocalTrack),
+      categories: [],
+      qualitySchema: 0,
+      nameModeSchema: 0,
+    };
   }
   if (raw && typeof raw === "object") {
-    const obj = raw as Record<string, unknown>
-    const tracks = Array.isArray(obj.tracks) ? obj.tracks.filter(isLocalTrack) : []
-    const categories = Array.isArray(obj.categories) ? obj.categories.filter(isLocalCategory) : []
-    const catIds = new Set(categories.map((c) => c.id))
+    const obj = raw as Record<string, unknown>;
+    const tracks = Array.isArray(obj.tracks)
+      ? obj.tracks.filter(isLocalTrack)
+      : [];
+    const categories = Array.isArray(obj.categories)
+      ? obj.categories.filter(isLocalCategory)
+      : [];
+    const catIds = new Set(categories.map((c) => c.id));
     const qualitySchema =
-      typeof obj.qualitySchema === "number" && Number.isFinite(obj.qualitySchema)
+      typeof obj.qualitySchema === "number" &&
+      Number.isFinite(obj.qualitySchema)
         ? obj.qualitySchema
-        : 0
+        : 0;
+    const nameModeSchema =
+      typeof obj.nameModeSchema === "number" &&
+      Number.isFinite(obj.nameModeSchema)
+        ? obj.nameModeSchema
+        : 0;
     return {
       tracks: tracks.map((t) =>
-        t.categoryId && !catIds.has(t.categoryId) ? { ...t, categoryId: null } : t
+        t.categoryId && !catIds.has(t.categoryId)
+          ? { ...t, categoryId: null }
+          : t,
       ),
       categories,
       qualitySchema,
-    }
+      nameModeSchema,
+    };
   }
-  return { tracks: [], categories: [], qualitySchema: 0 }
+  return { tracks: [], categories: [], qualitySchema: 0, nameModeSchema: 0 };
 }
 
 async function hydrateCovers(tracks: LocalTrack[]): Promise<LocalTrack[]> {
-  const out: LocalTrack[] = []
+  const out: LocalTrack[] = [];
   for (const track of tracks) {
-    const rel = track.song.meta.localCoverRel
+    const rel = track.song.meta.localCoverRel;
     if (!rel) {
-      out.push(track)
-      continue
+      out.push(track);
+      continue;
     }
-    const picUrl = await resolveLocalCoverUrl(rel)
+    const picUrl = await resolveLocalCoverUrl(rel);
     out.push({
       ...track,
       song: {
         ...track.song,
-        meta: { ...track.song.meta, picUrl: picUrl ?? track.song.meta.picUrl ?? null },
+        meta: {
+          ...track.song.meta,
+          picUrl: picUrl ?? track.song.meta.picUrl ?? null,
+        },
       },
-    })
+    });
   }
-  return out
+  return out;
+}
+
+function localNameModeForTrack(track: LocalTrack): LocalNameMode {
+  return track.nameMode === "filename" ? "filename" : "smart";
+}
+
+function migrateLegacyNameModes(
+  tracks: LocalTrack[],
+  nameModeSchema: number,
+): LocalTrack[] {
+  if (nameModeSchema >= NAME_MODE_SCHEMA) return tracks;
+  if (useSettingsStore.getState().localNameMode !== "filename") return tracks;
+  return tracks.map((track) => {
+    if (track.nameMode) return track;
+    const name = localFilenameTitle(track.filePath);
+    return {
+      ...track,
+      nameMode: "filename",
+      song: track.song.name === name ? track.song : { ...track.song, name },
+    };
+  });
 }
 
 function pathKey(filePath: string): string {
-  return filePath.replace(/\\/g, "/").toLowerCase()
+  return filePath.replace(/\\/g, "/").toLowerCase();
 }
 
 function fileBasename(filePath: string): string {
-  return filePath.split(/[/\\]/).pop() ?? filePath
+  return filePath.split(/[/\\]/).pop() ?? filePath;
 }
 
 /** Run `worker` over `items` with a fixed concurrency pool. */
 async function mapPool<T>(
   items: T[],
   concurrency: number,
-  worker: (item: T) => Promise<void>
+  worker: (item: T) => Promise<void>,
 ): Promise<void> {
-  if (items.length === 0) return
-  let next = 0
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (next < items.length) {
-      const i = next++
-      await worker(items[i])
-    }
-  })
-  await Promise.all(runners)
+  if (items.length === 0) return;
+  let next = 0;
+  const runners = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (next < items.length) {
+        const i = next++;
+        await worker(items[i]);
+      }
+    },
+  );
+  await Promise.all(runners);
 }
 
 export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
-  let persistTimer: ReturnType<typeof setTimeout> | null = null
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  const refreshVersions = new Map<string, number>();
 
   function schedulePersist() {
-    if (persistTimer) clearTimeout(persistTimer)
+    if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
-      persistTimer = null
-      const { tracks, categories } = get()
-      persist(tracks, categories)
-    }, PERSIST_DEBOUNCE_MS)
+      persistTimer = null;
+      const { tracks, categories } = get();
+      persist(tracks, categories);
+    }, PERSIST_DEBOUNCE_MS);
   }
 
   function flushPersist() {
     if (persistTimer) {
-      clearTimeout(persistTimer)
-      persistTimer = null
+      clearTimeout(persistTimer);
+      persistTimer = null;
     }
-    const { tracks, categories } = get()
-    persist(tracks, categories)
+    const { tracks, categories } = get();
+    persist(tracks, categories);
   }
 
   function prependTrack(track: LocalTrack) {
     // Functional set avoids lost updates when several workers finish close together.
-    set((state) => ({ tracks: [track, ...state.tracks] }))
-    schedulePersist()
+    set((state) => ({ tracks: [track, ...state.tracks] }));
+    schedulePersist();
   }
 
   function upsertRestoredTrack(track: LocalTrack) {
     set((state) => ({
       tracks: state.tracks.map((t) => (t.id === track.id ? track : t)),
-    }))
-    schedulePersist()
+    }));
+    schedulePersist();
+  }
+
+  function beginTrackRefresh(id: string): number {
+    const version = (refreshVersions.get(id) ?? 0) + 1;
+    refreshVersions.set(id, version);
+    return version;
+  }
+
+  function canApplyTrackRefresh(
+    id: string,
+    filePath: string,
+    nameMode: LocalNameMode,
+    version: number,
+  ): boolean {
+    const current = get().tracks.find((track) => track.id === id);
+    return (
+      refreshVersions.get(id) === version &&
+      current?.filePath === filePath &&
+      !!current &&
+      localNameModeForTrack(current) === nameMode
+    );
+  }
+
+  async function refreshTrack(track: LocalTrack): Promise<boolean> {
+    const nameMode = localNameModeForTrack(track);
+    const version = beginTrackRefresh(track.id);
+    try {
+      const tags = await parseLocalFile(track.filePath, track.id, nameMode);
+      if (!canApplyTrackRefresh(track.id, track.filePath, nameMode, version)) {
+        return false;
+      }
+      const current = get().tracks.find((item) => item.id === track.id);
+      if (!current) return false;
+      const song = buildLocalSong(track.id, track.filePath, tags);
+      upsertRestoredTrack({
+        ...current,
+        unavailable: false,
+        song,
+      });
+      void enrichLocalSong(song, tags, nameMode).then((enriched) => {
+        if (
+          !canApplyTrackRefresh(track.id, track.filePath, nameMode, version)
+        ) {
+          return;
+        }
+        if (enriched !== song) get().updateSong(track.id, enriched);
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async function ingestPaths(
     paths: string[],
-    opts?: { refreshExisting?: boolean }
+    opts?: { refreshExisting?: boolean },
   ): Promise<number> {
-    const byPath = new Map(get().tracks.map((t) => [pathKey(t.filePath), t]))
-    const toImport: string[] = []
-    const toRestore: LocalTrack[] = []
-    const toRefresh: LocalTrack[] = []
-    const seen = new Set<string>()
+    const byPath = new Map(get().tracks.map((t) => [pathKey(t.filePath), t]));
+    const toImport: string[] = [];
+    const toRestore: LocalTrack[] = [];
+    const toRefresh: LocalTrack[] = [];
+    const seen = new Set<string>();
 
     for (const filePath of paths) {
-      const key = pathKey(filePath)
-      if (seen.has(key)) continue
-      seen.add(key)
-      const existing = byPath.get(key)
+      const key = pathKey(filePath);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const existing = byPath.get(key);
       if (existing) {
         // Same path again: if it was marked missing, clear that on successful re-read.
-        if (existing.unavailable) toRestore.push(existing)
-        else if (opts?.refreshExisting) toRefresh.push(existing)
-        continue
+        if (existing.unavailable) toRestore.push(existing);
+        else if (opts?.refreshExisting) toRefresh.push(existing);
+        continue;
       }
-      toImport.push(filePath)
+      toImport.push(filePath);
     }
 
-    const total = toImport.length + toRestore.length + toRefresh.length
+    const total = toImport.length + toRestore.length + toRefresh.length;
     if (total === 0) {
-      set({ importProgress: null })
-      return 0
+      set({ importProgress: null });
+      return 0;
     }
 
-    let done = 0
-    let added = 0
-    set({ importProgress: { done: 0, total } })
+    let done = 0;
+    let added = 0;
+    set({ importProgress: { done: 0, total } });
 
     const bumpProgress = (current: string) => {
-      done += 1
-      set({ importProgress: { done, total, current } })
-    }
+      done += 1;
+      set({ importProgress: { done, total, current } });
+    };
 
     const applyParsed = async (existing: LocalTrack, countAsAdded: boolean) => {
-      const current = fileBasename(existing.filePath)
+      const current = fileBasename(existing.filePath);
       try {
-        const tags = await parseLocalFile(existing.filePath, existing.id)
-        const song = buildLocalSong(existing.id, existing.filePath, tags)
-        upsertRestoredTrack({
-          ...existing,
-          unavailable: false,
-          song,
-        })
-        if (countAsAdded) added += 1
-        void enrichLocalSong(song, tags).then((enriched) => {
-          if (enriched !== song) get().updateSong(existing.id, enriched)
-        })
+        const currentTrack =
+          get().tracks.find((track) => track.id === existing.id) ?? existing;
+        if ((await refreshTrack(currentTrack)) && countAsAdded) added += 1;
       } catch {
         /* still missing / unreadable — leave as-is */
       } finally {
-        bumpProgress(current)
+        bumpProgress(current);
       }
-    }
+    };
 
-    await mapPool(toRestore, IMPORT_CONCURRENCY, (existing) => applyParsed(existing, true))
+    await mapPool(toRestore, IMPORT_CONCURRENCY, (existing) =>
+      applyParsed(existing, true),
+    );
     // Open-with re-read: recover covers/tags after a prior failed (scoped) import.
-    await mapPool(toRefresh, IMPORT_CONCURRENCY, (existing) => applyParsed(existing, false))
+    await mapPool(toRefresh, IMPORT_CONCURRENCY, (existing) =>
+      applyParsed(existing, false),
+    );
 
     await mapPool(toImport, IMPORT_CONCURRENCY, async (filePath) => {
-      const current = fileBasename(filePath)
+      const current = fileBasename(filePath);
       try {
-        const id = localTrackId(filePath)
-        const tags = await parseLocalFile(filePath, id)
-        const song = buildLocalSong(id, filePath, tags)
+        const id = localTrackId(filePath);
+        const nameMode: LocalNameMode = "smart";
+        const tags = await parseLocalFile(filePath, id, nameMode);
+        const song = buildLocalSong(id, filePath, tags);
         const track: LocalTrack = {
           id,
           filePath,
           addedAt: Date.now(),
           categoryId: null,
           song,
-        }
-        prependTrack(track)
-        added += 1
+        };
+        prependTrack(track);
+        added += 1;
 
         // Enrich (NetEase fill) off the critical path so the row appears immediately.
-        void enrichLocalSong(song, tags).then((enriched) => {
-          if (enriched !== song) get().updateSong(id, enriched)
-        })
+        const version = beginTrackRefresh(id);
+        void enrichLocalSong(song, tags, nameMode).then((enriched) => {
+          if (!canApplyTrackRefresh(id, filePath, nameMode, version)) return;
+          if (enriched !== song) get().updateSong(id, enriched);
+        });
       } catch {
         /* skip unreadable files; still advance progress */
       } finally {
-        bumpProgress(current)
+        bumpProgress(current);
       }
-    })
+    });
 
-    flushPersist()
-    return added
+    flushPersist();
+    return added;
   }
 
   return {
@@ -302,24 +425,27 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     importProgress: null,
 
     async loadFromDisk() {
-      const raw = await readData<unknown>(STORE_FILE, [])
-      const { tracks, categories, qualitySchema } = parseStore(raw)
-      const hydrated = await hydrateCovers(tracks)
-      set({ tracks: hydrated, categories })
+      const raw = await readData<unknown>(STORE_FILE, []);
+      const { tracks, categories, qualitySchema, nameModeSchema } =
+        parseStore(raw);
+      const migrated = migrateLegacyNameModes(tracks, nameModeSchema ?? 0);
+      const normalized = await hydrateCovers(migrated);
+      set({ tracks: normalized, categories });
 
       // One-time fix: older imports guessed quality from extension only (e.g. all
       // MP3 → 320k, 24-bit FLAC → FLAC). Re-probe in the background.
-      if ((qualitySchema ?? 0) < QUALITY_SCHEMA && hydrated.length > 0) {
+      if ((qualitySchema ?? 0) < QUALITY_SCHEMA && normalized.length > 0) {
         void (async () => {
-          await mapPool(hydrated, IMPORT_CONCURRENCY, async (track) => {
-            const qualitys = await peekLocalQuality(track.filePath)
-            if (!qualitys?.length) return
-            const next = qualitys[0]?.type
-            const prev = track.song.meta.qualitys[0]?.type
+          await mapPool(normalized, IMPORT_CONCURRENCY, async (track) => {
+            const qualitys = await peekLocalQuality(track.filePath);
+            if (!qualitys?.length) return;
+            const next = qualitys[0]?.type;
+            const prev = track.song.meta.qualitys[0]?.type;
             const sizeChanged =
-              (qualitys[0]?.size ?? null) !== (track.song.meta.qualitys[0]?.size ?? null)
-            if (!next || (next === prev && !sizeChanged)) return
-            const _qualitys = indexQualitySizes(qualitys)
+              (qualitys[0]?.size ?? null) !==
+              (track.song.meta.qualitys[0]?.size ?? null);
+            if (!next || (next === prev && !sizeChanged)) return;
+            const _qualitys = indexQualitySizes(qualitys);
             set((state) => ({
               tracks: state.tracks.map((t) =>
                 t.id === track.id
@@ -330,150 +456,185 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
                         meta: { ...t.song.meta, qualitys, _qualitys },
                       },
                     }
-                  : t
+                  : t,
               ),
-            }))
-          })
-          persist(get().tracks, get().categories, QUALITY_SCHEMA)
-        })()
-      } else if ((qualitySchema ?? 0) < QUALITY_SCHEMA) {
-        persist(hydrated, categories, QUALITY_SCHEMA)
+            }));
+          });
+          persist(get().tracks, get().categories, QUALITY_SCHEMA);
+        })();
+      } else if (
+        (qualitySchema ?? 0) < QUALITY_SCHEMA ||
+        (nameModeSchema ?? 0) < NAME_MODE_SCHEMA
+      ) {
+        persist(normalized, categories, QUALITY_SCHEMA);
       }
     },
 
     async importFiles() {
-      const paths = await pickLocalAudioFiles()
-      if (!paths.length) return 0
-      set({ importing: true, importProgress: null })
+      const paths = await pickLocalAudioFiles();
+      if (!paths.length) return 0;
+      set({ importing: true, importProgress: null });
       try {
-        return await ingestPaths(paths)
+        return await ingestPaths(paths);
       } finally {
-        set({ importing: false, importProgress: null })
+        set({ importing: false, importProgress: null });
       }
     },
 
     async importFolder() {
-      const depth = useSettingsStore.getState().localScanDepth
-      const paths = await pickLocalAudioFolder(depth)
-      if (!paths.length) return 0
-      set({ importing: true, importProgress: null })
+      const depth = useSettingsStore.getState().localScanDepth;
+      const paths = await pickLocalAudioFolder(depth);
+      if (!paths.length) return 0;
+      set({ importing: true, importProgress: null });
       try {
-        return await ingestPaths(paths)
+        return await ingestPaths(paths);
       } finally {
-        set({ importing: false, importProgress: null })
+        set({ importing: false, importProgress: null });
       }
     },
 
     async importPaths(paths, opts) {
-      const filtered = paths.filter((p) => typeof p === "string" && isLocalAudioPath(p))
-      if (!filtered.length) return 0
-      set({ importing: true, importProgress: null })
+      const filtered = paths.filter(
+        (p) => typeof p === "string" && isLocalAudioPath(p),
+      );
+      if (!filtered.length) return 0;
+      set({ importing: true, importProgress: null });
       try {
-        return await ingestPaths(filtered, opts)
+        return await ingestPaths(filtered, opts);
       } finally {
-        set({ importing: false, importProgress: null })
+        set({ importing: false, importProgress: null });
       }
     },
 
     async remove(id) {
-      const track = get().tracks.find((t) => t.id === id)
-      const tracks = get().tracks.filter((t) => t.id !== id)
-      set({ tracks })
-      persist(tracks, get().categories)
-      if (track) await deleteFileIfNeeded(track.filePath)
+      const track = get().tracks.find((t) => t.id === id);
+      const tracks = get().tracks.filter((t) => t.id !== id);
+      set({ tracks });
+      persist(tracks, get().categories);
+      if (track) await deleteFileIfNeeded(track.filePath);
     },
 
     async removeMany(ids) {
-      const idSet = new Set(ids)
-      const removing = get().tracks.filter((t) => idSet.has(t.id))
-      const tracks = get().tracks.filter((t) => !idSet.has(t.id))
-      set({ tracks })
-      persist(tracks, get().categories)
-      for (const t of removing) await deleteFileIfNeeded(t.filePath)
+      const idSet = new Set(ids);
+      const removing = get().tracks.filter((t) => idSet.has(t.id));
+      const tracks = get().tracks.filter((t) => !idSet.has(t.id));
+      set({ tracks });
+      persist(tracks, get().categories);
+      for (const t of removing) await deleteFileIfNeeded(t.filePath);
     },
 
     updateSong(id, song) {
-      const tracks = get().tracks.map((t) => (t.id === id ? { ...t, song } : t))
-      set({ tracks })
-      persist(tracks, get().categories)
+      const tracks = get().tracks.map((t) =>
+        t.id === id ? { ...t, song } : t,
+      );
+      set({ tracks });
+      persist(tracks, get().categories);
       // Enrich/cover refresh often finishes after playback already started — push
       // into the player without a static import cycle.
       queueMicrotask(() => {
         void import("@/stores/playerStore").then(({ usePlayerStore }) => {
-          const p = usePlayerStore.getState()
-          if (p.currentSong?.id !== id) return
-          const picUrl = song.meta.picUrl ?? p.currentPicUrl
+          const p = usePlayerStore.getState();
+          if (p.currentSong?.id !== id) return;
+          const picUrl = song.meta.picUrl ?? p.currentPicUrl;
           usePlayerStore.setState({
             currentSong: song,
             currentPicUrl: picUrl,
             queue: p.queue.map((item) =>
-              item.music.id === id ? { ...item, music: song } : item
+              item.music.id === id ? { ...item, music: song } : item,
             ),
-          })
+          });
           void import("@/lib/smtc").then(({ updateMediaControls }) => {
             updateMediaControls(
               song.name,
               song.singer,
               song.albumName ?? "",
               picUrl,
-              p.isPlaying
-            )
-          })
-        })
-      })
+              p.isPlaying,
+            );
+          });
+        });
+      });
+    },
+
+    async setTrackNameMode(id, mode) {
+      const track = get().tracks.find((item) => item.id === id);
+      if (!track || localNameModeForTrack(track) === mode) return;
+      const tracks = get().tracks.map((item) => {
+        if (item.id !== id) return item;
+        if (mode === "smart") {
+          const { nameMode: _nameMode, ...withoutMode } = item;
+          return withoutMode;
+        }
+        return { ...item, nameMode: mode };
+      });
+      set({ tracks });
+      persist(tracks, get().categories);
+      const updated = tracks.find((item) => item.id === id);
+      if (updated) await refreshTrack(updated);
     },
 
     setTrackUnavailable(id, unavailable) {
-      const track = get().tracks.find((t) => t.id === id)
-      if (!track || !!track.unavailable === unavailable) return
+      const track = get().tracks.find((t) => t.id === id);
+      if (!track || !!track.unavailable === unavailable) return;
       const tracks = get().tracks.map((t) =>
-        t.id === id ? { ...t, unavailable } : t
-      )
-      set({ tracks })
-      persist(tracks, get().categories)
+        t.id === id ? { ...t, unavailable } : t,
+      );
+      set({ tracks });
+      persist(tracks, get().categories);
     },
 
     addCategory(name) {
-      const n = normalizeCategoryName(name)
-      if (!n) return null
-      if (get().categories.some((c) => c.name.toLowerCase() === n.toLowerCase())) return null
+      const n = normalizeCategoryName(name);
+      if (!n) return null;
+      if (
+        get().categories.some((c) => c.name.toLowerCase() === n.toLowerCase())
+      )
+        return null;
       const cat: LocalCategory = {
         id: `lc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
         name: n,
         createdAt: Date.now(),
-      }
-      const categories = [...get().categories, cat]
-      set({ categories })
-      persist(get().tracks, categories)
-      return cat
+      };
+      const categories = [...get().categories, cat];
+      set({ categories });
+      persist(get().tracks, categories);
+      return cat;
     },
 
     renameCategory(id, name) {
-      const n = normalizeCategoryName(name)
-      if (!n) return
-      if (get().categories.some((c) => c.id !== id && c.name.toLowerCase() === n.toLowerCase())) return
-      const categories = get().categories.map((c) => (c.id === id ? { ...c, name: n } : c))
-      set({ categories })
-      persist(get().tracks, categories)
+      const n = normalizeCategoryName(name);
+      if (!n) return;
+      if (
+        get().categories.some(
+          (c) => c.id !== id && c.name.toLowerCase() === n.toLowerCase(),
+        )
+      )
+        return;
+      const categories = get().categories.map((c) =>
+        c.id === id ? { ...c, name: n } : c,
+      );
+      set({ categories });
+      persist(get().tracks, categories);
     },
 
     removeCategory(id) {
-      const categories = get().categories.filter((c) => c.id !== id)
+      const categories = get().categories.filter((c) => c.id !== id);
       const tracks = get().tracks.map((t) =>
-        t.categoryId === id ? { ...t, categoryId: null } : t
-      )
-      set({ categories, tracks })
-      persist(tracks, categories)
+        t.categoryId === id ? { ...t, categoryId: null } : t,
+      );
+      set({ categories, tracks });
+      persist(tracks, categories);
     },
 
     setTracksCategory(ids, categoryId) {
-      if (categoryId && !get().categories.some((c) => c.id === categoryId)) return
-      const idSet = new Set(ids)
+      if (categoryId && !get().categories.some((c) => c.id === categoryId))
+        return;
+      const idSet = new Set(ids);
       const tracks = get().tracks.map((t) =>
-        idSet.has(t.id) ? { ...t, categoryId } : t
-      )
-      set({ tracks })
-      persist(tracks, get().categories)
+        idSet.has(t.id) ? { ...t, categoryId } : t,
+      );
+      set({ tracks });
+      persist(tracks, get().categories);
     },
-  }
-})
+  };
+});

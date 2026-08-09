@@ -1,7 +1,13 @@
-import { create } from "zustand"
+import { create } from "zustand";
 
-export type ThemeMode = "light" | "dark" | "system"
-export type Palette = "default" | "violet" | "blue" | "emerald" | "rose" | "teal"
+export type ThemeMode = "light" | "dark" | "system";
+export type Palette =
+  | "default"
+  | "violet"
+  | "blue"
+  | "emerald"
+  | "rose"
+  | "teal";
 
 export const PALETTES: { id: Palette; name: string; color: string }[] = [
   { id: "default", name: "石墨", color: "hsl(30 10% 14%)" },
@@ -9,73 +15,79 @@ export const PALETTES: { id: Palette; name: string; color: string }[] = [
   { id: "blue", name: "海蓝", color: "hsl(212 52% 48%)" },
   { id: "emerald", name: "翡翠", color: "hsl(158 42% 36%)" },
   { id: "rose", name: "玫瑰", color: "hsl(350 48% 48%)" },
-  { id: "teal", name: "青石", color: "hsl(186 42% 36%)" },
-]
+  { id: "teal", name: "青石", color: "hsl(186 52% 34%)" },
+];
 
-const MODE_KEY = "museek.theme.mode"
-const PALETTE_KEY = "museek.theme.palette"
+const MODE_KEY = "museek.theme.mode";
+const PALETTE_KEY = "museek.theme.palette";
 
 function systemPrefersDark(): boolean {
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
 }
 
-function applyToDom(mode: ThemeMode, palette: Palette) {
-  const dark = mode === "dark" || (mode === "system" && systemPrefersDark())
-  const root = document.documentElement
-  root.classList.toggle("dark", dark)
-  if (palette === "default") root.removeAttribute("data-palette")
-  else root.setAttribute("data-palette", palette)
+function applyToDom(mode: ThemeMode, palette: Palette, syncTray = true) {
+  const dark = mode === "dark" || (mode === "system" && systemPrefersDark());
+  const root = document.documentElement;
+  root.classList.toggle("dark", dark);
+  if (palette === "default") root.removeAttribute("data-palette");
+  else root.setAttribute("data-palette", palette);
   // Tray mark uses computed --primary / --primary-foreground (all palettes).
-  void import("@/lib/trayMark").then((m) => m.syncTrayMark())
+  if (syncTray) void import("@/lib/trayMark").then((m) => m.syncTrayMark());
 }
 
 function readMode(): ThemeMode {
-  const v = localStorage.getItem(MODE_KEY)
-  return v === "light" || v === "dark" || v === "system" ? v : "system"
+  const v = localStorage.getItem(MODE_KEY);
+  return v === "light" || v === "dark" || v === "system" ? v : "system";
 }
 
 function readPalette(): Palette {
-  const v = localStorage.getItem(PALETTE_KEY)
+  const v = localStorage.getItem(PALETTE_KEY);
   // Former "琥珀金" (amber) used dark-on-gold text that looked muddy; map to teal.
   if (v === "amber") {
-    localStorage.setItem(PALETTE_KEY, "teal")
-    return "teal"
+    localStorage.setItem(PALETTE_KEY, "teal");
+    return "teal";
   }
-  return v && PALETTES.some((p) => p.id === v) ? (v as Palette) : "default"
+  return v && PALETTES.some((p) => p.id === v) ? (v as Palette) : "default";
 }
 
 interface ThemeState {
-  mode: ThemeMode
-  palette: Palette
-  setMode: (m: ThemeMode) => void
-  setPalette: (p: Palette) => void
+  mode: ThemeMode;
+  palette: Palette;
+  setMode: (m: ThemeMode) => void;
+  setPalette: (p: Palette) => void;
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   mode: readMode(),
   palette: readPalette(),
   setMode(mode) {
-    localStorage.setItem(MODE_KEY, mode)
-    set({ mode })
-    applyToDom(mode, get().palette)
+    localStorage.setItem(MODE_KEY, mode);
+    set({ mode });
+    applyToDom(mode, get().palette);
   },
   setPalette(palette) {
-    localStorage.setItem(PALETTE_KEY, palette)
-    set({ palette })
-    applyToDom(get().mode, palette)
+    localStorage.setItem(PALETTE_KEY, palette);
+    set({ palette });
+    applyToDom(get().mode, palette);
   },
-}))
+}));
+
+/** Apply a theme received from the main window without persisting it locally. */
+export function applyThemeSnapshot(mode: ThemeMode, palette: Palette): void {
+  useThemeStore.setState({ mode, palette });
+  applyToDom(mode, palette, false);
+}
 
 /**
  * Apply the saved theme to the DOM immediately (call before React renders to
  * avoid a flash) and keep "system" mode in sync with OS appearance changes.
  */
-export function initTheme() {
-  applyToDom(readMode(), readPalette())
+export function initTheme(syncTray = true) {
+  applyToDom(readMode(), readPalette(), syncTray);
   window
     .matchMedia?.("(prefers-color-scheme: dark)")
     .addEventListener?.("change", () => {
-      const { mode, palette } = useThemeStore.getState()
-      if (mode === "system") applyToDom(mode, palette)
-    })
+      const { mode, palette } = useThemeStore.getState();
+      if (mode === "system") applyToDom(mode, palette, syncTray);
+    });
 }

@@ -1,9 +1,9 @@
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { SettingsCard } from "@/components/settings/SettingsCard"
-import { useT } from "@/lib/i18n"
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SettingsCard } from "@/components/settings/SettingsCard";
+import { useT } from "@/lib/i18n";
 
 export function ShortcutsSettings() {
-  const t = useT()
+  const t = useT();
   const rows = [
     { keys: ["Space"], action: t("shortcuts.playPause") },
     { keys: ["←", "→"], action: t("shortcuts.seek") },
@@ -11,8 +11,14 @@ export function ShortcutsSettings() {
     { keys: ["↑", "↓"], action: t("shortcuts.volume") },
     { keys: ["M"], action: t("shortcuts.mute") },
     { keys: ["L"], action: t("shortcuts.lyrics") },
+    { keys: ["Ctrl/⌘ + L"], action: t("shortcuts.desktopLyrics") },
+    { keys: ["Ctrl/⌘ + Shift + L"], action: t("shortcuts.desktopLyricsMode") },
+    {
+      keys: ["Ctrl/⌘ + Wheel ↑", "Ctrl/⌘ + Wheel ↓"],
+      action: t("shortcuts.desktopLyricsFont"),
+    },
     { keys: ["P"], action: t("shortcuts.mini") },
-  ]
+  ];
 
   return (
     <ScrollArea className="h-full">
@@ -20,7 +26,10 @@ export function ShortcutsSettings() {
         <p className="text-sm text-muted-foreground">{t("shortcuts.desc")}</p>
         <SettingsCard>
           {rows.map((r) => (
-            <div key={r.action} className="flex items-center justify-between gap-4 px-4 py-3">
+            <div
+              key={r.action}
+              className="flex items-center justify-between gap-4 px-4 py-3"
+            >
               <span className="text-sm">{r.action}</span>
               <span className="flex items-center gap-1.5">
                 {r.keys.map((k, i) => (
@@ -37,5 +46,5 @@ export function ShortcutsSettings() {
         </SettingsCard>
       </div>
     </ScrollArea>
-  )
+  );
 }

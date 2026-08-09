@@ -6,6 +6,7 @@ import {
   HardDrive,
   Database,
   Keyboard,
+  Captions,
   Palette,
   FolderSync,
   Info,
@@ -14,6 +15,7 @@ import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SourceManager } from "@/components/settings/SourceManager";
 import { PlaybackSettings } from "@/components/settings/PlaybackSettings";
+import { LyricsSettings } from "@/components/settings/LyricsSettings";
 import { DownloadSettings } from "@/components/settings/DownloadSettings";
 import { LocalSettings } from "@/components/settings/LocalSettings";
 import { CacheSettings } from "@/components/settings/CacheSettings";
@@ -26,6 +28,7 @@ import { useT } from "@/lib/i18n";
 const TAB_VALUES = [
   "sources",
   "playback",
+  "lyrics",
   "download",
   "local",
   "cache",
@@ -42,6 +45,7 @@ const SETTINGS_TABS: {
 }[] = [
   { value: "sources", labelKey: "settings.tab.sources", icon: Plug },
   { value: "playback", labelKey: "settings.tab.playback", icon: Play },
+  { value: "lyrics", labelKey: "settings.tab.lyrics", icon: Captions },
   { value: "download", labelKey: "settings.tab.download", icon: Download },
   { value: "local", labelKey: "settings.tab.local", icon: HardDrive },
   { value: "cache", labelKey: "settings.tab.cache", icon: Database },
@@ -104,6 +108,10 @@ export function Settings() {
 
           <TabsContent value="playback" className="mt-0 flex-1 min-h-0">
             <PlaybackSettings />
+          </TabsContent>
+
+          <TabsContent value="lyrics" className="mt-0 flex-1 min-h-0">
+            <LyricsSettings />
           </TabsContent>
 
           <TabsContent value="download" className="mt-0 flex-1 min-h-0">
