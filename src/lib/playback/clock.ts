@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { audioPlayer } from "@/lib/audio";
 import { findActiveLyricIndex } from "@/lib/lyrics";
 import type { LyricLine } from "@/types/music";
@@ -15,7 +15,7 @@ export function subscribePlaybackTime(
 }
 
 export function getPlaybackTime(): number {
-  return audioPlayer.getState().currentTime;
+  return audioPlayer.getCurrentTime();
 }
 
 const subscribePlaybackStore = (onStoreChange: () => void): (() => void) =>
@@ -26,8 +26,14 @@ export function usePlaybackTime(): number {
 }
 
 export function usePlaybackLyricIndex(lines: LyricLine[]): number {
-  const getSnapshot = () => findActiveLyricIndex(lines, getPlaybackTime());
-  const getServerSnapshot = () => findActiveLyricIndex(lines, 0);
+  const getSnapshot = useCallback(
+    () => findActiveLyricIndex(lines, getPlaybackTime()),
+    [lines],
+  );
+  const getServerSnapshot = useCallback(
+    () => findActiveLyricIndex(lines, 0),
+    [lines],
+  );
   return useSyncExternalStore(
     subscribePlaybackStore,
     getSnapshot,

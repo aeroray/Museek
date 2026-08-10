@@ -18,6 +18,8 @@ import { useSearchStore } from "@/stores/searchStore";
 import { useT } from "@/lib/i18n";
 import { usePlaybackLyricIndex } from "@/lib/playback/clock";
 import { cn } from "@/lib/utils";
+import { PlaybackKaraokeText } from "@/components/lyrics/KaraokeText";
+import { LyricTransition } from "@/components/lyrics/LyricTransition";
 
 /** Current lyric line for the top bar, or a warm welcome when no song is loaded. */
 function TopBarLyrics() {
@@ -51,16 +53,16 @@ function TopBarLyrics() {
     return <WarmWelcome refreshKey={`${location.pathname}:${searchContext}`} />;
   }
 
+  const activeLine = lyricLines[Math.max(0, currentLyricIndex)]?.text?.trim()
+    ? lyricLines[Math.max(0, currentLyricIndex)]
+    : null;
   let text = "";
-  let muted = true;
   if (lyricsLoading && lyricLines.length === 0) {
     text = t("lyrics.loading");
   } else if (lyricLines.length === 0) {
     text = currentSong.name;
   } else {
-    const idx = Math.max(0, currentLyricIndex);
-    text = lyricLines[idx]?.text?.trim() || currentSong.name;
-    muted = false;
+    text = activeLine?.text.trim() || currentSong.name;
   }
 
   if (!text) {
@@ -83,23 +85,21 @@ function TopBarLyrics() {
       )}
       onPointerDown={startDragging}
     >
-      {/*
-        Plain text only — do NOT mount KaraokeText / LyricTransition here.
-        Truncate + 60fps clip-path karaoke + blur transitions has crashed
-        macOS WKWebView when lyrics load during playback (window looks gone).
-      */}
-      <span
-        key={`${currentSong?.id ?? "none"}-${currentLyricIndex}-${text}`}
-        className={cn(
-          "block max-w-full truncate text-center text-base leading-tight tracking-tight",
-          "animate-in fade-in duration-300",
-          muted
-            ? "text-muted-foreground/70 font-normal"
-            : "text-primary font-medium",
-        )}
+      <LyricTransition
+        transitionKey={`${currentSong.id}-${currentLyricIndex}-${text}`}
+        className="w-full min-w-0"
       >
-        {text}
-      </span>
+        {activeLine ? (
+          <PlaybackKaraokeText
+            line={activeLine}
+            className="top-bar-lyrics-text block w-full min-w-0 truncate text-center text-base leading-tight tracking-tight text-primary font-medium"
+          />
+        ) : (
+          <span className="top-bar-lyrics-text block w-full min-w-0 truncate text-center text-base leading-tight tracking-tight text-muted-foreground/70 font-normal">
+            {text}
+          </span>
+        )}
+      </LyricTransition>
     </div>
   );
 }

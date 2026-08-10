@@ -543,3 +543,34 @@ Use souvlaki 0.8.3 for Now Playing artwork, dispatch macOS media-control updates
 
 Reason:
 Older souvlaki versions passed a raw NSURL into an asynchronous artwork task, while WebView animation frames can be throttled when the window is hidden or deprioritized. The newer dependency removes the URL lifetime hazard, main-thread dispatch protects AppKit state updates, and the media event fallback keeps lyrics advancing.
+
+## 2026-08-10 - Cache the React playback-clock snapshot
+
+Decision:
+Treat the audio element's current time as an external-store value that changes
+only when the audio event or animation-frame clock emits an update. Do not read
+the continuously advancing HTMLAudioElement.currentTime directly from
+useSyncExternalStore snapshots, and do not invoke a listener synchronously while
+it is being subscribed.
+
+Reason:
+React 19 compares external-store snapshots during passive effects. A live media
+element currentTime can change between those reads without a corresponding store
+notification, so playback caused repeated forceStoreRerender calls and the
+maximum update depth error that made the macOS WKWebView appear to disappear.
+Caching the value at the clock boundary keeps the snapshot stable between
+notifications while preserving smooth lyric and progress updates.
+
+## 2026-08-10 - Keep macOS icon artwork inside a safe margin
+
+Decision:
+Keep a 10% transparent margin on each side of the desktop icon artwork and
+regenerate the Tauri PNG sizes and macOS ICNS together. Keep platform-specific
+mobile and Windows icon assets independent unless their visual treatment also
+needs to change.
+
+Reason:
+An opaque black canvas reaching every edge has more visual weight in the macOS
+Dock than neighboring icons with inset artwork. The Tauri configuration uses
+the ICNS resource for macOS, so changing only a source PNG would not reliably
+update the installed application icon.

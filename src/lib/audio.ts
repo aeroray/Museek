@@ -19,6 +19,7 @@ class AudioPlayer {
   private onStateChange: AudioCallback | null = null;
   private onEnded: EndedCallback | null = null;
   private onError: ErrorCallback | null = null;
+  private currentTime = 0;
   /** Smooth clock listeners (rAF while playing). */
   private timeListeners = new Set<TimeCallback>();
   private timeRaf = 0;
@@ -32,7 +33,10 @@ class AudioPlayer {
   }
 
   private bindEvents() {
-    const notify = () => this.onStateChange?.(this.getState());
+    const notify = () => {
+      this.readCurrentTime();
+      this.onStateChange?.(this.getState());
+    };
 
     this.audio.addEventListener("play", () => {
       notify();
@@ -62,9 +66,15 @@ class AudioPlayer {
     });
   }
 
+  private readCurrentTime(): number {
+    const currentTime = this.audio.currentTime;
+    this.currentTime = Number.isFinite(currentTime) ? currentTime : 0;
+    return this.currentTime;
+  }
+
   private emitTime() {
-    const t = this.audio.currentTime;
-    for (const cb of this.timeListeners) cb(t);
+    const currentTime = this.readCurrentTime();
+    for (const cb of this.timeListeners) cb(currentTime);
   }
 
   private startSmoothClock() {
@@ -92,7 +102,6 @@ class AudioPlayer {
    */
   subscribeTime(cb: TimeCallback): () => void {
     this.timeListeners.add(cb);
-    cb(this.audio.currentTime);
     if (!this.audio.paused && !this.audio.ended) this.startSmoothClock();
     return () => {
       this.timeListeners.delete(cb);
@@ -111,6 +120,7 @@ class AudioPlayer {
   }
 
   setSource(url: string) {
+    this.currentTime = 0;
     this.audio.src = url;
     this.audio.load();
   }
@@ -129,6 +139,7 @@ class AudioPlayer {
     this.audio.pause();
     this.audio.removeAttribute("src");
     this.audio.load();
+    this.currentTime = 0;
     this.stopSmoothClock();
   }
 
@@ -159,12 +170,16 @@ class AudioPlayer {
   getState(): AudioState {
     return {
       isPlaying: !this.audio.paused && !this.audio.ended,
-      currentTime: this.audio.currentTime,
+      currentTime: this.currentTime,
       duration: this.audio.duration || 0,
       volume: this.audio.volume,
       muted: this.audio.muted,
       status: this.resolveStatus(),
     };
+  }
+
+  getCurrentTime(): number {
+    return this.currentTime;
   }
 }
 
