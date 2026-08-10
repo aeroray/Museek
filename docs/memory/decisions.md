@@ -487,3 +487,19 @@ Keep the available low-resolution song thumbnail visible immediately on the lyri
 
 Reason:
 The player already has a usable thumbnail when the lyrics page opens. Keeping it visible avoids an empty cover during the first high-resolution request and makes the quality upgrade feel continuous rather than abrupt.
+
+## 2026-08-10 - Invalidate stale search results when the search context changes
+
+Decision:
+Treat a search request's query, platform, and scope as one context. Increment the search generation whenever a new search, scope/platform switch, platform jump, or clear action occurs, and ignore responses from older contexts. Recreate the result scroll surface when switching between songs and collections.
+
+Reason:
+Song, playlist, and album requests can finish in a different order from the user's clicks. Invalidating older responses and separating the result surface prevents stale song rows from surviving a scope switch while keeping the active search state authoritative.
+
+## 2026-08-10 - Keep the lyrics font gesture permanently discoverable
+
+Decision:
+Keep a small, low-contrast hint permanently at both the beginning and end of the lyric scroll content. Use friendly, conversational platform-specific Ctrl/Command plus wheel wording, keep both copies at a fixed 12px size independent of lyric scaling, and include the shortcut in the font button titles as a persistent zero-visual-cost fallback.
+
+Reason:
+The gesture needs discoverability, but a banner or centered toast would compete with lyric reading. Placing the cue at the natural start and end boundaries of the lyrics makes it available without competing with the active line or adding another control-surface annotation.

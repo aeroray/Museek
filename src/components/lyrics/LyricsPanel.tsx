@@ -192,6 +192,9 @@ export function LyricsPanel() {
 
   if (!rendered) return null;
 
+  const fontShortcut = t(
+    isMacOs() ? "lyrics.fontShortcutMac" : "lyrics.fontShortcutCtrl",
+  );
   const setScale = (v: number) => {
     const nextScale = clampLyricFontScale(v, MAIN_FONT_POLICY);
     fontScaleRef.current = nextScale;
@@ -326,26 +329,28 @@ export function LyricsPanel() {
             {immersive ? <Minimize size={18} /> : <Maximize size={18} />}
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-increase"
-          onClick={inc}
-          disabled={fontScale >= FONT_MAX}
-          title={t("lyrics.fontIncrease")}
-        >
-          <AArrowUp size={20} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-decrease"
-          onClick={dec}
-          disabled={fontScale <= FONT_MIN}
-          title={t("lyrics.fontDecrease")}
-        >
-          <AArrowDown size={20} />
-        </Button>
+        <div className="relative flex flex-col items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-increase"
+            onClick={inc}
+            disabled={fontScale >= FONT_MAX}
+            title={t("lyrics.fontIncrease", { shortcut: fontShortcut })}
+          >
+            <AArrowUp size={20} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-decrease"
+            onClick={dec}
+            disabled={fontScale <= FONT_MIN}
+            title={t("lyrics.fontDecrease", { shortcut: fontShortcut })}
+          >
+            <AArrowDown size={20} />
+          </Button>
+        </div>
         <DownloadSongButton
           song={currentSong}
           className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
@@ -454,6 +459,9 @@ export function LyricsPanel() {
                   lyricsOnly ? "px-4" : "pl-4 pr-24",
                 )}
               >
+                <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
+                  {t("lyrics.fontHint", { shortcut: fontShortcut })}
+                </p>
                 {lyricLines.map((line, i) => {
                   const active = i === currentLyricIndex;
                   return (
@@ -487,6 +495,9 @@ export function LyricsPanel() {
                     </div>
                   );
                 })}
+                <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
+                  {t("lyrics.fontHint", { shortcut: fontShortcut })}
+                </p>
               </div>
             </ScrollArea>
           )}
