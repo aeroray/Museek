@@ -17,6 +17,74 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.0.0": {
+    zh: {
+      sections: [
+        {
+          title: "🖥️ 桌面歌词",
+          bullets: [
+            "新增始终置顶的桌面歌词浮窗，可在其他应用工作时显示当前歌词",
+            "播放栏或 Ctrl/⌘ + L 开关；Ctrl/⌘ + Shift + L 锁定 / 解锁（未聚焦也可用）",
+            "可拖动位置、Ctrl/⌘ + 滚轮调字号；支持胶囊底与「设置 → 歌词」选项",
+            "有逐字时间轴时按主题色做卡拉 OK 填色",
+          ],
+        },
+        {
+          title: "🎤 歌词体验",
+          bullets: [
+            "优先使用各平台原生逐字歌词（YRC / QRC / KRC / MRC 等），跟唱更贴人声",
+            "主歌词页支持「歌词独享」布局，以及 Ctrl/⌘ + 滚轮调字号",
+          ],
+        },
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "每首歌可单独选择：智能识别歌名，或保留原文件名（跳过在线改写）",
+          ],
+        },
+        {
+          title: "🔍 搜索",
+          bullets: [
+            "切换平台或类型时不再残留上一次请求的旧结果",
+            "咪咕搜索失败时自动回退，更稳定",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🖥️ Desktop lyrics",
+          bullets: [
+            "Always-on-top desktop lyrics overlay so you can follow along while using other apps",
+            "Toggle from the player bar or with Ctrl/⌘ + L; lock/unlock with Ctrl/⌘ + Shift + L (works unfocused)",
+            "Drag to move, Ctrl/⌘ + scroll to resize; optional capsule background and Settings → Lyrics options",
+            "Theme-colored karaoke fill when word timings are available",
+          ],
+        },
+        {
+          title: "🎤 Lyrics",
+          bullets: [
+            "Prefer platform-native word timing (YRC / QRC / KRC / MRC, and more) for tighter karaoke",
+            "Lyrics-only layout in the main lyrics view, plus Ctrl/⌘ + scroll font scaling",
+          ],
+        },
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Per-track title mode: smart recognition, or keep the original filename (skip online rewrite)",
+          ],
+        },
+        {
+          title: "🔍 Search",
+          bullets: [
+            "Switching platform or result type no longer leaves stale rows from the previous request",
+            "More reliable Migu search with automatic fallback",
+          ],
+        },
+      ],
+    },
+  },
   "2.5.3": {
     zh: {
       sections: [
