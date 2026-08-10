@@ -464,6 +464,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "download.concurrencyDesc": "同时下载几首歌（最多 5 首）。",
     "download.namingTitle": "文件命名",
     "download.namingDesc": "下载文件的命名方式。",
+    "download.embedLyricsTitle": "内嵌歌词",
+    "download.embedLyricsDesc": "将可用的 LRC 歌词写入下载文件。",
+    "download.embedCoverTitle": "内嵌封面",
+    "download.embedCoverDesc": "将可用的专辑封面写入下载文件。",
     "download.deleteFilesTitle": "删除任务时同时删除文件",
     "download.deleteFilesDesc": "关闭时只删下载记录，不删文件（默认）。",
     "naming.singer-name": "歌手 - 歌名",
@@ -473,6 +477,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "download.qualityDowngraded": "「{name}」已改用「{quality}」",
     "download.added": "已加入下载：{name}",
     "download.complete": "下载完成：{name}",
+    "download.completeMetadataWarning":
+      "下载完成，但部分元数据未写入：{name}（{details}）",
+    "download.metadataLyrics": "歌词",
+    "download.metadataCover": "封面",
+    "download.metadataWrite": "标签",
     "download.openFolder": "打开下载目录",
     "download.openFolderFailed": "打开下载目录失败：{msg}",
 
@@ -1034,6 +1043,12 @@ const dict: Record<Lang, Record<string, string>> = {
     "download.concurrencyDesc": "How many songs to download at once (up to 5).",
     "download.namingTitle": "File naming",
     "download.namingDesc": "How downloaded files are named.",
+    "download.embedLyricsTitle": "Embed lyrics",
+    "download.embedLyricsDesc":
+      "Write available LRC lyrics into downloaded files.",
+    "download.embedCoverTitle": "Embed cover art",
+    "download.embedCoverDesc":
+      "Write available album artwork into downloaded files.",
     "download.deleteFilesTitle": "Also delete files when removing tasks",
     "download.deleteFilesDesc":
       "Off (default): remove the download record only, keep the file.",
@@ -1044,6 +1059,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "download.qualityDowngraded": "“{name}” using “{quality}” instead",
     "download.added": "Added to downloads: {name}",
     "download.complete": "Download complete: {name}",
+    "download.completeMetadataWarning":
+      "Download complete, but some metadata was not written: {name} ({details})",
+    "download.metadataLyrics": "lyrics",
+    "download.metadataCover": "cover art",
+    "download.metadataWrite": "tags",
     "download.openFolder": "Open download folder",
     "download.openFolderFailed": "Failed to open folder: {msg}",
 

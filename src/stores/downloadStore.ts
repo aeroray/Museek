@@ -1,76 +1,202 @@
-import { create } from "zustand"
-import { cdnHeadersForUrl } from "@/lib/cdnHeaders"
-import { httpFetch as tauriFetch } from "@/lib/http"
-import { writeFile } from "@tauri-apps/plugin-fs"
-import type { MusicInfo, Quality } from "@/types/music"
-import { resolveAdaptiveUrl } from "@/lib/playback"
-import { notify, promptDownloadLocation } from "@/lib/notify"
-import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore"
-import { readData, writeData } from "@/lib/db"
-import { t } from "@/lib/i18n"
+import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
+import { cdnHeadersForUrl } from "@/lib/cdnHeaders";
+import { hiResCover } from "@/lib/cover";
+import { httpFetch as tauriFetch } from "@/lib/http";
+import { writeFile } from "@tauri-apps/plugin-fs";
+import type { MusicInfo, Quality } from "@/types/music";
+import { resolveAdaptiveUrl } from "@/lib/playback";
+import { notify, promptDownloadLocation } from "@/lib/notify";
+import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore";
+import { readData, writeData } from "@/lib/db";
+import { t } from "@/lib/i18n";
+import { loadLyricInfo } from "@/lib/lyric/loadLyric";
+import { sourceRunner } from "@/lib/sourceRunner";
 
-export type DownloadStatus = "waiting" | "downloading" | "completed" | "error"
+export type DownloadStatus = "waiting" | "downloading" | "completed" | "error";
 
 export interface DownloadTask {
-  id: string
-  song: MusicInfo
-  quality: Quality
-  status: DownloadStatus
-  progress: number
-  error?: string
+  id: string;
+  song: MusicInfo;
+  quality: Quality;
+  embedLyrics: boolean;
+  embedCover: boolean;
+  status: DownloadStatus;
+  progress: number;
+  error?: string;
   /** Absolute path written on disk when completed (used if delete-with-task is on). */
-  filePath?: string
+  filePath?: string;
 }
 
 interface DownloadState {
-  tasks: DownloadTask[]
-  addTask: (song: MusicInfo, quality?: Quality) => void
-  removeTask: (id: string) => void
-  removeTasks: (ids: string[]) => void
-  clearCompleted: () => void
-  startTask: (id: string) => Promise<void>
-  updateProgress: (id: string, progress: number) => void
-  updateStatus: (id: string, status: DownloadStatus, error?: string) => void
+  tasks: DownloadTask[];
+  addTask: (song: MusicInfo, quality?: Quality) => void;
+  removeTask: (id: string) => void;
+  removeTasks: (ids: string[]) => void;
+  clearCompleted: () => void;
+  startTask: (id: string) => Promise<void>;
+  updateProgress: (id: string, progress: number) => void;
+  updateStatus: (id: string, status: DownloadStatus, error?: string) => void;
   // Start queued tasks up to the configured concurrency limit.
-  _pump: () => void
+  _pump: () => void;
   /** Device-local history (not synced). Restores queue across restarts. */
-  loadFromDisk: () => Promise<void>
+  loadFromDisk: () => Promise<void>;
 }
 
-const STORE_FILE = "downloads.json"
-const STATUSES: DownloadStatus[] = ["waiting", "downloading", "completed", "error"]
-const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
+type DownloadTaskSnapshot = Omit<DownloadTask, "embedLyrics" | "embedCover"> & {
+  embedLyrics?: boolean;
+  embedCover?: boolean;
+};
+
+const STORE_FILE = "downloads.json";
+const STATUSES: DownloadStatus[] = [
+  "waiting",
+  "downloading",
+  "completed",
+  "error",
+];
+const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"];
 
 function sanitize(s: string): string {
-  return s.replace(/[/\\:*?"<>|]/g, "_").trim()
+  return s.replace(/[/\\:*?"<>|]/g, "_").trim();
 }
 
-function buildFilename(song: MusicInfo, scheme: NamingScheme, ext: string): string {
-  const name = sanitize(song.name)
-  const singer = sanitize(song.singer)
-  let base: string
+function buildFilename(
+  song: MusicInfo,
+  scheme: NamingScheme,
+  ext: string,
+): string {
+  const name = sanitize(song.name);
+  const singer = sanitize(song.singer);
+  let base: string;
   switch (scheme) {
     case "name-singer":
-      base = singer ? `${name} - ${singer}` : name
-      break
+      base = singer ? `${name} - ${singer}` : name;
+      break;
     case "name":
-      base = name
-      break
+      base = name;
+      break;
     case "singer-name":
     default:
-      base = singer ? `${singer} - ${name}` : name
+      base = singer ? `${singer} - ${name}` : name;
   }
-  return `${base || "audio"}.${ext}`
+  return `${base || "audio"}.${ext}`;
 }
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+type DownloadCover = { bytes: Uint8Array };
+
+const MAX_DOWNLOAD_COVER_BYTES = 10 * 1024 * 1024;
+
+function startsWithBytes(bytes: Uint8Array, prefix: number[]): boolean {
+  return prefix.every((value, index) => bytes[index] === value);
+}
+
+function detectCoverMimeType(bytes: Uint8Array): string | null {
+  if (startsWithBytes(bytes, [0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (startsWithBytes(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    return "image/png";
+  if (
+    startsWithBytes(bytes, [0x52, 0x49, 0x46, 0x46]) &&
+    startsWithBytes(bytes.slice(8), [0x57, 0x45, 0x42, 0x50])
+  )
+    return "image/webp";
+  if (
+    startsWithBytes(bytes, [0x47, 0x49, 0x46, 0x38]) &&
+    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
+    bytes[5] === 0x61
+  )
+    return "image/gif";
+  if (startsWithBytes(bytes, [0x42, 0x4d])) return "image/bmp";
+  return null;
+}
+
+async function fetchDownloadCover(
+  song: MusicInfo,
+): Promise<DownloadCover | null> {
+  const sourceUrl =
+    song.meta.picUrl ||
+    (await sourceRunner.getPic({
+      source: song.source,
+      action: "pic",
+      info: song,
+    }));
+  const url = hiResCover(sourceUrl, song.source);
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: cdnHeadersForUrl(url),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (!bytes.length) throw new Error("Empty cover response");
+  if (bytes.byteLength > MAX_DOWNLOAD_COVER_BYTES)
+    throw new Error("Cover is too large");
+  const mimeType = detectCoverMimeType(bytes);
+  if (!mimeType) throw new Error("Invalid cover response");
+  return { bytes };
+}
+
+async function embedMetadataForTask(
+  task: DownloadTask,
+  filePath: string,
+): Promise<string[]> {
+  if (!isTauri || (task.embedLyrics === false && task.embedCover === false))
+    return [];
+
+  const lyricPromise =
+    task.embedLyrics === false
+      ? Promise.resolve(null)
+      : loadLyricInfo(task.song);
+  const coverPromise =
+    task.embedCover === false
+      ? Promise.resolve(null)
+      : fetchDownloadCover(task.song);
+  const [lyricResult, coverResult] = await Promise.allSettled([
+    lyricPromise,
+    coverPromise,
+  ]);
+  const warnings: string[] = [];
+  let lyrics: string | null = null;
+  let cover: DownloadCover | null = null;
+
+  if (lyricResult.status === "fulfilled") {
+    lyrics =
+      lyricResult.value?.lyric?.trim() ||
+      lyricResult.value?.lxlyric?.trim() ||
+      null;
+  } else {
+    warnings.push(t("download.metadataLyrics"));
+  }
+  if (coverResult.status === "fulfilled") {
+    cover = coverResult.value;
+  } else {
+    warnings.push(t("download.metadataCover"));
+  }
+
+  try {
+    await invoke("embed_download_metadata", {
+      path: filePath,
+      title: task.song.name,
+      artist: task.song.singer,
+      album: task.song.albumName,
+      lyrics,
+      cover: cover ? Array.from(cover.bytes) : null,
+    });
+  } catch {
+    warnings.push(t("download.metadataWrite"));
+  }
+  return warnings;
+}
+
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 async function deleteFileIfNeeded(filePath: string | undefined) {
-  if (!filePath || !isTauri) return
-  if (!useSettingsStore.getState().deleteDownloadFiles) return
+  if (!filePath || !isTauri) return;
+  if (!useSettingsStore.getState().deleteDownloadFiles) return;
   try {
-    const { remove, exists } = await import("@tauri-apps/plugin-fs")
-    if (await exists(filePath)) await remove(filePath)
+    const { remove, exists } = await import("@tauri-apps/plugin-fs");
+    if (await exists(filePath)) await remove(filePath);
   } catch {
     /* ignore — task still removed from the list */
   }
@@ -78,12 +204,12 @@ async function deleteFileIfNeeded(filePath: string | undefined) {
 
 function persist(tasks: DownloadTask[]) {
   // Device-local only — deliberately excluded from config sync (see configIO DB_FILES).
-  writeData(STORE_FILE, tasks)
+  writeData(STORE_FILE, tasks);
 }
 
-function isTask(v: unknown): v is DownloadTask {
-  if (!v || typeof v !== "object") return false
-  const t = v as DownloadTask
+function isTask(v: unknown): v is DownloadTaskSnapshot {
+  if (!v || typeof v !== "object") return false;
+  const t = v as DownloadTaskSnapshot;
   return (
     typeof t.id === "string" &&
     !!t.song &&
@@ -91,8 +217,18 @@ function isTask(v: unknown): v is DownloadTask {
     typeof t.song.name === "string" &&
     QUALITIES.includes(t.quality) &&
     STATUSES.includes(t.status) &&
-    typeof t.progress === "number"
-  )
+    typeof t.progress === "number" &&
+    (t.embedLyrics === undefined || typeof t.embedLyrics === "boolean") &&
+    (t.embedCover === undefined || typeof t.embedCover === "boolean")
+  );
+}
+
+function normalizeTask(task: DownloadTaskSnapshot): DownloadTask {
+  return {
+    ...task,
+    embedLyrics: task.embedLyrics ?? true,
+    embedCover: task.embedCover ?? true,
+  };
 }
 
 export const useDownloadStore = create<DownloadState>((set, get) => ({
@@ -102,170 +238,217 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     // No download location set yet → prompt the user (with a shortcut to Settings)
     // instead of silently saving somewhere. downloadDir is a device-local setting.
     if (!useSettingsStore.getState().downloadDir) {
-      promptDownloadLocation()
-      return
+      promptDownloadLocation();
+      return;
     }
-    const q = quality ?? useSettingsStore.getState().downloadQuality
+    const { downloadQuality, embedLyrics, embedCover } =
+      useSettingsStore.getState();
+    const q = quality ?? downloadQuality;
     const task: DownloadTask = {
       id: `dl_${Date.now()}_${song.id}`,
       song,
       quality: q,
+      embedLyrics,
+      embedCover,
       status: "waiting",
       progress: 0,
-    }
+    };
     set((s) => {
-      const tasks = [...s.tasks, task]
-      persist(tasks)
-      return { tasks }
-    })
-    notify({ message: t("download.added", { name: song.name }), variant: "success" })
-    get()._pump()
+      const tasks = [...s.tasks, task];
+      persist(tasks);
+      return { tasks };
+    });
+    notify({
+      message: t("download.added", { name: song.name }),
+      variant: "success",
+    });
+    get()._pump();
   },
 
   removeTask(id) {
-    const task = get().tasks.find((t) => t.id === id)
-    void deleteFileIfNeeded(task?.filePath)
+    const task = get().tasks.find((t) => t.id === id);
+    void deleteFileIfNeeded(task?.filePath);
     set((s) => {
-      const tasks = s.tasks.filter((t) => t.id !== id)
-      persist(tasks)
-      return { tasks }
-    })
-    get()._pump()
+      const tasks = s.tasks.filter((t) => t.id !== id);
+      persist(tasks);
+      return { tasks };
+    });
+    get()._pump();
   },
 
   removeTasks(ids) {
-    const idSet = new Set(ids)
-    const toDelete = get().tasks.filter((t) => idSet.has(t.id))
-    for (const task of toDelete) void deleteFileIfNeeded(task.filePath)
+    const idSet = new Set(ids);
+    const toDelete = get().tasks.filter((t) => idSet.has(t.id));
+    for (const task of toDelete) void deleteFileIfNeeded(task.filePath);
     set((s) => {
-      const tasks = s.tasks.filter((t) => !idSet.has(t.id))
-      persist(tasks)
-      return { tasks }
-    })
-    get()._pump()
+      const tasks = s.tasks.filter((t) => !idSet.has(t.id));
+      persist(tasks);
+      return { tasks };
+    });
+    get()._pump();
   },
 
   clearCompleted() {
-    const done = get().tasks.filter((t) => t.status === "completed")
-    for (const task of done) void deleteFileIfNeeded(task.filePath)
+    const done = get().tasks.filter((t) => t.status === "completed");
+    for (const task of done) void deleteFileIfNeeded(task.filePath);
     set((s) => {
-      const tasks = s.tasks.filter((t) => t.status !== "completed")
-      persist(tasks)
-      return { tasks }
-    })
+      const tasks = s.tasks.filter((t) => t.status !== "completed");
+      persist(tasks);
+      return { tasks };
+    });
   },
 
   updateProgress(id, progress) {
     // Progress ticks are frequent — keep them in memory only; status changes persist.
-    set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, progress } : t)) }))
+    set((s) => ({
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, progress } : t)),
+    }));
   },
 
   updateStatus(id, status, error) {
     set((s) => {
-      const tasks = s.tasks.map((t) => (t.id === id ? { ...t, status, error } : t))
-      persist(tasks)
-      return { tasks }
-    })
+      const tasks = s.tasks.map((t) =>
+        t.id === id ? { ...t, status, error } : t,
+      );
+      persist(tasks);
+      return { tasks };
+    });
   },
 
   _pump() {
-    const { maxConcurrent } = useSettingsStore.getState()
+    const { maxConcurrent } = useSettingsStore.getState();
     // startTask flips a task to "downloading" synchronously (before its first
     // await), so this loop can fill all free slots in one pass.
     for (;;) {
-      const running = get().tasks.filter((t) => t.status === "downloading").length
-      if (running >= maxConcurrent) break
-      const next = get().tasks.find((t) => t.status === "waiting")
-      if (!next) break
-      void get().startTask(next.id)
+      const running = get().tasks.filter(
+        (t) => t.status === "downloading",
+      ).length;
+      if (running >= maxConcurrent) break;
+      const next = get().tasks.find((t) => t.status === "waiting");
+      if (!next) break;
+      void get().startTask(next.id);
     }
   },
 
   async loadFromDisk() {
-    const raw = await readData<unknown>(STORE_FILE, [])
-    const list = Array.isArray(raw) ? raw.filter(isTask) : []
-    const interrupted = list.some((task) => task.status === "downloading")
+    const raw = await readData<unknown>(STORE_FILE, []);
+    const list = Array.isArray(raw)
+      ? raw.filter(isTask).map(normalizeTask)
+      : [];
+    const interrupted = list.some((task) => task.status === "downloading");
     // Interrupted mid-download → re-queue so _pump can finish them after launch.
     const tasks = list.map((task) =>
       task.status === "downloading"
         ? { ...task, status: "waiting" as const, progress: 0, error: undefined }
-        : task
-    )
-    set({ tasks })
-    if (interrupted) persist(tasks)
-    get()._pump()
+        : task,
+    );
+    set({ tasks });
+    if (interrupted) persist(tasks);
+    get()._pump();
   },
 
   async startTask(id) {
-    const task = get().tasks.find((t) => t.id === id)
-    if (!task || task.status === "downloading" || task.status === "completed") return
+    const task = get().tasks.find((t) => t.id === id);
+    if (!task || task.status === "downloading" || task.status === "completed")
+      return;
 
-    get().updateStatus(id, "downloading")
-    get().updateProgress(id, 0)
+    get().updateStatus(id, "downloading");
+    get().updateProgress(id, 0);
     try {
       // Resolve URL with auto-downgrade; tell the user if the quality stepped down.
-      const { url, quality: actual } = await resolveAdaptiveUrl(task.song, task.quality)
+      const { url, quality: actual } = await resolveAdaptiveUrl(
+        task.song,
+        task.quality,
+      );
       if (actual !== task.quality) {
         set((s) => {
-          const tasks = s.tasks.map((t) => (t.id === id ? { ...t, quality: actual } : t))
-          persist(tasks)
-          return { tasks }
-        })
+          const tasks = s.tasks.map((t) =>
+            t.id === id ? { ...t, quality: actual } : t,
+          );
+          persist(tasks);
+          return { tasks };
+        });
         notify({
-          message: t("download.qualityDowngraded", { name: task.song.name, quality: t(`quality.${actual}`) }),
+          message: t("download.qualityDowngraded", {
+            name: task.song.name,
+            quality: t(`quality.${actual}`),
+          }),
           variant: "info",
-        })
+        });
       }
 
-      const res = await tauriFetch(url, { method: "GET", headers: cdnHeadersForUrl(url) })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const res = await tauriFetch(url, {
+        method: "GET",
+        headers: cdnHeadersForUrl(url),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const contentLength = parseInt(res.headers.get("content-length") || "0")
-      const reader = res.body?.getReader()
-      if (!reader) throw new Error("No response body")
+      const contentLength = parseInt(res.headers.get("content-length") || "0");
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
 
-      const chunks: Uint8Array[] = []
-      let received = 0
+      const chunks: Uint8Array[] = [];
+      let received = 0;
 
       while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        chunks.push(value)
-        received += value.length
-        if (contentLength > 0) get().updateProgress(id, Math.round((received / contentLength) * 100))
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (contentLength > 0)
+          get().updateProgress(
+            id,
+            Math.round((received / contentLength) * 100),
+          );
       }
 
       // Merge chunks
-      const total = chunks.reduce((s, c) => s + c.length, 0)
-      const merged = new Uint8Array(total)
-      let offset = 0
+      const total = chunks.reduce((s, c) => s + c.length, 0);
+      const merged = new Uint8Array(total);
+      let offset = 0;
       for (const c of chunks) {
-        merged.set(c, offset)
-        offset += c.length
+        merged.set(c, offset);
+        offset += c.length;
       }
 
-      const ext = actual === "flac" || actual === "flac24bit" ? "flac" : "mp3"
-      const { downloadDir, fileNaming } = useSettingsStore.getState()
+      const ext = actual === "flac" || actual === "flac24bit" ? "flac" : "mp3";
+      const { downloadDir, fileNaming } = useSettingsStore.getState();
       // Guarded at addTask, but a queued task could outlive the user clearing it.
-      if (!downloadDir) throw new Error(t("download.noLocationError"))
-      const filename = buildFilename(task.song, fileNaming, ext)
-      const dir = downloadDir.replace(/[/\\]+$/, "")
-      const filePath = `${dir}/${filename}`
-      await writeFile(filePath, merged)
+      if (!downloadDir) throw new Error(t("download.noLocationError"));
+      const filename = buildFilename(task.song, fileNaming, ext);
+      const dir = downloadDir.replace(/[/\\]+$/, "");
+      const filePath = `${dir}/${filename}`;
+      await writeFile(filePath, merged);
+      const metadataWarnings = await embedMetadataForTask(task, filePath);
 
       set((s) => {
         const tasks = s.tasks.map((t) =>
-          t.id === id ? { ...t, status: "completed" as const, progress: 100, filePath } : t
-        )
-        persist(tasks)
-        return { tasks }
-      })
-      notify({ message: t("download.complete", { name: task.song.name }), variant: "success" })
+          t.id === id
+            ? { ...t, status: "completed" as const, progress: 100, filePath }
+            : t,
+        );
+        persist(tasks);
+        return { tasks };
+      });
+      if (metadataWarnings.length) {
+        notify({
+          message: t("download.completeMetadataWarning", {
+            name: task.song.name,
+            details: metadataWarnings.join(", "),
+          }),
+          variant: "info",
+        });
+      } else {
+        notify({
+          message: t("download.complete", { name: task.song.name }),
+          variant: "success",
+        });
+      }
     } catch (err) {
-      get().updateStatus(id, "error", (err as Error).message)
+      get().updateStatus(id, "error", (err as Error).message);
     } finally {
       // Free slot → kick off the next queued task.
-      get()._pump()
+      get()._pump();
     }
   },
-}))
+}));

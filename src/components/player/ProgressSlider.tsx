@@ -36,7 +36,7 @@ export function ProgressSlider({ className }: { className?: string }) {
     );
   }, [playbackTime, status, scrubbing]);
 
-  const time = scrubTime ?? displayTime;
+  const time = scrubTime ?? (status === "playing" ? playbackTime : displayTime);
   const pct =
     duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0;
 

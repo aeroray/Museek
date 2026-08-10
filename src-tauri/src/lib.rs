@@ -1,9 +1,175 @@
+use lofty::config::WriteOptions;
+use lofty::file::{AudioFile, FileType, TaggedFileExt};
+use lofty::picture::{MimeType, Picture, PictureType};
+use lofty::tag::{Accessor, ItemKey, Tag, TagType};
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_fs::FsExt;
+
+const MAX_EMBEDDED_COVER_BYTES: usize = 10 * 1024 * 1024;
+
+fn detect_cover_mime_type(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        return Some("image/jpeg");
+    }
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Some("image/png");
+    }
+    if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+        return Some("image/webp");
+    }
+    if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        return Some("image/gif");
+    }
+    if bytes.starts_with(b"BM") {
+        return Some("image/bmp");
+    }
+    None
+}
+
+fn metadata_temp_path(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("audio");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    path.with_file_name(format!(
+        ".{file_name}.museek-meta-{}-{nonce}.tmp",
+        std::process::id()
+    ))
+}
+
+fn replace_metadata_file(temp_path: &Path, target_path: &Path) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use windows::core::PCWSTR;
+        use windows::Win32::Storage::FileSystem::{ReplaceFileW, REPLACE_FILE_FLAGS};
+
+        let target = target_path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        let temp = temp_path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        unsafe {
+            ReplaceFileW(
+                PCWSTR(target.as_ptr()),
+                PCWSTR(temp.as_ptr()),
+                PCWSTR::null(),
+                REPLACE_FILE_FLAGS(0),
+                None,
+                None,
+            )
+            .map_err(|error| std::io::Error::other(error.to_string()))
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        fs::rename(temp_path, target_path)
+    }
+}
+
+#[tauri::command]
+fn embed_download_metadata(
+    path: String,
+    title: String,
+    artist: String,
+    album: String,
+    lyrics: Option<String>,
+    cover: Option<Vec<u8>>,
+) -> Result<(), String> {
+    let cover = cover.filter(|bytes| !bytes.is_empty());
+    let cover_mime = if let Some(bytes) = cover.as_deref() {
+        if bytes.len() > MAX_EMBEDDED_COVER_BYTES {
+            return Err("Cover image is too large".to_string());
+        }
+        Some(detect_cover_mime_type(bytes).ok_or_else(|| "Invalid cover image".to_string())?)
+    } else {
+        None
+    };
+
+    let target_path = Path::new(&path);
+    let temp_path = metadata_temp_path(target_path);
+    if let Err(error) = fs::copy(target_path, &temp_path) {
+        let _ = fs::remove_file(&temp_path);
+        return Err(error.to_string());
+    }
+
+    let result = (|| -> Result<(), String> {
+        let mut tagged_file =
+            lofty::read_from_path(&temp_path).map_err(|error| error.to_string())?;
+        if !matches!(tagged_file.file_type(), FileType::Mpeg | FileType::Flac) {
+            return Err("Only MP3 and FLAC downloads support embedded metadata".to_string());
+        }
+
+        let tag_type = tagged_file.primary_tag_type();
+        if tagged_file.primary_tag().is_none() {
+            if !tagged_file.tag_support(tag_type).is_writable() {
+                return Err("The audio format does not support writable metadata".to_string());
+            }
+            tagged_file.insert_tag(Tag::new(tag_type));
+        }
+
+        let tag = tagged_file
+            .primary_tag_mut()
+            .ok_or_else(|| "Could not create the audio metadata tag".to_string())?;
+        if !title.trim().is_empty() {
+            tag.set_title(title);
+        }
+        if !artist.trim().is_empty() {
+            tag.set_artist(artist);
+        }
+        if !album.trim().is_empty() {
+            tag.set_album(album);
+        }
+        if let Some(lyrics) = lyrics.filter(|value| !value.trim().is_empty()) {
+            let lyric_key = if tag_type == TagType::Id3v2 {
+                ItemKey::UnsyncLyrics
+            } else {
+                ItemKey::Lyrics
+            };
+            if !tag.insert_text(lyric_key, lyrics) {
+                return Err("Could not write embedded lyrics".to_string());
+            }
+        }
+        if let Some(cover) = cover {
+            let mime = cover_mime.ok_or_else(|| "Invalid cover image".to_string())?;
+            tag.remove_picture_type(PictureType::CoverFront);
+            tag.push_picture(
+                Picture::unchecked(cover)
+                    .pic_type(PictureType::CoverFront)
+                    .mime_type(MimeType::from_str(mime))
+                    .build(),
+            );
+        }
+
+        tagged_file
+            .save_to_path(&temp_path, WriteOptions::default())
+            .map_err(|error| error.to_string())?;
+        fs::File::open(&temp_path)
+            .and_then(|file| file.sync_all())
+            .map_err(|error| error.to_string())?;
+        replace_metadata_file(&temp_path, target_path).map_err(|error| error.to_string())
+    })();
+
+    let _ = fs::remove_file(&temp_path);
+    result
+}
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod update_race;
@@ -20,49 +186,60 @@ unsafe impl Sync for MediaState {}
 #[tauri::command]
 fn media_update(
     app: tauri::AppHandle,
-    state: tauri::State<'_, MediaState>,
     title: String,
     artist: String,
     album: String,
     cover: Option<String>,
     playing: bool,
 ) {
-    if let Ok(mut guard) = state.0.lock() {
-        if let Some(controls) = guard.as_mut() {
-            let _ = controls.set_metadata(MediaMetadata {
-                title: Some(&title),
-                artist: Some(&artist),
-                album: Some(&album),
-                cover_url: cover.as_deref(),
-                ..Default::default()
-            });
-            let _ = controls.set_playback(if playing {
-                MediaPlayback::Playing { progress: None }
-            } else {
-                MediaPlayback::Paused { progress: None }
-            });
+    let handle = app.clone();
+    let update = move || {
+        if let Ok(mut guard) = handle.state::<MediaState>().0.lock() {
+            if let Some(controls) = guard.as_mut() {
+                let cover_url = cover.as_deref();
+
+                let _ = controls.set_metadata(MediaMetadata {
+                    title: Some(&title),
+                    artist: Some(&artist),
+                    album: Some(&album),
+                    cover_url,
+                    ..Default::default()
+                });
+                let _ = controls.set_playback(if playing {
+                    MediaPlayback::Playing { progress: None }
+                } else {
+                    MediaPlayback::Paused { progress: None }
+                });
+            }
         }
+        // Reflect the play/pause state on the Windows taskbar thumbnail toolbar too.
+        #[cfg(target_os = "windows")]
+        taskbar::set_playing(&handle, playing);
+        // Keep the tray tooltip in sync with Now Playing (when the tray is shown).
+        if let Some(tray) = handle.tray_by_id("main-tray") {
+            let tip = if title.trim().is_empty() {
+                "Museek".to_string()
+            } else if artist.trim().is_empty() {
+                format!("{title} — Museek")
+            } else {
+                format!("{artist} - {title}")
+            };
+            // Windows tray tooltips are short; truncate gracefully.
+            let tip = if tip.chars().count() > 120 {
+                format!("{}…", tip.chars().take(119).collect::<String>())
+            } else {
+                tip
+            };
+            let _ = tray.set_tooltip(Some(tip));
+        }
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.run_on_main_thread(update);
     }
-    // Reflect the play/pause state on the Windows taskbar thumbnail toolbar too.
-    #[cfg(target_os = "windows")]
-    taskbar::set_playing(&app, playing);
-    // Keep the tray tooltip in sync with Now Playing (when the tray is shown).
-    if let Some(tray) = app.tray_by_id("main-tray") {
-        let tip = if title.trim().is_empty() {
-            "Museek".to_string()
-        } else if artist.trim().is_empty() {
-            format!("{title} — Museek")
-        } else {
-            format!("{artist} - {title}")
-        };
-        // Windows tray tooltips are short; truncate gracefully.
-        let tip = if tip.chars().count() > 120 {
-            format!("{}…", tip.chars().take(119).collect::<String>())
-        } else {
-            tip
-        };
-        let _ = tray.set_tooltip(Some(tip));
-    }
+    #[cfg(not(target_os = "macos"))]
+    update();
 }
 
 // Keep-awake: prevent the system from *sleeping* while music plays, but still let
@@ -839,6 +1016,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            embed_download_metadata,
             media_update,
             set_prevent_sleep,
             quit_app,

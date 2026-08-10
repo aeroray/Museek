@@ -1,38 +1,43 @@
-import { Folder, RotateCcw } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
-import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore"
-import { useT } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
-import type { Quality } from "@/types/music"
+import { Folder, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard";
+import { useSettingsStore, type NamingScheme } from "@/stores/settingsStore";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import type { Quality } from "@/types/music";
 
-const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"]
-const NAMINGS: NamingScheme[] = ["singer-name", "name-singer", "name"]
-const CONCURRENCY = [1, 2, 3, 4, 5]
+const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"];
+const NAMINGS: NamingScheme[] = ["singer-name", "name-singer", "name"];
+const CONCURRENCY = [1, 2, 3, 4, 5];
 
 export function DownloadSettings() {
   const {
     downloadQuality,
+    embedLyrics,
+    embedCover,
     downloadDir,
     maxConcurrent,
     fileNaming,
     deleteDownloadFiles,
     setDownloadQuality,
+    setEmbedLyrics,
+    setEmbedCover,
     setDownloadDir,
     setMaxConcurrent,
     setFileNaming,
     setDeleteDownloadFiles,
-  } = useSettingsStore()
-  const t = useT()
-  const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+  } = useSettingsStore();
+  const t = useT();
+  const isTauri =
+    typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
   async function chooseFolder() {
     try {
-      const { open } = await import("@tauri-apps/plugin-dialog")
-      const dir = await open({ directory: true, multiple: false })
-      if (typeof dir === "string") setDownloadDir(dir)
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const dir = await open({ directory: true, multiple: false });
+      if (typeof dir === "string") setDownloadDir(dir);
     } catch {
       // dialog unavailable (e.g. browser preview)
     }
@@ -42,7 +47,10 @@ export function DownloadSettings() {
     <ScrollArea className="h-full">
       <div className="pr-3 pb-4">
         <SettingsCard>
-          <SettingRow title={t("playback.downloadQualityTitle")} desc={t("playback.downloadQualityDesc")}>
+          <SettingRow
+            title={t("playback.downloadQualityTitle")}
+            desc={t("playback.downloadQualityDesc")}
+          >
             <div className="flex flex-wrap gap-2">
               {QUALITIES.map((q) => (
                 <Button
@@ -57,18 +65,27 @@ export function DownloadSettings() {
             </div>
           </SettingRow>
 
-          <SettingRow title={t("download.locationTitle")} desc={t("download.locationDesc")}>
+          <SettingRow
+            title={t("download.locationTitle")}
+            desc={t("download.locationDesc")}
+          >
             <div className="flex items-center gap-2">
               <div
                 className={cn(
                   "flex-1 min-w-0 text-sm px-3 py-2 rounded-md border bg-muted/40 truncate",
-                  !downloadDir && "text-muted-foreground"
+                  !downloadDir && "text-muted-foreground",
                 )}
                 title={downloadDir ?? undefined}
               >
                 {downloadDir || t("download.notSet")}
               </div>
-              <Button variant="outline" size="sm" onClick={chooseFolder} disabled={!isTauri} className="shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={chooseFolder}
+                disabled={!isTauri}
+                className="shrink-0"
+              >
                 <Folder size={15} className="mr-2" />
                 {t("download.choose")}
               </Button>
@@ -86,7 +103,10 @@ export function DownloadSettings() {
             </div>
           </SettingRow>
 
-          <SettingRow title={t("download.concurrencyTitle")} desc={t("download.concurrencyDesc")}>
+          <SettingRow
+            title={t("download.concurrencyTitle")}
+            desc={t("download.concurrencyDesc")}
+          >
             <div className="flex gap-2">
               {CONCURRENCY.map((n) => (
                 <Button
@@ -102,7 +122,10 @@ export function DownloadSettings() {
             </div>
           </SettingRow>
 
-          <SettingRow title={t("download.namingTitle")} desc={t("download.namingDesc")}>
+          <SettingRow
+            title={t("download.namingTitle")}
+            desc={t("download.namingDesc")}
+          >
             <div className="flex flex-wrap gap-2">
               {NAMINGS.map((n) => (
                 <Button
@@ -118,14 +141,33 @@ export function DownloadSettings() {
           </SettingRow>
 
           <SettingRow
+            title={t("download.embedLyricsTitle")}
+            desc={t("download.embedLyricsDesc")}
+            control={
+              <Switch checked={embedLyrics} onCheckedChange={setEmbedLyrics} />
+            }
+          />
+
+          <SettingRow
+            title={t("download.embedCoverTitle")}
+            desc={t("download.embedCoverDesc")}
+            control={
+              <Switch checked={embedCover} onCheckedChange={setEmbedCover} />
+            }
+          />
+
+          <SettingRow
             title={t("download.deleteFilesTitle")}
             desc={t("download.deleteFilesDesc")}
             control={
-              <Switch checked={deleteDownloadFiles} onCheckedChange={setDeleteDownloadFiles} />
+              <Switch
+                checked={deleteDownloadFiles}
+                onCheckedChange={setDeleteDownloadFiles}
+              />
             }
           />
         </SettingsCard>
       </div>
     </ScrollArea>
-  )
+  );
 }

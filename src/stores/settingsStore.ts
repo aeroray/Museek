@@ -15,6 +15,8 @@ export type CloseBehavior = "exit" | "tray";
 interface Persisted {
   playQuality: Quality;
   downloadQuality: Quality;
+  embedLyrics: boolean;
+  embedCover: boolean;
   // null = not set → the user is prompted to choose on first download; otherwise an
   // absolute directory. Device-local: deliberately excluded from cross-device sync
   // (Windows/macOS paths differ), see DEVICE_LOCAL_SETTINGS in configIO.ts.
@@ -69,6 +71,8 @@ interface Persisted {
 interface SettingsState extends Persisted {
   setPlayQuality: (q: Quality) => void;
   setDownloadQuality: (q: Quality) => void;
+  setEmbedLyrics: (v: boolean) => void;
+  setEmbedCover: (v: boolean) => void;
   setDownloadDir: (dir: string | null) => void;
   setMaxConcurrent: (n: number) => void;
   setFileNaming: (s: NamingScheme) => void;
@@ -97,6 +101,8 @@ interface SettingsState extends Persisted {
 const DEFAULTS: Persisted = {
   playQuality: "320k",
   downloadQuality: "320k",
+  embedLyrics: true,
+  embedCover: true,
   downloadDir: null,
   maxConcurrent: 1,
   fileNaming: "singer-name",
@@ -142,6 +148,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     const {
       playQuality,
       downloadQuality,
+      embedLyrics,
+      embedCover,
       downloadDir,
       maxConcurrent,
       fileNaming,
@@ -169,6 +177,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     return writeData("settings.json", {
       playQuality,
       downloadQuality,
+      embedLyrics,
+      embedCover,
       downloadDir,
       maxConcurrent,
       fileNaming,
@@ -204,6 +214,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setDownloadQuality(q) {
       set({ downloadQuality: q });
+      persist();
+    },
+    setEmbedLyrics(v) {
+      set({ embedLyrics: v });
+      persist();
+    },
+    setEmbedCover(v) {
+      set({ embedCover: v });
       persist();
     },
     setDownloadDir(dir) {
@@ -335,6 +353,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         downloadQuality: QUALITIES.includes(data.downloadQuality as Quality)
           ? (data.downloadQuality as Quality)
           : DEFAULTS.downloadQuality,
+        embedLyrics:
+          typeof data.embedLyrics === "boolean"
+            ? data.embedLyrics
+            : DEFAULTS.embedLyrics,
+        embedCover:
+          typeof data.embedCover === "boolean"
+            ? data.embedCover
+            : DEFAULTS.embedCover,
         downloadDir:
           dlLocalized && typeof data.downloadDir === "string"
             ? data.downloadDir

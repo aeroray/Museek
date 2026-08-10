@@ -381,8 +381,7 @@
   letter-spacing: -0.025em;
   transform: translateY(-0.04em);
   transform-origin: center;
-  animation: desktop-lyrics-heading-enter 260ms cubic-bezier(0.22, 0.8, 0.24, 1)
-    both;
+  white-space: nowrap;
   text-wrap: nowrap;
   user-select: none;
   text-shadow:
@@ -390,60 +389,138 @@
     0 0 18px hsl(var(--primary) / 0.14);
 }
 
-@keyframes desktop-lyrics-heading-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 0.1em, 0) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, -0.04em, 0) scale(1);
-  }
+.lyric-karaoke-words {
+  display: inline;
+  white-space: normal;
 }
 
-.desktop-lyrics-heading-text,
-.desktop-lyrics-heading-sung {
-  grid-area: 1 / 1;
-  display: block;
-  white-space: nowrap;
-}
-
-.desktop-lyrics-heading-word {
+.lyric-karaoke-word {
   position: relative;
   display: inline-block;
   white-space: pre;
 }
 
-.desktop-lyrics-heading-words {
-  display: inline-flex;
-  white-space: pre;
-}
-
-.desktop-lyrics-heading-word-text,
-.desktop-lyrics-heading-word-sung {
+.lyric-karaoke-word-text,
+.lyric-karaoke-word-sung {
   display: block;
   white-space: pre;
 }
 
-.desktop-lyrics-heading-sung,
-.desktop-lyrics-heading-word-sung {
+.lyric-karaoke-word-text {
+  opacity: 0.48;
+}
+
+.lyric-karaoke-word-sung {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
   color: hsl(var(--primary));
   text-shadow:
     0 1px 2px hsl(0 0% 0% / 0.3),
     0 0 18px hsl(var(--primary) / 0.2);
 }
 
-.desktop-lyrics-heading-word-sung {
+.lyrics-edge-blur {
   position: absolute;
-  inset: 0;
-  overflow: visible;
+  z-index: 10;
+  inset-inline: 0;
+  height: 18%;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 24%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 24%,
+    transparent 100%
+  );
+}
+
+.lyrics-edge-blur--top {
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--background) / 0.18),
+    transparent 76%
+  );
+}
+
+.lyrics-edge-blur--bottom {
+  bottom: 0;
+  transform: rotate(180deg);
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--background) / 0.18),
+    transparent 76%
+  );
+}
+
+.desktop-lyrics-heading .lyric-karaoke-word-text {
+  opacity: 1;
+}
+
+.lyric-transition {
+  position: relative;
+  display: grid;
+  isolation: isolate;
+}
+
+.lyric-transition--animate-size {
+  transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width;
+}
+
+.lyric-transition__current,
+.lyric-transition__outgoing {
+  grid-area: 1 / 1;
+  transition:
+    opacity 240ms cubic-bezier(0.2, 0, 0, 1),
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 240ms cubic-bezier(0.2, 0, 0, 1);
+  transform-origin: center;
+  will-change: opacity, transform, filter;
+}
+
+.lyric-transition__current {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lyric-transition__current > *,
+.lyric-transition__outgoing > * {
+  flex: 0 0 auto;
+}
+
+.lyric-transition__current[data-lyric-transition-state="entering"] {
+  opacity: 0;
+  transform: translate3d(0, 0.08em, 0) scale(0.999);
+  filter: blur(1.25px);
+}
+
+.lyric-transition__outgoing {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
 }
 
-.desktop-lyrics-heading-sung {
-  overflow: visible;
-  pointer-events: none;
-  transition: none;
+.lyric-transition--animate-size .lyric-transition__outgoing {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.lyric-transition__outgoing[data-lyric-transition-state="exiting"] {
+  opacity: 0;
+  transform: translate3d(0, -0.08em, 0) scale(0.999);
+  filter: blur(1.25px);
 }
 
 .desktop-lyrics-window:not([data-interaction-mode="locked"])
@@ -459,12 +536,24 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-lyrics-heading {
-    animation: none;
+  .lyric-karaoke-word-sung {
+    transition: none;
   }
 
-  .desktop-lyrics-heading-sung,
-  .desktop-lyrics-heading-word-sung {
+  .lyric-transition__current,
+  .lyric-transition__outgoing {
+    transition: opacity 140ms ease;
+    transform: none;
+    filter: none;
+  }
+
+  .lyric-transition__current[data-lyric-transition-state="entering"],
+  .lyric-transition__outgoing[data-lyric-transition-state="exiting"] {
+    transform: none;
+    filter: none;
+  }
+
+  .lyric-transition--animate-size {
     transition: none;
   }
 }

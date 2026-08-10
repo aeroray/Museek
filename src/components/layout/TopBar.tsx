@@ -16,8 +16,43 @@ import { useUiStore } from "@/stores/uiStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useSearchStore } from "@/stores/searchStore";
 import { useT } from "@/lib/i18n";
-import { usePlaybackLyricIndex } from "@/lib/playback/clock";
+import { usePlaybackLyricIndex, usePlaybackTime } from "@/lib/playback/clock";
+import { KaraokeText, hasKaraokeTiming } from "@/components/lyrics/KaraokeText";
+import { LyricTransition } from "@/components/lyrics/LyricTransition";
 import { cn } from "@/lib/utils";
+import type { LyricLine } from "@/types/music";
+
+interface TopBarLyricTransitionProps {
+  line: LyricLine | undefined;
+  text: string;
+  transitionKey: string;
+  textClassName: string;
+}
+
+function TopBarLyricTransition({
+  line,
+  text,
+  transitionKey,
+  textClassName,
+}: TopBarLyricTransitionProps) {
+  const currentTime = usePlaybackTime();
+  const content =
+    line && hasKaraokeTiming(line) ? (
+      <KaraokeText
+        line={line}
+        currentTime={currentTime}
+        className={textClassName}
+      />
+    ) : (
+      <span className={textClassName}>{text}</span>
+    );
+
+  return (
+    <LyricTransition transitionKey={transitionKey} className="w-full min-w-0">
+      {content}
+    </LyricTransition>
+  );
+}
 
 /** Current lyric line for the top bar, or a warm welcome when no song is loaded. */
 function TopBarLyrics() {
@@ -51,6 +86,10 @@ function TopBarLyrics() {
     return <WarmWelcome refreshKey={`${location.pathname}:${searchContext}`} />;
   }
 
+  const displayedLyricIndex =
+    lyricLines.length > 0 ? Math.max(0, currentLyricIndex) : -1;
+  const currentLine =
+    lyricLines.length > 0 ? lyricLines[displayedLyricIndex] : undefined;
   let text = "";
   let muted = true;
   if (lyricsLoading && lyricLines.length === 0) {
@@ -58,8 +97,7 @@ function TopBarLyrics() {
   } else if (lyricLines.length === 0) {
     text = currentSong.name;
   } else {
-    const idx = Math.max(0, currentLyricIndex);
-    text = lyricLines[idx]?.text?.trim() || currentSong.name;
+    text = lyricLines[displayedLyricIndex]?.text?.trim() || currentSong.name;
     muted = false;
   }
 
@@ -73,6 +111,12 @@ function TopBarLyrics() {
     );
   }
 
+  const lyricClassName = cn(
+    "block max-w-full truncate text-center text-base leading-tight tracking-tight",
+    muted ? "text-muted-foreground/70 font-normal" : "text-primary font-medium",
+  );
+  const lyricKey = `${currentSong?.id ?? "none"}-${displayedLyricIndex}-${text}`;
+
   return (
     <div
       data-tauri-drag-region
@@ -83,18 +127,12 @@ function TopBarLyrics() {
       )}
       onPointerDown={startDragging}
     >
-      <span
-        key={`${currentSong?.id ?? "none"}-${currentLyricIndex}-${text}`}
-        className={cn(
-          "block max-w-full truncate text-center text-base leading-tight tracking-tight",
-          "animate-in fade-in duration-300",
-          muted
-            ? "text-muted-foreground/70 font-normal"
-            : "text-primary font-medium",
-        )}
-      >
-        {text}
-      </span>
+      <TopBarLyricTransition
+        line={currentLine}
+        text={text}
+        transitionKey={lyricKey}
+        textClassName={lyricClassName}
+      />
     </div>
   );
 }

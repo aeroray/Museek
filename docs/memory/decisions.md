@@ -503,3 +503,43 @@ Keep a small, low-contrast hint permanently at both the beginning and end of the
 
 Reason:
 The gesture needs discoverability, but a banner or centered toast would compete with lyric reading. Placing the cue at the natural start and end boundaries of the lyrics makes it available without competing with the active line or adding another control-surface annotation.
+
+## 2026-08-10 - Keep lyric line transitions interruptible
+
+Decision:
+Keep the active lyric DOM layer mounted while it becomes the outgoing layer, render that layer visibly for one frame before fading it, create the new line separately, and derive transition keys from the visible fallback line. Use shallow transform and blur transitions shared by top-bar and desktop lyrics.
+
+Reason:
+Preserving layer identity and a guaranteed initial frame lets interrupted transitions continue from their current presentation instead of flashing or resetting to a target, while stable fallback keys avoid redundant flashes before the first timed line.
+
+## 2026-08-10 - Keep lyric transition layers in one intrinsic track
+
+Decision:
+Stack the incoming and outgoing desktop lyric layers in the same CSS Grid track so both contribute to the capsule's intrinsic size until the outgoing layer is removed.
+
+Reason:
+An absolutely positioned outgoing layer is excluded from `max-content` sizing, which can make the desktop capsule collapse to the entering lyric and then expand during the transition.
+
+## 2026-08-10 - Animate desktop capsule width from its live presentation
+
+Decision:
+When desktop lyric text changes, lock the capsule to its current rendered width through the crossfade, measure the next content intrinsically, and release inline width only after the width transition settles. For shorter targets, begin the width transition after a short overlap delay and clip the outgoing layer to the current capsule width; interrupted changes recapture the current width.
+
+Reason:
+Intrinsic grid sizing alone can collapse long-to-short capsules immediately, while an overflowing outgoing layer can remain visible outside the capsule during an overlapped shrink.
+
+## 2026-08-10 - Embed download metadata best-effort
+
+Decision:
+Offer independent embedded-lyrics and embedded-cover switches, both enabled by default, snapshot them when a download is queued, and keep the audio download successful when metadata retrieval or tag writing fails.
+
+Reason:
+Metadata is useful but remote lyrics, artwork, and format tags are optional inputs; deterministic queue settings and post-write enrichment preserve usable audio without making downloads brittle.
+
+## 2026-08-10 - Keep macOS media updates on the main thread
+
+Decision:
+Use souvlaki 0.8.3 for Now Playing artwork, dispatch macOS media-control updates through Tauri's main-thread queue, and keep the shared playback clock fed by native `timeupdate` events as a fallback to animation frames.
+
+Reason:
+Older souvlaki versions passed a raw NSURL into an asynchronous artwork task, while WebView animation frames can be throttled when the window is hidden or deprioritized. The newer dependency removes the URL lifetime hazard, main-thread dispatch protects AppKit state updates, and the media event fallback keeps lyrics advancing.

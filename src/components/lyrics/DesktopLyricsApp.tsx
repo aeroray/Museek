@@ -14,6 +14,8 @@ import {
 } from "@tauri-apps/api/window";
 import { Lock, LockOpen, X } from "lucide-react";
 import { applyLanguageSnapshot, useT } from "@/lib/i18n";
+import { KaraokeText } from "./KaraokeText";
+import { LyricTransition } from "./LyricTransition";
 import {
   clampLyricFontScale,
   readLyricFontScale,
@@ -22,14 +24,12 @@ import {
 import { isMacOs } from "@/lib/os";
 import { findActiveLyricIndex } from "@/lib/lyrics";
 import { applyThemeSnapshot } from "@/stores/themeStore";
-import type { LyricLine } from "@/types/music";
 import {
   DEFAULT_FONT_SCALE,
   FONT_MAX,
   FONT_MIN,
   FONT_STEP,
   applyDesktopLyricsInteractionMode,
-  clamp,
   clampAndPersistDesktopLyricsGeometry,
   isInteractionMode,
   monitorForRect,
@@ -76,65 +76,6 @@ const DESKTOP_FONT_POLICY = {
   max: FONT_MAX,
   defaultValue: DEFAULT_FONT_SCALE,
 };
-
-interface KaraokeHeadingProps {
-  line: LyricLine;
-  currentTime: number;
-  fontSize: number;
-  onPointerEnter: () => void;
-}
-
-function KaraokeHeading({
-  line,
-  currentTime,
-  fontSize,
-  onPointerEnter,
-}: KaraokeHeadingProps) {
-  const clipReveal = (right: string) => `inset(0 ${right} -0.18em 0)`;
-  const words = line.words?.filter((word) => word.text.length > 0) ?? [];
-  const hasWordTiming =
-    (line.karaoke === "native" || line.karaoke === "estimated") &&
-    words.length > 0;
-  return (
-    <p
-      className="desktop-lyrics-heading"
-      onPointerEnter={onPointerEnter}
-      style={{ fontSize: `${fontSize}px` }}
-    >
-      {hasWordTiming ? (
-        <span className="desktop-lyrics-heading-words">
-          {words.map((word, index) => {
-            const wordProgress = clamp(
-              (currentTime - word.time) / word.duration,
-              0,
-              1,
-            );
-            const wordReveal = `${(1 - wordProgress) * 100}%`;
-            return (
-              <span
-                className="desktop-lyrics-heading-word"
-                key={`${word.time}:${index}`}
-              >
-                <span className="desktop-lyrics-heading-word-text">
-                  {word.text}
-                </span>
-                <span
-                  className="desktop-lyrics-heading-word-sung"
-                  aria-hidden="true"
-                  style={{ clipPath: clipReveal(wordReveal) }}
-                >
-                  {word.text}
-                </span>
-              </span>
-            );
-          })}
-        </span>
-      ) : (
-        <span className="desktop-lyrics-heading-text">{line.text}</span>
-      )}
-    </p>
-  );
-}
 
 export function DesktopLyricsApp() {
   const t = useT();
@@ -584,8 +525,8 @@ export function DesktopLyricsApp() {
   const actionTabIndex = interactionMode === "interactive" ? 0 : -1;
 
   const activeLyricIndex = findActiveLyricIndex(snapshot.lines, currentTime);
-  const activeLine =
-    snapshot.lines[activeLyricIndex >= 0 ? activeLyricIndex : 0] ?? null;
+  const displayedLyricIndex = activeLyricIndex >= 0 ? activeLyricIndex : 0;
+  const activeLine = snapshot.lines[displayedLyricIndex] ?? null;
   const lyricPaddingScale = fontScale / DEFAULT_FONT_SCALE;
 
   return (
@@ -667,13 +608,19 @@ export function DesktopLyricsApp() {
                   padding: `${DEFAULT_LYRIC_PADDING.top * lyricPaddingScale}px ${DEFAULT_LYRIC_PADDING.horizontal * lyricPaddingScale}px ${DEFAULT_LYRIC_PADDING.bottom * lyricPaddingScale}px`,
                 }}
               >
-                <KaraokeHeading
-                  key={`${activeLyricIndex}:${activeLine.time}`}
-                  line={activeLine}
-                  currentTime={currentTime}
-                  fontSize={LYRIC_FONT_SIZE * fontScale}
-                  onPointerEnter={() => setIsLyricsHovered(true)}
-                />
+                <LyricTransition
+                  transitionKey={`${displayedLyricIndex}:${activeLine.time}`}
+                  className="w-max"
+                  animateSize
+                >
+                  <KaraokeText
+                    line={activeLine}
+                    currentTime={currentTime}
+                    className="desktop-lyrics-heading"
+                    style={{ fontSize: `${LYRIC_FONT_SIZE * fontScale}px` }}
+                    onPointerEnter={() => setIsLyricsHovered(true)}
+                  />
+                </LyricTransition>
               </div>
             </div>
           )}

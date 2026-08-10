@@ -43,6 +43,7 @@ import { useT } from "@/lib/i18n";
 import { isMacOs } from "@/lib/os";
 import { getPlaybackTime, usePlaybackLyricIndex } from "@/lib/playback/clock";
 import { cn } from "@/lib/utils";
+import { hasKaraokeTiming, PlaybackKaraokeText } from "./KaraokeText";
 
 const FONT_MIN = 0.85;
 const FONT_MAX = 2.5;
@@ -452,54 +453,72 @@ export function LyricsPanel() {
               {currentSong ? t("lyrics.empty") : t("lyrics.selectSong")}
             </div>
           ) : (
-            <ScrollArea ref={scrollRef} className="h-full">
-              <div
-                className={cn(
-                  "py-[42vh] text-center animate-in fade-in duration-300",
-                  lyricsOnly ? "px-4" : "pl-4 pr-24",
-                )}
-              >
-                <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
-                  {t("lyrics.fontHint", { shortcut: fontShortcut })}
-                </p>
-                {lyricLines.map((line, i) => {
-                  const active = i === currentLyricIndex;
-                  return (
-                    <div
-                      key={i}
-                      ref={(el) => {
-                        lineRefs.current[i] = el;
-                      }}
-                      onClick={() => seek(line.time)}
-                      className={cn(
-                        "py-2.5 cursor-pointer transition-[color,font-size] duration-300 ease-out",
-                        active
-                          ? "text-primary font-semibold"
-                          : "text-muted-foreground/50 hover:text-muted-foreground",
-                      )}
-                      style={{
-                        fontSize: `${(active ? 1.4 : 1.05) * fontScale}rem`,
-                      }}
-                    >
-                      <p>{line.text}</p>
-                      {line.translation && (
-                        <p
-                          className="mt-1 opacity-80"
-                          style={{
-                            fontSize: `${(active ? 1.0 : 0.85) * fontScale}rem`,
-                          }}
-                        >
-                          {line.translation}
+            <>
+              <ScrollArea ref={scrollRef} className="h-full">
+                <div
+                  className={cn(
+                    "py-[42vh] text-center animate-in fade-in duration-300",
+                    lyricsOnly ? "px-4" : "pl-4 pr-24",
+                  )}
+                >
+                  <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
+                    {t("lyrics.fontHint", { shortcut: fontShortcut })}
+                  </p>
+                  {lyricLines.map((line, i) => {
+                    const active = i === currentLyricIndex;
+                    return (
+                      <div
+                        key={i}
+                        ref={(el) => {
+                          lineRefs.current[i] = el;
+                        }}
+                        onClick={() => seek(line.time)}
+                        className={cn(
+                          "py-2.5 cursor-pointer transition-colors duration-300 ease-out",
+                          active
+                            ? "text-primary font-semibold"
+                            : "text-muted-foreground/50 hover:text-muted-foreground",
+                        )}
+                        style={{
+                          fontSize: `${1.05 * fontScale}rem`,
+                        }}
+                      >
+                        <p className="transition-[color,filter] duration-300 ease-out motion-reduce:transition-none">
+                          {active && hasKaraokeTiming(line) ? (
+                            <PlaybackKaraokeText line={line} />
+                          ) : (
+                            line.text
+                          )}
                         </p>
-                      )}
-                    </div>
-                  );
-                })}
-                <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
-                  {t("lyrics.fontHint", { shortcut: fontShortcut })}
-                </p>
-              </div>
-            </ScrollArea>
+                        {line.translation && (
+                          <p
+                            className="mt-1 opacity-80"
+                            style={{
+                              fontSize: `${0.85 * fontScale}rem`,
+                            }}
+                          >
+                            <span className="block transition-[color,filter] duration-300 ease-out motion-reduce:transition-none">
+                              {line.translation}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
+                    {t("lyrics.fontHint", { shortcut: fontShortcut })}
+                  </p>
+                </div>
+              </ScrollArea>
+              <div
+                className="lyrics-edge-blur lyrics-edge-blur--top"
+                aria-hidden="true"
+              />
+              <div
+                className="lyrics-edge-blur lyrics-edge-blur--bottom"
+                aria-hidden="true"
+              />
+            </>
           )}
         </div>
       </div>
