@@ -17,6 +17,32 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.1.2": {
+    zh: {
+      sections: [
+        {
+          title: "🍎 macOS / 播放",
+          bullets: [
+            "修复播放时钟导致的无限重渲染，避免主窗口空白 / 消失",
+            "顶栏恢复逐字卡拉 OK（在稳定的播放时钟之上）",
+            "更新 macOS 应用图标，四周留出安全边距，Dock 观感更轻",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🍎 macOS / Playback",
+          bullets: [
+            "Fix infinite re-renders from the playback clock that blanked the main window",
+            "Restore word-by-word karaoke in the top bar on the stabilized clock",
+            "Refresh the macOS app icon with a safer inset margin for a lighter Dock look",
+          ],
+        },
+      ],
+    },
+  },
   "3.1.1": {
     zh: {
       sections: [
