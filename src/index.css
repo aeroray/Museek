@@ -1167,14 +1167,33 @@ html[data-mini-peek="true"] .app-shell > * {
     transform: translateY(0) scale(0.98);
   }
 }
-@keyframes iconAudioPulse {
+@keyframes queueEqualizerBar {
   0%,
   100% {
-    transform: scale(1);
+    transform: scaleY(0.3);
   }
   50% {
-    transform: scale(1.06);
+    transform: scaleY(1);
   }
+}
+
+.queue-equalizer {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.queue-equalizer__bar {
+  display: block;
+  width: 2px;
+  height: 12px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: scaleY(0.3);
+  transform-origin: center;
 }
 
 /* Brand mark equalizer — mirrors docs landing `.eq` / `.eqbar` motion */
@@ -1321,15 +1340,25 @@ html[data-mini-peek="true"] .app-shell > * {
     animation: iconPlayPop 280ms cubic-bezier(0.2, 0, 0, 1) both;
   }
 
-  .icon-audio-pulse {
-    animation: iconAudioPulse 2.4s ease-in-out infinite;
+  .queue-equalizer__bar {
+    animation: queueEqualizerBar 760ms ease-in-out infinite;
+  }
+  .queue-equalizer__bar:nth-child(2) {
+    animation-delay: -240ms;
+    animation-duration: 680ms;
+  }
+  .queue-equalizer__bar:nth-child(3) {
+    animation-delay: -420ms;
+    animation-duration: 860ms;
+  }
+  .queue-equalizer--paused .queue-equalizer__bar {
+    animation-play-state: paused;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .icon-pop-in,
   .icon-heart-burst,
-  .icon-audio-pulse,
   .nav-active-bar,
   .hot-cloud-word,
   .lyric-cover-float {

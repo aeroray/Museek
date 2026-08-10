@@ -574,3 +574,41 @@ An opaque black canvas reaching every edge has more visual weight in the macOS
 Dock than neighboring icons with inset artwork. The Tauri configuration uses
 the ICNS resource for macOS, so changing only a source PNG would not reliably
 update the installed application icon.
+
+## 2026-08-10 - Keep one Windows media-session owner
+
+Decision:
+Use souvlaki's native SMTC for Windows, macOS, and Linux, and keep the native
+Windows taskbar thumbnail toolbar for its separate hover buttons. Windows sets
+the SMTC AppMediaId to `Museek`.
+
+Reason:
+The HTML audio element can expose a WebView2 media session, but its browser
+child process does not reliably inherit the desktop app identity. Publishing
+from the native window keeps the media card under Museek's AUMID and avoids a
+second WebView2 session.
+
+## 2026-08-10 - Set the Windows media app identity before window creation
+
+Decision:
+Set the process AppUserModelID to `com.museek.app` at the start of the Windows
+entry point, before Tauri creates any windows or media sessions.
+
+Reason:
+Windows uses the process and window AppUserModelID to resolve the application
+label shown by system media controls. The process identity and native SMTC
+AppMediaId must be initialized before playback metadata is published.
+
+## 2026-08-11 - Keep WebView2 out of Windows desktop media ownership
+
+Decision:
+On Windows Tauri, do not create an HTML audio element. Fetch and decode the
+resolved audio source through Web Audio, while keeping the existing HTML audio
+and `navigator.mediaSession` path for browser preview and non-Windows platforms.
+Native souvlaki SMTC remains the only Windows desktop media-card owner.
+
+Reason:
+WebView2 automatically publishes a media card for an HTML audio element even
+when Museek suppresses explicit JavaScript Media Session updates. Removing the
+HTML media element from the Windows Tauri path eliminates the duplicate card
+without weakening browser-preview playback controls or normal HTML audio behavior.

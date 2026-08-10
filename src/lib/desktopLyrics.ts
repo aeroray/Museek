@@ -230,6 +230,8 @@ export function startDesktopLyricsBridge(): () => void {
   let unlistenSetInteraction: (() => void) | undefined;
   let unlistenClosed: (() => void) | undefined;
   let unsubscribeTime: (() => void) | undefined;
+  let pendingTime: number | null = null;
+  let flushingTime = false;
   const unsubscribe = usePlayerStore.subscribe(() => {
     void publishSnapshot();
   });
@@ -255,18 +257,44 @@ export function startDesktopLyricsBridge(): () => void {
 
   const startTimeBridge = () => {
     if (unsubscribeTime) return;
+    const flushTime = () => {
+      if (flushingTime) return;
+      flushingTime = true;
+      void (async () => {
+        try {
+          while (
+            pendingTime !== null &&
+            useDesktopLyricsStore.getState().isVisible
+          ) {
+            const currentTime = pendingTime;
+            pendingTime = null;
+            await emitTo(
+              DESKTOP_LYRICS_LABEL,
+              DESKTOP_LYRICS_TIME_EVENT,
+              currentTime,
+            ).catch(() => {});
+          }
+        } finally {
+          flushingTime = false;
+          if (
+            pendingTime !== null &&
+            useDesktopLyricsStore.getState().isVisible
+          ) {
+            flushTime();
+          }
+        }
+      })();
+    };
     unsubscribeTime = audioPlayer.subscribeTime((currentTime) => {
       if (!useDesktopLyricsStore.getState().isVisible) return;
-      void emitTo(
-        DESKTOP_LYRICS_LABEL,
-        DESKTOP_LYRICS_TIME_EVENT,
-        Math.max(0, currentTime),
-      ).catch(() => {});
+      pendingTime = Math.max(0, currentTime);
+      flushTime();
     });
   };
   const stopTimeBridge = () => {
     unsubscribeTime?.();
     unsubscribeTime = undefined;
+    pendingTime = null;
   };
   const unsubscribeVisibility = useDesktopLyricsStore.subscribe(
     (state, previous) => {

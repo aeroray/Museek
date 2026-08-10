@@ -157,6 +157,7 @@ export function DesktopLyricsApp() {
             listen<DesktopLyricsSnapshot>(
               DESKTOP_LYRICS_STATE_EVENT,
               (event) => {
+                ignoreCursorEventsRef.current = null;
                 setSnapshot(event.payload);
                 setCurrentTime(event.payload.currentTime);
               },
@@ -181,6 +182,8 @@ export function DesktopLyricsApp() {
               DESKTOP_LYRICS_INTERACTION_EVENT,
               (event) => {
                 if (!isInteractionMode(event.payload)) return;
+                ignoreCursorEventsRef.current = null;
+                setIsLyricsHovered(false);
                 setInteractionMode(event.payload);
                 void applyDesktopLyricsInteractionMode(event.payload);
               },
@@ -423,6 +426,8 @@ export function DesktopLyricsApp() {
 
   const toggleInteractionMode = () => {
     const next = interactionMode === "interactive" ? "locked" : "interactive";
+    ignoreCursorEventsRef.current = null;
+    setIsLyricsHovered(false);
     setInteractionMode(next);
     void applyDesktopLyricsInteractionMode(next);
     void emitTo("main", DESKTOP_LYRICS_SET_INTERACTION_EVENT, next).catch(

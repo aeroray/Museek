@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { X, Trash2, Music, AudioLines } from "lucide-react"
+import { useEffect, useRef, useState } from "react";
+import { X, Trash2, Music } from "lucide-react";
 import {
   Drawer,
   DrawerClose,
@@ -8,7 +8,7 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-} from "@/components/ui/drawer"
+} from "@/components/ui/drawer";
 import {
   Dialog,
   DialogContent,
@@ -16,32 +16,60 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges"
-import { usePlayerStore } from "@/stores/playerStore"
-import { useT } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges";
+import { usePlayerStore } from "@/stores/playerStore";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export function PlayQueue() {
-  const { queue, queueIndex, showQueue, isPlaying, setShowQueue, playFromQueue, clearQueue } =
-    usePlayerStore()
-  const t = useT()
-  const [confirmClear, setConfirmClear] = useState(false)
+  const {
+    queue,
+    queueIndex,
+    showQueue,
+    isPlaying,
+    setShowQueue,
+    playFromQueue,
+    clearQueue,
+  } = usePlayerStore();
+  const t = useT();
+  const [confirmClear, setConfirmClear] = useState(false);
+  const activeItemRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showQueue || queueIndex < 0 || queueIndex >= queue.length) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      activeItemRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [queue.length, queueIndex, showQueue]);
 
   const removeAt = (i: number) => {
-    const next = [...usePlayerStore.getState().queue]
-    next.splice(i, 1)
-    usePlayerStore.setState({ queue: next })
-  }
+    const next = [...usePlayerStore.getState().queue];
+    next.splice(i, 1);
+    usePlayerStore.setState({ queue: next });
+  };
 
   return (
     <>
-      <Drawer open={showQueue} onOpenChange={setShowQueue} swipeDirection="right">
+      <Drawer
+        open={showQueue}
+        onOpenChange={setShowQueue}
+        swipeDirection="right"
+      >
         <DrawerContent className="data-[swipe-axis=x]:[--drawer-content-width:min(100%,22.5rem)]">
           <DrawerHeader className="border-b border-border/60 relative pr-12">
             <DrawerTitle>{t("queue.title")}</DrawerTitle>
-            <DrawerDescription>{t("queue.count", { count: queue.length })}</DrawerDescription>
+            <DrawerDescription>
+              {t("queue.count", { count: queue.length })}
+            </DrawerDescription>
             <DrawerClose
               render={
                 <Button
@@ -69,10 +97,11 @@ export function PlayQueue() {
               <div className="flex-1 overflow-y-auto overscroll-contain p-2 pb-8 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground)/0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/25 [&::-webkit-scrollbar-track]:bg-transparent">
                 <div className="flex flex-col gap-0.5">
                   {queue.map((item, i) => {
-                    const active = i === queueIndex
+                    const active = i === queueIndex;
                     return (
                       <div
                         key={`${item.music.id}-${i}`}
+                        ref={active ? activeItemRef : undefined}
                         className={cn(
                           "group flex cursor-pointer items-center gap-3 rounded-xl p-2 transition-colors duration-200",
                           active ? "bg-primary/10" : "hover:bg-accent/60",
@@ -93,11 +122,18 @@ export function PlayQueue() {
                             </div>
                           )}
                           {active && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/45">
-                              <AudioLines
-                                size={16}
-                                className={cn("text-white", isPlaying && "icon-audio-pulse")}
-                              />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-white">
+                              <span
+                                className={cn(
+                                  "queue-equalizer",
+                                  !isPlaying && "queue-equalizer--paused",
+                                )}
+                                aria-hidden="true"
+                              >
+                                <span className="queue-equalizer__bar" />
+                                <span className="queue-equalizer__bar" />
+                                <span className="queue-equalizer__bar" />
+                              </span>
                             </div>
                           )}
                         </div>
@@ -107,7 +143,9 @@ export function PlayQueue() {
                             <p
                               className={cn(
                                 "truncate text-sm",
-                                active ? "font-medium text-primary" : "text-foreground",
+                                active
+                                  ? "font-medium text-primary"
+                                  : "text-foreground",
                               )}
                             >
                               {item.music.name}
@@ -115,8 +153,12 @@ export function PlayQueue() {
                             <PlatformBadge source={item.music.source} />
                           </div>
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className="truncate text-xs text-muted-foreground">{item.music.singer}</p>
-                            <QualityBadge quality={item.playedQuality ?? item.quality} />
+                            <p className="truncate text-xs text-muted-foreground">
+                              {item.music.singer}
+                            </p>
+                            <QualityBadge
+                              quality={item.playedQuality ?? item.quality}
+                            />
                           </div>
                         </div>
 
@@ -125,14 +167,14 @@ export function PlayQueue() {
                           size="icon"
                           className="h-8 w-8 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
                           onClick={(e) => {
-                            e.stopPropagation()
-                            removeAt(i)
+                            e.stopPropagation();
+                            removeAt(i);
                           }}
                         >
                           <X size={14} />
                         </Button>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               </div>
@@ -172,8 +214,8 @@ export function PlayQueue() {
             <Button
               variant="destructive"
               onClick={() => {
-                clearQueue()
-                setConfirmClear(false)
+                clearQueue();
+                setConfirmClear(false);
               }}
             >
               {t("queue.clear")}
@@ -182,5 +224,5 @@ export function PlayQueue() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

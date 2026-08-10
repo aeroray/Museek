@@ -331,7 +331,7 @@ export async function applyDesktopLyricsInteractionMode(
   try {
     if (mode === "interactive") {
       await window.setFocusable(true);
-      await window.setIgnoreCursorEvents(false);
+      await window.setIgnoreCursorEvents(true);
     } else {
       await window.setIgnoreCursorEvents(true);
       await window.setFocusable(false);

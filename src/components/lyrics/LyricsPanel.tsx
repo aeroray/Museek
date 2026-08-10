@@ -412,29 +412,27 @@ export function LyricsPanel() {
               </p>
             </div>
           )}
-          {isPlaying ? (
-            <div className="lyric-cover-float shrink-0">
-              <SpecularFrame
-                autoAnimate
-                followMouse={false}
-                className="h-60 w-60"
-                radius={16}
-                lineColor="#ffffff"
-                baseColor="#9ca3af"
-                intensity={1.85}
-                shineSize={18}
-                shineFade={28}
-                thickness={0.8}
-                speed={-0.5}
-              >
-                {coverArt}
-              </SpecularFrame>
-            </div>
-          ) : (
-            <div className="h-60 w-60 shrink-0 overflow-hidden rounded-2xl shadow-[0_20px_40px_-12px_rgba(0,0,0,0.35)]">
+          <div
+            className="lyric-cover-float shrink-0"
+            style={{ animationPlayState: isPlaying ? "running" : "paused" }}
+          >
+            <SpecularFrame
+              autoAnimate
+              paused={!isPlaying}
+              followMouse={false}
+              className="h-60 w-60"
+              radius={16}
+              lineColor="#ffffff"
+              baseColor="#9ca3af"
+              intensity={1.85}
+              shineSize={18}
+              shineFade={28}
+              thickness={0.8}
+              speed={-0.5}
+            >
               {coverArt}
-            </div>
-          )}
+            </SpecularFrame>
+          </div>
           <Controls />
         </div>
 
@@ -474,13 +472,13 @@ export function LyricsPanel() {
                         }}
                         onClick={() => seek(line.time)}
                         className={cn(
-                          "py-2.5 cursor-pointer transition-colors duration-300 ease-out",
+                          "py-2.5 cursor-pointer transition-[color,font-size] duration-300 ease-out",
                           active
                             ? "text-primary font-semibold"
                             : "text-muted-foreground/50 hover:text-muted-foreground",
                         )}
                         style={{
-                          fontSize: `${1.05 * fontScale}rem`,
+                          fontSize: `${(active ? 1.4 : 0.95) * fontScale}rem`,
                         }}
                       >
                         <p className="transition-colors duration-300 ease-out motion-reduce:transition-none">
@@ -494,7 +492,7 @@ export function LyricsPanel() {
                           <p
                             className="mt-1 opacity-80"
                             style={{
-                              fontSize: `${0.85 * fontScale}rem`,
+                              fontSize: `${(active ? 1 : 0.85) * fontScale}rem`,
                             }}
                           >
                             <span className="block transition-colors duration-300 ease-out motion-reduce:transition-none">

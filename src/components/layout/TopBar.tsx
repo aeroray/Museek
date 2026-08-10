@@ -1,5 +1,3 @@
-import type { PointerEvent } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -27,18 +25,13 @@ function TopBarLyrics() {
   const location = useLocation();
   const enabled = useUiStore((s) => s.topBarLyrics);
   const currentSong = usePlayerStore((s) => s.currentSong);
+  const setShowLyrics = usePlayerStore((s) => s.setShowLyrics);
   const lyricLines = usePlayerStore((s) => s.lyricLines);
   const currentLyricIndex = usePlaybackLyricIndex(lyricLines);
   const lyricsLoading = usePlayerStore((s) => s.lyricsLoading);
   const searchContext = useSearchStore(
     (s) => `${s.query.trim() ? "searched" : "landing"}:${s.platform}`,
   );
-  const startDragging = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    void getCurrentWindow().startDragging();
-  };
-
   if (!enabled) {
     return (
       <div
@@ -77,13 +70,13 @@ function TopBarLyrics() {
 
   return (
     <div
-      data-tauri-drag-region
       className={cn(
-        "mx-2 min-w-0 flex-1 select-none",
+        "pointer-events-auto mx-2 min-w-0 flex-1 select-none",
         // Stay inside the h-10 top bar; leave room for descenders (g/y/p).
-        "flex h-8 items-center justify-center rounded-md px-3",
+        "flex h-8 cursor-pointer items-center justify-center rounded-md px-3",
+        "transition-[background-color,color] duration-200 ease-out hover:bg-accent/60",
       )}
-      onPointerDown={startDragging}
+      onClick={() => setShowLyrics(true)}
     >
       <LyricTransition
         transitionKey={`${currentSong.id}-${currentLyricIndex}-${text}`}

@@ -2,7 +2,10 @@ use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, FileType, TaggedFileExt};
 use lofty::picture::{MimeType, Picture, PictureType};
 use lofty::tag::{Accessor, ItemKey, Tag, TagType};
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use souvlaki::{
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -13,6 +16,41 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_fs::FsExt;
 
 const MAX_EMBEDDED_COVER_BYTES: usize = 10 * 1024 * 1024;
+
+#[cfg(target_os = "windows")]
+fn set_windows_app_user_model_id() {
+    use windows::core::w;
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+
+    unsafe {
+        let _ = SetCurrentProcessExplicitAppUserModelID(w!("com.museek.app"));
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn set_windows_media_app_id(hwnd: *mut std::ffi::c_void) {
+    use windows::core::{factory, HSTRING};
+    use windows::Media::SystemMediaTransportControls;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::WinRT::ISystemMediaTransportControlsInterop;
+
+    let result = (|| -> windows::core::Result<()> {
+        let interop = factory::<
+            SystemMediaTransportControls,
+            ISystemMediaTransportControlsInterop,
+        >()?;
+        let controls: SystemMediaTransportControls =
+            unsafe { interop.GetForWindow(HWND(hwnd)) }?;
+        let updater = controls.DisplayUpdater()?;
+        updater.SetAppMediaId(&HSTRING::from("Museek"))?;
+        updater.Update()?;
+        Ok(())
+    })();
+
+    if let Err(error) = result {
+        eprintln!("Failed to set Museek Windows media app identity: {error}");
+    }
+}
 
 fn detect_cover_mime_type(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
@@ -174,13 +212,13 @@ fn embed_download_metadata(
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod update_race;
 
-// OS media controls (Windows SMTC / macOS Now Playing / Linux MPRIS) — the media
-// flyout / lock-screen play-pause-next-prev. MediaControls isn't Send/Sync on
-// Windows (raw window + COM handles); we only touch it from `media_update` behind
-// a Mutex. Stored as an Option so the command still runs (and can update the
-// Windows taskbar toolbar) even if SMTC failed to initialize.
+// Native OS media controls for desktop platforms. Windows uses the native
+// session so its app identity and metadata stay under our control.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 struct MediaState(Mutex<Option<MediaControls>>);
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 unsafe impl Send for MediaState {}
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 unsafe impl Sync for MediaState {}
 
 #[tauri::command]
@@ -194,22 +232,25 @@ fn media_update(
 ) {
     let handle = app.clone();
     let update = move || {
-        if let Ok(mut guard) = handle.state::<MediaState>().0.lock() {
-            if let Some(controls) = guard.as_mut() {
-                let cover_url = cover.as_deref();
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            if let Ok(mut guard) = handle.state::<MediaState>().0.lock() {
+                if let Some(controls) = guard.as_mut() {
+                    let cover_url = cover.as_deref();
 
-                let _ = controls.set_metadata(MediaMetadata {
-                    title: Some(&title),
-                    artist: Some(&artist),
-                    album: Some(&album),
-                    cover_url,
-                    ..Default::default()
-                });
-                let _ = controls.set_playback(if playing {
-                    MediaPlayback::Playing { progress: None }
-                } else {
-                    MediaPlayback::Paused { progress: None }
-                });
+                    let _ = controls.set_metadata(MediaMetadata {
+                        title: Some(&title),
+                        artist: Some(&artist),
+                        album: Some(&album),
+                        cover_url,
+                        ..Default::default()
+                    });
+                    let _ = controls.set_playback(if playing {
+                        MediaPlayback::Playing { progress: None }
+                    } else {
+                        MediaPlayback::Paused { progress: None }
+                    });
+                }
             }
         }
         // Reflect the play/pause state on the Windows taskbar thumbnail toolbar too.
@@ -372,7 +413,7 @@ fn configure_lyrics_interaction(
     focus: bool,
 ) -> Result<(), String> {
     window
-        .set_ignore_cursor_events(!interactive)
+        .set_ignore_cursor_events(true)
         .map_err(|e| e.to_string())?;
     window
         .set_focusable(interactive)
@@ -833,6 +874,9 @@ async fn race_download_and_install(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "windows")]
+    set_windows_app_user_model_id();
+
     let mut builder = tauri::Builder::default();
 
     // Single-instance must register early: a second "Open with" should forward
@@ -972,36 +1016,63 @@ pub fn run() {
                     taskbar::install(h.0 as *mut std::ffi::c_void, app_handle.clone());
                 }
 
-                #[cfg(target_os = "windows")]
-                let hwnd = window.hwnd().ok().map(|h| h.0 as *mut std::ffi::c_void);
-                #[cfg(not(target_os = "windows"))]
-                let hwnd = None;
-
-                let config = PlatformConfig {
-                    dbus_name: "museek",
-                    display_name: "Museek",
-                    hwnd,
-                };
-
-                let controls = MediaControls::new(config).ok().map(|mut controls| {
-                    let handle = app_handle.clone();
-                    let _ = controls.attach(move |event: MediaControlEvent| {
-                        let action = match event {
-                            MediaControlEvent::Play => "play",
-                            MediaControlEvent::Pause => "pause",
-                            MediaControlEvent::Toggle => "toggle",
-                            MediaControlEvent::Next => "next",
-                            MediaControlEvent::Previous => "previous",
-                            MediaControlEvent::Stop => "pause",
-                            _ => return,
-                        };
-                        let _ = handle.emit("media-control", action);
-                    });
-                    // Set an initial state so the controls register with the OS.
-                    let _ = controls.set_playback(MediaPlayback::Paused { progress: None });
-                    controls
-                });
-                app.manage(MediaState(Mutex::new(controls)));
+                #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                {
+                    let controls = {
+                        #[cfg(target_os = "windows")]
+                        {
+                            window.hwnd().ok().and_then(|h| {
+                                set_windows_media_app_id(h.0 as *mut std::ffi::c_void);
+                                let config = PlatformConfig {
+                                    dbus_name: "museek",
+                                    display_name: "Museek",
+                                    hwnd: Some(h.0 as *mut std::ffi::c_void),
+                                };
+                                MediaControls::new(config).ok().map(|mut controls| {
+                                    let handle = app_handle.clone();
+                                    let _ = controls.attach(move |event: MediaControlEvent| {
+                                        let action = match event {
+                                            MediaControlEvent::Play => "play",
+                                            MediaControlEvent::Pause => "pause",
+                                            MediaControlEvent::Toggle => "toggle",
+                                            MediaControlEvent::Next => "next",
+                                            MediaControlEvent::Previous => "previous",
+                                            MediaControlEvent::Stop => "pause",
+                                            _ => return,
+                                        };
+                                        let _ = handle.emit("media-control", action);
+                                    });
+                                    controls
+                                })
+                            })
+                        }
+                        #[cfg(not(target_os = "windows"))]
+                        {
+                            let config = PlatformConfig {
+                                dbus_name: "museek",
+                                display_name: "Museek",
+                                hwnd: None,
+                            };
+                            MediaControls::new(config).ok().map(|mut controls| {
+                                let handle = app_handle.clone();
+                                let _ = controls.attach(move |event: MediaControlEvent| {
+                                    let action = match event {
+                                        MediaControlEvent::Play => "play",
+                                        MediaControlEvent::Pause => "pause",
+                                        MediaControlEvent::Toggle => "toggle",
+                                        MediaControlEvent::Next => "next",
+                                        MediaControlEvent::Previous => "previous",
+                                        MediaControlEvent::Stop => "pause",
+                                        _ => return,
+                                    };
+                                    let _ = handle.emit("media-control", action);
+                                });
+                                controls
+                            })
+                        }
+                    };
+                    app.manage(MediaState(Mutex::new(controls)));
+                }
             }
 
             if let Some(window) = app.get_webview_window("lyrics") {
@@ -1144,10 +1215,16 @@ mod taskbar {
                     CoCreateInstance(&TaskbarList, None, CLSCTX_ALL);
                 match created {
                     Ok(list) => {
-                        let _ = list.HrInit();
+                        if let Err(error) = list.HrInit() {
+                            eprintln!("Failed to initialize Windows taskbar: {error}");
+                            return;
+                        }
                         self.list = Some(list);
                     }
-                    Err(_) => return,
+                    Err(error) => {
+                        eprintln!("Failed to create Windows taskbar interface: {error}");
+                        return;
+                    }
                 }
             }
             let list = match &self.list {
@@ -1156,13 +1233,38 @@ mod taskbar {
             };
             let buttons = self.buttons();
             if !self.added {
-                if list.ThumbBarAddButtons(self.hwnd, &buttons).is_ok() {
-                    self.added = true;
+                match list.ThumbBarAddButtons(self.hwnd, &buttons) {
+                    Ok(()) => self.added = true,
+                    Err(error) => {
+                        eprintln!("Failed to add Windows taskbar buttons: {error}");
+                    }
                 }
-            } else {
-                let _ = list.ThumbBarUpdateButtons(self.hwnd, &buttons);
+            } else if let Err(error) = list.ThumbBarUpdateButtons(self.hwnd, &buttons) {
+                self.added = false;
+                eprintln!("Failed to update Windows taskbar buttons: {error}");
             }
         }
+    }
+
+    fn refresh_current() {
+        TB.with(|c| {
+            if let Some(state) = c.borrow_mut().as_mut() {
+                unsafe { state.refresh() };
+            }
+        });
+    }
+
+    fn refresh_on_main_thread(app: &AppHandle) {
+        let _ = app.run_on_main_thread(refresh_current);
+    }
+
+    fn schedule_refreshes(app: AppHandle) {
+        std::thread::spawn(move || {
+            for delay in [100_u64, 400, 1_000, 2_500, 5_000] {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                refresh_on_main_thread(&app);
+            }
+        });
     }
 
     fn make_button(id: u32, icon: HICON, tip: &str) -> THUMBBUTTON {
@@ -1296,6 +1398,8 @@ mod taskbar {
         if created != 0 && umsg == created {
             TB.with(|c| {
                 if let Some(s) = c.borrow_mut().as_mut() {
+                    s.list = None;
+                    s.added = false;
                     s.refresh();
                 }
             });
@@ -1323,6 +1427,7 @@ mod taskbar {
     /// Install the thumbnail toolbar on the given window (called once at startup,
     /// on the main thread). Best-effort: any failure leaves the app unaffected.
     pub fn install(hwnd_ptr: *mut std::ffi::c_void, app: AppHandle) {
+        let retry_app = app.clone();
         let _ = APP.set(app);
         unsafe {
             let hwnd = HWND(hwnd_ptr);
@@ -1351,6 +1456,7 @@ mod taskbar {
                 }
             });
         }
+        schedule_refreshes(retry_app);
     }
 
     /// Update the play/pause button to reflect the current state. Marshals onto
