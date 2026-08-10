@@ -17,6 +17,30 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.1.1": {
+    zh: {
+      sections: [
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "修复播放时歌词加载导致主窗口空白 / 消失的问题",
+            "顶栏改回整行歌词显示；歌词页与桌面歌词仍保留逐字卡拉 OK",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "Fix the main window going blank / disappearing when lyrics load during playback",
+            "Top bar uses plain lyric lines again; word karaoke remains in the lyrics page and desktop lyrics",
+          ],
+        },
+      ],
+    },
+  },
   "3.1.0": {
     zh: {
       sections: [

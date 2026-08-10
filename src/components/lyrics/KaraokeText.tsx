@@ -61,7 +61,9 @@ export function KaraokeText({
                   className="lyric-karaoke-word-sung"
                   aria-hidden="true"
                   style={{
-                    clipPath: `inset(0 ${wordReveal} -0.18em 0)`,
+                    // Keep inset non-negative — negative clip-path values have
+                    // crashed / blanked WKWebView on some macOS builds.
+                    clipPath: `inset(0 ${wordReveal} 0 0)`,
                   }}
                 >
                   {word.text}

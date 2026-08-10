@@ -483,7 +483,7 @@ export function LyricsPanel() {
                           fontSize: `${1.05 * fontScale}rem`,
                         }}
                       >
-                        <p className="transition-[color,filter] duration-300 ease-out motion-reduce:transition-none">
+                        <p className="transition-colors duration-300 ease-out motion-reduce:transition-none">
                           {active && hasKaraokeTiming(line) ? (
                             <PlaybackKaraokeText line={line} />
                           ) : (
@@ -497,7 +497,7 @@ export function LyricsPanel() {
                               fontSize: `${0.85 * fontScale}rem`,
                             }}
                           >
-                            <span className="block transition-[color,filter] duration-300 ease-out motion-reduce:transition-none">
+                            <span className="block transition-colors duration-300 ease-out motion-reduce:transition-none">
                               {line.translation}
                             </span>
                           </p>
