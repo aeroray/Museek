@@ -1053,6 +1053,30 @@ html[data-mini-peek="true"] .app-shell > * {
     transform: scale(0.96) translateY(0);
   }
 }
+@keyframes iconFontIncrease {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(-2px) scale(1.08);
+  }
+  70% {
+    transform: translateY(0) scale(0.98);
+  }
+}
+@keyframes iconFontDecrease {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  45% {
+    transform: translateY(2px) scale(1.08);
+  }
+  70% {
+    transform: translateY(0) scale(0.98);
+  }
+}
 @keyframes iconAudioPulse {
   0%,
   100% {
@@ -1193,6 +1217,12 @@ html[data-mini-peek="true"] .app-shell > * {
   }
   .icon-hover-captions:hover svg {
     animation: iconCaptions 400ms ease;
+  }
+  .icon-hover-font-increase:hover svg {
+    animation: iconFontIncrease 360ms ease;
+  }
+  .icon-hover-font-decrease:hover svg {
+    animation: iconFontDecrease 360ms ease;
   }
 
   /* Nested icons (TrackRow / overlays) — animate the icon itself on parent hover */

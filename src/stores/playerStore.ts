@@ -1,9 +1,9 @@
-import { create } from "zustand"
-import { audioPlayer } from "@/lib/audio"
-import { readData, writeData } from "@/lib/db"
-import { sourceRunner } from "@/lib/sourceRunner"
-import { findActiveLyricIndex, loadLyric } from "@/lib/lyrics"
-import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic"
+import { create } from "zustand";
+import { audioPlayer } from "@/lib/audio";
+import { readData, writeData } from "@/lib/db";
+import { sourceRunner } from "@/lib/sourceRunner";
+import { loadLyric } from "@/lib/lyrics";
+import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic";
 import {
   applyAudioSource,
   beginPlayGeneration,
@@ -11,105 +11,106 @@ import {
   isPlayGenerationCurrent,
   resolvePlayableSrc,
   revokeCurrentObjectUrl,
-} from "@/lib/playback"
-import { notify } from "@/lib/notify"
-import { updateMediaControls, attachMediaControls } from "@/lib/smtc"
-import { setPreventSleep } from "@/lib/power"
-import { useLocalMusicStore } from "@/stores/localMusicStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import { t } from "@/lib/i18n"
-import type { MusicInfo, LyricLine, Quality } from "@/types/music"
-import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player"
+} from "@/lib/playback";
+import { notify } from "@/lib/notify";
+import { updateMediaControls, attachMediaControls } from "@/lib/smtc";
+import { setPreventSleep } from "@/lib/power";
+import { useLocalMusicStore } from "@/stores/localMusicStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { t } from "@/lib/i18n";
+import type { MusicInfo, LyricLine, Quality } from "@/types/music";
+import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player";
 
 // Last play-state pushed to the OS media controls (avoids redundant updates).
-let lastMediaPlaying = false
+let lastMediaPlaying = false;
 
-const PLAY_START_TIMEOUT_MS = 10_000
+const PLAY_START_TIMEOUT_MS = 10_000;
 /** Device-local volume/mute — deliberately excluded from config sync. */
-const PLAYER_PREFS_FILE = "player.json"
+const PLAYER_PREFS_FILE = "player.json";
 
 type PlayerPrefs = {
-  volume: number
-  muted: boolean
-}
+  volume: number;
+  muted: boolean;
+};
 
 function clampVolume(v: number): number {
-  if (!Number.isFinite(v)) return 1
-  return Math.max(0, Math.min(1, v))
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(0, Math.min(1, v));
 }
 
 function persistPlayerPrefs(volume: number, muted: boolean) {
-  writeData(PLAYER_PREFS_FILE, { volume, muted } satisfies PlayerPrefs)
+  writeData(PLAYER_PREFS_FILE, { volume, muted } satisfies PlayerPrefs);
 }
 
 function playWithTimeout(): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(t("player.err.playTimeout"))), PLAY_START_TIMEOUT_MS)
+    const timer = setTimeout(
+      () => reject(new Error(t("player.err.playTimeout"))),
+      PLAY_START_TIMEOUT_MS,
+    );
     audioPlayer.play().then(
       () => {
-        clearTimeout(timer)
-        resolve()
+        clearTimeout(timer);
+        resolve();
       },
       (err) => {
-        clearTimeout(timer)
-        reject(err)
+        clearTimeout(timer);
+        reject(err);
       },
-    )
-  })
+    );
+  });
 }
 
 interface PlayerState {
-  currentSong: MusicInfo | null
-  currentQuality: Quality
-  queue: QueueItem[]
-  queueIndex: number
-  playMode: PlayMode
-  isPlaying: boolean
-  currentTime: number
-  duration: number
-  volume: number
-  muted: boolean
-  status: PlayerStatus
-  error: string | null
-  lyricLines: LyricLine[]
-  currentLyricIndex: number
+  currentSong: MusicInfo | null;
+  currentQuality: Quality;
+  queue: QueueItem[];
+  queueIndex: number;
+  playMode: PlayMode;
+  isPlaying: boolean;
+  duration: number;
+  volume: number;
+  muted: boolean;
+  status: PlayerStatus;
+  error: string | null;
+  lyricLines: LyricLine[];
   /** True while fetching/parsing lyrics for the current song (avoids empty→content flash). */
-  lyricsLoading: boolean
-  showQueue: boolean
-  showLyrics: boolean
+  lyricsLoading: boolean;
+  showQueue: boolean;
+  showLyrics: boolean;
   /** True while the main window is morphing into the mini player shell. */
-  miniMode: boolean
+  miniMode: boolean;
   /** True while enter/exit mini is animating — content stays blurred until done. */
-  miniMorphing: boolean
+  miniMorphing: boolean;
   /** Mini bar collapsed to cover-only while docked at a screen edge. */
-  miniPeek: boolean
+  miniPeek: boolean;
   /** Which edge is in the magnetic dock zone (hint while dragging / before peek). */
-  miniDockHint: "left" | "right" | "top" | "bottom" | null
-  currentPicUrl: string | null
+  miniDockHint: "left" | "right" | "top" | "bottom" | null;
+  currentPicUrl: string | null;
 
-  play: (song: MusicInfo, quality?: Quality) => Promise<void>
-  playFromQueue: (index: number) => Promise<void>
-  addToQueue: (songs: MusicInfo[]) => void
-  playAll: (songs: MusicInfo[]) => void
-  clearQueue: () => void
-  next: () => Promise<void>
-  prev: () => Promise<void>
-  togglePlay: () => void
-  seek: (time: number) => void
-  setVolume: (v: number) => void
-  setMuted: (m: boolean) => void
-  setPlayMode: (mode: PlayMode) => void
-  setShowQueue: (v: boolean) => void
-  setShowLyrics: (v: boolean) => void
+  play: (song: MusicInfo, quality?: Quality) => Promise<void>;
+  playFromQueue: (index: number) => Promise<void>;
+  addToQueue: (songs: MusicInfo[]) => void;
+  playAll: (songs: MusicInfo[]) => void;
+  clearQueue: () => void;
+  next: () => Promise<void>;
+  prev: () => Promise<void>;
+  togglePlay: () => void;
+  seek: (time: number) => void;
+  setVolume: (v: number) => void;
+  setMuted: (m: boolean) => void;
+  setPlayMode: (mode: PlayMode) => void;
+  setShowQueue: (v: boolean) => void;
+  setShowLyrics: (v: boolean) => void;
   /** Restore volume/mute from device-local prefs (not synced). */
-  loadFromDisk: () => Promise<void>
+  loadFromDisk: () => Promise<void>;
 
   // Internal
-  _syncFromAudio: () => void
-  _handleEnded: () => void
-  _handleError: (msg: string) => void
-  _loadLyric: (song: MusicInfo) => Promise<void>
-  _loadPic: (song: MusicInfo) => Promise<void>
+  _syncFromAudio: () => void;
+  _handleEnded: () => void;
+  _handleError: (msg: string) => void;
+  _loadLyric: (song: MusicInfo) => Promise<void>;
+  _loadPic: (song: MusicInfo) => Promise<void>;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => {
@@ -119,7 +120,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       onStateChange: () => get()._syncFromAudio(),
       onEnded: () => get()._handleEnded(),
       onError: (msg) => get()._handleError(msg),
-    })
+    });
     // Wire OS media-control buttons (taskbar thumbnail / media flyout) to playback.
     attachMediaControls({
       play: () => audioPlayer.play(),
@@ -127,8 +128,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       toggle: () => get().togglePlay(),
       next: () => get().next(),
       previous: () => get().prev(),
-    })
-  }, 0)
+    });
+  }, 0);
 
   return {
     currentSong: null,
@@ -137,14 +138,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     queueIndex: -1,
     playMode: "sequence",
     isPlaying: false,
-    currentTime: 0,
     duration: 0,
     volume: 1,
     muted: false,
     status: "idle",
     error: null,
     lyricLines: [],
-    currentLyricIndex: -1,
     lyricsLoading: false,
     showQueue: false,
     showLyrics: false,
@@ -155,9 +154,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     currentPicUrl: null,
 
     async play(song, quality) {
-      const preferred = quality ?? useSettingsStore.getState().playQuality
-      const gen = beginPlayGeneration()
-      const isLocal = song.source === "local"
+      const preferred = quality ?? useSettingsStore.getState().playQuality;
+      const gen = beginPlayGeneration();
+      const isLocal = song.source === "local";
 
       // No source loaded → can't resolve a playback URL. Prompt to import instead
       // of silently failing. Local files play from disk and need no lx source.
@@ -167,13 +166,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           variant: "error",
           actionLabel: t("player.goImport"),
           actionTo: "/settings",
-        })
-        return
+        });
+        return;
       }
 
       // Immediately silence the previous track so switching feels instant — don't
       // let the old song keep playing while the new URL is being resolved.
-      audioPlayer.pause()
+      audioPlayer.pause();
 
       // status:"loading" must survive audio pause/timeupdate sync (see _syncFromAudio).
       // Clear progress so the bar reads as inactive while the new URL resolves.
@@ -183,116 +182,139 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         status: "loading",
         error: null,
         lyricLines: [],
-        currentLyricIndex: -1,
         lyricsLoading: true,
         currentPicUrl: null,
-        currentTime: 0,
         duration: 0,
         isPlaying: false,
-      })
+      });
 
       // Add to queue if not already there
-      const { queue } = get()
-      let idx = queue.findIndex((item) => item.music.id === song.id)
+      const { queue } = get();
+      let idx = queue.findIndex((item) => item.music.id === song.id);
       if (idx === -1) {
-        const newQueue = [...queue, { music: song, quality: preferred }]
-        idx = newQueue.length - 1
-        set({ queue: newQueue, queueIndex: idx })
+        const newQueue = [...queue, { music: song, quality: preferred }];
+        idx = newQueue.length - 1;
+        set({ queue: newQueue, queueIndex: idx });
       } else {
-        set({ queueIndex: idx })
+        set({ queueIndex: idx });
       }
 
       try {
         if (isLocal) {
-          const filePath = song.meta.filePath
-          if (!filePath) throw new Error(t("local.missingPath"))
-          const src = await localFileToObjectUrl(filePath)
-          if (!isPlayGenerationCurrent(gen)) return
-          const best = song.meta.qualitys[0]?.type ?? preferred
+          const filePath = song.meta.filePath;
+          if (!filePath) throw new Error(t("local.missingPath"));
+          const src = await localFileToObjectUrl(filePath);
+          if (!isPlayGenerationCurrent(gen)) return;
+          const best = song.meta.qualitys[0]?.type ?? preferred;
           set((s) => {
-            const q = [...s.queue]
-            if (q[idx]) q[idx] = { ...q[idx], playedQuality: best }
-            return { currentQuality: best, queue: q }
-          })
-          applyAudioSource(src)
-          await playWithTimeout()
-          if (!isPlayGenerationCurrent(gen)) return
-          lastMediaPlaying = true
-          updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
-          useLocalMusicStore.getState().setTrackUnavailable(song.id, false)
-          get()._loadLyric(song)
-          get()._loadPic(song)
-          return
+            const q = [...s.queue];
+            if (q[idx]) q[idx] = { ...q[idx], playedQuality: best };
+            return { currentQuality: best, queue: q };
+          });
+          applyAudioSource(src);
+          await playWithTimeout();
+          if (!isPlayGenerationCurrent(gen)) return;
+          lastMediaPlaying = true;
+          updateMediaControls(
+            song.name,
+            song.singer,
+            song.albumName ?? "",
+            song.meta.picUrl ?? null,
+            true,
+          );
+          useLocalMusicStore.getState().setTrackUnavailable(song.id, false);
+          get()._loadLyric(song);
+          get()._loadPic(song);
+          return;
         }
 
-        const settings = useSettingsStore.getState()
+        const settings = useSettingsStore.getState();
 
         // Fast path: reuse on-disk audio before any remote URL resolve / probe.
         // Without this, A→B→A still spins on loading even when A is already cached.
-        const cached = await findCachedPlayableSrc(song, preferred, settings.audioCache)
-        if (!isPlayGenerationCurrent(gen)) return
+        const cached = await findCachedPlayableSrc(
+          song,
+          preferred,
+          settings.audioCache,
+        );
+        if (!isPlayGenerationCurrent(gen)) return;
 
         if (cached) {
           set((s) => {
-            const q = [...s.queue]
-            if (q[idx]) q[idx] = { ...q[idx], playedQuality: cached.quality }
-            return { currentQuality: cached.quality, queue: q }
-          })
-          applyAudioSource(cached.src)
-          await playWithTimeout()
-          if (!isPlayGenerationCurrent(gen)) return
+            const q = [...s.queue];
+            if (q[idx]) q[idx] = { ...q[idx], playedQuality: cached.quality };
+            return { currentQuality: cached.quality, queue: q };
+          });
+          applyAudioSource(cached.src);
+          await playWithTimeout();
+          if (!isPlayGenerationCurrent(gen)) return;
 
-          lastMediaPlaying = true
-          updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
+          lastMediaPlaying = true;
+          updateMediaControls(
+            song.name,
+            song.singer,
+            song.albumName ?? "",
+            song.meta.picUrl ?? null,
+            true,
+          );
         } else {
           // Slow path: resolve a remote URL (adaptive quality), then cache + play.
-          const { url, quality: actual } = await sourceRunner.getMusicUrlAdaptive(song, preferred)
-          if (!isPlayGenerationCurrent(gen)) return
+          const { url, quality: actual } =
+            await sourceRunner.getMusicUrlAdaptive(song, preferred);
+          if (!isPlayGenerationCurrent(gen)) return;
 
           // Record the real quality on the now-playing queue item so its badge
           // reflects what actually played (and stays put when it's no longer active).
           set((s) => {
-            const q = [...s.queue]
-            if (q[idx]) q[idx] = { ...q[idx], playedQuality: actual }
-            return { currentQuality: actual, queue: q }
-          })
+            const q = [...s.queue];
+            if (q[idx]) q[idx] = { ...q[idx], playedQuality: actual };
+            return { currentQuality: actual, queue: q };
+          });
           if (actual !== preferred) {
             notify({
-              message: t("player.qualityDowngraded", { quality: t(`quality.${actual}`) }),
+              message: t("player.qualityDowngraded", {
+                quality: t(`quality.${actual}`),
+              }),
               variant: "info",
-            })
+            });
           }
           const src = await resolvePlayableSrc(song, actual, url, {
             audioCache: settings.audioCache,
             maxCacheMB: settings.maxCacheMB,
-          })
-          if (!isPlayGenerationCurrent(gen)) return
+          });
+          if (!isPlayGenerationCurrent(gen)) return;
 
-          applyAudioSource(src)
-          await playWithTimeout()
-          if (!isPlayGenerationCurrent(gen)) return
+          applyAudioSource(src);
+          await playWithTimeout();
+          if (!isPlayGenerationCurrent(gen)) return;
 
           // Publish to the OS media controls (taskbar / media flyout).
-          lastMediaPlaying = true
-          updateMediaControls(song.name, song.singer, song.albumName ?? "", song.meta.picUrl ?? null, true)
+          lastMediaPlaying = true;
+          updateMediaControls(
+            song.name,
+            song.singer,
+            song.albumName ?? "",
+            song.meta.picUrl ?? null,
+            true,
+          );
         }
       } catch (err) {
-        if (!isPlayGenerationCurrent(gen)) return
-        const raw = (err as Error).message || t("player.err.unknown")
+        if (!isPlayGenerationCurrent(gen)) return;
+        const raw = (err as Error).message || t("player.err.unknown");
         // Local missing/unreadable files: clear copy, not "播放失败：File not found".
         // Also reset the player bar — leaving the broken track as "current" looks paused.
         if (isLocal) {
           if (raw === t("player.err.playTimeout")) {
-            set({ status: "error", error: raw, lyricsLoading: false })
-            notify({ message: raw, variant: "error" })
-            return
+            set({ status: "error", error: raw, lyricsLoading: false });
+            notify({ message: raw, variant: "error" });
+            return;
           }
-          const message = mapLocalPlayError(err)
-          useLocalMusicStore.getState().setTrackUnavailable(song.id, true)
-          const failed = get().currentSong
-          audioPlayer.stop()
-          revokeCurrentObjectUrl()
-          lastMediaPlaying = false
+          const message = mapLocalPlayError(err);
+          useLocalMusicStore.getState().setTrackUnavailable(song.id, true);
+          const failed = get().currentSong;
+          audioPlayer.stop();
+          revokeCurrentObjectUrl();
+          lastMediaPlaying = false;
           if (failed) {
             updateMediaControls(
               failed.name,
@@ -300,7 +322,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               failed.albumName ?? "",
               get().currentPicUrl ?? failed.meta.picUrl ?? null,
               false,
-            )
+            );
           }
           set({
             currentSong: null,
@@ -308,51 +330,51 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             isPlaying: false,
             status: "idle",
             error: null,
-            currentTime: 0,
             duration: 0,
             lyricLines: [],
-            currentLyricIndex: -1,
             lyricsLoading: false,
             currentPicUrl: null,
             showLyrics: false,
-          })
-          notify({ message, variant: "error" })
-          return
+          });
+          notify({ message, variant: "error" });
+          return;
         }
-        const isTimeout = raw === t("player.err.playTimeout")
+        const isTimeout = raw === t("player.err.playTimeout");
         // Transport-level failures from the source's HTTP request (DNS/TLS/connection)
         // surface as cryptic reqwest strings — give a clearer hint that it's a
         // network/proxy/source-reachability problem, not a bug in the song itself.
         const isNetwork =
           !isTimeout &&
-          /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(raw)
+          /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(
+            raw,
+          );
         const message = isTimeout
           ? raw
           : isNetwork
             ? t("player.err.network", { msg: raw })
-            : t("player.failedDetail", { msg: raw })
-        set({ status: "error", error: message, lyricsLoading: false })
-        notify({ message, variant: "error" })
-        return
+            : t("player.failedDetail", { msg: raw });
+        set({ status: "error", error: message, lyricsLoading: false });
+        notify({ message, variant: "error" });
+        return;
       }
 
       // Load lyric and pic in parallel, non-blocking
-      get()._loadLyric(song)
-      get()._loadPic(song)
+      get()._loadLyric(song);
+      get()._loadPic(song);
     },
 
     async playFromQueue(index) {
-      const item = get().queue[index]
-      if (!item) return
-      set({ queueIndex: index })
-      await get().play(item.music, item.quality)
+      const item = get().queue[index];
+      if (!item) return;
+      set({ queueIndex: index });
+      await get().play(item.music, item.quality);
     },
 
     addToQueue(songs) {
       // Stamp queued items with the preferred quality from Settings (not the
       // last-played `currentQuality`, which defaults to 128k) so the configured
       // quality actually applies when these items play.
-      const preferred = useSettingsStore.getState().playQuality
+      const preferred = useSettingsStore.getState().playQuality;
       set((s) => ({
         queue: [
           ...s.queue,
@@ -360,64 +382,67 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             .filter((song) => !s.queue.some((q) => q.music.id === song.id))
             .map((song) => ({ music: song, quality: preferred })),
         ],
-      }))
+      }));
     },
 
     clearQueue() {
-      set({ queue: [], queueIndex: -1 })
+      set({ queue: [], queueIndex: -1 });
     },
 
     // Append `songs` to the current queue (deduped) and start playing. In shuffle
     // mode it starts from a RANDOM track of the selection — otherwise the first.
     playAll(songs) {
-      if (!songs.length) return
-      get().addToQueue(songs)
-      const startIdx = get().playMode === "shuffle" ? Math.floor(Math.random() * songs.length) : 0
-      get().play(songs[startIdx])
+      if (!songs.length) return;
+      get().addToQueue(songs);
+      const startIdx =
+        get().playMode === "shuffle"
+          ? Math.floor(Math.random() * songs.length)
+          : 0;
+      get().play(songs[startIdx]);
     },
 
     async next() {
-      const { queue, queueIndex, playMode } = get()
-      if (!queue.length) return
-      let nextIdx: number
+      const { queue, queueIndex, playMode } = get();
+      if (!queue.length) return;
+      let nextIdx: number;
       if (playMode === "shuffle") {
-        nextIdx = Math.floor(Math.random() * queue.length)
+        nextIdx = Math.floor(Math.random() * queue.length);
       } else {
-        nextIdx = (queueIndex + 1) % queue.length
+        nextIdx = (queueIndex + 1) % queue.length;
       }
-      await get().playFromQueue(nextIdx)
+      await get().playFromQueue(nextIdx);
     },
 
     async prev() {
-      const { queue, queueIndex } = get()
-      if (!queue.length) return
-      const prevIdx = (queueIndex - 1 + queue.length) % queue.length
-      await get().playFromQueue(prevIdx)
+      const { queue, queueIndex } = get();
+      if (!queue.length) return;
+      const prevIdx = (queueIndex - 1 + queue.length) % queue.length;
+      await get().playFromQueue(prevIdx);
     },
 
     togglePlay() {
       if (get().isPlaying) {
-        audioPlayer.pause()
+        audioPlayer.pause();
       } else {
-        audioPlayer.play()
+        audioPlayer.play();
       }
     },
 
     seek(time) {
-      audioPlayer.seek(time)
+      audioPlayer.seek(time);
     },
 
     setVolume(v) {
-      const volume = clampVolume(v)
-      audioPlayer.setVolume(volume)
-      set({ volume })
-      persistPlayerPrefs(volume, get().muted)
+      const volume = clampVolume(v);
+      audioPlayer.setVolume(volume);
+      set({ volume });
+      persistPlayerPrefs(volume, get().muted);
     },
 
     setMuted(m) {
-      audioPlayer.setMuted(m)
-      set({ muted: m })
-      persistPlayerPrefs(get().volume, m)
+      audioPlayer.setMuted(m);
+      set({ muted: m });
+      persistPlayerPrefs(get().volume, m);
     },
 
     setPlayMode: (mode) => set({ playMode: mode }),
@@ -425,48 +450,49 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     setShowLyrics: (v) => set({ showLyrics: v }),
 
     async loadFromDisk() {
-      const data = await readData<Partial<PlayerPrefs>>(PLAYER_PREFS_FILE, {})
-      const volume = typeof data.volume === "number" ? clampVolume(data.volume) : 1
-      const muted = typeof data.muted === "boolean" ? data.muted : false
-      audioPlayer.setVolume(volume)
-      audioPlayer.setMuted(muted)
-      set({ volume, muted })
+      const data = await readData<Partial<PlayerPrefs>>(PLAYER_PREFS_FILE, {});
+      const volume =
+        typeof data.volume === "number" ? clampVolume(data.volume) : 1;
+      const muted = typeof data.muted === "boolean" ? data.muted : false;
+      audioPlayer.setVolume(volume);
+      audioPlayer.setMuted(muted);
+      set({ volume, muted });
     },
 
     _syncFromAudio() {
-      const state = audioPlayer.getState()
-      const { lyricLines, status: storeStatus } = get()
-
-      const currentLyricIndex = findActiveLyricIndex(lyricLines, state.currentTime)
+      const state = audioPlayer.getState();
+      const { status: storeStatus } = get();
 
       // While resolving a playback URL, pause()/timeupdate would otherwise report
       // "paused" and wipe the intentional loading UI (play spinner + disabled seek).
       // Accept audio status only once playback actually starts (or buffers).
       const status =
-        storeStatus === "loading" && state.status !== "playing" && state.status !== "loading"
+        storeStatus === "loading" &&
+        state.status !== "playing" &&
+        state.status !== "loading"
           ? "loading"
           : storeStatus === "error"
             ? "error"
-            : state.status
+            : state.status;
 
       // Use the *computed* status for isPlaying — if we keyed off storeStatus==="loading"
       // after already promoting status to "playing", one frame shows Play instead of Pause.
       set({
         isPlaying: status === "loading" ? false : state.isPlaying,
-        currentTime: status === "loading" ? 0 : state.currentTime,
         duration: status === "loading" ? 0 : state.duration,
         status,
-        currentLyricIndex,
-      })
+      });
 
       // Keep the system awake only while actually playing (respecting the
       // setting). setPreventSleep de-dupes, so calling it every tick is cheap.
-      setPreventSleep(state.isPlaying && useSettingsStore.getState().preventSleepWhilePlaying)
+      setPreventSleep(
+        state.isPlaying && useSettingsStore.getState().preventSleepWhilePlaying,
+      );
 
       // Keep the OS media controls' play/pause state in sync (only on change).
       if (state.isPlaying !== lastMediaPlaying) {
-        lastMediaPlaying = state.isPlaying
-        const song = get().currentSong
+        lastMediaPlaying = state.isPlaying;
+        const song = get().currentSong;
         if (song) {
           updateMediaControls(
             song.name,
@@ -474,27 +500,27 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             song.albumName ?? "",
             get().currentPicUrl ?? song.meta.picUrl ?? null,
             state.isPlaying,
-          )
+          );
         }
       }
     },
 
     _handleEnded() {
-      const { playMode, queue, queueIndex } = get()
+      const { playMode, queue, queueIndex } = get();
       if (playMode === "repeat-one") {
-        audioPlayer.seek(0)
-        audioPlayer.play()
-        return
+        audioPlayer.seek(0);
+        audioPlayer.play();
+        return;
       }
       // Sequential mode stops at the end of the queue; list-loop wraps; shuffle
       // keeps picking. (next() itself wraps, so guard the end here.)
       if (playMode === "sequence" && queueIndex >= queue.length - 1) {
         // Reached the end → clear the now-playing state so the player returns to
         // idle instead of leaving the finished song sitting there looking paused.
-        const finished = get().currentSong
-        audioPlayer.stop()
-        revokeCurrentObjectUrl()
-        lastMediaPlaying = false
+        const finished = get().currentSong;
+        audioPlayer.stop();
+        revokeCurrentObjectUrl();
+        lastMediaPlaying = false;
         if (finished) {
           updateMediaControls(
             finished.name,
@@ -502,62 +528,64 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             finished.albumName ?? "",
             get().currentPicUrl ?? finished.meta.picUrl ?? null,
             false,
-          )
+          );
         }
         set({
           currentSong: null,
           queueIndex: -1,
           isPlaying: false,
           status: "idle",
-          currentTime: 0,
           duration: 0,
           lyricLines: [],
-          currentLyricIndex: -1,
           lyricsLoading: false,
           currentPicUrl: null,
           showLyrics: false,
-        })
-        return
+        });
+        return;
       }
-      get().next()
+      get().next();
     },
 
     _handleError(msg) {
-      set({ status: "error", error: msg, isPlaying: false })
+      set({ status: "error", error: msg, isPlaying: false });
     },
 
     async _loadLyric(song) {
-      const songId = song.id
-      set({ lyricsLoading: true })
+      const songId = song.id;
+      set({ lyricsLoading: true });
       try {
-        const lines = await loadLyric(song)
-        if (get().currentSong?.id !== songId) return
-        set({ lyricLines: lines, lyricsLoading: false })
+        const lines = await loadLyric(song);
+        if (get().currentSong?.id !== songId) return;
+        set({ lyricLines: lines, lyricsLoading: false });
       } catch {
-        if (get().currentSong?.id !== songId) return
-        set({ lyricLines: [], lyricsLoading: false })
+        if (get().currentSong?.id !== songId) return;
+        set({ lyricLines: [], lyricsLoading: false });
       }
     },
 
     async _loadPic(song) {
       if (song.meta.picUrl) {
-        set({ currentPicUrl: song.meta.picUrl })
-        return
+        set({ currentPicUrl: song.meta.picUrl });
+        return;
       }
       // Local embedded covers are stored under AppData; resolve if we only have the rel path.
       if (song.source === "local" && song.meta.localCoverRel) {
-        const { resolveLocalCoverUrl } = await import("@/lib/localMusic")
-        const localUrl = await resolveLocalCoverUrl(song.meta.localCoverRel)
+        const { resolveLocalCoverUrl } = await import("@/lib/localMusic");
+        const localUrl = await resolveLocalCoverUrl(song.meta.localCoverRel);
         if (localUrl) {
-          set({ currentPicUrl: localUrl })
-          return
+          set({ currentPicUrl: localUrl });
+          return;
         }
       }
-      const picUrl = await sourceRunner.getPic({ source: song.source, action: "pic", info: song })
-      if (picUrl) set({ currentPicUrl: picUrl })
+      const picUrl = await sourceRunner.getPic({
+        source: song.source,
+        action: "pic",
+        info: song,
+      });
+      if (picUrl) set({ currentPicUrl: picUrl });
     },
-  }
-})
+  };
+});
 
 // Preserve playback state across Vite HMR in dev. Without this, hot-reloading a
 // module recreates the store with its initial state (currentSong=null, queue=[])
@@ -565,10 +593,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 // "nothing playing" mid-song. No effect in production (import.meta.hot is undefined
 // and the block is tree-shaken away). Only data fields are restored, never actions.
 if (import.meta.hot) {
-  const saved = import.meta.hot.data.playerState as Partial<PlayerState> | undefined
-  if (saved) usePlayerStore.setState(saved)
+  const saved = import.meta.hot.data.playerState as
+    | Partial<PlayerState>
+    | undefined;
+  if (saved) usePlayerStore.setState(saved);
   import.meta.hot.dispose((data) => {
-    const s = usePlayerStore.getState()
+    const s = usePlayerStore.getState();
     data.playerState = {
       currentSong: s.currentSong,
       currentQuality: s.currentQuality,
@@ -576,15 +606,13 @@ if (import.meta.hot) {
       queueIndex: s.queueIndex,
       playMode: s.playMode,
       isPlaying: s.isPlaying,
-      currentTime: s.currentTime,
       duration: s.duration,
       status: s.status,
       currentPicUrl: s.currentPicUrl,
       lyricLines: s.lyricLines,
-      currentLyricIndex: s.currentLyricIndex,
       lyricsLoading: s.lyricsLoading,
       volume: s.volume,
       muted: s.muted,
-    }
-  })
+    };
+  });
 }

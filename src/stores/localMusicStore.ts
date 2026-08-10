@@ -310,7 +310,9 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
         unavailable: false,
         song,
       });
-      void enrichLocalSong(song, tags, nameMode).then((enriched) => {
+      void enrichLocalSong(song, tags, nameMode, () =>
+        canApplyTrackRefresh(track.id, track.filePath, nameMode, version),
+      ).then((enriched) => {
         if (
           !canApplyTrackRefresh(track.id, track.filePath, nameMode, version)
         ) {
@@ -403,7 +405,9 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
 
         // Enrich (NetEase fill) off the critical path so the row appears immediately.
         const version = beginTrackRefresh(id);
-        void enrichLocalSong(song, tags, nameMode).then((enriched) => {
+        void enrichLocalSong(song, tags, nameMode, () =>
+          canApplyTrackRefresh(id, filePath, nameMode, version),
+        ).then((enriched) => {
           if (!canApplyTrackRefresh(id, filePath, nameMode, version)) return;
           if (enriched !== song) get().updateSong(id, enriched);
         });

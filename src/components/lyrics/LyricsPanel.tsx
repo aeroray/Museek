@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type WheelEvent,
+} from "react";
 import {
   X,
   AArrowUp,
@@ -7,8 +13,9 @@ import {
   Music,
   Captions,
   CaptionsOff,
-  Expand,
-  Shrink,
+  Maximize,
+  Minimize,
+  ScanEye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,28 +28,36 @@ import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { hiResCover } from "@/lib/cover";
 import { hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
 import {
+  clampLyricFontScale,
+  readLyricFontScale,
+  writeLyricFontScale,
+} from "@/lib/lyrics/fontScale";
+import {
   enterLyricsFullscreen,
   exitLyricsFullscreen,
+  findActiveLyricIndex,
   isLyricsFullscreenSession,
   syncLyricsFullscreenState,
 } from "@/lib/lyrics";
 import { useT } from "@/lib/i18n";
+import { isMacOs } from "@/lib/os";
+import { getPlaybackTime, usePlaybackLyricIndex } from "@/lib/playback/clock";
 import { cn } from "@/lib/utils";
 
 const FONT_MIN = 0.85;
-const FONT_MAX = 1.8;
+const FONT_MAX = 2.5;
 const FONT_STEP = 0.15;
-const LYRIC_FONT_KEY = "museek.lyricFontScale";
 const SLIDE_MS = 320;
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const FADE =
   "linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%)";
+const MAIN_FONT_POLICY = { min: FONT_MIN, max: FONT_MAX, defaultValue: 1 };
 
 export function LyricsPanel() {
   const currentSong = usePlayerStore((s) => s.currentSong);
   const lyricLines = usePlayerStore((s) => s.lyricLines);
-  const currentLyricIndex = usePlayerStore((s) => s.currentLyricIndex);
+  const currentLyricIndex = usePlaybackLyricIndex(lyricLines);
   const showLyrics = usePlayerStore((s) => s.showLyrics);
   const lyricsLoading = usePlayerStore((s) => s.lyricsLoading);
   const currentPicUrl = usePlayerStore((s) => s.currentPicUrl);
@@ -54,13 +69,15 @@ export function LyricsPanel() {
   const seek = usePlayerStore((s) => s.seek);
   const t = useT();
   const desktopLyricsControlsDisabled = !currentSong && !desktopLyricsVisible;
-  const [fontScale, setFontScale] = useState(() => {
-    const v = parseFloat(localStorage.getItem(LYRIC_FONT_KEY) ?? "");
-    return Number.isFinite(v) ? Math.min(FONT_MAX, Math.max(FONT_MIN, v)) : 1;
-  });
+  const [fontScale, setFontScale] = useState(() =>
+    readLyricFontScale(MAIN_FONT_POLICY),
+  );
+  const fontScaleRef = useRef(fontScale);
   const [rendered, setRendered] = useState(showLyrics);
   const [entered, setEntered] = useState(false);
   const [immersive, setImmersive] = useState(false);
+  const [lyricsOnly, setLyricsOnly] = useState(false);
+  const [loadedHeroSrc, setLoadedHeroSrc] = useState<string | null>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -69,6 +86,7 @@ export function LyricsPanel() {
     ? (hiResCover(thumbSrc, currentSong?.source) ?? thumbSrc)
     : null;
   const needsHeroUpgrade = !!heroSrc && !!thumbSrc && heroSrc !== thumbSrc;
+  const heroReady = !needsHeroUpgrade || loadedHeroSrc === heroSrc;
 
   useEffect(() => {
     if (showLyrics) {
@@ -106,7 +124,8 @@ export function LyricsPanel() {
   }, [showLyrics, immersive]);
 
   const centerActiveLine = useCallback((behavior: ScrollBehavior) => {
-    const idx = usePlayerStore.getState().currentLyricIndex;
+    const state = usePlayerStore.getState();
+    const idx = findActiveLyricIndex(state.lyricLines, getPlaybackTime());
     const line = lineRefs.current[idx];
     const root = scrollRef.current;
     if (idx < 0 || !line || !root) return;
@@ -133,7 +152,7 @@ export function LyricsPanel() {
       return;
     const id = requestAnimationFrame(() => centerActiveLine("auto"));
     return () => cancelAnimationFrame(id);
-  }, [entered, lyricsLoading, lyricLines.length, centerActiveLine]);
+  }, [entered, lyricsLoading, lyricLines.length, lyricsOnly, centerActiveLine]);
 
   useEffect(() => {
     if (!showLyrics) return;
@@ -174,8 +193,24 @@ export function LyricsPanel() {
   if (!rendered) return null;
 
   const setScale = (v: number) => {
-    setFontScale(v);
-    localStorage.setItem(LYRIC_FONT_KEY, String(v));
+    const nextScale = clampLyricFontScale(v, MAIN_FONT_POLICY);
+    fontScaleRef.current = nextScale;
+    setFontScale(nextScale);
+    writeLyricFontScale(nextScale);
+  };
+  const handleLyricWheel = (event: WheelEvent<HTMLDivElement>) => {
+    const modifierPressed = isMacOs() ? event.metaKey : event.ctrlKey;
+    if (!modifierPressed || event.deltaY === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const steps = Math.max(
+      1,
+      Math.min(3, Math.round(Math.abs(event.deltaY) / 100)),
+    );
+    setScale(
+      +(fontScaleRef.current + direction * FONT_STEP * steps).toFixed(2),
+    );
   };
   const dec = () =>
     setScale(Math.max(FONT_MIN, +(fontScale - FONT_STEP).toFixed(2)));
@@ -190,17 +225,30 @@ export function LyricsPanel() {
           <img
             src={thumbSrc}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            className={cn(
+              "absolute inset-0 h-full w-full object-cover transition-[filter,transform,opacity] duration-700 ease-out",
+              needsHeroUpgrade && "scale-105 blur-md opacity-80",
+            )}
             decoding="async"
           />
           {needsHeroUpgrade && (
-            <CoverImage
-              src={heroSrc}
-              alt="album"
-              loading="eager"
-              showOutline={false}
-              className="absolute inset-0"
-            />
+            <div
+              className={cn(
+                "absolute inset-0 transition-opacity duration-700 ease-out",
+                heroReady ? "opacity-100" : "pointer-events-none opacity-0",
+              )}
+            >
+              <CoverImage
+                src={heroSrc}
+                alt="album"
+                loading="eager"
+                showOutline={false}
+                className="absolute inset-0"
+                onLoaded={(loaded) => {
+                  if (loaded && heroSrc) setLoadedHeroSrc(heroSrc);
+                }}
+              />
+            </div>
           )}
         </>
       ) : (
@@ -251,21 +299,37 @@ export function LyricsPanel() {
       </Button>
 
       <div className="absolute right-4 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "h-9 w-9 icon-hover-captions",
+            lyricsOnly
+              ? "text-primary"
+              : "text-muted-foreground/55 hover:text-muted-foreground",
+          )}
+          onClick={() => setLyricsOnly((value) => !value)}
+          title={t(lyricsOnly ? "lyrics.exitSolo" : "lyrics.solo")}
+          aria-label={t(lyricsOnly ? "lyrics.exitSolo" : "lyrics.solo")}
+          aria-pressed={lyricsOnly}
+        >
+          <ScanEye size={16} />
+        </Button>
         {isTauri && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
+            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-maximize"
             onClick={() => void toggleImmersive()}
             title={t(immersive ? "lyrics.exitFullscreen" : "lyrics.fullscreen")}
           >
-            {immersive ? <Shrink size={18} /> : <Expand size={18} />}
+            {immersive ? <Minimize size={18} /> : <Maximize size={18} />}
           </Button>
         )}
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
+          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-increase"
           onClick={inc}
           disabled={fontScale >= FONT_MAX}
           title={t("lyrics.fontIncrease")}
@@ -275,7 +339,7 @@ export function LyricsPanel() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
+          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-decrease"
           onClick={dec}
           disabled={fontScale <= FONT_MIN}
           title={t("lyrics.fontDecrease")}
@@ -318,7 +382,14 @@ export function LyricsPanel() {
       </div>
 
       <div className="relative z-10 flex h-full min-h-0">
-        <div className="flex w-2/5 shrink-0 flex-col items-center justify-center gap-6 overflow-visible p-12">
+        <div
+          className={cn(
+            "flex shrink-0 flex-col items-center justify-center gap-6 transition-[width,opacity,transform,padding] duration-300 ease-out",
+            lyricsOnly
+              ? "pointer-events-none w-0 -translate-x-4 overflow-hidden p-0 opacity-0"
+              : "w-2/5 overflow-visible p-12",
+          )}
+        >
           {currentSong && (
             <div className="text-center max-w-xs">
               <p
@@ -363,6 +434,7 @@ export function LyricsPanel() {
 
         <div
           className="relative flex-1 min-h-0"
+          onWheel={handleLyricWheel}
           style={{ maskImage: FADE, WebkitMaskImage: FADE }}
         >
           {lyricsLoading && lyricLines.length === 0 ? (
@@ -376,7 +448,12 @@ export function LyricsPanel() {
             </div>
           ) : (
             <ScrollArea ref={scrollRef} className="h-full">
-              <div className="py-[42vh] pl-4 pr-24 text-center animate-in fade-in duration-300">
+              <div
+                className={cn(
+                  "py-[42vh] text-center animate-in fade-in duration-300",
+                  lyricsOnly ? "px-4" : "pl-4 pr-24",
+                )}
+              >
                 {lyricLines.map((line, i) => {
                   const active = i === currentLyricIndex;
                   return (

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { usePlayerStore } from "@/stores/playerStore";
+import { getPlaybackTime } from "@/lib/playback/clock";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { DESKTOP_LYRICS_GLOBAL_INTERACTION_EVENT } from "@/lib/desktopLyricsProtocol";
 import { toggleMiniPlayer } from "@/lib/miniPlayer";
@@ -84,7 +85,7 @@ export function useGlobalShortcuts(): void {
             if (canTransport) void p.prev();
             else handled = false;
           } else if (canSeek) {
-            p.seek(p.currentTime - SEEK_STEP);
+            p.seek(getPlaybackTime() - SEEK_STEP);
           } else {
             handled = false;
           }
@@ -94,7 +95,7 @@ export function useGlobalShortcuts(): void {
             if (canTransport) void p.next();
             else handled = false;
           } else if (canSeek) {
-            p.seek(p.currentTime + SEEK_STEP);
+            p.seek(getPlaybackTime() + SEEK_STEP);
           } else {
             handled = false;
           }

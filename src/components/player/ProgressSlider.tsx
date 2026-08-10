@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react"
-import { subscribePlaybackTime } from "@/lib/playback/clock"
-import { usePlayerStore } from "@/stores/playerStore"
-import { formatDuration, cn } from "@/lib/utils"
+import { useEffect, useRef, useState } from "react";
+import { usePlaybackTime } from "@/lib/playback/clock";
+import { usePlayerStore } from "@/stores/playerStore";
+import { formatDuration, cn } from "@/lib/utils";
 
 /**
  * Playback seek bar.
@@ -10,71 +10,79 @@ import { formatDuration, cn } from "@/lib/utils"
  * lags the thumb. Smooth time comes from the playback-clock seam.
  */
 export function ProgressSlider({ className }: { className?: string }) {
-  const duration = usePlayerStore((s) => s.duration)
-  const status = usePlayerStore((s) => s.status)
-  const currentSong = usePlayerStore((s) => s.currentSong)
-  const storeTime = usePlayerStore((s) => s.currentTime)
-  const seek = usePlayerStore((s) => s.seek)
+  const duration = usePlayerStore((s) => s.duration);
+  const status = usePlayerStore((s) => s.status);
+  const currentSong = usePlayerStore((s) => s.currentSong);
+  const seek = usePlayerStore((s) => s.seek);
+  const playbackTime = usePlaybackTime();
 
-  const trackRef = useRef<HTMLDivElement>(null)
-  const scrubbingRef = useRef(false)
-  const scrubTimeRef = useRef<number | null>(null)
-  const [scrubTime, setScrubTime] = useState<number | null>(null)
-  const [displayTime, setDisplayTime] = useState(storeTime)
+  const trackRef = useRef<HTMLDivElement>(null);
+  const scrubbingRef = useRef(false);
+  const scrubTimeRef = useRef<number | null>(null);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+  const [displayTime, setDisplayTime] = useState(playbackTime);
 
-  const disabled = !currentSong || status === "loading" || status === "idle" || status === "error"
-  const scrubbing = scrubTime !== null
+  const disabled =
+    !currentSong ||
+    status === "loading" ||
+    status === "idle" ||
+    status === "error";
+  const scrubbing = scrubTime !== null;
 
   useEffect(() => {
-    if (scrubbing || status === "playing") return
-    setDisplayTime(storeTime)
-  }, [storeTime, status, scrubbing])
+    if (scrubbing || status === "playing") return;
+    setDisplayTime(
+      status === "loading" || status === "idle" ? 0 : playbackTime,
+    );
+  }, [playbackTime, status, scrubbing]);
 
-  useEffect(() => {
-    if (status !== "playing" || scrubbing) return
-    return subscribePlaybackTime((t) => setDisplayTime(t))
-  }, [status, scrubbing])
-
-  const time = scrubTime ?? displayTime
-  const pct = duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0
+  const time = scrubTime ?? displayTime;
+  const pct =
+    duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0;
 
   const timeFromClientX = (clientX: number) => {
-    const el = trackRef.current
-    if (!el || duration <= 0) return 0
-    const rect = el.getBoundingClientRect()
-    if (rect.width <= 0) return 0
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-    return ratio * duration
-  }
+    const el = trackRef.current;
+    if (!el || duration <= 0) return 0;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return ratio * duration;
+  };
 
   const beginScrub = (clientX: number) => {
-    if (disabled || duration <= 0) return
-    scrubbingRef.current = true
-    const next = timeFromClientX(clientX)
-    scrubTimeRef.current = next
-    setScrubTime(next)
-    seek(next)
-  }
+    if (disabled || duration <= 0) return;
+    scrubbingRef.current = true;
+    const next = timeFromClientX(clientX);
+    scrubTimeRef.current = next;
+    setScrubTime(next);
+    seek(next);
+  };
 
   const moveScrub = (clientX: number) => {
-    if (!scrubbingRef.current || duration <= 0) return
-    const next = timeFromClientX(clientX)
-    scrubTimeRef.current = next
-    setScrubTime(next)
-    seek(next)
-  }
+    if (!scrubbingRef.current || duration <= 0) return;
+    const next = timeFromClientX(clientX);
+    scrubTimeRef.current = next;
+    setScrubTime(next);
+    seek(next);
+  };
 
   const endScrub = () => {
-    if (!scrubbingRef.current) return
-    scrubbingRef.current = false
-    const t = scrubTimeRef.current
-    scrubTimeRef.current = null
-    if (t != null) setDisplayTime(t)
-    setScrubTime(null)
-  }
+    if (!scrubbingRef.current) return;
+    scrubbingRef.current = false;
+    const t = scrubTimeRef.current;
+    scrubTimeRef.current = null;
+    if (t != null) setDisplayTime(t);
+    setScrubTime(null);
+  };
 
   return (
-    <div className={cn("flex items-center gap-3 w-full px-4 pt-3 pb-1", className, disabled && "opacity-50")}>
+    <div
+      className={cn(
+        "flex items-center gap-3 w-full px-4 pt-3 pb-1",
+        className,
+        disabled && "opacity-50",
+      )}
+    >
       <span className="text-[11px] text-muted-foreground/80 tabular-nums w-10 text-right shrink-0 font-medium tracking-wide">
         {formatDuration(time)}
       </span>
@@ -91,31 +99,33 @@ export function ProgressSlider({ className }: { className?: string }) {
         aria-disabled={disabled || undefined}
         className={cn(
           "group/slider relative flex h-5 w-full flex-1 touch-none select-none items-center",
-          disabled ? "cursor-not-allowed pointer-events-none" : "cursor-pointer",
+          disabled
+            ? "cursor-not-allowed pointer-events-none"
+            : "cursor-pointer",
         )}
         onPointerDown={(e) => {
-          if (disabled) return
-          e.currentTarget.setPointerCapture(e.pointerId)
-          beginScrub(e.clientX)
+          if (disabled) return;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          beginScrub(e.clientX);
         }}
         onPointerMove={(e) => moveScrub(e.clientX)}
         onPointerUp={endScrub}
         onPointerCancel={endScrub}
         onKeyDown={(e) => {
-          if (disabled || duration <= 0) return
-          const step = e.shiftKey ? 10 : 5
+          if (disabled || duration <= 0) return;
+          const step = e.shiftKey ? 10 : 5;
           if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-            e.preventDefault()
-            seek(Math.max(0, time - step))
+            e.preventDefault();
+            seek(Math.max(0, time - step));
           } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-            e.preventDefault()
-            seek(Math.min(duration, time + step))
+            e.preventDefault();
+            seek(Math.min(duration, time + step));
           } else if (e.key === "Home") {
-            e.preventDefault()
-            seek(0)
+            e.preventDefault();
+            seek(0);
           } else if (e.key === "End") {
-            e.preventDefault()
-            seek(duration)
+            e.preventDefault();
+            seek(duration);
           }
         }}
       >
@@ -140,5 +150,5 @@ export function ProgressSlider({ className }: { className?: string }) {
         {formatDuration(duration)}
       </span>
     </div>
-  )
+  );
 }

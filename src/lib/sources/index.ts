@@ -1,10 +1,11 @@
 /**
- * Sources module — runtime runner, registry seam, and script persistence.
+ * Sources module — runtime runner and script persistence.
  * Zustand sourceStore remains the UI projection / orchestration adapter.
  */
 export {
   sourceRunner,
-  bindSourceRegistry,
-  type SourceRegistry,
-} from "@/lib/sourceRunner"
-export { loadSourceScripts, saveSourceScripts } from "./persist"
+  createSourceRunner,
+  SourceRunner,
+} from "@/lib/sourceRunner";
+export type { SourceRegistry } from "@/types/source";
+export { loadSourceScripts, saveSourceScripts } from "./persist";

@@ -1,4 +1,5 @@
 import { readData, writeData } from "@/lib/db";
+import { LYRIC_FONT_SCALE_KEY } from "@/lib/lyrics/fontScale";
 
 // Import/export of all user config as one JSON file, so it can be synced across
 // devices. Covers the db.ts JSON files (settings, sources, favorites, history)
@@ -24,7 +25,7 @@ const LS_KEYS = [
   "museek.theme.mode",
   "museek.theme.palette",
   "museek.sidebarCollapsed",
-  "museek.lyricFontScale",
+  LYRIC_FONT_SCALE_KEY,
   "museek.topBarLyrics",
 ] as const;
 

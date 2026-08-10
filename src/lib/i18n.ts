@@ -595,6 +595,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "lyrics.fontDecrease": "减小字体",
     "lyrics.fullscreen": "全屏沉浸",
     "lyrics.exitFullscreen": "退出全屏",
+    "lyrics.solo": "歌词独享",
+    "lyrics.exitSolo": "退出歌词独享",
   },
   en: {
     // App
@@ -1170,6 +1172,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "lyrics.fontDecrease": "Decrease font size",
     "lyrics.fullscreen": "Immersive fullscreen",
     "lyrics.exitFullscreen": "Exit fullscreen",
+    "lyrics.solo": "Lyrics only",
+    "lyrics.exitSolo": "Show song panel",
   },
 };
 

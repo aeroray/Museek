@@ -6,6 +6,8 @@ import { useLangStore } from "@/lib/i18n";
 import { useThemeStore } from "@/stores/themeStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
+import { findActiveLyricIndex } from "@/lib/lyrics";
+import { getPlaybackTime } from "@/lib/playback/clock";
 import {
   loadDesktopLyricsInteractionMode,
   saveDesktopLyricsInteractionMode,
@@ -37,6 +39,10 @@ let interactionModeLoaded = false;
 let interactionModeLoadPromise: Promise<void> | null = null;
 
 function createSnapshot(state: PlayerSnapshotState): DesktopLyricsSnapshot {
+  const currentTime =
+    state.status === "loading" || state.status === "idle"
+      ? 0
+      : getPlaybackTime();
   return {
     song: state.currentSong
       ? {
@@ -52,8 +58,8 @@ function createSnapshot(state: PlayerSnapshotState): DesktopLyricsSnapshot {
       text: line.text,
       ...(line.translation ? { translation: line.translation } : {}),
     })),
-    currentTime: state.currentTime,
-    currentLyricIndex: state.currentLyricIndex,
+    currentTime,
+    currentLyricIndex: findActiveLyricIndex(state.lyricLines, currentTime),
     isPlaying: state.isPlaying,
     status: state.status,
     lyricsLoading: state.lyricsLoading,
@@ -61,10 +67,15 @@ function createSnapshot(state: PlayerSnapshotState): DesktopLyricsSnapshot {
 }
 
 function snapshotKey(state: PlayerSnapshotState): string {
+  const currentTime =
+    state.status === "loading" || state.status === "idle"
+      ? 0
+      : getPlaybackTime();
+  const currentLyricIndex = findActiveLyricIndex(state.lyricLines, currentTime);
   return [
     state.currentSong?.id ?? "",
-    Math.round(state.currentTime * 1000),
-    state.currentLyricIndex,
+    Math.round(currentTime * 1000),
+    currentLyricIndex,
     state.isPlaying,
     state.status,
     state.lyricsLoading,

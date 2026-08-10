@@ -447,3 +447,43 @@ Default local imports to preserve the file basename as the song title and expose
 
 Reason:
 Local fragments, covers, remixes, and other non-mainstream versions often use intentionally meaningful names that online matching can erase. A conservative default protects that intent while keeping automatic recognition available for users who prefer it.
+
+## 2026-08-10 - Deepen runtime boundaries without changing UX
+
+Decision:
+Keep the existing player, desktop-lyrics, local-library, source-script, and font-preference behavior while moving their policy boundaries into dedicated modules. Playback time is consumed through the audio clock seam; desktop window geometry is owned by a window-management module; local enrichment is queued, rate-limited, cached, and guarded by track versions; source runners receive an explicit registry port; and lyric font storage is shared while each view retains its own scale policy.
+
+Reason:
+These changes reduce hidden coupling and create narrow validation seams without changing user-visible controls, persistence formats, source-script ownership, desktop lyrics protocol events, or the local import workflow.
+
+## 2026-08-10 - Keep lyrics-only as a panel view mode
+
+Decision:
+Add a lyrics-only toggle inside the main lyrics panel. Hide the song metadata, cover, and transport column while letting the lyric list use the full panel width; keep the existing toolbar controls and OS fullscreen mode separate. Keep the toggle local to the panel session rather than adding a persisted setting.
+
+Reason:
+Users can focus on the lyric content without changing window geometry, playback ownership, or the existing immersive fullscreen behavior, while the visible toggle remains available to restore the normal song-focused layout.
+
+## 2026-08-10 - Align main lyric controls with desktop lyrics
+
+Decision:
+Use Maximize/Minimize for the main lyrics immersive toggle and ScanEye for lyrics-only mode. Match the lyrics-only active treatment to the adjacent desktop lyrics control, and support the same platform modifier plus mouse-wheel font scaling over the main lyric area: Ctrl on Windows/Linux and Command on macOS, in 0.15 steps with the shared 0.85x–2.5x scale limits.
+
+Reason:
+The two lyric surfaces should share recognizable control semantics and typography behavior, while platform-native modifier keys keep the gesture consistent with the existing desktop lyrics interaction.
+
+## 2026-08-10 - Give every lyrics toolbar action semantic hover motion
+
+Decision:
+Use the existing captions, download, and maximize icon animations for matching lyrics toolbar actions, and add restrained upward/downward motion for the font-size controls. Keep all toolbar hover animations disabled under `prefers-reduced-motion`.
+
+Reason:
+Every visible action should provide the same level of tactile feedback without introducing unrelated motion or overriding the user's reduced-motion preference.
+
+## 2026-08-10 - Blur up lyric-page covers from the existing thumbnail
+
+Decision:
+Keep the available low-resolution song thumbnail visible immediately on the lyrics page, render it slightly enlarged and blurred while the high-resolution cover loads, and fade the sharp cover layer in after `CoverImage` finishes decoding. Keep the thumbnail as the visual fallback instead of showing the high-resolution placeholder over it.
+
+Reason:
+The player already has a usable thumbnail when the lyrics page opens. Keeping it visible avoids an empty cover during the first high-resolution request and makes the quality upgrade feel continuous rather than abrupt.

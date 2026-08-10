@@ -1,29 +1,34 @@
-import type { Quality, MusicInfo, LyricInfo } from "./music"
+import type { Quality, MusicInfo, LyricInfo } from "./music";
 
 export interface SourceInfo {
-  type: "music"
-  actions: Array<"musicUrl" | "lyric" | "pic">
-  qualitys: Quality[]
+  type: "music";
+  actions: Array<"musicUrl" | "lyric" | "pic">;
+  qualitys: Quality[];
 }
 
 export interface SourceScript {
-  id: string
-  name: string
-  version: string
-  author: string
-  description: string
-  rawScript: string
-  enabled: boolean
-  sources?: Record<string, SourceInfo>
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  rawScript: string;
+  enabled: boolean;
+  sources?: Record<string, SourceInfo>;
   /** Remote URL the script was imported from, used for re-fetching/updating. */
-  url?: string
+  url?: string;
+}
+
+export interface SourceRegistry {
+  getScripts: () => SourceScript[];
+  setScripts: (scripts: SourceScript[]) => void;
 }
 
 export interface LxRequestPayload {
-  source: string
-  action: "musicUrl" | "lyric" | "pic"
-  info: MusicInfo
-  type?: string
+  source: string;
+  action: "musicUrl" | "lyric" | "pic";
+  info: MusicInfo;
+  type?: string;
 }
 
-export type LxRequestResult = string | LyricInfo
+export type LxRequestResult = string | LyricInfo;

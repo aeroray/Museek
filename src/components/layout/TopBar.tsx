@@ -16,6 +16,7 @@ import { useUiStore } from "@/stores/uiStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useSearchStore } from "@/stores/searchStore";
 import { useT } from "@/lib/i18n";
+import { usePlaybackLyricIndex } from "@/lib/playback/clock";
 import { cn } from "@/lib/utils";
 
 /** Current lyric line for the top bar, or a warm welcome when no song is loaded. */
@@ -25,7 +26,7 @@ function TopBarLyrics() {
   const enabled = useUiStore((s) => s.topBarLyrics);
   const currentSong = usePlayerStore((s) => s.currentSong);
   const lyricLines = usePlayerStore((s) => s.lyricLines);
-  const currentLyricIndex = usePlayerStore((s) => s.currentLyricIndex);
+  const currentLyricIndex = usePlaybackLyricIndex(lyricLines);
   const lyricsLoading = usePlayerStore((s) => s.lyricsLoading);
   const searchContext = useSearchStore(
     (s) => `${s.query.trim() ? "searched" : "landing"}:${s.platform}`,
