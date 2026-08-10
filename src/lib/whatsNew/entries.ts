@@ -17,15 +17,22 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
-  "3.1.3": {
+  "3.1.4": {
     zh: {
       sections: [
         {
-          title: "🍎 macOS / 播放",
+          title: "🪟 Windows 媒体控制",
           bullets: [
-            "修复播放时钟导致的无限重渲染，避免主窗口空白 / 消失",
-            "顶栏恢复逐字卡拉 OK（在稳定的播放时钟之上）",
-            "更新 macOS 应用图标，四周留出安全边距，Dock 观感更轻",
+            "系统媒体卡片统一显示为 Museek，避免与 WebView2 重复出现两张卡",
+            "进程启动时设置应用身份，媒体信息归属更稳定",
+          ],
+        },
+        {
+          title: "🎤 歌词",
+          bullets: [
+            "点击顶栏歌词可打开歌词页",
+            "歌词页封面高光与浮动动画在暂停时会停下，当前行字号更突出",
+            "桌面歌词时间同步更稳，减少跳动与丢帧感",
           ],
         },
       ],
@@ -33,11 +40,40 @@ const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
     en: {
       sections: [
         {
-          title: "🍎 macOS / Playback",
+          title: "🪟 Windows media controls",
           bullets: [
-            "Fix infinite re-renders from the playback clock that blanked the main window",
-            "Restore word-by-word karaoke in the top bar on the stabilized clock",
-            "Refresh the macOS app icon with a safer inset margin for a lighter Dock look",
+            "System media card shows as Museek only — no duplicate WebView2 session card",
+            "App identity is set at process start so media metadata stays correctly owned",
+          ],
+        },
+        {
+          title: "🎤 Lyrics",
+          bullets: [
+            "Click the top-bar lyric line to open the lyrics page",
+            "Lyrics-page cover shine/float pauses when playback pauses; active line is larger",
+            "Desktop lyrics timing sync is steadier with fewer jumps",
+          ],
+        },
+      ],
+    },
+  },
+  "3.1.3": {
+    zh: {
+      sections: [
+        {
+          title: "🛠 构建",
+          bullets: [
+            "修复 pnpm workspace 配置，解除 3.1.2 发版 CI 卡在依赖缓存的问题",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🛠 Build",
+          bullets: [
+            "Fix pnpm workspace config that blocked the 3.1.2 release CI at dependency cache setup",
           ],
         },
       ],
