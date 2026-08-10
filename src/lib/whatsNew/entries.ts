@@ -17,6 +17,58 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.1.0": {
+    zh: {
+      sections: [
+        {
+          title: "⬇️ 下载",
+          bullets: [
+            "下载的 MP3 / FLAC 可内嵌歌词与封面（默认开启）",
+            "「设置 → 下载」新增内嵌歌词、内嵌封面开关",
+            "元数据写入失败时仍算下载完成，并提示哪些未写入",
+          ],
+        },
+        {
+          title: "🎤 歌词",
+          bullets: [
+            "歌词页、桌面歌词与顶栏当前行支持逐字卡拉 OK 高亮",
+            "换行过渡更顺滑；歌词页上下边缘更柔和，当前行不再突然放大",
+          ],
+        },
+        {
+          title: "▶️ 播放",
+          bullets: [
+            "播放中进度条更平滑，拖动与暂停时的时间同步更稳",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "⬇️ Downloads",
+          bullets: [
+            "Embed lyrics and cover art into MP3 / FLAC downloads (on by default)",
+            "New Settings → Download toggles for embed lyrics and embed cover art",
+            "If metadata write fails, the download still completes with a clear warning",
+          ],
+        },
+        {
+          title: "🎤 Lyrics",
+          bullets: [
+            "Word-by-word karaoke highlight in the lyrics panel, desktop lyrics, and top bar",
+            "Smoother line transitions; softer panel edges, and the active line no longer jumps in size",
+          ],
+        },
+        {
+          title: "▶️ Playback",
+          bullets: [
+            "Smoother progress tracking while playing, with steadier seek / pause time sync",
+          ],
+        },
+      ],
+    },
+  },
   "3.0.0": {
     zh: {
       sections: [
