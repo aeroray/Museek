@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Museek feature screenshot placeholders</title>
+  <desc id="desc">Neutral placeholders for source manager, player lyrics, and local library screenshots.</desc>
+  <rect width="1200" height="680" fill="#f4f5f7"/>
+  <rect x="32" y="32" width="1136" height="616" rx="18" fill="#ffffff" stroke="#d9dde5" stroke-width="2"/>
+  <text x="600" y="92" fill="#20242d" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700" text-anchor="middle">Additional screenshots coming soon</text>
+  <text x="600" y="126" fill="#687181" font-family="Segoe UI, Arial, sans-serif" font-size="16" text-anchor="middle">Replace these neutral placeholders with product screenshots.</text>
+  <g fill="#fafbfc" stroke="#cbd1db" stroke-width="2" stroke-dasharray="8 8">
+    <rect x="72" y="182" width="320" height="350" rx="12"/>
+    <rect x="440" y="182" width="320" height="350" rx="12"/>
+    <rect x="808" y="182" width="320" height="350" rx="12"/>
+  </g>
+  <g fill="#8b95a5">
+    <rect x="184" y="294" width="96" height="8" rx="4"/>
+    <rect x="184" y="318" width="64" height="8" rx="4"/>
+    <rect x="552" y="294" width="96" height="8" rx="4"/>
+    <rect x="552" y="318" width="64" height="8" rx="4"/>
+    <rect x="920" y="294" width="96" height="8" rx="4"/>
+    <rect x="920" y="318" width="64" height="8" rx="4"/>
+  </g>
+  <g fill="#20242d" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600" text-anchor="middle">
+    <text x="232" y="424">Source manager</text>
+    <text x="600" y="424">Player + lyrics</text>
+    <text x="968" y="424">Local library</text>
+  </g>
+  <g fill="#687181" font-family="Segoe UI, Arial, sans-serif" font-size="14" text-anchor="middle">
+    <text x="232" y="454">Settings / Sources</text>
+    <text x="600" y="454">Desktop lyrics / Mini player</text>
+    <text x="968" y="454">Downloads / Recognition</text>
+  </g>
+</svg>
