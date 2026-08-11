@@ -17,6 +17,48 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.2.0": {
+    zh: {
+      sections: [
+        {
+          title: "🎧 听歌识曲",
+          bullets: [
+            "侧栏新增「识曲」页（Beta）：听一段旋律，找出对应歌曲",
+            "支持麦克风或系统声音采集；桌面端可用时默认系统声音",
+            "使用网易云指纹识别，匹配成功后以可播放曲目展示",
+            "需手动开始聆听；识曲时会暂停 Museek 播放，避免采到本机播放声",
+          ],
+        },
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "macOS 现已支持系统声音识曲（首次可能请求屏幕录制权限）",
+            "修复播放时钟不稳导致主窗口空白 / 顶栏歌词异常的问题",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎧 Song recognition",
+          bullets: [
+            "New Recognize page (Beta) in the sidebar — hear a clip and find the song",
+            "Capture with Microphone or System audio; desktop defaults to system audio when available",
+            "Powered by NetEase fingerprint matching; matches appear as playable tracks",
+            "Starts only when you press listen; pauses Museek playback during capture for a clean sample",
+          ],
+        },
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "System-audio recognition now works on macOS (may ask for Screen Recording permission)",
+            "Fix unstable playback clock that could blank the main window or break top-bar karaoke",
+          ],
+        },
+      ],
+    },
+  },
   "3.1.4": {
     zh: {
       sections: [
