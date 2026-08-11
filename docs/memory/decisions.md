@@ -561,6 +561,18 @@ maximum update depth error that made the macOS WKWebView appear to disappear.
 Caching the value at the clock boundary keeps the snapshot stable between
 notifications while preserving smooth lyric and progress updates.
 
+## 2026-08-11 - Keep top-bar karaoke on cached playback snapshots
+
+Decision:
+Keep `PlaybackKaraokeText` and `LyricTransition` enabled in the top bar. Their
+React subscribers must consume the cached clock value from `AudioPlayer`, not a
+fresh `HTMLAudioElement.currentTime` read.
+
+Reason:
+The macOS regression was caused by the live external-store snapshot, not by
+top-bar karaoke itself. After the cached getter was restored, clicking Play was
+retested on macOS and the main window remained visible while karaoke rendered.
+
 ## 2026-08-10 - Keep macOS icon artwork inside a safe margin
 
 Decision:

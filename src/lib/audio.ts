@@ -475,7 +475,7 @@ class AudioPlayer {
   }
 
   getCurrentTime(): number {
-    return this.readCurrentTime();
+    return this.currentTime;
   }
 }
 
