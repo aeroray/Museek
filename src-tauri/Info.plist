@@ -16,6 +16,9 @@
     <true/>
   </dict>
 
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Museek uses the microphone to recognize a song sample.</string>
+
   <!-- Default locale + declared localizations (EN / Simplified Chinese) -->
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>

@@ -25,6 +25,8 @@ class AudioPlayer {
   /** Smooth clock listeners (rAF while playing). */
   private timeListeners = new Set<TimeCallback>();
   private timeRaf = 0;
+  private timeFallbackTimer = 0;
+  private lastTimeTick = 0;
 
   private context: AudioContext | null = null;
   private gain: GainNode | null = null;
@@ -116,22 +118,42 @@ class AudioPlayer {
   }
 
   private startSmoothClock() {
-    if (this.timeRaf || this.timeListeners.size === 0) return;
+    if (
+      this.timeRaf ||
+      this.timeFallbackTimer ||
+      this.timeListeners.size === 0
+    ) {
+      return;
+    }
     const tick = () => {
-      this.emitTime();
-      if (this.isPlaying()) {
-        this.timeRaf = requestAnimationFrame(tick);
-      } else {
-        this.timeRaf = 0;
+      if (!this.isPlaying() || this.timeListeners.size === 0) {
+        this.stopSmoothClock();
+        return;
       }
+      this.lastTimeTick = performance.now();
+      this.emitTime();
+      this.timeRaf = requestAnimationFrame(tick);
     };
+    const fallbackTick = () => {
+      if (!this.isPlaying() || this.timeListeners.size === 0) {
+        this.stopSmoothClock();
+        return;
+      }
+      const now = performance.now();
+      if (now - this.lastTimeTick < 50) return;
+      this.lastTimeTick = now;
+      this.emitTime();
+    };
+    this.lastTimeTick = performance.now();
+    this.timeFallbackTimer = window.setInterval(fallbackTick, 50);
     this.timeRaf = requestAnimationFrame(tick);
   }
 
   private stopSmoothClock() {
-    if (!this.timeRaf) return;
-    cancelAnimationFrame(this.timeRaf);
+    if (this.timeRaf) cancelAnimationFrame(this.timeRaf);
     this.timeRaf = 0;
+    if (this.timeFallbackTimer) window.clearInterval(this.timeFallbackTimer);
+    this.timeFallbackTimer = 0;
   }
 
   private isPlaying(): boolean {

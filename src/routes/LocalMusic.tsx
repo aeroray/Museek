@@ -444,45 +444,48 @@ export function LocalMusic() {
       )}
 
       {tracks.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-          <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
-            {importing ? (
-              <Loader2
-                size={28}
-                className="text-muted-foreground animate-spin"
-              />
-            ) : (
-              <HardDrive size={28} className="text-muted-foreground" />
-            )}
-          </div>
-          {importing && importProgress && importProgress.total > 0 ? (
-            <>
-              <p className="text-base font-medium">
-                {tr("local.importProgress", {
-                  done: importProgress.done,
-                  total: importProgress.total,
-                })}
-              </p>
-              <Progress
-                value={Math.round(
-                  (importProgress.done / importProgress.total) * 100,
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-5xl p-4">
+            <div className="flex min-h-[18rem] flex-col items-center justify-center px-4 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
+                {importing ? (
+                  <Loader2 size={28} className="animate-spin" />
+                ) : (
+                  <HardDrive size={28} strokeWidth={1.6} />
                 )}
-                className="h-1.5 w-48 mt-3"
-              />
-              {importProgress.current ? (
-                <p className="text-xs text-muted-foreground mt-2 max-w-sm truncate">
-                  {importProgress.current}
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <p className="text-base font-medium">{tr("local.empty")}</p>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                {tr("local.emptyHint")}
-              </p>
-            </>
-          )}
+              </div>
+              {importing && importProgress && importProgress.total > 0 ? (
+                <>
+                  <p className="mt-4 text-sm font-medium">
+                    {tr("local.importProgress", {
+                      done: importProgress.done,
+                      total: importProgress.total,
+                    })}
+                  </p>
+                  <Progress
+                    value={Math.round(
+                      (importProgress.done / importProgress.total) * 100,
+                    )}
+                    className="mt-3 h-1.5 w-48"
+                  />
+                  {importProgress.current ? (
+                    <p className="mt-2 max-w-sm truncate text-xs text-muted-foreground">
+                      {importProgress.current}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p className="mt-4 text-sm font-medium">
+                    {tr("local.empty")}
+                  </p>
+                  <p className="mt-1 max-w-sm text-xs text-muted-foreground text-pretty">
+                    {tr("local.emptyHint")}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       ) : (
         <ScrollArea className="flex-1">

@@ -2,3 +2,4 @@
 "CFBundleDisplayName" = "Museek";
 "CFBundleName" = "Museek";
 "NSHumanReadableCopyright" = "Copyright © 2026 Museek. Released under the MIT License.";
+"NSMicrophoneUsageDescription" = "Museek uses the microphone to recognize a song sample.";

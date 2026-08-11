@@ -9,5 +9,8 @@
     <key>NSAllowsArbitraryLoads</key>
     <true/>
   </dict>
+
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Museek uses the microphone to recognize a song sample.</string>
 </dict>
 </plist>

@@ -748,6 +748,138 @@ fn set_tray_visible(app: tauri::AppHandle, visible: bool) {
     }
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CapturedAudioDto {
+    samples: Vec<f32>,
+    sample_rate: u32,
+    channel_count: u16,
+    duration_ms: u64,
+}
+
+#[cfg(target_os = "windows")]
+fn capture_windows_audio(mode: String, duration_ms: u64) -> Result<CapturedAudioDto, String> {
+    use std::time::{Duration, Instant};
+    use wasapi::{deinitialize, initialize_mta, DeviceEnumerator, Direction, SampleType, StreamMode, WaveFormat};
+
+    let _ = initialize_mta();
+    let result = (|| -> Result<CapturedAudioDto, String> {
+        let enumerator = DeviceEnumerator::new().map_err(|error| error.to_string())?;
+        let (device, direction) = match mode.as_str() {
+            "microphone" => (
+                enumerator
+                    .get_default_device(&Direction::Capture)
+                    .map_err(|error| error.to_string())?,
+                Direction::Capture,
+            ),
+            "system" => (
+                enumerator
+                    .get_default_device(&Direction::Render)
+                    .map_err(|error| error.to_string())?,
+                Direction::Capture,
+            ),
+            _ => return Err("Unknown audio capture mode".to_string()),
+        };
+        let mut audio_client = device
+            .get_iaudioclient()
+            .map_err(|error| error.to_string())?;
+        let desired_format = WaveFormat::new(32, 32, &SampleType::Float, 16_000, 1, None);
+        let (_, min_time) = audio_client
+            .get_device_period()
+            .map_err(|error| error.to_string())?;
+        let stream_mode = StreamMode::EventsShared {
+            autoconvert: true,
+            buffer_duration_hns: min_time,
+        };
+        audio_client
+            .initialize_client(&desired_format, &direction, &stream_mode)
+            .map_err(|error| error.to_string())?;
+        let event = audio_client
+            .set_get_eventhandle()
+            .map_err(|error| error.to_string())?;
+        let capture_client = audio_client
+            .get_audiocaptureclient()
+            .map_err(|error| error.to_string())?;
+        let block_align = desired_format.get_blockalign() as usize;
+        let target_samples = (16_000u64 * duration_ms / 1000).clamp(48_000, 192_000) as usize;
+        let deadline = Instant::now()
+            + Duration::from_millis(duration_ms.clamp(3_000, 12_000) + 2_000);
+        let mut samples = Vec::with_capacity(target_samples);
+
+        audio_client
+            .start_stream()
+            .map_err(|error| error.to_string())?;
+        while samples.len() < target_samples && Instant::now() < deadline {
+            while samples.len() < target_samples {
+                let packet_frames = capture_client
+                    .get_next_packet_size()
+                    .map_err(|error| error.to_string())?
+                    .unwrap_or(0);
+                if packet_frames == 0 {
+                    break;
+                }
+                let mut bytes = vec![0u8; packet_frames as usize * block_align];
+                let (frames, info) = capture_client
+                    .read_from_device(&mut bytes)
+                    .map_err(|error| error.to_string())?;
+                for frame in 0..frames as usize {
+                    if info.flags.silent {
+                        samples.push(0.0);
+                    } else {
+                        let start = frame * block_align;
+                        let end = start + std::mem::size_of::<f32>();
+                        samples.push(f32::from_ne_bytes(
+                            bytes[start..end]
+                                .try_into()
+                                .map_err(|_| "Invalid audio sample".to_string())?,
+                        ));
+                    }
+                    if samples.len() >= target_samples {
+                        break;
+                    }
+                }
+            }
+            if samples.len() < target_samples {
+                event
+                    .wait_for_event(1000)
+                    .map_err(|error| error.to_string())?;
+            }
+        }
+        audio_client
+            .stop_stream()
+            .map_err(|error| error.to_string())?;
+        if samples.is_empty() {
+            return Err("No audio samples were captured".to_string());
+        }
+        samples.truncate(target_samples);
+        Ok(CapturedAudioDto {
+            duration_ms: samples.len() as u64 * 1000 / 16_000,
+            samples,
+            sample_rate: 16_000,
+            channel_count: 1,
+        })
+    })();
+    deinitialize();
+    result
+}
+
+#[tauri::command]
+async fn capture_audio_clip(mode: String, duration_ms: u64) -> Result<CapturedAudioDto, String> {
+    #[cfg(target_os = "windows")]
+    {
+        return tauri::async_runtime::spawn_blocking(move || {
+            capture_windows_audio(mode, duration_ms)
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (mode, duration_ms);
+        Err("Native audio capture is currently available on Windows only".to_string())
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OuterRectDto {
@@ -1092,6 +1224,7 @@ pub fn run() {
             set_prevent_sleep,
             quit_app,
             set_tray_visible,
+            capture_audio_clip,
             set_tray_mark_icon,
             show_lyrics_window,
             set_lyrics_interaction,

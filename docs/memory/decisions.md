@@ -612,3 +612,40 @@ WebView2 automatically publishes a media card for an HTML audio element even
 when Museek suppresses explicit JavaScript Media Session updates. Removing the
 HTML media element from the Windows Tauri path eliminates the duplicate card
 without weakening browser-preview playback controls or normal HTML audio behavior.
+
+## 2026-08-11 - Use sliding three-second NetEase recognition windows
+
+Decision:
+Generate NetEase `shazam_v2` fingerprints from overlapping three-second,
+8 kHz windows of the captured clip and stop after the first candidate result.
+Parse both object and array forms of the service's result payload.
+
+Reason:
+NetEase's AFP endpoint accepts the short Shazam fingerprint protocol rather
+than an AFP generated from the full capture duration. A sliding window keeps
+the existing capture length for diagnostics while allowing a song's matching
+segment to occur anywhere in the sample.
+
+## 2026-08-11 - Keep NetEase as the sole recognition provider
+
+Decision:
+Use NetEase as Museek's only song-recognition provider. Remove the ShazamIO
+adapter, comparison workflow, related UI, and its WASM dependency.
+
+Reason:
+Local testing showed the NetEase provider was faster and more accurate for
+the intended recognition workflow, while the comparison path added runtime
+weight and UI complexity without improving the result.
+
+## 2026-08-11 - Match recognition controls to the search-page layout
+
+Decision:
+Present recognition as a compact search-style page with capture-mode tabs in
+the upper-left, default Windows desktop capture to system audio, and show
+recognition results directly below the header actions. Remove the separate
+capture waveform card and captured-audio preview from the primary view.
+
+Reason:
+Capture mode is the primary input choice, so it should be available in the
+page header rather than hidden in a secondary card. The result list is the
+main purpose of the route and should receive the page's visual focus.

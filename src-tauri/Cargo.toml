@@ -30,6 +30,7 @@ tokio = { version = "1", default-features = false, features = ["time"] }
 # Windows taskbar thumbnail toolbar (hover-over-taskbar media buttons). Reuses the
 # same `windows` crate version Tauri already pulls in, just with extra features.
 [target.'cfg(windows)'.dependencies]
+wasapi = "0.23"
 windows = { version = "0.61", features = [
     "Media",
     "Win32_Foundation",

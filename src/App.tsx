@@ -9,6 +9,7 @@ import { Favorites } from "@/routes/Favorites";
 import { LocalMusic } from "@/routes/LocalMusic";
 import { Playlist } from "@/routes/Playlist";
 import { Downloads } from "@/routes/Downloads";
+import { Recognize } from "@/routes/Recognize";
 import { Settings } from "@/routes/Settings";
 import { useSourceStore } from "@/stores/sourceStore";
 import { usePlaylistStore } from "@/stores/playlistStore";
@@ -119,6 +120,7 @@ export default function App() {
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/local" element={<LocalMusic />} />
             <Route path="/playlist/:id" element={<Playlist />} />
+            <Route path="/recognize" element={<Recognize />} />
             <Route path="/downloads" element={<Downloads />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

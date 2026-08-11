@@ -120,13 +120,6 @@ async function publishSnapshot(force = false): Promise<void> {
   if (!isTauri) return;
   const state = usePlayerStore.getState();
   const key = snapshotKey(state);
-  if (!state.currentSong) {
-    lastSnapshotKey = key;
-    if (useDesktopLyricsStore.getState().isVisible) {
-      await hideDesktopLyrics();
-    }
-    return;
-  }
   if (!force && key === lastSnapshotKey) return;
   lastSnapshotKey = key;
   await emitTo(

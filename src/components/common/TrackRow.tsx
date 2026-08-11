@@ -1,21 +1,21 @@
-import { memo, useMemo } from "react"
-import { Play, Plus, Heart, Download, Music, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { CoverImage } from "@/components/common/CoverImage"
+import { memo, useMemo } from "react";
+import { Play, Plus, Heart, Download, Music, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CoverImage } from "@/components/common/CoverImage";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { usePlayerStore } from "@/stores/playerStore"
-import { usePlaylistStore } from "@/stores/playlistStore"
-import { useDownloadStore } from "@/stores/downloadStore"
-import { QualityBadge } from "@/components/common/MetaBadges"
-import { bestQuality } from "@/lib/quality"
-import { useT } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
-import type { MusicInfo, Quality } from "@/types/music"
+} from "@/components/ui/dropdown-menu";
+import { usePlayerStore } from "@/stores/playerStore";
+import { usePlaylistStore } from "@/stores/playlistStore";
+import { useDownloadStore } from "@/stores/downloadStore";
+import { QualityBadge } from "@/components/common/MetaBadges";
+import { bestQuality } from "@/lib/quality";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import type { MusicInfo, Quality } from "@/types/music";
 
 /**
  * Shared song row for the Search / Charts / Hot-playlist lists. Hover reveals
@@ -32,30 +32,35 @@ export const TrackRow = memo(function TrackRow({
   selectable = false,
   selected = false,
   onToggleSelect,
+  className,
 }: {
-  song: MusicInfo
-  rank?: number
+  song: MusicInfo;
+  rank?: number;
   /** Shown when the song itself has no cover (e.g. kw/kg playlist songs inherit
    *  the playlist's cover). Display only — never written back to the song. */
-  fallbackImg?: string | null
-  selectable?: boolean
-  selected?: boolean
-  onToggleSelect?: () => void
+  fallbackImg?: string | null;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+  className?: string;
 }) {
-  const play = usePlayerStore((s) => s.play)
-  const addToQueue = usePlayerStore((s) => s.addToQueue)
-  const fav = usePlaylistStore((s) => s.favorites.some((f) => f.id === song.id))
-  const addToFavorites = usePlaylistStore((s) => s.addToFavorites)
-  const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites)
-  const addTask = useDownloadStore((s) => s.addTask)
-  const t = useT()
-  const thumb = song.meta.picUrl || fallbackImg
-  const best = useMemo(() => bestQuality(song), [song])
+  const play = usePlayerStore((s) => s.play);
+  const addToQueue = usePlayerStore((s) => s.addToQueue);
+  const fav = usePlaylistStore((s) =>
+    s.favorites.some((f) => f.id === song.id),
+  );
+  const addToFavorites = usePlaylistStore((s) => s.addToFavorites);
+  const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites);
+  const addTask = useDownloadStore((s) => s.addTask);
+  const t = useT();
+  const thumb = song.meta.picUrl || fallbackImg;
+  const best = useMemo(() => bestQuality(song), [song]);
 
   return (
     <div
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-xl group group/row cursor-pointer transition-[background-color,transform] duration-200 ease-out hover:bg-accent/55 active:scale-[0.995]",
+        className,
         selectable && selected && "bg-primary/10",
       )}
       onClick={selectable ? onToggleSelect : undefined}
@@ -75,7 +80,9 @@ export const TrackRow = memo(function TrackRow({
       )}
 
       {rank != null && (
-        <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0 font-medium">{rank}</span>
+        <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0 font-medium">
+          {rank}
+        </span>
       )}
 
       <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-muted shadow-[var(--shadow-border)]">
@@ -91,7 +98,12 @@ export const TrackRow = memo(function TrackRow({
             onClick={() => play(song)}
             className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
           >
-            <Play size={16} className="ml-0.5 text-white icon-play-pop" fill="currentColor" strokeWidth={0} />
+            <Play
+              size={16}
+              className="ml-0.5 text-white icon-play-pop"
+              fill="currentColor"
+              strokeWidth={0}
+            />
           </button>
         )}
       </div>
@@ -102,12 +114,16 @@ export const TrackRow = memo(function TrackRow({
       </div>
 
       {song.albumName && (
-        <p className="text-xs text-muted-foreground truncate max-w-32 hidden lg:block">{song.albumName}</p>
+        <p className="text-xs text-muted-foreground truncate max-w-32 hidden lg:block">
+          {song.albumName}
+        </p>
       )}
 
       {best && <QualityBadge quality={best} />}
 
-      <span className="text-xs text-muted-foreground w-12 text-right shrink-0 tabular-nums">{song.interval}</span>
+      <span className="text-xs text-muted-foreground w-12 text-right shrink-0 tabular-nums">
+        {song.interval}
+      </span>
 
       {!selectable && (
         <div className="flex items-center gap-0.5 shrink-0">
@@ -116,8 +132,8 @@ export const TrackRow = memo(function TrackRow({
             size="icon"
             className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
             onClick={(e) => {
-              e.stopPropagation()
-              addToQueue([song])
+              e.stopPropagation();
+              addToQueue([song]);
             }}
             title={t("common.addToQueue")}
           >
@@ -129,18 +145,23 @@ export const TrackRow = memo(function TrackRow({
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn("h-8 w-8 icon-hover-heart", fav ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
+                className={cn(
+                  "h-8 w-8 icon-hover-heart",
+                  fav ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                )}
                 onClick={(e) => {
-                  e.stopPropagation()
-                  if (fav) removeFromFavorites(song.id)
-                  else addToFavorites(song)
+                  e.stopPropagation();
+                  if (fav) removeFromFavorites(song.id);
+                  else addToFavorites(song);
                 }}
                 title={t(fav ? "common.unfavorite" : "common.favorite")}
               >
                 <Heart
                   key={fav ? "on" : "off"}
                   size={14}
-                  className={cn(fav && "fill-red-500 text-red-500 icon-heart-burst")}
+                  className={cn(
+                    fav && "fill-red-500 text-red-500 icon-heart-burst",
+                  )}
                 />
               </Button>
 
@@ -164,7 +185,11 @@ export const TrackRow = memo(function TrackRow({
                       className="justify-between gap-8"
                     >
                       <span>{t("search.download", { quality: q.type })}</span>
-                      {q.size && <span className="text-muted-foreground text-xs tabular-nums">{q.size}</span>}
+                      {q.size && (
+                        <span className="text-muted-foreground text-xs tabular-nums">
+                          {q.size}
+                        </span>
+                      )}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -174,5 +199,5 @@ export const TrackRow = memo(function TrackRow({
         </div>
       )}
     </div>
-  )
-})
+  );
+});

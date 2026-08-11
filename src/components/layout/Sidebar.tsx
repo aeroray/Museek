@@ -1,23 +1,76 @@
-import { NavLink } from "react-router-dom"
-import { Search, ListMusic, Disc3, TrendingUp, Heart, HardDrive, Download, Settings } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { isMacOs } from "@/lib/os"
-import { useT } from "@/lib/i18n"
-import { useUiStore } from "@/stores/uiStore"
-import { usePlayerStore } from "@/stores/playerStore"
-import { SidebarUpdateCard } from "@/components/layout/SidebarUpdateCard"
-import { BrandMark } from "@/components/brand/BrandMark"
+import { NavLink } from "react-router-dom";
+import {
+  Search,
+  ListMusic,
+  Disc3,
+  TrendingUp,
+  Heart,
+  HardDrive,
+  Fingerprint,
+  Download,
+  Settings,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { isMacOs } from "@/lib/os";
+import { useT } from "@/lib/i18n";
+import { useUiStore } from "@/stores/uiStore";
+import { usePlayerStore } from "@/stores/playerStore";
+import { SidebarUpdateCard } from "@/components/layout/SidebarUpdateCard";
+import { BrandMark } from "@/components/brand/BrandMark";
+import { Badge } from "@/components/ui/badge";
 
 // Settings is rendered separately at the bottom; these fill the main nav.
 const navItems = [
-  { to: "/search", icon: Search, labelKey: "nav.search", iconHover: "icon-hover-search" },
-  { to: "/hot-playlists", icon: ListMusic, labelKey: "nav.playlists", iconHover: "icon-hover-list" },
-  { to: "/hot-albums", icon: Disc3, labelKey: "nav.albums", iconHover: "icon-hover-list" },
-  { to: "/library", icon: TrendingUp, labelKey: "nav.library", iconHover: "icon-hover-trend" },
-  { to: "/favorites", icon: Heart, labelKey: "nav.favorites", iconHover: "icon-hover-heart" },
-  { to: "/local", icon: HardDrive, labelKey: "nav.local", iconHover: "icon-hover-list" },
-  { to: "/downloads", icon: Download, labelKey: "nav.downloads", iconHover: "icon-hover-download" },
-]
+  {
+    to: "/search",
+    icon: Search,
+    labelKey: "nav.search",
+    iconHover: "icon-hover-search",
+  },
+  {
+    to: "/hot-playlists",
+    icon: ListMusic,
+    labelKey: "nav.playlists",
+    iconHover: "icon-hover-list",
+  },
+  {
+    to: "/hot-albums",
+    icon: Disc3,
+    labelKey: "nav.albums",
+    iconHover: "icon-hover-list",
+  },
+  {
+    to: "/library",
+    icon: TrendingUp,
+    labelKey: "nav.library",
+    iconHover: "icon-hover-trend",
+  },
+  {
+    to: "/favorites",
+    icon: Heart,
+    labelKey: "nav.favorites",
+    iconHover: "icon-hover-heart",
+  },
+  {
+    to: "/local",
+    icon: HardDrive,
+    labelKey: "nav.local",
+    iconHover: "icon-hover-list",
+  },
+  {
+    to: "/recognize",
+    icon: Fingerprint,
+    labelKey: "nav.recognize",
+    iconHover: "icon-hover-search",
+    beta: true,
+  },
+  {
+    to: "/downloads",
+    icon: Download,
+    labelKey: "nav.downloads",
+    iconHover: "icon-hover-download",
+  },
+];
 
 const navLinkClass =
   (collapsed: boolean) =>
@@ -29,14 +82,14 @@ const navLinkClass =
       collapsed && "justify-center px-0",
       isActive
         ? "bg-primary/10 text-foreground"
-        : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-    )
+        : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+    );
 
 export function Sidebar() {
-  const t = useT()
-  const collapsed = useUiStore((s) => s.sidebarCollapsed)
-  const isPlaying = usePlayerStore((s) => s.isPlaying)
-  const mac = isMacOs()
+  const t = useT();
+  const collapsed = useUiStore((s) => s.sidebarCollapsed);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const mac = isMacOs();
 
   return (
     <aside
@@ -44,7 +97,7 @@ export function Sidebar() {
         "shrink-0 flex flex-col h-full bg-sidebar transition-[width] duration-200 ease-out",
         "border-r border-border/60",
         // Collapsed: w-20 so macOS Overlay traffic lights fit inside the rail.
-        collapsed ? "w-20" : "w-56"
+        collapsed ? "w-20" : "w-56",
       )}
     >
       {/* macOS: reserve space for native traffic lights (titleBarStyle Overlay). */}
@@ -56,13 +109,17 @@ export function Sidebar() {
         className={cn(
           "brand-mark-hot px-3 pb-2 flex items-center gap-3",
           mac ? "pt-1" : "pt-3.5",
-          collapsed && "justify-center px-2"
+          collapsed && "justify-center px-2",
         )}
       >
         {/* Logo keeps pointer events so hover can drive the eq animation;
             text stays non-interactive so the drag region still works. */}
         <div className="pointer-events-auto h-9 w-9 shrink-0 drop-shadow-sm">
-          <BrandMark live={isPlaying} className="h-full w-full" title={t("app.name")} />
+          <BrandMark
+            live={isPlaying}
+            className="h-full w-full"
+            title={t("app.name")}
+          />
         </div>
         {!collapsed && (
           <div className="pointer-events-none min-w-0 flex-1 flex flex-col justify-center">
@@ -77,12 +134,14 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-1">
-        {navItems.map(({ to, icon: Icon, labelKey, iconHover }) => (
+        {navItems.map(({ to, icon: Icon, labelKey, iconHover, beta }) => (
           <NavLink
             key={to}
             to={to}
             title={collapsed ? t(labelKey) : undefined}
-            className={({ isActive }) => cn(navLinkClass(collapsed)({ isActive }), iconHover)}
+            className={({ isActive }) =>
+              cn(navLinkClass(collapsed)({ isActive }), iconHover)
+            }
           >
             {({ isActive }) => (
               <>
@@ -92,8 +151,24 @@ export function Sidebar() {
                     className="nav-active-bar absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary"
                   />
                 )}
-                <Icon size={18} strokeWidth={isActive ? 2.25 : 2} className="shrink-0" />
-                {!collapsed && <span className="truncate">{t(labelKey)}</span>}
+                <Icon
+                  size={18}
+                  strokeWidth={isActive ? 2.25 : 2}
+                  className="shrink-0"
+                />
+                {!collapsed && (
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="truncate">{t(labelKey)}</span>
+                    {beta && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 border-0 px-1.5 py-0 text-[10px] font-semibold leading-4"
+                      >
+                        {t("recognize.beta")}
+                      </Badge>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </NavLink>
@@ -105,7 +180,9 @@ export function Sidebar() {
         <NavLink
           to="/settings"
           title={collapsed ? t("nav.settings") : undefined}
-          className={({ isActive }) => cn(navLinkClass(collapsed)({ isActive }), "icon-hover-settings")}
+          className={({ isActive }) =>
+            cn(navLinkClass(collapsed)({ isActive }), "icon-hover-settings")
+          }
         >
           {({ isActive }) => (
             <>
@@ -115,12 +192,18 @@ export function Sidebar() {
                   className="nav-active-bar absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary"
                 />
               )}
-              <Settings size={18} strokeWidth={isActive ? 2.25 : 2} className="shrink-0" />
-              {!collapsed && <span className="truncate">{t("nav.settings")}</span>}
+              <Settings
+                size={18}
+                strokeWidth={isActive ? 2.25 : 2}
+                className="shrink-0"
+              />
+              {!collapsed && (
+                <span className="truncate">{t("nav.settings")}</span>
+              )}
             </>
           )}
         </NavLink>
       </div>
     </aside>
-  )
+  );
 }

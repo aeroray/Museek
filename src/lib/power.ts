@@ -38,16 +38,6 @@ export function setTrayVisible(visible: boolean): void {
 export async function hideToTray(
   win: Window | null | undefined,
 ): Promise<void> {
-  if (isTauri) {
-    await invoke<void>("hide_lyrics_window").catch(() => {});
-    try {
-      const { useDesktopLyricsStore } =
-        await import("@/stores/desktopLyricsStore");
-      useDesktopLyricsStore.getState().setVisible(false);
-    } catch {
-      /* best-effort */
-    }
-  }
   // Dynamic imports avoid a cycle: playerStore → power → miniPlayer → playerStore.
   try {
     const [{ exitMiniPlayer, isMiniPlayerSession }, { usePlayerStore }] =

@@ -1,106 +1,133 @@
-import { useMemo, useState } from "react"
-import { Trash2, X, Download, Music, FolderOpen, Search, Pencil, Check, CheckCheck, Eraser } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { CoverImage } from "@/components/common/CoverImage"
-import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges"
-import { useDownloadStore } from "@/stores/downloadStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import { useUiStore } from "@/stores/uiStore"
-import { useT, t } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+import { useMemo, useState } from "react";
+import {
+  Trash2,
+  X,
+  Download,
+  Music,
+  FolderOpen,
+  Search,
+  Pencil,
+  Check,
+  CheckCheck,
+  Eraser,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { CoverImage } from "@/components/common/CoverImage";
+import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges";
+import { useDownloadStore } from "@/stores/downloadStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useUiStore } from "@/stores/uiStore";
+import { useT, t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 // Open the download folder in the OS file manager. Uses the opener plugin —
 // shell.open() validates against a URL pattern in Tauri v2 and rejects plain
 // file paths, so it silently failed for folders.
 async function openDownloadFolder(downloadDir: string | null) {
-  if (!isTauri) return
+  if (!isTauri) return;
   try {
-    const { openPath } = await import("@tauri-apps/plugin-opener")
+    const { openPath } = await import("@tauri-apps/plugin-opener");
     if (downloadDir) {
-      await openPath(downloadDir)
+      await openPath(downloadDir);
     } else {
       // Default app-data downloads folder — ensure it exists, then open it.
-      const { appDataDir, join } = await import("@tauri-apps/api/path")
-      const { mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs")
-      await mkdir("museek/downloads", { baseDir: BaseDirectory.AppData, recursive: true })
-      await openPath(await join(await appDataDir(), "museek", "downloads"))
+      const { appDataDir, join } = await import("@tauri-apps/api/path");
+      const { mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+      await mkdir("museek/downloads", {
+        baseDir: BaseDirectory.AppData,
+        recursive: true,
+      });
+      await openPath(await join(await appDataDir(), "museek", "downloads"));
     }
   } catch (e) {
-    console.error("Failed to open download folder:", e)
-    useUiStore.getState().notify({ message: t("download.openFolderFailed", { msg: String(e) }), variant: "error" })
+    console.error("Failed to open download folder:", e);
+    useUiStore
+      .getState()
+      .notify({
+        message: t("download.openFolderFailed", { msg: String(e) }),
+        variant: "error",
+      });
   }
 }
 
 export function Downloads() {
-  const { tasks, removeTask, removeTasks, clearCompleted } = useDownloadStore()
-  const downloadDir = useSettingsStore((s) => s.downloadDir)
-  const t = useT()
+  const { tasks, removeTask, removeTasks, clearCompleted } = useDownloadStore();
+  const downloadDir = useSettingsStore((s) => s.downloadDir);
+  const t = useT();
 
-  const [editing, setEditing] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [query, setQuery] = useState("")
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
 
   const displayed = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return tasks
+    const q = query.trim().toLowerCase();
+    if (!q) return tasks;
     return tasks.filter(
       (task) =>
-        task.song.name.toLowerCase().includes(q) || task.song.singer.toLowerCase().includes(q)
-    )
-  }, [tasks, query])
+        task.song.name.toLowerCase().includes(q) ||
+        task.song.singer.toLowerCase().includes(q),
+    );
+  }, [tasks, query]);
 
   const summary = useMemo(() => {
-    if (tasks.length === 0) return t("downloads.summaryEmpty")
-    let waiting = 0
-    let downloading = 0
-    let completed = 0
-    let error = 0
+    if (tasks.length === 0) return t("downloads.summaryEmpty");
+    let waiting = 0;
+    let downloading = 0;
+    let completed = 0;
+    let error = 0;
     for (const task of tasks) {
-      if (task.status === "waiting") waiting++
-      else if (task.status === "downloading") downloading++
-      else if (task.status === "completed") completed++
-      else if (task.status === "error") error++
+      if (task.status === "waiting") waiting++;
+      else if (task.status === "downloading") downloading++;
+      else if (task.status === "completed") completed++;
+      else if (task.status === "error") error++;
     }
-    const parts: string[] = []
-    if (downloading) parts.push(t("downloads.summary.downloading", { n: downloading }))
-    if (waiting) parts.push(t("downloads.summary.waiting", { n: waiting }))
-    if (completed) parts.push(t("downloads.summary.completed", { n: completed }))
-    if (error) parts.push(t("downloads.summary.error", { n: error }))
-    return parts.join(" · ")
-  }, [tasks, t])
+    const parts: string[] = [];
+    if (downloading)
+      parts.push(t("downloads.summary.downloading", { n: downloading }));
+    if (waiting) parts.push(t("downloads.summary.waiting", { n: waiting }));
+    if (completed)
+      parts.push(t("downloads.summary.completed", { n: completed }));
+    if (error) parts.push(t("downloads.summary.error", { n: error }));
+    return parts.join(" · ");
+  }, [tasks, t]);
 
-  const hasCompleted = tasks.some((task) => task.status === "completed")
-  const currentKeys = displayed.map((task) => task.id)
-  const allSelected = currentKeys.length > 0 && currentKeys.every((k) => selected.has(k))
+  const hasCompleted = tasks.some((task) => task.status === "completed");
+  const currentKeys = displayed.map((task) => task.id);
+  const allSelected =
+    currentKeys.length > 0 && currentKeys.every((k) => selected.has(k));
 
   const toggleOne = (key: string) =>
     setSelected((s) => {
-      const n = new Set(s)
-      if (n.has(key)) n.delete(key)
-      else n.add(key)
-      return n
-    })
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(currentKeys))
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(currentKeys));
   const exitEdit = () => {
-    setEditing(false)
-    setSelected(new Set())
-  }
+    setEditing(false);
+    setSelected(new Set());
+  };
   const batchDelete = () => {
-    removeTasks([...selected])
-    exitEdit()
-  }
+    removeTasks([...selected]);
+    exitEdit();
+  };
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border flex items-center gap-3">
         <Download size={20} className="shrink-0" />
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold leading-tight">{t("downloads.title")}</h2>
+          <h2 className="text-lg font-semibold leading-tight">
+            {t("downloads.title")}
+          </h2>
           <p className="text-xs text-muted-foreground mt-0.5">{summary}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -136,12 +163,22 @@ export function Downloads() {
                 />
               </div>
               {hasCompleted && (
-                <Button variant="ghost" size="sm" className="h-8 shrink-0" onClick={clearCompleted}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  onClick={clearCompleted}
+                >
                   <Eraser size={14} className="mr-1.5" />
                   {t("downloads.clearCompleted")}
                 </Button>
               )}
-              <Button variant="ghost" size="sm" className="h-8 shrink-0" onClick={() => setEditing(true)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 shrink-0"
+                onClick={() => setEditing(true)}
+              >
                 <Pencil size={14} className="mr-1.5" />
                 {t("downloads.batchEdit")}
               </Button>
@@ -152,9 +189,16 @@ export function Downloads() {
                 {t("downloads.selectedCount", { count: selected.size })}
               </span>
               <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                <Button variant="ghost" size="sm" className="h-8" onClick={toggleAll}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8"
+                  onClick={toggleAll}
+                >
                   <CheckCheck size={14} className="mr-1.5" />
-                  {allSelected ? t("downloads.deselectAll") : t("downloads.selectAll")}
+                  {allSelected
+                    ? t("downloads.deselectAll")
+                    : t("downloads.selectAll")}
                 </Button>
                 <Button
                   variant="outline"
@@ -166,7 +210,12 @@ export function Downloads() {
                   <Trash2 size={14} className="mr-1.5" />
                   {t("downloads.batchDelete")}
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8" onClick={exitEdit}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8"
+                  onClick={exitEdit}
+                >
                   {t("common.cancel")}
                 </Button>
               </div>
@@ -176,28 +225,36 @@ export function Downloads() {
       )}
 
       {tasks.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-          <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
-            <Download size={28} className="text-muted-foreground" />
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-5xl p-4">
+            <div className="flex min-h-[18rem] flex-col items-center justify-center px-4 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
+                <Download size={28} strokeWidth={1.6} />
+              </div>
+              <p className="mt-4 text-sm font-medium">{t("downloads.empty")}</p>
+              <p className="mt-1 max-w-sm text-xs text-muted-foreground text-pretty">
+                {t("downloads.emptyHint")}
+              </p>
+            </div>
           </div>
-          <p className="text-base font-medium">{t("downloads.empty")}</p>
-          <p className="text-sm text-muted-foreground mt-1">{t("downloads.emptyHint")}</p>
         </div>
       ) : (
         <ScrollArea className="flex-1">
           <div className="px-3 py-2">
             {displayed.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-12">{t("downloads.noMatch")}</p>
+              <p className="text-center text-sm text-muted-foreground py-12">
+                {t("downloads.noMatch")}
+              </p>
             ) : (
               displayed.map((task) => {
-                const sel = selected.has(task.id)
+                const sel = selected.has(task.id);
                 return (
                   <div
                     key={task.id}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2 rounded-xl group transition-[background-color] duration-200 hover:bg-accent/55",
                       editing && "cursor-pointer",
-                      editing && sel && "bg-primary/10"
+                      editing && sel && "bg-primary/10",
                     )}
                     onClick={editing ? () => toggleOne(task.id) : undefined}
                   >
@@ -205,7 +262,9 @@ export function Downloads() {
                       <span
                         className={cn(
                           "h-5 w-5 rounded-full border flex items-center justify-center shrink-0 transition-colors",
-                          sel ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40"
+                          sel
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "border-muted-foreground/40",
                         )}
                       >
                         {sel && <Check size={13} />}
@@ -224,18 +283,27 @@ export function Downloads() {
 
                     <div className="flex-1 min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <p className="text-sm truncate font-medium">{task.song.name}</p>
+                        <p className="text-sm truncate font-medium">
+                          {task.song.name}
+                        </p>
                         <PlatformBadge source={task.song.source} />
                       </div>
                       <div className="flex items-center gap-2 min-w-0">
-                        <p className="text-xs text-muted-foreground truncate min-w-0">{task.song.singer}</p>
+                        <p className="text-xs text-muted-foreground truncate min-w-0">
+                          {task.song.singer}
+                        </p>
                         <QualityBadge quality={task.quality} />
                       </div>
                       {task.status === "downloading" && (
-                        <Progress value={task.progress} className="h-1 mt-0.5" />
+                        <Progress
+                          value={task.progress}
+                          className="h-1 mt-0.5"
+                        />
                       )}
                       {task.error && (
-                        <p className="text-xs text-destructive truncate">{task.error}</p>
+                        <p className="text-xs text-destructive truncate">
+                          {task.error}
+                        </p>
                       )}
                     </div>
 
@@ -245,7 +313,7 @@ export function Downloads() {
                         task.status === "completed" && "text-green-600",
                         task.status === "error" && "text-destructive",
                         task.status === "downloading" && "text-primary",
-                        task.status === "waiting" && "text-muted-foreground"
+                        task.status === "waiting" && "text-muted-foreground",
                       )}
                     >
                       {task.status === "downloading"
@@ -265,8 +333,8 @@ export function Downloads() {
                             size="icon"
                             className="h-8 w-8 opacity-0 group-hover:opacity-100"
                             onClick={(e) => {
-                              e.stopPropagation()
-                              void openDownloadFolder(downloadDir)
+                              e.stopPropagation();
+                              void openDownloadFolder(downloadDir);
                             }}
                             title={t("download.openFolder")}
                           >
@@ -278,16 +346,18 @@ export function Downloads() {
                           size="icon"
                           className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
                           onClick={(e) => {
-                            e.stopPropagation()
-                            removeTask(task.id)
+                            e.stopPropagation();
+                            removeTask(task.id);
                           }}
                           title={
-                            task.status === "completed" || task.status === "error"
+                            task.status === "completed" ||
+                            task.status === "error"
                               ? t("downloads.batchDelete")
                               : t("common.cancel")
                           }
                         >
-                          {task.status === "completed" || task.status === "error" ? (
+                          {task.status === "completed" ||
+                          task.status === "error" ? (
                             <Trash2 size={14} />
                           ) : (
                             <X size={14} />
@@ -296,12 +366,12 @@ export function Downloads() {
                       </div>
                     )}
                   </div>
-                )
+                );
               })
             )}
           </div>
         </ScrollArea>
       )}
     </div>
-  )
+  );
 }

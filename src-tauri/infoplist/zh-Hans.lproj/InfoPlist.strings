@@ -2,3 +2,4 @@
 "CFBundleDisplayName" = "Museek 拾音";
 "CFBundleName" = "拾音";
 "NSHumanReadableCopyright" = "Copyright © 2026 Museek 拾音。基于 MIT 许可证发布。";
+"NSMicrophoneUsageDescription" = "拾音需要使用麦克风来识别歌曲片段。";
