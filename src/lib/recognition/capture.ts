@@ -9,10 +9,13 @@ const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const isWindows =
   typeof navigator !== "undefined" && /windows/i.test(navigator.userAgent);
+const isMacOS =
+  typeof navigator !== "undefined" &&
+  /macintosh|mac os x/i.test(navigator.userAgent);
 export const RECOGNITION_DURATION_MS = 8000;
 
 export function supportsSystemCapture(): boolean {
-  return isTauri && isWindows;
+  return isTauri && (isWindows || isMacOS);
 }
 
 async function captureBrowserMicrophone(
@@ -86,9 +89,7 @@ export async function captureAudio(
 ): Promise<AudioClip> {
   if (mode === "system") {
     if (!supportsSystemCapture())
-      throw new Error(
-        "System audio capture is available in the Windows desktop app",
-      );
+      throw new Error("System audio capture is unavailable on this platform");
     const { invoke } = await import("@tauri-apps/api/core");
     const dto = await invoke<CapturedAudioDto>("capture_audio_clip", {
       mode,

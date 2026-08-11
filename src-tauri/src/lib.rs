@@ -863,6 +863,95 @@ fn capture_windows_audio(mode: String, duration_ms: u64) -> Result<CapturedAudio
     result
 }
 
+#[cfg(target_os = "macos")]
+fn capture_macos_system_audio(duration_ms: u64) -> Result<CapturedAudioDto, String> {
+    use screencapturekit::prelude::*;
+    use std::sync::{Arc, Condvar, Mutex};
+    use std::time::{Duration, Instant};
+
+    const SAMPLE_RATE: usize = 16_000;
+    let duration_ms = duration_ms.clamp(3_000, 12_000);
+    let target_samples = (SAMPLE_RATE as u64 * duration_ms / 1000) as usize;
+    let content = SCShareableContent::get().map_err(|error| error.to_string())?;
+    let display = content
+        .displays()
+        .into_iter()
+        .next()
+        .ok_or_else(|| "No display is available for system audio capture".to_string())?;
+    let filter = SCContentFilter::create()
+        .with_display(&display)
+        .with_excluding_windows(&[])
+        .build();
+    let configuration = SCStreamConfiguration::new()
+        .with_captures_audio(true)
+        .with_sample_rate(SAMPLE_RATE as i32)
+        .with_channel_count(1);
+    let captured = Arc::new((Mutex::new(Vec::with_capacity(target_samples)), Condvar::new()));
+    let captured_for_handler = Arc::clone(&captured);
+    let mut stream = SCStream::new(&filter, &configuration);
+    let handler_registered = stream.add_output_handler(
+        move |sample: CMSampleBuffer, _output_type: SCStreamOutputType| {
+            let Some(audio_buffers) = sample.audio_buffer_list() else {
+                return;
+            };
+            let (samples, ready) = &*captured_for_handler;
+            let mut samples = samples.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            if samples.len() >= target_samples {
+                return;
+            }
+            for buffer in audio_buffers.iter() {
+                for bytes in buffer.data().chunks_exact(std::mem::size_of::<f32>()) {
+                    samples.push(f32::from_ne_bytes(bytes.try_into().unwrap_or([0; 4])));
+                    if samples.len() >= target_samples {
+                        break;
+                    }
+                }
+                if samples.len() >= target_samples {
+                    break;
+                }
+            }
+            ready.notify_one();
+        },
+        SCStreamOutputType::Audio,
+    );
+    if handler_registered.is_none() {
+        return Err("Failed to register the macOS system audio output".to_string());
+    }
+    stream
+        .start_capture()
+        .map_err(|error| format!("Failed to start macOS system audio capture: {error}"))?;
+
+    let deadline = Instant::now() + Duration::from_millis(duration_ms + 2_000);
+    let (samples, ready) = &*captured;
+    let mut samples = samples.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    while samples.len() < target_samples {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let (guard, _) = ready
+            .wait_timeout(samples, remaining)
+            .map_err(|_| "System audio capture synchronization failed".to_string())?;
+        samples = guard;
+    }
+    let result = if samples.is_empty() {
+        Err("No system audio samples were captured. Grant Screen Recording permission and play audio before retrying.".to_string())
+    } else {
+        samples.truncate(target_samples);
+        Ok(CapturedAudioDto {
+            duration_ms: samples.len() as u64 * 1000 / SAMPLE_RATE as u64,
+            samples: samples.clone(),
+            sample_rate: SAMPLE_RATE as u32,
+            channel_count: 1,
+        })
+    };
+    drop(samples);
+    stream
+        .stop_capture()
+        .map_err(|error| format!("Failed to stop macOS system audio capture: {error}"))?;
+    result
+}
+
 #[tauri::command]
 async fn capture_audio_clip(mode: String, duration_ms: u64) -> Result<CapturedAudioDto, String> {
     #[cfg(target_os = "windows")]
@@ -873,7 +962,19 @@ async fn capture_audio_clip(mode: String, duration_ms: u64) -> Result<CapturedAu
         .await
         .map_err(|error| error.to_string())?;
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        if mode == "system" {
+            return tauri::async_runtime::spawn_blocking(move || {
+                capture_macos_system_audio(duration_ms)
+            })
+            .await
+            .map_err(|error| error.to_string())?;
+        }
+        let _ = mode;
+        return Err("Native microphone capture is unavailable on macOS".to_string());
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         let _ = (mode, duration_ms);
         Err("Native audio capture is currently available on Windows only".to_string())

@@ -249,8 +249,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "recognize.captureTitle": "采集方式",
     "recognize.captureMicrophone": "麦克风",
     "recognize.captureSystem": "系统声音",
-    "recognize.captureSystemHint":
-      "Windows 桌面端可捕获浏览器和其他应用的播放声音",
+    "recognize.captureSystemHint": "桌面端可捕获浏览器和其他应用的播放声音",
     "recognize.previewTitle": "本次采样",
     "recognize.playSample": "播放采样",
     "recognize.sampleDuration": "时长 {ms} ms",
@@ -277,7 +276,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "recognize.candidates": "候选歌曲",
     "recognize.noPlayable": "已找到信息，但暂时没有匹配到可播放的网易云歌曲。",
     "recognize.permissionError": "请允许 Museek 使用麦克风，然后重试。",
-    "recognize.systemUnsupported": "系统声音采集仅支持 Windows 桌面端。",
+    "recognize.systemUnsupported":
+      "系统声音采集仅支持 Windows 和 macOS 桌面端。",
 
     // Local music
     "local.title": "本地音乐",
@@ -858,7 +858,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "recognize.captureMicrophone": "Microphone",
     "recognize.captureSystem": "System audio",
     "recognize.captureSystemHint":
-      "Windows desktop can capture playback from browsers and other apps",
+      "Desktop apps can capture playback from browsers and other apps",
     "recognize.previewTitle": "Captured sample",
     "recognize.playSample": "Play sample",
     "recognize.sampleDuration": "Duration {ms} ms",
@@ -888,7 +888,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "recognize.permissionError":
       "Allow Museek to use your microphone, then try again.",
     "recognize.systemUnsupported":
-      "System audio capture is available on Windows desktop only.",
+      "System audio capture is available on Windows and macOS desktop only.",
 
     // Local music
     "local.title": "Local music",

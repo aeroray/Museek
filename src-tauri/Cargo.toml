@@ -43,6 +43,9 @@ windows = { version = "0.61", features = [
     "Win32_Storage_FileSystem",
 ] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+screencapturekit = { version = "8", features = ["macos_13_0"] }
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-autostart = "2"

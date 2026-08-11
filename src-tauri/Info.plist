@@ -18,6 +18,8 @@
 
   <key>NSMicrophoneUsageDescription</key>
   <string>Museek uses the microphone to recognize a song sample.</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>Museek uses screen recording permission to capture system audio for song recognition.</string>
 
   <!-- Default locale + declared localizations (EN / Simplified Chinese) -->
   <key>CFBundleDevelopmentRegion</key>
