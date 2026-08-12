@@ -661,3 +661,18 @@ Reason:
 Capture mode is the primary input choice, so it should be available in the
 page header rather than hidden in a secondary card. The result list is the
 main purpose of the route and should receive the page's visual focus.
+
+## 2026-08-12 - Use screenshot-led SaaS framing for the landing page
+
+Decision:
+Keep `docs/index.html` as a bilingual static SaaS product site with a clear
+desktop-app preview, product-surface cards, a workflow explanation, and a
+GitHub Releases path. Render product screenshots at their intrinsic aspect
+ratios with `contain`; browser-style frames provide context but never crop the
+application content.
+
+Reason:
+The landing page should communicate Museek as a desktop music product before
+it communicates its visual style. Full-window captures make the actual app
+inspectable, while the SaaS structure keeps the page easy to scan and makes
+the source-script and no-content-distribution boundaries explicit.
