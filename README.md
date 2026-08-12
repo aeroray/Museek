@@ -40,7 +40,7 @@ Museek is a desktop music aggregator for discovering songs, playlists, albums, c
 
 ## Screenshots · 界面
 
-The following previews were captured on macOS.
+The following previews were captured on macOS.<br>
 以下界面截图来自 macOS。
 
 <div align="center">
