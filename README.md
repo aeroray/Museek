@@ -40,24 +40,32 @@ Museek is a desktop music aggregator for discovering songs, playlists, albums, c
 
 ## Screenshots · 界面
 
+The following previews were captured on macOS. Search and lyrics are shown first because they represent Museek's core discovery and playback experience.<br>
+以下界面截图来自 macOS。搜索和歌词优先展示，因为它们体现了拾音的核心发现与播放体验。
+
 <div align="center">
 
-![Museek hot playlists · 拾音热门歌单](./docs/screenshots/02-playlists.webp)
+![Search across five platforms · 五平台搜索](./docs/screenshots/01-search.webp)
+
+**Search across five platforms · 五平台搜索**
 
 </div>
 
-| ![Search across platforms · 多平台搜索](./docs/screenshots/01-search.webp) | ![Playlist detail · 歌单详情](./docs/screenshots/03-playlist-detail.webp) |
-| :------------------------------------------------------------------------: | :-----------------------------------------------------------------------: |
-|                               Search · 搜索                                |                              Playlist · 歌单                              |
+| ![Fullscreen synchronized lyrics · 全屏同步歌词](./docs/screenshots/02-lyrics.webp) | ![Desktop lyrics overlay · 桌面歌词](./docs/screenshots/10-desktop-lyrics.webp) |
+| :---------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------: |
+|                  **Fullscreen synchronized lyrics · 全屏同步歌词**                  |                    **Desktop lyrics overlay · 桌面歌词窗口**                    |
 
-| ![Charts across platforms · 多平台排行榜](./docs/screenshots/04-charts.webp) | ![Additional feature screenshot placeholders · 其他功能截图占位图](./docs/screenshots/05-feature-placeholders.svg) |
-| :--------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------------: |
-|                               Charts · 排行榜                                |                                              More features · 更多功能                                              |
+| ![Hot playlists · 热门歌单](./docs/screenshots/03-playlists.webp) | ![Charts across platforms · 多平台排行榜](./docs/screenshots/04-charts.webp) |
+| :---------------------------------------------------------------: | :--------------------------------------------------------------------------: |
+|                   **Hot playlists · 热门歌单**                    |                  **Charts across platforms · 多平台排行榜**                  |
 
-> [!NOTE]
-> The second image in the last row is a temporary placeholder for screenshots of the source manager, player and lyrics, local library, downloads, and song recognition pages. Replace it with real screenshots when they are ready.
->
-> 最后一行右侧图片是音源管理、播放器与歌词、本地音乐库、下载和听歌识曲页面的临时占位图，准备好真实截图后可以直接替换。
+| ![Albums across platforms · 多平台专辑](./docs/screenshots/05-albums.webp) | ![Favorites library · 收藏库](./docs/screenshots/06-favorites.webp) |
+| :------------------------------------------------------------------------: | :-----------------------------------------------------------------: |
+|                  **Albums across platforms · 多平台专辑**                  |                   **Favorites library · 收藏库**                    |
+
+| ![Song recognition beta · Beta 听歌识曲](./docs/screenshots/09-recognize.webp) | ![Local music library · 本地音乐库](./docs/screenshots/07-local-library.webp) | ![Download manager · 下载管理](./docs/screenshots/08-downloads.webp) |
+| :----------------------------------------------------------------------------: | :---------------------------------------------------------------------------: | :------------------------------------------------------------------: |
+|                   **Song recognition beta · Beta 听歌识曲**                    |                     **Local music library · 本地音乐库**                      |                   **Download manager · 下载管理**                    |
 
 <a id="features"></a>
 
