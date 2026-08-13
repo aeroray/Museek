@@ -2,6 +2,9 @@
  * Cheap checks so we don't treat CDN 403 HTML / JSON error bodies as MP3.
  */
 
+import * as pako from "pako";
+import type { Quality } from "@/types/music";
+
 function startsWithAscii(bytes: Uint8Array, ascii: string): boolean {
   if (bytes.length < ascii.length) return false
   for (let i = 0; i < ascii.length; i++) {
@@ -10,9 +13,43 @@ function startsWithAscii(bytes: Uint8Array, ascii: string): boolean {
   return true
 }
 
+function isMp4Ftyp(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 8 &&
+    bytes[4] === 0x66 &&
+    bytes[5] === 0x74 &&
+    bytes[6] === 0x79 &&
+    bytes[7] === 0x70
+  );
+}
+
 /** Gzip magic — Tauri HTTP may leave bodies compressed. */
 export function isGzipBytes(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
+}
+
+export function maybeGunzipAudio(bytes: Uint8Array): Uint8Array {
+  if (!isGzipBytes(bytes)) return bytes;
+  try {
+    return pako.inflate(bytes);
+  } catch {
+    return bytes;
+  }
+}
+
+/** Pick a real container extension from magic bytes, not from the requested quality. */
+export function suggestedDownloadExtension(
+  bytes: Uint8Array,
+  quality: Quality,
+): string {
+  if (isMp4Ftyp(bytes)) return "m4a";
+  if (startsWithAscii(bytes, "fLaC")) return "flac";
+  if (startsWithAscii(bytes, "OggS")) return "ogg";
+  if (startsWithAscii(bytes, "RIFF")) return "wav";
+  if (bytes.length >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33)
+    return "mp3";
+  if (quality === "flac" || quality === "flac24bit") return "flac";
+  return "mp3";
 }
 
 export function looksLikeAudioBytes(bytes: Uint8Array): boolean {
@@ -29,15 +66,7 @@ export function looksLikeAudioBytes(bytes: Uint8Array): boolean {
   // WAV / RIFF
   if (startsWithAscii(bytes, "RIFF")) return true
   // MP4 / M4A — "ftyp" at offset 4
-  if (
-    bytes.length >= 8 &&
-    bytes[4] === 0x66 &&
-    bytes[5] === 0x74 &&
-    bytes[6] === 0x79 &&
-    bytes[7] === 0x70
-  ) {
-    return true
-  }
+  if (isMp4Ftyp(bytes)) return true
 
   return false
 }

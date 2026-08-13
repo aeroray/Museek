@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import { cdnHeadersForUrl } from "@/lib/cdnHeaders";
+import { cdnFetchStrategies, cdnHeadersForUrl } from "@/lib/cdnHeaders";
 import { hiResCover } from "@/lib/cover";
 import { httpFetch as tauriFetch } from "@/lib/http";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { writeFile, remove, exists } from "@tauri-apps/plugin-fs";
 import type { MusicInfo, Quality } from "@/types/music";
 import { resolveAdaptiveUrl } from "@/lib/playback";
 import { notify, promptDownloadLocation } from "@/lib/notify";
@@ -12,6 +12,7 @@ import { readData, writeData } from "@/lib/db";
 import { t } from "@/lib/i18n";
 import { loadLyricInfo } from "@/lib/lyric/loadLyric";
 import { sourceRunner } from "@/lib/sourceRunner";
+import { maybeGunzipAudio, suggestedDownloadExtension } from "@/lib/audioBytes";
 
 export type DownloadStatus = "waiting" | "downloading" | "completed" | "error";
 
@@ -49,6 +50,8 @@ type DownloadTaskSnapshot = Omit<DownloadTask, "embedLyrics" | "embedCover"> & {
 };
 
 const STORE_FILE = "downloads.json";
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const STATUSES: DownloadStatus[] = [
   "waiting",
   "downloading",
@@ -95,53 +98,144 @@ function detectCoverMimeType(bytes: Uint8Array): string | null {
   if (startsWithBytes(bytes, [0xff, 0xd8, 0xff])) return "image/jpeg";
   if (startsWithBytes(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
     return "image/png";
-  if (
-    startsWithBytes(bytes, [0x52, 0x49, 0x46, 0x46]) &&
-    startsWithBytes(bytes.slice(8), [0x57, 0x45, 0x42, 0x50])
-  )
-    return "image/webp";
-  if (
-    startsWithBytes(bytes, [0x47, 0x49, 0x46, 0x38]) &&
-    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
-    bytes[5] === 0x61
-  )
-    return "image/gif";
-  if (startsWithBytes(bytes, [0x42, 0x4d])) return "image/bmp";
+  return null;
+}
+
+async function fetchCoverBytes(url: string): Promise<Uint8Array | null> {
+  for (const headers of cdnFetchStrategies(url)) {
+    try {
+      const res = await tauriFetch(url, {
+        method: "GET",
+        headers: {
+          ...headers,
+          Accept: "image/jpeg,image/png,image/*;q=0.8,*/*;q=0.5",
+        },
+      });
+      if (!res.ok) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (!bytes.length || bytes.byteLength > MAX_DOWNLOAD_COVER_BYTES) continue;
+      if (!detectCoverMimeType(bytes)) continue;
+      return bytes;
+    } catch {
+      /* try the next header strategy */
+    }
+  }
+  return null;
+}
+
+function coverUrlCandidates(...urls: Array<string | null | undefined>): string[] {
+  const unique: string[] = [];
+  for (const url of urls) {
+    if (
+      typeof url === "string" &&
+      /^https?:\/\//i.test(url) &&
+      !unique.includes(url)
+    ) {
+      unique.push(url);
+    }
+  }
+  return unique;
+}
+
+async function fetchCoverFromUrls(
+  urls: string[],
+): Promise<DownloadCover | null> {
+  for (const url of urls) {
+    const bytes = await fetchCoverBytes(url);
+    if (bytes) return { bytes };
+  }
   return null;
 }
 
 async function fetchDownloadCover(
   song: MusicInfo,
 ): Promise<DownloadCover | null> {
-  const sourceUrl =
-    song.meta.picUrl ||
-    (await sourceRunner.getPic({
+  const picUrl = song.meta.picUrl || null;
+  const fromMeta = await fetchCoverFromUrls(
+    coverUrlCandidates(hiResCover(picUrl, song.source), picUrl),
+  );
+  if (fromMeta) return fromMeta;
+
+  let fromScript: string | null = null;
+  try {
+    fromScript = await sourceRunner.getPic({
       source: song.source,
       action: "pic",
       info: song,
-    }));
-  const url = hiResCover(sourceUrl, song.source);
-  if (!url || !/^https?:\/\//i.test(url)) return null;
-  const res = await tauriFetch(url, {
-    method: "GET",
-    headers: cdnHeadersForUrl(url),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  if (!bytes.length) throw new Error("Empty cover response");
-  if (bytes.byteLength > MAX_DOWNLOAD_COVER_BYTES)
-    throw new Error("Cover is too large");
-  const mimeType = detectCoverMimeType(bytes);
-  if (!mimeType) throw new Error("Invalid cover response");
-  return { bytes };
+    });
+  } catch {
+    fromScript = null;
+  }
+  const fromPicAction = await fetchCoverFromUrls(
+    coverUrlCandidates(hiResCover(fromScript, song.source), fromScript),
+  );
+  if (fromPicAction) return fromPicAction;
+  if (picUrl || fromScript) throw new Error("Could not fetch cover art");
+  return null;
 }
 
-async function embedMetadataForTask(
-  task: DownloadTask,
-  filePath: string,
-): Promise<string[]> {
-  if (!isTauri || (task.embedLyrics === false && task.embedCover === false))
-    return [];
+const MAX_EMBED_LYRICS_CHARS = 80_000;
+
+function lyricTextForEmbed(info: Awaited<ReturnType<typeof loadLyricInfo>>): string | null {
+  if (!info) return null;
+  // Prefer line-level LRC; word-timed payloads are often too large for ID3 USLT.
+  const text = info.lyric?.trim() || info.lxlyric?.trim() || null;
+  if (!text) return null;
+  return text.length > MAX_EMBED_LYRICS_CHARS
+    ? text.slice(0, MAX_EMBED_LYRICS_CHARS)
+    : text;
+}
+
+const MAX_EMBED_COVER_IPC_BYTES = 768 * 1024;
+const AUDIO_EMBED_CHUNK = 512 * 1024;
+const MAX_IN_MEMORY_EMBED_BYTES = 48 * 1024 * 1024;
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x2000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function uint8ToBase64Chunks(bytes: Uint8Array): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += AUDIO_EMBED_CHUNK) {
+    chunks.push(uint8ToBase64(bytes.subarray(i, i + AUDIO_EMBED_CHUNK)));
+  }
+  return chunks;
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function concatBase64Chunks(chunks: string[]): Uint8Array {
+  const parts = chunks.map(base64ToUint8);
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+type EmbedPayload = {
+  lyrics: string | null;
+  coverBase64: string | null;
+  warnings: string[];
+};
+
+async function prepareEmbedPayload(task: DownloadTask): Promise<EmbedPayload> {
+  if (!isTauri || (task.embedLyrics === false && task.embedCover === false)) {
+    return { lyrics: null, coverBase64: null, warnings: [] };
+  }
 
   const lyricPromise =
     task.embedLyrics === false
@@ -156,46 +250,67 @@ async function embedMetadataForTask(
     coverPromise,
   ]);
   const warnings: string[] = [];
-  let lyrics: string | null = null;
-  let cover: DownloadCover | null = null;
-
-  if (lyricResult.status === "fulfilled") {
-    lyrics =
-      lyricResult.value?.lyric?.trim() ||
-      lyricResult.value?.lxlyric?.trim() ||
-      null;
-  } else {
+  const lyrics =
+    lyricResult.status === "fulfilled"
+      ? lyricTextForEmbed(lyricResult.value)
+      : null;
+  if (lyricResult.status === "rejected") {
     warnings.push(t("download.metadataLyrics"));
   }
-  if (coverResult.status === "fulfilled") {
-    cover = coverResult.value;
-  } else {
+  const cover = coverResult.status === "fulfilled" ? coverResult.value : null;
+  if (coverResult.status === "rejected") {
     warnings.push(t("download.metadataCover"));
   }
 
+  let coverBase64: string | null = null;
+  if (cover) {
+    if (cover.bytes.byteLength > MAX_EMBED_COVER_IPC_BYTES) {
+      warnings.push(t("download.metadataCover"));
+    } else {
+      coverBase64 = uint8ToBase64(cover.bytes);
+    }
+  }
+  return { lyrics, coverBase64, warnings };
+}
+
+async function embedMetadataInMemory(
+  task: DownloadTask,
+  audio: Uint8Array,
+  payload: EmbedPayload,
+): Promise<{ bytes: Uint8Array; warnings: string[] }> {
+  const warnings = [...payload.warnings];
+  if (!isTauri || (task.embedLyrics === false && task.embedCover === false)) {
+    return { bytes: audio, warnings };
+  }
+  if (audio.byteLength > MAX_IN_MEMORY_EMBED_BYTES) {
+    warnings.push(t("download.metadataWrite"));
+    return { bytes: audio, warnings };
+  }
   try {
-    await invoke("embed_download_metadata", {
-      path: filePath,
+    const taggedChunks = await invoke<string[]>("embed_download_metadata", {
+      audioChunksBase64: uint8ToBase64Chunks(audio),
       title: task.song.name,
       artist: task.song.singer,
       album: task.song.albumName,
-      lyrics,
-      cover: cover ? Array.from(cover.bytes) : null,
+      lyrics: payload.lyrics,
+      coverBase64: payload.coverBase64,
     });
-  } catch {
+    if (!Array.isArray(taggedChunks) || taggedChunks.length === 0) {
+      warnings.push(t("download.metadataWrite"));
+      return { bytes: audio, warnings };
+    }
+    return { bytes: concatBase64Chunks(taggedChunks), warnings };
+  } catch (error) {
+    console.error("[museek] embed_download_metadata", error);
     warnings.push(t("download.metadataWrite"));
+    return { bytes: audio, warnings };
   }
-  return warnings;
 }
-
-const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 async function deleteFileIfNeeded(filePath: string | undefined) {
   if (!filePath || !isTauri) return;
   if (!useSettingsStore.getState().deleteDownloadFiles) return;
   try {
-    const { remove, exists } = await import("@tauri-apps/plugin-fs");
     if (await exists(filePath)) await remove(filePath);
   } catch {
     /* ignore — task still removed from the list */
@@ -377,6 +492,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
         });
       }
 
+      const embedPromise = prepareEmbedPayload(task);
       const res = await tauriFetch(url, {
         method: "GET",
         headers: cdnHeadersForUrl(url),
@@ -395,11 +511,12 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
         if (done) break;
         chunks.push(value);
         received += value.length;
-        if (contentLength > 0)
+        if (contentLength > 0) {
           get().updateProgress(
             id,
-            Math.round((received / contentLength) * 100),
+            Math.min(85, Math.round((received / contentLength) * 85)),
           );
+        }
       }
 
       // Merge chunks
@@ -411,15 +528,23 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
         offset += c.length;
       }
 
-      const ext = actual === "flac" || actual === "flac24bit" ? "flac" : "mp3";
+      const audio = maybeGunzipAudio(merged);
+      const ext = suggestedDownloadExtension(audio, actual);
       const { downloadDir, fileNaming } = useSettingsStore.getState();
       // Guarded at addTask, but a queued task could outlive the user clearing it.
       if (!downloadDir) throw new Error(t("download.noLocationError"));
       const filename = buildFilename(task.song, fileNaming, ext);
       const dir = downloadDir.replace(/[/\\]+$/, "");
       const filePath = `${dir}/${filename}`;
-      await writeFile(filePath, merged);
-      const metadataWarnings = await embedMetadataForTask(task, filePath);
+
+      get().updateProgress(id, 86);
+      const payload = await embedPromise;
+      get().updateProgress(id, 90);
+      const { bytes: output, warnings: metadataWarnings } =
+        await embedMetadataInMemory(task, audio, payload);
+
+      get().updateProgress(id, 96);
+      await writeFile(filePath, output);
 
       set((s) => {
         const tasks = s.tasks.map((t) =>

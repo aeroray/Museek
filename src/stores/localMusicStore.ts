@@ -26,6 +26,11 @@ const STORE_FILE = "localMusic.json";
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+async function dropRemovedFromPlayback(ids: string[]) {
+  const { usePlayerStore } = await import("@/stores/playerStore");
+  usePlayerStore.getState().removeSongsFromPlayback(ids);
+}
+
 /** Parallel file reads + tag parse. Keep modest — each file is loaded fully into memory. */
 const IMPORT_CONCURRENCY = 4;
 const PERSIST_DEBOUNCE_MS = 400;
@@ -515,6 +520,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       const tracks = get().tracks.filter((t) => t.id !== id);
       set({ tracks });
       persist(tracks, get().categories);
+      await dropRemovedFromPlayback([id]);
       if (track) await deleteFileIfNeeded(track.filePath);
     },
 
@@ -524,6 +530,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       const tracks = get().tracks.filter((t) => !idSet.has(t.id));
       set({ tracks });
       persist(tracks, get().categories);
+      await dropRemovedFromPlayback(ids);
       for (const t of removing) await deleteFileIfNeeded(t.filePath);
     },
 

@@ -70,29 +70,35 @@ function TopBarLyrics() {
 
   return (
     <div
-      className={cn(
-        "pointer-events-auto mx-2 min-w-0 flex-1 select-none",
-        // Stay inside the h-10 top bar; leave room for descenders (g/y/p).
-        "flex h-8 cursor-pointer items-center justify-center rounded-md px-3",
-        "transition-[background-color,color] duration-200 ease-out hover:bg-accent/60",
-      )}
-      onClick={() => setShowLyrics(true)}
+      data-tauri-drag-region
+      className="mx-2 flex h-8 min-w-0 flex-1 items-center justify-center select-none"
     >
-      <LyricTransition
-        transitionKey={`${currentSong.id}-${currentLyricIndex}-${text}`}
-        className="w-full min-w-0"
-      >
-        {activeLine ? (
-          <PlaybackKaraokeText
-            line={activeLine}
-            className="top-bar-lyrics-text block w-full min-w-0 truncate text-center text-base leading-tight tracking-tight text-primary font-medium"
-          />
-        ) : (
-          <span className="top-bar-lyrics-text block w-full min-w-0 truncate text-center text-base leading-tight tracking-tight text-muted-foreground/70 font-normal">
-            {text}
-          </span>
+      <button
+        type="button"
+        className={cn(
+          "inline-flex max-w-full min-w-0 items-center rounded-md px-2 py-0.5",
+          "cursor-pointer text-center",
+          "transition-[background-color,color] duration-200 ease-out hover:bg-accent/60",
         )}
-      </LyricTransition>
+        onClick={() => setShowLyrics(true)}
+        title={t("player.lyrics")}
+      >
+        <LyricTransition
+          transitionKey={`${currentSong.id}-${currentLyricIndex}-${text}`}
+          className="w-max max-w-full min-w-0"
+        >
+          {activeLine ? (
+            <PlaybackKaraokeText
+              line={activeLine}
+              className="top-bar-lyrics-text block max-w-full truncate text-center text-base leading-tight tracking-tight text-primary font-medium"
+            />
+          ) : (
+            <span className="top-bar-lyrics-text block max-w-full truncate text-center text-base leading-tight tracking-tight text-muted-foreground/70 font-normal">
+              {text}
+            </span>
+          )}
+        </LyricTransition>
+      </button>
     </div>
   );
 }

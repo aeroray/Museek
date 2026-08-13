@@ -341,11 +341,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         "settings.json",
         DEFAULTS,
       );
-      // Download location is now device-local and no longer synced. On the first
-      // load after this change, drop any value that rode in via the old cross-device
-      // sync so the user re-picks it per device (one-time, tracked in localStorage).
-      const dlLocalized =
-        localStorage.getItem("museek.downloadDir.localized") === "1";
       set({
         playQuality: QUALITIES.includes(data.playQuality as Quality)
           ? (data.playQuality as Quality)
@@ -361,8 +356,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.embedCover === "boolean"
             ? data.embedCover
             : DEFAULTS.embedCover,
+        // Device-local: kept in settings.json, never gated on WebView localStorage
+        // (that flag was wiped on some updates and then persist() blanked the path).
         downloadDir:
-          dlLocalized && typeof data.downloadDir === "string"
+          typeof data.downloadDir === "string" && data.downloadDir.trim()
             ? data.downloadDir
             : null,
         maxConcurrent:
@@ -461,11 +458,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         setTrayVisible(true);
       }
       void syncOpenAtLogin(openAtLogin);
-      // Persist the one-time download-location reset so it doesn't repeat next launch.
-      if (!dlLocalized) {
-        localStorage.setItem("museek.downloadDir.localized", "1");
-        persist();
-      }
     },
   };
 });

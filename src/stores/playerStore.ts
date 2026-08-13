@@ -93,6 +93,8 @@ interface PlayerState {
   addToQueue: (songs: MusicInfo[]) => void;
   playAll: (songs: MusicInfo[]) => void;
   clearQueue: () => void;
+  /** Drop songs from the queue; stop playback if the current track is among them. */
+  removeSongsFromPlayback: (ids: string[]) => void;
   next: () => Promise<void>;
   prev: () => Promise<void>;
   togglePlay: () => void;
@@ -387,6 +389,52 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     clearQueue() {
       set({ queue: [], queueIndex: -1 });
+    },
+
+    removeSongsFromPlayback(ids) {
+      if (!ids.length) return;
+      const idSet = new Set(ids);
+      const { currentSong, queue, queueIndex } = get();
+      const droppingCurrent = !!currentSong && idSet.has(currentSong.id);
+      const nextQueue = queue.filter((item) => !idSet.has(item.music.id));
+      if (!droppingCurrent && nextQueue.length === queue.length) return;
+
+      if (droppingCurrent) {
+        beginPlayGeneration();
+        audioPlayer.stop();
+        revokeCurrentObjectUrl();
+        lastMediaPlaying = false;
+        updateMediaControls(
+          currentSong.name,
+          currentSong.singer,
+          currentSong.albumName ?? "",
+          get().currentPicUrl ?? currentSong.meta.picUrl ?? null,
+          false,
+        );
+        set({
+          currentSong: null,
+          queue: nextQueue,
+          queueIndex: -1,
+          isPlaying: false,
+          status: "idle",
+          error: null,
+          duration: 0,
+          lyricLines: [],
+          lyricsLoading: false,
+          currentPicUrl: null,
+          showLyrics: false,
+        });
+        return;
+      }
+
+      const playingId = queue[queueIndex]?.music.id;
+      const nextIndex = playingId
+        ? nextQueue.findIndex((item) => item.music.id === playingId)
+        : -1;
+      set({
+        queue: nextQueue,
+        queueIndex: nextIndex,
+      });
     },
 
     // Append `songs` to the current queue (deduped) and start playing. In shuffle

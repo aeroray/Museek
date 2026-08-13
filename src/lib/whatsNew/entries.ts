@@ -17,6 +17,50 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.2.1": {
+    zh: {
+      sections: [
+        {
+          title: "⬇️ 下载",
+          bullets: [
+            "修复下载完成后歌词、封面经常写不进文件的问题（Windows 拒绝访问）",
+            "在内存中写入标签后再保存，M4A 等实际格式也能内嵌",
+            "写入标签时进度条会显示「写入标签…」，不再提前到 100%",
+            "修复部分更新后下载目录设置被清空的问题",
+          ],
+        },
+        {
+          title: "✨ 其它",
+          bullets: [
+            "歌单 / 专辑批量编辑可一键加入收藏",
+            "删除本地歌曲时同步从播放队列移除",
+            "顶栏歌词可点进歌词页，空白区域仍可拖动窗口",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "⬇️ Downloads",
+          bullets: [
+            "Fix lyrics and cover art often failing to embed after a download (Windows access denied)",
+            "Write tags in memory before saving, including M4A when that is the real file format",
+            "Progress shows “Writing tags…” instead of jumping to 100% too early",
+            "Fix the download folder setting being cleared after some updates",
+          ],
+        },
+        {
+          title: "✨ Other",
+          bullets: [
+            "Batch-edit on playlists and albums can add songs to favorites",
+            "Removing a local track also drops it from the play queue",
+            "Click the top-bar lyric to open lyrics; empty space still drags the window",
+          ],
+        },
+      ],
+    },
+  },
   "3.2.0": {
     zh: {
       sections: [

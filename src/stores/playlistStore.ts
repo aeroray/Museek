@@ -30,6 +30,7 @@ interface PersistShape {
 
 interface PlaylistState extends PersistShape {
   addToFavorites: (song: MusicInfo) => void
+  addManyToFavorites: (songs: MusicInfo[]) => number
   removeFromFavorites: (songId: string) => void
   isFavorite: (songId: string) => boolean
   // Favorite a whole platform playlist / album (from 歌单 or 专辑详情).
@@ -80,11 +81,21 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => {
     favoriteSongCategories: {},
 
     addToFavorites(song) {
-      // Local files are offline-only — keep them out of the online favorites list.
-      if (song.source === "local") return
-      if (get().favorites.some((f) => f.id === song.id)) return
-      set((s) => ({ favorites: [song, ...s.favorites] }))
+      get().addManyToFavorites([song])
+    },
+
+    addManyToFavorites(songs) {
+      const existing = new Set(get().favorites.map((f) => f.id))
+      const toAdd: MusicInfo[] = []
+      for (const song of songs) {
+        if (song.source === "local" || existing.has(song.id)) continue
+        existing.add(song.id)
+        toAdd.push(song)
+      }
+      if (toAdd.length === 0) return 0
+      set((s) => ({ favorites: [...toAdd, ...s.favorites] }))
       persist()
+      return toAdd.length
     },
 
     removeFromFavorites(songId) {

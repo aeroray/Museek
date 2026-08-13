@@ -56,6 +56,8 @@ export function HotPlaylists() {
   const favoritePlaylists = usePlaylistStore((s) => s.favoritePlaylists)
   const addFavoritePlaylist = usePlaylistStore((s) => s.addFavoritePlaylist)
   const removeFavoritePlaylist = usePlaylistStore((s) => s.removeFavoritePlaylist)
+  const addManyToFavorites = usePlaylistStore((s) => s.addManyToFavorites)
+  const notify = useUiStore((s) => s.notify)
   const navState = useLocation().state as {
     openPlaylist?: Playlist
     openAlbum?: Album
@@ -326,6 +328,16 @@ export function HotPlaylists() {
     setEditing(false)
     setSelectedIds(new Set())
   }
+  const batchFavorite = () => {
+    const n = addManyToFavorites(
+      songs.filter((s) => selectedIds.has(s.id) && s.source !== "local"),
+    )
+    notify({
+      message: n > 0 ? t("playlist.batchFavoriteDone", { n }) : t("playlist.batchFavoriteNone"),
+      variant: n > 0 ? "success" : "info",
+    })
+    exitEdit()
+  }
   const batchDownload = () => {
     songs.filter((s) => selectedIds.has(s.id) && s.source !== "local").forEach((s) => addTask(s))
     exitEdit()
@@ -502,6 +514,16 @@ export function HotPlaylists() {
                   <Button variant="ghost" size="sm" className="h-8" onClick={toggleAll}>
                     <CheckCheck size={14} className="mr-1.5" />
                     {allSelected ? t("favorites.deselectAll") : t("favorites.selectAll")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={selectedIds.size === 0}
+                    onClick={batchFavorite}
+                  >
+                    <Heart size={14} className="mr-1.5" />
+                    {t("playlist.batchFavorite")}
                   </Button>
                   <Button
                     variant="outline"

@@ -1,10 +1,9 @@
-import * as pako from "pako"
 import { audioPlayer } from "@/lib/audio"
 import {
   isAudioContentType,
-  isGzipBytes,
   looksLikeAudioBytes,
   looksLikeNonAudioBytes,
+  maybeGunzipAudio,
 } from "@/lib/audioBytes"
 import { cdnFetchStrategies, isNetEaseCdnUrl } from "@/lib/cdnHeaders"
 import { httpFetch } from "@/lib/http"
@@ -82,15 +81,6 @@ function mimeForQuality(quality: Quality): { ext: string; mime: string } {
   return { ext: "mp3", mime: "audio/mpeg" }
 }
 
-function maybeGunzip(bytes: Uint8Array): Uint8Array {
-  if (!isGzipBytes(bytes)) return bytes
-  try {
-    return pako.inflate(bytes)
-  } catch {
-    return bytes
-  }
-}
-
 function acceptAudioBytes(bytes: Uint8Array, contentType: string | null): boolean {
   if (looksLikeNonAudioBytes(bytes)) return false
   if (looksLikeAudioBytes(bytes)) return true
@@ -122,7 +112,7 @@ async function downloadAudioBytes(
       })
       if (!res.ok) continue
       const contentType = res.headers.get("content-type")
-      const bytes = maybeGunzip(new Uint8Array(await res.arrayBuffer()))
+      const bytes = maybeGunzipAudio(new Uint8Array(await res.arrayBuffer()))
       if (!acceptAudioBytes(bytes, contentType)) continue
       return { bytes, contentType }
     } catch {

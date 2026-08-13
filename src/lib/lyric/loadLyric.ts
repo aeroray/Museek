@@ -74,11 +74,15 @@ async function fetchLyricInfo(
     } else {
       lyricInfo = await getBuiltinLyric(song);
       if (!hasLyricPayload(lyricInfo)) {
-        lyricInfo = await sourceRunner.getLyric({
-          source: song.source,
-          action: "lyric",
-          info: song,
-        });
+        try {
+          lyricInfo = await sourceRunner.getLyric({
+            source: song.source,
+            action: "lyric",
+            info: song,
+          });
+        } catch {
+          lyricInfo = null;
+        }
       }
     }
     if (hasLyricPayload(lyricInfo)) {

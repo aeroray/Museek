@@ -536,6 +536,14 @@ Offer independent embedded-lyrics and embedded-cover switches, both enabled by d
 Reason:
 Metadata is useful but remote lyrics, artwork, and format tags are optional inputs; deterministic queue settings and post-write enrichment preserve usable audio without making downloads brittle.
 
+## 2026-08-14 - Harden download cover and lyric embedding
+
+Decision:
+Tag downloads in a lofty `Cursor<Vec<u8>>` and return tagged bytes over IPC. plugin-fs writes the user file once. Keep network fetch at most 85% of the progress bar; lyrics/cover fetch overlaps the download, and tag writing occupies 86–99%.
+
+Reason:
+Rust must not open a file plugin-fs just wrote — Windows returns os error 5 even in AppData, and macOS can hit the same lock or TCC race. Showing 100% before tagging made the task look stuck.
+
 ## 2026-08-10 - Keep macOS media updates on the main thread
 
 Decision:

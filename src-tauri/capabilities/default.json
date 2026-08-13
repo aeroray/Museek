@@ -95,7 +95,21 @@
       ]
     },
     "fs:allow-mkdir",
-    "fs:allow-remove",
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        { "path": "**" },
+        { "path": "**/*" },
+        { "path": "$HOME/**" },
+        { "path": "$TEMP/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" }
+      ]
+    },
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
     {

@@ -1,15 +1,15 @@
 use lofty::config::WriteOptions;
-use lofty::file::{AudioFile, FileType, TaggedFileExt};
+use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::{MimeType, Picture, PictureType};
+use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey, Tag, TagType};
+use base64::Engine;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig,
 };
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::io::Cursor;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
@@ -52,161 +52,191 @@ fn set_windows_media_app_id(hwnd: *mut std::ffi::c_void) {
     }
 }
 
-fn detect_cover_mime_type(bytes: &[u8]) -> Option<&'static str> {
+fn detect_embeddable_cover_mime(bytes: &[u8]) -> Option<&'static str> {
+    // ID3 APIC is reliable for JPEG/PNG. WebP/GIF/BMP often make the whole tag write fail.
     if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
         return Some("image/jpeg");
     }
     if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
         return Some("image/png");
     }
-    if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
-        return Some("image/webp");
-    }
-    if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
-        return Some("image/gif");
-    }
-    if bytes.starts_with(b"BM") {
-        return Some("image/bmp");
-    }
     None
 }
 
-fn metadata_temp_path(path: &Path) -> PathBuf {
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("audio");
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    path.with_file_name(format!(
-        ".{file_name}.museek-meta-{}-{nonce}.tmp",
-        std::process::id()
-    ))
+const EMBED_CHUNK_BYTES: usize = 512 * 1024;
+
+fn lofty_error(error: &dyn std::error::Error) -> String {
+    let mut msg = error.to_string();
+    let mut source = error.source();
+    while let Some(inner) = source {
+        msg.push_str(": ");
+        msg.push_str(&inner.to_string());
+        source = inner.source();
+    }
+    msg
 }
 
-fn replace_metadata_file(temp_path: &Path, target_path: &Path) -> std::io::Result<()> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::ffi::OsStrExt;
-        use windows::core::PCWSTR;
-        use windows::Win32::Storage::FileSystem::{ReplaceFileW, REPLACE_FILE_FLAGS};
+fn load_embed_cover_bytes(bytes: Vec<u8>) -> Option<(Vec<u8>, &'static str)> {
+    if bytes.is_empty() || bytes.len() > MAX_EMBEDDED_COVER_BYTES {
+        return None;
+    }
+    let mime = detect_embeddable_cover_mime(&bytes)?;
+    Some((bytes, mime))
+}
 
-        let target = target_path
-            .as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect::<Vec<_>>();
-        let temp = temp_path
-            .as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect::<Vec<_>>();
-        unsafe {
-            ReplaceFileW(
-                PCWSTR(target.as_ptr()),
-                PCWSTR(temp.as_ptr()),
-                PCWSTR::null(),
-                REPLACE_FILE_FLAGS(0),
-                None,
-                None,
-            )
-            .map_err(|error| std::io::Error::other(error.to_string()))
+fn load_embed_cover(cover_base64: Option<String>) -> Option<(Vec<u8>, &'static str)> {
+    let cover_base64 = cover_base64.filter(|value| !value.trim().is_empty())?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(cover_base64.trim())
+        .ok()?;
+    load_embed_cover_bytes(bytes)
+}
+
+fn decode_base64_chunks(chunks: Vec<String>) -> Result<Vec<u8>, String> {
+    let mut audio = Vec::new();
+    for chunk in chunks {
+        let trimmed = chunk.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(trimmed)
+            .map_err(|error| error.to_string())?;
+        audio.extend_from_slice(&bytes);
+    }
+    Ok(audio)
+}
+
+fn encode_base64_chunks(bytes: &[u8]) -> Vec<String> {
+    bytes
+        .chunks(EMBED_CHUNK_BYTES)
+        .map(|chunk| base64::engine::general_purpose::STANDARD.encode(chunk))
+        .collect()
+}
+
+fn apply_download_tags(
+    tagged_file: &mut lofty::file::TaggedFile,
+    title: &str,
+    artist: &str,
+    album: &str,
+    lyrics: Option<&str>,
+    cover: Option<&(Vec<u8>, &'static str)>,
+) -> Result<(), String> {
+    let tag_type = tagged_file.primary_tag_type();
+    if !tagged_file.tag_support(tag_type).is_writable() {
+        return Err(format!(
+            "The audio format {:?} does not support writable metadata",
+            tagged_file.file_type()
+        ));
+    }
+
+    if tagged_file.primary_tag().is_none() {
+        tagged_file.insert_tag(Tag::new(tag_type));
+    }
+
+    let tag = tagged_file
+        .primary_tag_mut()
+        .ok_or_else(|| "Could not create the audio metadata tag".to_string())?;
+    if !title.trim().is_empty() {
+        tag.set_title(title.to_string());
+    }
+    if !artist.trim().is_empty() {
+        tag.set_artist(artist.to_string());
+    }
+    if !album.trim().is_empty() {
+        tag.set_album(album.to_string());
+    }
+    if let Some(lyrics) = lyrics.filter(|value| !value.trim().is_empty()) {
+        let lyrics = lyrics.replace('\0', "");
+        let keys = if tag_type == TagType::Id3v2 {
+            [ItemKey::UnsyncLyrics, ItemKey::Lyrics]
+        } else {
+            [ItemKey::Lyrics, ItemKey::UnsyncLyrics]
+        };
+        for key in keys {
+            if tag.insert_text(key, lyrics.clone()) {
+                break;
+            }
         }
     }
-
-    #[cfg(not(windows))]
-    {
-        fs::rename(temp_path, target_path)
+    if let Some((cover, mime)) = cover {
+        tag.remove_picture_type(PictureType::CoverFront);
+        tag.push_picture(
+            Picture::unchecked(cover.clone())
+                .pic_type(PictureType::CoverFront)
+                .mime_type(MimeType::from_str(mime))
+                .build(),
+        );
     }
+    Ok(())
+}
+
+fn embed_audio_in_memory(
+    audio: Vec<u8>,
+    title: &str,
+    artist: &str,
+    album: &str,
+    lyrics: Option<&str>,
+    cover: Option<&(Vec<u8>, &'static str)>,
+) -> Result<Vec<u8>, String> {
+    let mut cursor = Cursor::new(audio);
+    let mut tagged_file = Probe::new(&mut cursor)
+        .guess_file_type()
+        .map_err(|error| error.to_string())?
+        .read()
+        .map_err(|error| lofty_error(&error))?;
+    apply_download_tags(&mut tagged_file, title, artist, album, lyrics, cover)?;
+    tagged_file
+        .save_to(&mut cursor, WriteOptions::default())
+        .map_err(|error| error.to_string())?;
+    Ok(cursor.into_inner())
 }
 
 #[tauri::command]
 fn embed_download_metadata(
-    path: String,
+    audio_chunks_base64: Vec<String>,
     title: String,
     artist: String,
     album: String,
     lyrics: Option<String>,
-    cover: Option<Vec<u8>>,
-) -> Result<(), String> {
-    let cover = cover.filter(|bytes| !bytes.is_empty());
-    let cover_mime = if let Some(bytes) = cover.as_deref() {
-        if bytes.len() > MAX_EMBEDDED_COVER_BYTES {
-            return Err("Cover image is too large".to_string());
-        }
-        Some(detect_cover_mime_type(bytes).ok_or_else(|| "Invalid cover image".to_string())?)
-    } else {
-        None
-    };
-
-    let target_path = Path::new(&path);
-    let temp_path = metadata_temp_path(target_path);
-    if let Err(error) = fs::copy(target_path, &temp_path) {
-        let _ = fs::remove_file(&temp_path);
-        return Err(error.to_string());
+    cover_base64: Option<String>,
+) -> Result<Vec<String>, String> {
+    let audio = decode_base64_chunks(audio_chunks_base64)?;
+    if audio.is_empty() {
+        return Err("Empty audio".to_string());
     }
 
-    let result = (|| -> Result<(), String> {
-        let mut tagged_file =
-            lofty::read_from_path(&temp_path).map_err(|error| error.to_string())?;
-        if !matches!(tagged_file.file_type(), FileType::Mpeg | FileType::Flac) {
-            return Err("Only MP3 and FLAC downloads support embedded metadata".to_string());
+    let cover = load_embed_cover(cover_base64);
+    let lyrics = lyrics.filter(|value| !value.trim().is_empty());
+    let attempts = [
+        (lyrics.as_deref(), cover.as_ref()),
+        (None, cover.as_ref()),
+        (lyrics.as_deref(), None),
+        (None, None),
+    ];
+    let mut last_error = None;
+    let mut seen = Vec::new();
+    for attempt in attempts {
+        let key = (attempt.0.is_some(), attempt.1.is_some());
+        if seen.contains(&key) {
+            continue;
         }
-
-        let tag_type = tagged_file.primary_tag_type();
-        if tagged_file.primary_tag().is_none() {
-            if !tagged_file.tag_support(tag_type).is_writable() {
-                return Err("The audio format does not support writable metadata".to_string());
-            }
-            tagged_file.insert_tag(Tag::new(tag_type));
+        seen.push(key);
+        match embed_audio_in_memory(
+            audio.clone(),
+            &title,
+            &artist,
+            &album,
+            attempt.0,
+            attempt.1,
+        ) {
+            Ok(tagged) => return Ok(encode_base64_chunks(&tagged)),
+            Err(error) => last_error = Some(error),
         }
-
-        let tag = tagged_file
-            .primary_tag_mut()
-            .ok_or_else(|| "Could not create the audio metadata tag".to_string())?;
-        if !title.trim().is_empty() {
-            tag.set_title(title);
-        }
-        if !artist.trim().is_empty() {
-            tag.set_artist(artist);
-        }
-        if !album.trim().is_empty() {
-            tag.set_album(album);
-        }
-        if let Some(lyrics) = lyrics.filter(|value| !value.trim().is_empty()) {
-            let lyric_key = if tag_type == TagType::Id3v2 {
-                ItemKey::UnsyncLyrics
-            } else {
-                ItemKey::Lyrics
-            };
-            if !tag.insert_text(lyric_key, lyrics) {
-                return Err("Could not write embedded lyrics".to_string());
-            }
-        }
-        if let Some(cover) = cover {
-            let mime = cover_mime.ok_or_else(|| "Invalid cover image".to_string())?;
-            tag.remove_picture_type(PictureType::CoverFront);
-            tag.push_picture(
-                Picture::unchecked(cover)
-                    .pic_type(PictureType::CoverFront)
-                    .mime_type(MimeType::from_str(mime))
-                    .build(),
-            );
-        }
-
-        tagged_file
-            .save_to_path(&temp_path, WriteOptions::default())
-            .map_err(|error| error.to_string())?;
-        fs::File::open(&temp_path)
-            .and_then(|file| file.sync_all())
-            .map_err(|error| error.to_string())?;
-        replace_metadata_file(&temp_path, target_path).map_err(|error| error.to_string())
-    })();
-
-    let _ = fs::remove_file(&temp_path);
-    result
+    }
+    let error = last_error.unwrap_or_else(|| "Could not write embedded metadata".to_string());
+    eprintln!("embed_download_metadata failed: {error}");
+    Err(error)
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]

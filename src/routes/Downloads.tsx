@@ -317,7 +317,9 @@ export function Downloads() {
                       )}
                     >
                       {task.status === "downloading"
-                        ? `${task.progress}%`
+                        ? task.progress >= 86
+                          ? t("download.writingTags")
+                          : `${task.progress}%`
                         : t(`downloads.status.${task.status}`)}
                     </span>
 
