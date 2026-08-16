@@ -5,14 +5,18 @@ import {
   sourceRunner,
   loadSourceScripts,
   saveSourceScripts,
+  loadSourceProbeResults,
+  saveSourceProbeResults,
 } from "@/lib/sources";
 import { t } from "@/lib/i18n";
 import type { SourceScript } from "@/types/source";
+import type { SourceProbeResult } from "@/lib/sources/probe";
 
 interface SourceState {
   scripts: SourceScript[];
   isLoading: boolean;
   error: string | null;
+  probeResults: Record<string, SourceProbeResult>;
 
   /** @returns whether this created a new entry or refreshed a duplicate */
   importScript: (
@@ -22,8 +26,10 @@ interface SourceState {
   importScriptFromUrl: (url: string) => Promise<"added" | "updated">;
   removeScript: (id: string) => void;
   toggleEnabled: (id: string) => Promise<void>;
+  setEnabled: (id: string, enabled: boolean) => Promise<void>;
   reorderScripts: (from: number, to: number) => void;
   setScriptSources: (id: string, sources: unknown) => void;
+  setProbeResult: (id: string, result: SourceProbeResult) => void;
   loadFromDisk: () => Promise<void>;
   clearError: () => void;
 }
@@ -36,6 +42,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
   scripts: [],
   isLoading: false,
   error: null,
+  probeResults: {},
 
   clearError: () => set({ error: null }),
 
@@ -116,29 +123,29 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     sourceRunner.unloadScript(id);
     set((s) => {
       const scripts = s.scripts.filter((x) => x.id !== id);
+      const probeResults = { ...s.probeResults };
+      delete probeResults[id];
       sourceRunner.setScripts(scripts);
       saveSourceScripts(scripts);
-      return { scripts };
+      saveSourceProbeResults(probeResults);
+      return { scripts, probeResults };
     });
   },
 
-  async toggleEnabled(id) {
+  async setEnabled(id, enabled) {
     const script = get().scripts.find((s) => s.id === id);
-    if (!script) return;
-    const willEnable = !script.enabled;
+    if (!script || script.enabled === enabled) return;
 
-    // Persist the new enabled flag immediately.
     set((s) => {
       const scripts = s.scripts.map((x) =>
-        x.id === id ? { ...x, enabled: willEnable } : x,
+        x.id === id ? { ...x, enabled } : x,
       );
       sourceRunner.setScripts(scripts);
       saveSourceScripts(scripts);
       return { scripts };
     });
 
-    if (willEnable) {
-      // Load it so it can join the failover rotation.
+    if (enabled) {
       set({ isLoading: true, error: null });
       try {
         const sources = await sourceRunner.loadScript(script);
@@ -156,6 +163,12 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     } else {
       sourceRunner.unloadScript(id);
     }
+  },
+
+  async toggleEnabled(id) {
+    const script = get().scripts.find((s) => s.id === id);
+    if (!script) return;
+    await get().setEnabled(id, !script.enabled);
   },
 
   reorderScripts(from, to) {
@@ -181,12 +194,29 @@ export const useSourceStore = create<SourceState>((set, get) => ({
     });
   },
 
+  setProbeResult(id, result) {
+    set((s) => {
+      const probeResults = { ...s.probeResults, [id]: result };
+      saveSourceProbeResults(probeResults);
+      return { probeResults };
+    });
+  },
+
   async loadFromDisk() {
-    const scripts = await loadSourceScripts();
-    set({ scripts });
+    const [scripts, storedProbe] = await Promise.all([
+      loadSourceScripts(),
+      loadSourceProbeResults(),
+    ]);
+    const known = new Set(scripts.map((s) => s.id));
+    const probeResults = Object.fromEntries(
+      Object.entries(storedProbe).filter(([id]) => known.has(id)),
+    );
+    if (Object.keys(probeResults).length !== Object.keys(storedProbe).length) {
+      saveSourceProbeResults(probeResults);
+    }
+    set({ scripts, probeResults });
     sourceRunner.setScripts(scripts);
-    // Load every enabled source (sequentially — they share globalThis.lx while
-    // executing) so they can all participate in failover. Tolerate individual
+    // Load every enabled source (each in its own Worker). Tolerate individual
     // init failures: a source that fails to load just won't be tried.
     for (const script of scripts) {
       if (!script.enabled) continue;

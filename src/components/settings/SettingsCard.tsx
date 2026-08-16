@@ -34,12 +34,19 @@ export function SettingRow({
   return (
     <div className="p-4">
       {(title || control) && (
-        <div className="flex items-start justify-between gap-4">
+        <div
+          className={cn(
+            "flex justify-between gap-4",
+            desc ? "items-start" : "items-center",
+          )}
+        >
           <div className="min-w-0 space-y-1">
             {title && <h3 className="text-sm font-medium leading-snug">{title}</h3>}
             {desc && <p className="text-xs leading-relaxed text-muted-foreground">{desc}</p>}
           </div>
-          {control && <div className="shrink-0 pt-0.5">{control}</div>}
+          {control && (
+            <div className={cn("shrink-0", desc && "pt-0.5")}>{control}</div>
+          )}
         </div>
       )}
       {children && <div className={cn(title && "mt-3")}>{children}</div>}

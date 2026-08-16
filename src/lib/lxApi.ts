@@ -1,9 +1,10 @@
-import { httpFetch as tauriFetch } from "@/lib/http"
 import * as md5Lib from "js-md5"
 import * as pako from "pako"
 import * as aesjs from "aes-js"
 import forge from "node-forge"
 import type { LxRequestResult } from "@/types/source"
+
+export type LxRequestFn = (url: string, init: RequestInit) => Promise<Response>
 
 // js-md5 CommonJS/ESM interop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,6 +12,7 @@ const md5 = ((md5Lib as any).default ?? md5Lib) as (str: string) => string
 
 export interface LxApiOptions {
   scriptInfo: { name: string; version: string; author: string; rawScript: string; description: string }
+  requestFn: LxRequestFn
   onRequestRegister: (handler: (payload: unknown) => Promise<LxRequestResult>) => void
   onInited: (sourceInfo: Record<string, unknown>) => void
   onUpdateAlert?: (info: unknown) => void
@@ -69,7 +71,7 @@ function rsaEncrypt(buf: Uint8Array, publicKeyPem: string): Uint8Array {
 }
 
 export function createLxApi(options: LxApiOptions) {
-  const { scriptInfo, onRequestRegister, onInited, onUpdateAlert } = options
+  const { scriptInfo, requestFn, onRequestRegister, onInited, onUpdateAlert } = options
 
   const lxObj = {
     EVENT_NAMES: {
@@ -116,7 +118,7 @@ export function createLxApi(options: LxApiOptions) {
         ;(fetchOpts.headers as Record<string, string>)["Content-Type"] = "application/x-www-form-urlencoded"
       }
 
-      tauriFetch(url, fetchOpts)
+      requestFn(url, fetchOpts)
         .then(async (res) => {
           clearTimeout(timer)
           const rawText = await res.text()

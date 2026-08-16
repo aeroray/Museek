@@ -7,11 +7,24 @@ import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic";
 import {
   applyAudioSource,
   beginPlayGeneration,
+  findBestCachedSrc,
+  findCachedMeetingPreferred,
   findCachedPlayableSrc,
   isPlayGenerationCurrent,
+  rememberQualityUpgradeMiss,
   resolvePlayableSrc,
   revokeCurrentObjectUrl,
+  shouldAttemptQualityUpgrade,
 } from "@/lib/playback";
+import { qualityMeets } from "@/lib/quality";
+import {
+  clampResumeTime,
+  flushPlaybackSessionWrite,
+  intervalToSeconds,
+  readPlaybackSession,
+  schedulePlaybackSessionWrite,
+  type PlaybackSession,
+} from "@/lib/playbackSession";
 import { notify } from "@/lib/notify";
 import { updateMediaControls, attachMediaControls } from "@/lib/smtc";
 import { setPreventSleep } from "@/lib/power";
@@ -27,6 +40,12 @@ let lastMediaPlaying = false;
 const PLAY_START_TIMEOUT_MS = 10_000;
 /** Device-local volume/mute — deliberately excluded from config sync. */
 const PLAYER_PREFS_FILE = "player.json";
+/** Keep restored duration/status until a real audio source is attached. */
+let holdRestoredClock = false;
+/** Resume offset for a restored song if play() races source hydration. */
+let sessionResumeAt = 0;
+let sessionResumeSongId: string | null = null;
+let restoreSourcePromise: Promise<void> | null = null;
 
 type PlayerPrefs = {
   volume: number;
@@ -40,6 +59,34 @@ function clampVolume(v: number): number {
 
 function persistPlayerPrefs(volume: number, muted: boolean) {
   writeData(PLAYER_PREFS_FILE, { volume, muted } satisfies PlayerPrefs);
+}
+
+function snapshotPlaybackSession(): PlaybackSession {
+  const s = usePlayerStore.getState();
+  return {
+    version: 1,
+    queue: s.queue,
+    queueIndex: s.queueIndex,
+    currentSong: s.currentSong,
+    currentQuality: s.currentQuality,
+    playMode: s.playMode,
+    currentTime: audioPlayer.getCurrentTime(),
+    duration: s.duration,
+  };
+}
+
+function persistPlaybackSession(immediate = false) {
+  schedulePlaybackSessionWrite(snapshotPlaybackSession(), immediate);
+}
+
+function consumeResume(songId: string): number {
+  if (sessionResumeSongId !== songId) return 0;
+  return sessionResumeAt;
+}
+
+function clearResume() {
+  sessionResumeAt = 0;
+  sessionResumeSongId = null;
 }
 
 function playWithTimeout(): Promise<void> {
@@ -59,6 +106,33 @@ function playWithTimeout(): Promise<void> {
       },
     );
   });
+}
+
+/** Map engine/DOM exceptions so the toast is readable, not a WebView string. */
+function formatRemotePlayError(raw: string): string {
+  if (
+    raw === t("player.err.playTimeout") ||
+    raw === t("player.err.invalidAudio") ||
+    raw === t("player.err.unknown")
+  ) {
+    return raw;
+  }
+  if (
+    /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(
+      raw,
+    )
+  ) {
+    return t("player.err.network", { msg: raw });
+  }
+  // HTMLAudio / Web Audio NotSupportedError, decode failures, empty bodies.
+  if (
+    /not supported|unable to decode|encodingerror|no supported source|media_element_error|format error|empty audio/i.test(
+      raw,
+    )
+  ) {
+    return t("player.err.invalidAudio");
+  }
+  return t("player.failedDetail", { msg: raw });
 }
 
 interface PlayerState {
@@ -87,6 +161,10 @@ interface PlayerState {
   /** Which edge is in the magnetic dock zone (hint while dragging / before peek). */
   miniDockHint: "left" | "right" | "top" | "bottom" | null;
   currentPicUrl: string | null;
+  /** True once a playable audio source is attached (cache, local file, or stream). */
+  sourceReady: boolean;
+  /** True while togglePlay is waiting (restore, decode, or URL resolve). */
+  playPending: boolean;
 
   play: (song: MusicInfo, quality?: Quality) => Promise<void>;
   playFromQueue: (index: number) => Promise<void>;
@@ -104,8 +182,10 @@ interface PlayerState {
   setPlayMode: (mode: PlayMode) => void;
   setShowQueue: (v: boolean) => void;
   setShowLyrics: (v: boolean) => void;
-  /** Restore volume/mute from device-local prefs (not synced). */
+  /** Restore volume/mute and the last queue / now-playing song from disk. */
   loadFromDisk: () => Promise<void>;
+  /** Attach a cached or local file for the restored song without autoplay. */
+  restorePlaybackSource: () => Promise<void>;
 
   // Internal
   _syncFromAudio: () => void;
@@ -125,7 +205,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     });
     // Wire OS media-control buttons (taskbar thumbnail / media flyout) to playback.
     attachMediaControls({
-      play: () => audioPlayer.play(),
+      play: () => {
+        if (!get().isPlaying) get().togglePlay();
+      },
       pause: () => audioPlayer.pause(),
       toggle: () => get().togglePlay(),
       next: () => get().next(),
@@ -154,8 +236,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     miniPeek: false,
     miniDockHint: null,
     currentPicUrl: null,
+    sourceReady: false,
+    playPending: false,
 
     async play(song, quality) {
+      if (restoreSourcePromise) await restoreSourcePromise;
+      if (song.id !== sessionResumeSongId) clearResume();
       const preferred = quality ?? useSettingsStore.getState().playQuality;
       const gen = beginPlayGeneration();
       const isLocal = song.source === "local";
@@ -188,6 +274,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         currentPicUrl: null,
         duration: 0,
         isPlaying: false,
+        sourceReady: false,
       });
 
       // Add to queue if not already there
@@ -200,6 +287,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       } else {
         set({ queueIndex: idx });
       }
+      persistPlaybackSession(true);
 
       try {
         if (isLocal) {
@@ -214,6 +302,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             return { currentQuality: best, queue: q };
           });
           applyAudioSource(src);
+          holdRestoredClock = false;
+          const resumeAt = consumeResume(song.id);
+          if (resumeAt > 0) {
+            await audioPlayer.whenReady();
+            audioPlayer.seek(resumeAt);
+          }
+          set({ sourceReady: true });
+          persistPlaybackSession(true);
           await playWithTimeout();
           if (!isPlayGenerationCurrent(gen)) return;
           lastMediaPlaying = true;
@@ -232,74 +328,92 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
         const settings = useSettingsStore.getState();
 
-        // Fast path: reuse on-disk audio before any remote URL resolve / probe.
-        // Without this, A→B→A still spins on loading even when A is already cached.
-        const cached = await findCachedPlayableSrc(
+        const meeting = await findCachedMeetingPreferred(
           song,
           preferred,
           settings.audioCache,
         );
         if (!isPlayGenerationCurrent(gen)) return;
+        const lower = meeting
+          ? null
+          : await findBestCachedSrc(song, settings.audioCache);
+        if (!isPlayGenerationCurrent(gen)) return;
 
-        if (cached) {
-          set((s) => {
-            const q = [...s.queue];
-            if (q[idx]) q[idx] = { ...q[idx], playedQuality: cached.quality };
-            return { currentQuality: cached.quality, queue: q };
-          });
-          applyAudioSource(cached.src);
-          await playWithTimeout();
-          if (!isPlayGenerationCurrent(gen)) return;
+        let src: string;
+        let actual: Quality;
+        let fromCache = false;
 
-          lastMediaPlaying = true;
-          updateMediaControls(
-            song.name,
-            song.singer,
-            song.albumName ?? "",
-            song.meta.picUrl ?? null,
-            true,
-          );
+        if (meeting) {
+          src = meeting.src;
+          actual = meeting.quality;
+          fromCache = true;
+        } else if (lower && !shouldAttemptQualityUpgrade(song, preferred)) {
+          src = lower.src;
+          actual = lower.quality;
+          fromCache = true;
         } else {
-          // Slow path: resolve a remote URL (adaptive quality), then cache + play.
-          const { url, quality: actual } =
-            await sourceRunner.getMusicUrlAdaptive(song, preferred);
-          if (!isPlayGenerationCurrent(gen)) return;
-
-          // Record the real quality on the now-playing queue item so its badge
-          // reflects what actually played (and stays put when it's no longer active).
-          set((s) => {
-            const q = [...s.queue];
-            if (q[idx]) q[idx] = { ...q[idx], playedQuality: actual };
-            return { currentQuality: actual, queue: q };
-          });
-          if (actual !== preferred) {
-            notify({
-              message: t("player.qualityDowngraded", {
-                quality: t(`quality.${actual}`),
-              }),
-              variant: "info",
+          try {
+            const resolved = await sourceRunner.getMusicUrlAdaptive(
+              song,
+              preferred,
+              lower ? { betterThan: lower.quality } : undefined,
+            );
+            if (!isPlayGenerationCurrent(gen)) return;
+            actual = resolved.quality;
+            if (!qualityMeets(actual, preferred)) {
+              rememberQualityUpgradeMiss(song, preferred);
+            }
+            src = await resolvePlayableSrc(song, actual, resolved.url, {
+              audioCache: settings.audioCache,
+              maxCacheMB: settings.maxCacheMB,
             });
+            if (!isPlayGenerationCurrent(gen)) return;
+          } catch (err) {
+            if (!lower) throw err;
+            rememberQualityUpgradeMiss(song, preferred);
+            src = lower.src;
+            actual = lower.quality;
+            fromCache = true;
           }
-          const src = await resolvePlayableSrc(song, actual, url, {
-            audioCache: settings.audioCache,
-            maxCacheMB: settings.maxCacheMB,
-          });
-          if (!isPlayGenerationCurrent(gen)) return;
-
-          applyAudioSource(src);
-          await playWithTimeout();
-          if (!isPlayGenerationCurrent(gen)) return;
-
-          // Publish to the OS media controls (taskbar / media flyout).
-          lastMediaPlaying = true;
-          updateMediaControls(
-            song.name,
-            song.singer,
-            song.albumName ?? "",
-            song.meta.picUrl ?? null,
-            true,
-          );
         }
+
+        set((s) => {
+          const q = [...s.queue];
+          if (q[idx]) q[idx] = { ...q[idx], playedQuality: actual };
+          return { currentQuality: actual, queue: q };
+        });
+        if (!fromCache && actual !== preferred) {
+          notify({
+            message: t("player.qualityDowngraded", {
+              quality: t(`quality.${actual}`),
+            }),
+            variant: "info",
+          });
+        }
+        applyAudioSource(src);
+        holdRestoredClock = false;
+        if (fromCache) {
+          const resumeAt = consumeResume(song.id);
+          if (resumeAt > 0) {
+            await audioPlayer.whenReady();
+            audioPlayer.seek(resumeAt);
+          }
+        } else {
+          clearResume();
+        }
+        set({ sourceReady: true });
+        persistPlaybackSession(true);
+        await playWithTimeout();
+        if (!isPlayGenerationCurrent(gen)) return;
+
+        lastMediaPlaying = true;
+        updateMediaControls(
+          song.name,
+          song.singer,
+          song.albumName ?? "",
+          song.meta.picUrl ?? null,
+          true,
+        );
       } catch (err) {
         if (!isPlayGenerationCurrent(gen)) return;
         const raw = (err as Error).message || t("player.err.unknown");
@@ -337,24 +451,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             lyricsLoading: false,
             currentPicUrl: null,
             showLyrics: false,
+            sourceReady: false,
           });
+          persistPlaybackSession(true);
           notify({ message, variant: "error" });
           return;
         }
         const isTimeout = raw === t("player.err.playTimeout");
-        // Transport-level failures from the source's HTTP request (DNS/TLS/connection)
-        // surface as cryptic reqwest strings — give a clearer hint that it's a
-        // network/proxy/source-reachability problem, not a bug in the song itself.
-        const isNetwork =
-          !isTimeout &&
-          /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(
-            raw,
-          );
-        const message = isTimeout
-          ? raw
-          : isNetwork
-            ? t("player.err.network", { msg: raw })
-            : t("player.failedDetail", { msg: raw });
+        const message = isTimeout ? raw : formatRemotePlayError(raw);
         set({ status: "error", error: message, lyricsLoading: false });
         notify({ message, variant: "error" });
         return;
@@ -385,10 +489,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             .map((song) => ({ music: song, quality: preferred })),
         ],
       }));
+      persistPlaybackSession(true);
     },
 
     clearQueue() {
       set({ queue: [], queueIndex: -1 });
+      persistPlaybackSession(true);
     },
 
     removeSongsFromPlayback(ids) {
@@ -423,7 +529,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           lyricsLoading: false,
           currentPicUrl: null,
           showLyrics: false,
+          sourceReady: false,
         });
+        persistPlaybackSession(true);
         return;
       }
 
@@ -435,6 +543,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         queue: nextQueue,
         queueIndex: nextIndex,
       });
+      persistPlaybackSession(true);
     },
 
     // Append `songs` to the current queue (deduped) and start playing. In shuffle
@@ -471,13 +580,46 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     togglePlay() {
       if (get().isPlaying) {
         audioPlayer.pause();
-      } else {
-        audioPlayer.play();
+        persistPlaybackSession(true);
+        return;
       }
+      if (get().status === "loading" || get().playPending) return;
+      void (async () => {
+        set({ playPending: true });
+        try {
+          if (restoreSourcePromise) await restoreSourcePromise;
+          const song = get().currentSong;
+          const preferred = useSettingsStore.getState().playQuality;
+          if (
+            song &&
+            song.source !== "local" &&
+            !qualityMeets(get().currentQuality, preferred) &&
+            shouldAttemptQualityUpgrade(song, preferred)
+          ) {
+            await get().play(song, preferred);
+            return;
+          }
+          if (audioPlayer.hasSource()) {
+            await audioPlayer.play();
+            return;
+          }
+          if (song) await get().play(song, preferred);
+        } catch (err) {
+          if (get().status === "loading") return;
+          get()._handleError(
+            formatRemotePlayError(
+              (err as Error).message || t("player.err.unknown"),
+            ),
+          );
+        } finally {
+          set({ playPending: false });
+        }
+      })();
     },
 
     seek(time) {
       audioPlayer.seek(time);
+      persistPlaybackSession(true);
     },
 
     setVolume(v) {
@@ -493,7 +635,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       persistPlayerPrefs(get().volume, m);
     },
 
-    setPlayMode: (mode) => set({ playMode: mode }),
+    setPlayMode: (mode) => {
+      set({ playMode: mode });
+      persistPlaybackSession(true);
+    },
     setShowQueue: (v) => set({ showQueue: v }),
     setShowLyrics: (v) => set({ showLyrics: v }),
 
@@ -504,12 +649,141 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       const muted = typeof data.muted === "boolean" ? data.muted : false;
       audioPlayer.setVolume(volume);
       audioPlayer.setMuted(muted);
-      set({ volume, muted });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+          persistPlaybackSession(true);
+          flushPlaybackSessionWrite();
+        }
+      });
+
+      const session = await readPlaybackSession();
+      if (!session?.currentSong && !session?.queue.length) {
+        set({ volume, muted });
+        return;
+      }
+
+      const duration =
+        session.duration > 0
+          ? session.duration
+          : intervalToSeconds(session.currentSong?.interval);
+      sessionResumeSongId = session.currentSong?.id ?? null;
+      sessionResumeAt = session.currentSong
+        ? clampResumeTime(session.currentTime, duration)
+        : 0;
+      holdRestoredClock = !!session.currentSong;
+      set({
+        volume,
+        muted,
+        queue: session.queue,
+        queueIndex: session.queueIndex,
+        currentSong: session.currentSong,
+        currentQuality: session.currentQuality,
+        playMode: session.playMode,
+        duration,
+        status: session.currentSong ? "paused" : "idle",
+        isPlaying: false,
+        sourceReady: false,
+        currentPicUrl: session.currentSong?.meta.picUrl ?? null,
+      });
+      if (
+        session.currentSong?.source === "local" &&
+        session.currentSong.meta.localCoverRel
+      ) {
+        void get()._loadPic(session.currentSong);
+      }
+    },
+
+    async restorePlaybackSource() {
+      if (restoreSourcePromise) return restoreSourcePromise;
+      restoreSourcePromise = (async () => {
+        const song = get().currentSong;
+        if (!song) {
+          holdRestoredClock = false;
+          clearResume();
+          return;
+        }
+        void get()._loadLyric(song);
+        const resumeAt = sessionResumeAt;
+        try {
+          if (song.source === "local") {
+            const filePath = song.meta.filePath;
+            if (!filePath) throw new Error("missing");
+            const src = await localFileToObjectUrl(filePath);
+            if (get().currentSong?.id !== song.id) return;
+            await audioPlayer.preparePausedSource(src, resumeAt);
+            holdRestoredClock = false;
+            clearResume();
+            set({
+              sourceReady: true,
+              status: "paused",
+              isPlaying: false,
+              duration: audioPlayer.getState().duration || get().duration,
+            });
+            persistPlaybackSession(true);
+            lastMediaPlaying = false;
+            updateMediaControls(
+              song.name,
+              song.singer,
+              song.albumName ?? "",
+              get().currentPicUrl ?? song.meta.picUrl ?? null,
+              false,
+            );
+            return;
+          }
+
+          const settings = useSettingsStore.getState();
+          const cached = await findCachedPlayableSrc(
+            song,
+            get().currentQuality,
+            settings.audioCache,
+          );
+          if (get().currentSong?.id !== song.id) return;
+          if (!cached) {
+            holdRestoredClock = true;
+            clearResume();
+            set({ sourceReady: false, status: "paused", isPlaying: false });
+            return;
+          }
+
+          await audioPlayer.preparePausedSource(cached.src, resumeAt);
+          holdRestoredClock = false;
+          clearResume();
+          set({
+            sourceReady: true,
+            currentQuality: cached.quality,
+            status: "paused",
+            isPlaying: false,
+            duration: audioPlayer.getState().duration || get().duration,
+          });
+          persistPlaybackSession(true);
+          lastMediaPlaying = false;
+          updateMediaControls(
+            song.name,
+            song.singer,
+            song.albumName ?? "",
+            get().currentPicUrl ?? song.meta.picUrl ?? null,
+            false,
+          );
+        } catch {
+          if (get().currentSong?.id !== song.id) return;
+          holdRestoredClock = true;
+          clearResume();
+          set({ sourceReady: false, status: "paused", isPlaying: false });
+        }
+      })().finally(() => {
+        restoreSourcePromise = null;
+      });
+      return restoreSourcePromise;
     },
 
     _syncFromAudio() {
       const state = audioPlayer.getState();
       const { status: storeStatus } = get();
+
+      if (holdRestoredClock && !audioPlayer.hasSource()) {
+        return;
+      }
 
       // While resolving a playback URL, pause()/timeupdate would otherwise report
       // "paused" and wipe the intentional loading UI (play spinner + disabled seek).
@@ -527,9 +801,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       // after already promoting status to "playing", one frame shows Play instead of Pause.
       set({
         isPlaying: status === "loading" ? false : state.isPlaying,
-        duration: status === "loading" ? 0 : state.duration,
+        duration: status === "loading" ? 0 : state.duration || get().duration,
         status,
+        playPending:
+          status === "playing" || status === "error" ? false : get().playPending,
       });
+
+      if (status === "playing") persistPlaybackSession(false);
+      else if (status === "paused") persistPlaybackSession(true);
 
       // Keep the system awake only while actually playing (respecting the
       // setting). setPreventSleep de-dupes, so calling it every tick is cheap.
@@ -588,14 +867,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           lyricsLoading: false,
           currentPicUrl: null,
           showLyrics: false,
+          sourceReady: false,
+          playPending: false,
         });
+        persistPlaybackSession(true);
         return;
       }
       get().next();
     },
 
     _handleError(msg) {
-      set({ status: "error", error: msg, isPlaying: false });
+      set({
+        status: "error",
+        error: formatRemotePlayError(msg),
+        isPlaying: false,
+        playPending: false,
+      });
     },
 
     async _loadLyric(song) {

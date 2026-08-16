@@ -63,6 +63,7 @@ export function MiniPlayer() {
   const miniMorphing = usePlayerStore((s) => s.miniMorphing)
   const miniDockHint = usePlayerStore((s) => s.miniDockHint)
   const togglePlay = usePlayerStore((s) => s.togglePlay)
+  const playPending = usePlayerStore((s) => s.playPending)
   const next = usePlayerStore((s) => s.next)
   const prev = usePlayerStore((s) => s.prev)
   const playFromQueue = usePlayerStore((s) => s.playFromQueue)
@@ -76,6 +77,7 @@ export function MiniPlayer() {
   const queuePanelRef = useRef<HTMLDivElement>(null)
 
   const loading = status === "loading"
+  const playBusy = loading || playPending
   const canPlay = status !== "idle"
   const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null
   const isLocal = currentSong?.source === "local"
@@ -300,7 +302,7 @@ export function MiniPlayer() {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground icon-hover-skip-prev"
-            disabled={!canPlay || loading}
+            disabled={!canPlay || playBusy}
             onClick={() => void prev()}
           >
             <SkipBack size={15} />
@@ -310,10 +312,10 @@ export function MiniPlayer() {
             variant="default"
             size="icon"
             className="h-9 w-9 rounded-full shadow-[var(--shadow-elevated)]"
-            disabled={!canPlay || loading}
+            disabled={!canPlay || playBusy}
             onClick={() => togglePlay()}
           >
-            {loading ? (
+            {playBusy ? (
               <Loader2 size={15} className="animate-spin" />
             ) : isPlaying ? (
               <Pause size={15} fill="currentColor" strokeWidth={0} />
@@ -326,7 +328,7 @@ export function MiniPlayer() {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground icon-hover-skip-next"
-            disabled={!canPlay || loading}
+            disabled={!canPlay || playBusy}
             onClick={() => void next()}
           >
             <SkipForward size={15} />

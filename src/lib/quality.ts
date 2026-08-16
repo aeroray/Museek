@@ -28,6 +28,25 @@ export function qualityCandidates(preferred: Quality): Quality[] {
   return QUALITY_LADDER.slice(start < 0 ? 0 : start)
 }
 
+function qualityIndex(q: Quality): number {
+  const i = QUALITY_LADDER.indexOf(q)
+  return i < 0 ? QUALITY_LADDER.length : i
+}
+
+/** True when `have` is the preferred tier or better (FLAC satisfies 320k). */
+export function qualityMeets(have: Quality, preferred: Quality): boolean {
+  return qualityIndex(have) <= qualityIndex(preferred)
+}
+
+/** Preferred-and-down, excluding `cached` and anything worse. Empty if nothing higher exists. */
+export function qualityUpgradeCandidates(
+  preferred: Quality,
+  cached: Quality,
+): Quality[] {
+  const floor = qualityIndex(cached)
+  return qualityCandidates(preferred).filter((q) => qualityIndex(q) < floor)
+}
+
 /** The highest quality a song advertises (tiers are hierarchical, so this is the
  *  ceiling). Returns null if the song lists none. */
 export function bestQuality(song: MusicInfo): Quality | null {

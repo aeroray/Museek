@@ -1,12 +1,48 @@
+import {
+  Search,
+  ListMusic,
+  Disc3,
+  TrendingUp,
+  Heart,
+  HardDrive,
+  Fingerprint,
+  Download,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard";
-import { useSettingsStore } from "@/stores/settingsStore";
+import {
+  useSettingsStore,
+  STARTUP_PAGES,
+  type StartupPage,
+} from "@/stores/settingsStore";
 import { useT } from "@/lib/i18n";
 import type { Quality } from "@/types/music";
 
 const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"];
+
+const STARTUP_META: Record<
+  StartupPage,
+  { labelKey: string; icon: LucideIcon }
+> = {
+  search: { labelKey: "nav.search", icon: Search },
+  "hot-playlists": { labelKey: "nav.playlists", icon: ListMusic },
+  "hot-albums": { labelKey: "nav.albums", icon: Disc3 },
+  library: { labelKey: "nav.library", icon: TrendingUp },
+  favorites: { labelKey: "nav.favorites", icon: Heart },
+  local: { labelKey: "nav.local", icon: HardDrive },
+  recognize: { labelKey: "nav.recognize", icon: Fingerprint },
+  downloads: { labelKey: "nav.downloads", icon: Download },
+};
 
 export function PlaybackSettings() {
   const {
@@ -15,13 +51,17 @@ export function PlaybackSettings() {
     closeBehavior,
     openAtLogin,
     startHiddenToTray,
+    startupPage,
     setPlayQuality,
     setPreventSleepWhilePlaying,
     setCloseBehavior,
     setOpenAtLogin,
     setStartHiddenToTray,
+    setStartupPage,
   } = useSettingsStore();
   const t = useT();
+  const selected = STARTUP_META[startupPage];
+  const SelectedIcon = selected.icon;
 
   return (
     <ScrollArea className="h-full">
@@ -53,6 +93,42 @@ export function PlaybackSettings() {
                 checked={preventSleepWhilePlaying}
                 onCheckedChange={setPreventSleepWhilePlaying}
               />
+            }
+          />
+
+          <SettingRow
+            title={t("playback.startupPageTitle")}
+            desc={t("playback.startupPageDesc")}
+            control={
+              <Select
+                value={startupPage}
+                onValueChange={(value) =>
+                  setStartupPage(value as StartupPage)
+                }
+              >
+                <SelectTrigger
+                  className="w-fit"
+                  aria-label={t("playback.startupPageTitle")}
+                >
+                  <span className="flex items-center gap-2">
+                    <SelectedIcon size={16} />
+                    <span>{t(selected.labelKey)}</span>
+                  </span>
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectGroup>
+                    {STARTUP_PAGES.map((page) => {
+                      const { labelKey, icon: Icon } = STARTUP_META[page];
+                      return (
+                        <SelectItem key={page} value={page}>
+                          <Icon size={16} />
+                          {t(labelKey)}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             }
           />
 

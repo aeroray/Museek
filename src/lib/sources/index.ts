@@ -8,4 +8,4 @@ export {
   SourceRunner,
 } from "@/lib/sourceRunner";
 export type { SourceRegistry } from "@/types/source";
-export { loadSourceScripts, saveSourceScripts } from "./persist";
+export { loadSourceScripts, saveSourceScripts, loadSourceProbeResults, saveSourceProbeResults } from "./persist";

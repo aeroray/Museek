@@ -15,6 +15,9 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, Tray
 use tauri::{Emitter, Manager};
 use tauri_plugin_fs::FsExt;
 
+#[cfg(target_os = "macos")]
+mod macos_traffic_lights;
+
 const MAX_EMBEDDED_COVER_BYTES: usize = 10 * 1024 * 1024;
 
 #[cfg(target_os = "windows")]
@@ -389,6 +392,12 @@ fn should_start_hidden(flags: tauri::State<'_, LaunchFlags>) -> bool {
     flags.start_hidden
 }
 
+#[tauri::command]
+fn reapply_macos_traffic_lights(_app: tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    macos_traffic_lights::refresh_main(&_app);
+}
+
 /// Read `startHiddenToTray` from the same AppData settings.json the frontend uses.
 fn read_start_hidden_to_tray(app: &tauri::AppHandle) -> bool {
     let Ok(dir) = app.path().app_data_dir() else {
@@ -414,6 +423,7 @@ fn read_start_hidden_to_tray(app: &tauri::AppHandle) -> bool {
 fn refresh_macos_window_shadow(window: &tauri::WebviewWindow) {
     let _ = window.set_shadow(false);
     let _ = window.set_shadow(true);
+    macos_traffic_lights::apply(window);
 }
 
 // Bring the main window back from hidden / minimized and focus it.
@@ -1172,20 +1182,11 @@ pub fn run() {
         .setup(|app| {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
-                use tauri::Emitter;
-                use tauri_plugin_global_shortcut::{Builder, ShortcutState};
+                use tauri_plugin_global_shortcut::Builder;
 
-                let global_shortcut = Builder::new()
-                    .with_shortcuts(["CommandOrControl+Shift+L"])
-                    .expect("desktop lyrics global shortcut must be valid")
-                    .with_handler(|app, _shortcut, event| {
-                        if event.state == ShortcutState::Pressed {
-                            let _ = app.emit("desktop-lyrics/toggle-interaction", ());
-                        }
-                    })
-                    .build();
+                let global_shortcut = Builder::new().build();
                 if let Err(error) = app.handle().plugin(global_shortcut) {
-                    eprintln!("Failed to register desktop lyrics global shortcut: {error}");
+                    eprintln!("Failed to init global shortcut plugin: {error}");
                 }
             }
 
@@ -1241,11 +1242,14 @@ pub fn run() {
                         let _ = window.show();
                         let _ = window.set_focus();
                         refresh_macos_window_shadow(&window);
+                        macos_traffic_lights::install(app.handle(), &window);
                         let w = window.clone();
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(120));
                             refresh_macos_window_shadow(&w);
                         });
+                    } else {
+                        macos_traffic_lights::install(app.handle(), &window);
                     }
                 }
                 // Non-macOS: frameless + custom WindowControls (conf uses
@@ -1365,7 +1369,8 @@ pub fn run() {
             take_opened_local_files,
             take_opened_unsupported_files,
             is_autostart_launch,
-            should_start_hidden
+            should_start_hidden,
+            reapply_macos_traffic_lights
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

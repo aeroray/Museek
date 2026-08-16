@@ -1,16 +1,64 @@
 import { useEffect } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { usePlayerStore } from "@/stores/playerStore";
-import { getPlaybackTime } from "@/lib/playback/clock";
-import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
-import { DESKTOP_LYRICS_GLOBAL_INTERACTION_EVENT } from "@/lib/desktopLyricsProtocol";
-import { toggleMiniPlayer } from "@/lib/miniPlayer";
+import { useSettingsStore } from "@/stores/settingsStore";
+import {
+  SHORTCUT_ACTIONS,
+  eventMatchesShortcut,
+  formatShortcut,
+  isShortcutCaptureLocked,
+  type ShortcutMap,
+} from "@/lib/shortcutKeys";
+import { runShortcutAction } from "@/lib/shortcutActions";
+import { notify } from "@/lib/notify";
+import { t } from "@/lib/i18n";
+import { isMacOs } from "@/lib/os";
 
-const SEEK_STEP = 5; // seconds
-const VOL_STEP = 0.05;
-const DESKTOP_LYRICS_TOGGLE_DEDUPE_MS = 200;
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+let registerGeneration = 0;
+
+async function syncGlobalShortcuts(map: ShortcutMap): Promise<void> {
+  const gen = ++registerGeneration;
+  const { unregisterAll, register } = await import(
+    "@tauri-apps/plugin-global-shortcut"
+  );
+  if (gen !== registerGeneration) return;
+  try {
+    await unregisterAll();
+  } catch {
+    /* nothing registered yet */
+  }
+  if (gen !== registerGeneration) return;
+  const reverse = new Map<string, (typeof SHORTCUT_ACTIONS)[number]>();
+  for (const action of SHORTCUT_ACTIONS) {
+    if (!reverse.has(map[action])) reverse.set(map[action], action);
+  }
+  const failed: string[] = [];
+  for (const [accel, action] of reverse) {
+    try {
+      await register(accel, (event) => {
+        if (event.state !== "Pressed") return;
+        if (isShortcutCaptureLocked()) return;
+        runShortcutAction(action);
+      });
+    } catch (err) {
+      console.warn(`[museek] global shortcut failed: ${accel}`, err);
+      failed.push(formatShortcut(accel, isMacOs()));
+    }
+    if (gen !== registerGeneration) return;
+  }
+  if (failed.length === 1) {
+    notify({
+      message: t("shortcuts.registerFailed", { combo: failed[0] }),
+      variant: "error",
+    });
+  } else if (failed.length > 1) {
+    notify({
+      message: t("shortcuts.registerFailedMany", { n: failed.length }),
+      variant: "error",
+    });
+  }
+}
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
@@ -20,151 +68,42 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 /**
- * Global media keyboard shortcuts, registered once at the app root. Always
- * active, except while focus is in a text field (so typing in the search box
- * never triggers playback). Modifier = Ctrl (Windows) / ⌘ (mac).
- *
- *  Space            play / pause
- *  ← / →            seek −/+ 5s
- *  Ctrl/⌘ + ← / →   previous / next track
- *  Ctrl/⌘ + L        desktop lyrics toggle
- *  Ctrl/⌘ + Shift + L lock / unlock desktop lyrics
- *  ↑ / ↓            volume up / down
- *  M                mute toggle
- *  L                lyrics view toggle
- *  P                mini player toggle
+ * Registers every playback shortcut as an OS global hotkey (minimized / background).
+ * The same map also runs on window keydown while focused (deduped with the OS hook).
  */
 export function useGlobalShortcuts(): void {
-  useEffect(() => {
-    let disposed = false;
-    let unlistenGlobalInteraction: (() => void) | undefined;
-    let lastDesktopLyricsInteractionAt = 0;
-    const toggleDesktopLyricsInteraction = () => {
-      if (!useDesktopLyricsStore.getState().isVisible) return;
-      const now = Date.now();
-      if (
-        now - lastDesktopLyricsInteractionAt <
-        DESKTOP_LYRICS_TOGGLE_DEDUPE_MS
-      ) {
-        return;
-      }
-      lastDesktopLyricsInteractionAt = now;
-      void import("@/lib/desktopLyrics").then((m) =>
-        m.toggleDesktopLyricsInteraction(),
-      );
-    };
+  const hydrated = useSettingsStore((s) => s.hydrated);
+  const shortcuts = useSettingsStore((s) => s.shortcuts);
 
-    if (isTauri) {
-      void listen<null>(DESKTOP_LYRICS_GLOBAL_INTERACTION_EVENT, () => {
-        toggleDesktopLyricsInteraction();
-      }).then((unlisten) => {
-        if (disposed) unlisten();
-        else unlistenGlobalInteraction = unlisten;
-      });
-    }
+  useEffect(() => {
+    if (!hydrated) return;
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey || isTypingTarget(e.target)) return;
-      const p = usePlayerStore.getState();
-      const desktopLyricsVisible = useDesktopLyricsStore.getState().isVisible;
-      const canTransport = p.status !== "idle" && p.status !== "loading";
-      const canSeek =
-        !!p.currentSong &&
-        p.status !== "idle" &&
-        p.status !== "loading" &&
-        p.status !== "error";
-      const mod = e.ctrlKey || e.metaKey;
-      let handled = true;
-      switch (e.key) {
-        case " ":
-          if (canTransport) p.togglePlay();
-          else handled = false;
-          break;
-        case "ArrowLeft":
-          if (mod) {
-            if (canTransport) void p.prev();
-            else handled = false;
-          } else if (canSeek) {
-            p.seek(getPlaybackTime() - SEEK_STEP);
-          } else {
-            handled = false;
-          }
-          break;
-        case "ArrowRight":
-          if (mod) {
-            if (canTransport) void p.next();
-            else handled = false;
-          } else if (canSeek) {
-            p.seek(getPlaybackTime() + SEEK_STEP);
-          } else {
-            handled = false;
-          }
-          break;
-        case "ArrowUp":
-          if (p.muted) p.setMuted(false);
-          p.setVolume(Math.min(1, p.volume + VOL_STEP));
-          break;
-        case "ArrowDown":
-          if (p.muted) p.setMuted(false);
-          p.setVolume(Math.max(0, p.volume - VOL_STEP));
-          break;
-        case "m":
-        case "M":
-          if (mod) {
-            handled = false;
-            break;
-          }
-          p.setMuted(!p.muted);
-          break;
-        case "l":
-        case "L":
-          if (mod && e.shiftKey) {
-            if (!desktopLyricsVisible) {
-              handled = false;
-              break;
-            }
-            toggleDesktopLyricsInteraction();
-            break;
-          }
-          if (mod) {
-            if (!p.currentSong && !desktopLyricsVisible) {
-              handled = false;
-              break;
-            }
-            void import("@/lib/desktopLyrics").then((m) =>
-              m.toggleDesktopLyricsVisibility(),
-            );
-            break;
-          }
-          if (p.currentSong) p.setShowLyrics(!p.showLyrics);
-          else handled = false;
-          break;
-        case "p":
-        case "P":
-          if (mod) {
-            handled = false;
-            break;
-          }
-          if (p.currentSong) void toggleMiniPlayer();
-          else handled = false;
-          break;
-        default:
-          handled = false;
+      if (isShortcutCaptureLocked() || isTypingTarget(e.target)) return;
+      for (const action of SHORTCUT_ACTIONS) {
+        if (!eventMatchesShortcut(e, shortcuts[action])) continue;
+        if (!runShortcutAction(action)) return;
+        e.preventDefault();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) {
+          active.blur();
+        }
+        return;
       }
-      if (!handled) return;
-      e.preventDefault();
-      // Drop focus from any control so the same keypress can't also activate it
-      // or leave a focus-visible ring (e.g. Space right after clicking a button
-      // or a playlist card's "play all").
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && active !== document.body)
-        active.blur();
     };
     window.addEventListener("keydown", onKey);
+
+    if (!isTauri) {
+      return () => window.removeEventListener("keydown", onKey);
+    }
+
+    void syncGlobalShortcuts(shortcuts);
     return () => {
-      disposed = true;
-      unlistenGlobalInteraction?.();
       window.removeEventListener("keydown", onKey);
+      registerGeneration += 1;
+      void import("@tauri-apps/plugin-global-shortcut")
+        .then((m) => m.unregisterAll())
+        .catch(() => {});
     };
-  }, []);
+  }, [hydrated, shortcuts]);
 }

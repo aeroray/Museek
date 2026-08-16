@@ -346,6 +346,53 @@ class AudioPlayer {
     this.audio.load();
   }
 
+  hasSource(): boolean {
+    if (!this.audio) return Boolean(this.sourceUrl);
+    return Boolean(this.audio.getAttribute("src"));
+  }
+
+  whenReady(): Promise<void> {
+    if (!this.audio) return Promise.resolve();
+    const audio = this.audio;
+    if (
+      audio.readyState >= 1 &&
+      Number.isFinite(audio.duration) &&
+      audio.duration > 0
+    ) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const done = () => {
+        cleanup();
+        resolve();
+      };
+      const timer = window.setTimeout(done, 8_000);
+      const cleanup = () => {
+        window.clearTimeout(timer);
+        audio.removeEventListener("loadedmetadata", done);
+        audio.removeEventListener("error", done);
+      };
+      audio.addEventListener("loadedmetadata", done);
+      audio.addEventListener("error", done);
+    });
+  }
+
+  /** Attach a source and seek without starting playback (startup resume). */
+  async preparePausedSource(url: string, startTime: number): Promise<void> {
+    this.setSource(url);
+    if (!this.audio) {
+      this.webCurrentTime = Math.max(0, startTime);
+      this.currentTime = this.webCurrentTime;
+      this.webStatus = "paused";
+      this.emitTime();
+      this.notifyWebState();
+      return;
+    }
+    await this.whenReady();
+    this.seek(startTime);
+    this.audio.pause();
+  }
+
   play(): Promise<void> {
     if (this.audio) return this.audio.play();
     if (!this.sourceUrl) return Promise.reject(new Error("No audio source"));

@@ -1,5 +1,53 @@
 # Confirmed Decisions
 
+## 2026-08-17 - Reapply macOS traffic lights after sleep
+
+Decision:
+Pin Overlay traffic-light spacing to 20pt and reapply the configured inset on display wake, scale-factor change, focus, resize, and shadow refresh. Do not measure spacing from live button frames.
+
+Reason:
+After sleep AppKit can reset only some buttons; Tao/Wry then re-inset from an inflated gap, so the lights walk right.
+
+## 2026-08-16 - Register every playback shortcut as a global hotkey
+
+Decision:
+Store shortcuts in synced settings as `CommandOrControl` (Win Ctrl ↔ Mac ⌘). Allow only Ctrl/⌘, Alt/⌥, and Shift, plus F1–F12; reject Win/Super. Defaults use Ctrl/⌘+Shift only (no Ctrl+Alt letters, no bare Ctrl+arrows). Register via the Tauri plugin after hydrate. Wheel font-size stays window-local.
+
+Reason:
+Minimized Museek cannot see WebView keydown; global registration keeps transport available, and a platform-neutral accelerator avoids per-OS copies in sync.
+
+## 2026-08-16 - Treat audio cache as a floor, not a ceiling
+
+Decision:
+If the disk cache is below the preferred play quality, try current sources for higher tiers once. On miss, play the cached file and skip retries until the enabled source list changes. Do not add a per-song cache-clear control.
+
+Reason:
+A fallback 128k cache was blocking upgrades after the user switched sources; the retry must stay invisible.
+
+## 2026-08-16 - Customizable startup page in synced settings
+
+Decision:
+Keep `startupPage` in `settings.json` (default search). Redirect `/` only after settings hydrate. Include it in config sync; it is not device-local.
+
+Reason:
+A hardcoded index navigate to `/search` races settings load and cannot honor a user or synced choice.
+
+## 2026-08-16 - Sandbox source scripts in Workers with a URL policy
+
+Decision:
+Run each imported lx source in a Dedicated Worker. `lx.request` is the only network path; the main thread allows http(s) only and denies private nets plus gambling/miner-like hosts. Do not fall back to main-window execution.
+
+Reason:
+Workers keep scripts off the UI and Tauri file APIs; the host filter blocks junk requests like niuma666bet.buzz without enumerating music CDNs.
+
+## 2026-08-15 - Restore the play queue without blocking startup
+
+Decision:
+Persist the play queue, current song, play mode, and position in device-local `playbackSession.json`. On launch, restore that UI immediately; attach a cached or local file and seek only when it is already on disk. If there is no cache, keep audio position at 0 and fetch audio only when the user presses play. Reload lyrics in the background (disk cache first, then network) so the restored song has lyrics without waiting for play.
+
+Reason:
+Users want to resume quickly, but resolving a remote audio URL on startup would delay the first frame. Lyrics are small and still needed for the top bar and lyrics page.
+
 ## 2026-08-08 - Delegate playback to imported source scripts
 
 Decision:
@@ -427,7 +475,10 @@ The capsule improves readability over varied desktop backgrounds, but text-only 
 ## 2026-08-09 - Make desktop lyrics unlocking global
 
 Decision:
-Register `CommandOrControl+Shift+L` through the Tauri global-shortcut plugin and forward press events to the main webview, where the existing desktop lyrics interaction state is toggled. Keep the remaining playback shortcuts scoped to the Museek window to avoid taking over common system and other-app combinations.
+Superseded 2026-08-16: every playback shortcut is now a user-editable global hotkey. `CommandOrControl+Shift+L` remains the default lock/unlock combo.
+
+Reason:
+Window-scoped keys stopped working once Museek was minimized.
 
 ## 2026-08-10 - Make local naming a per-track override
 

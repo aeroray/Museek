@@ -125,6 +125,10 @@
     "dialog:allow-save",
     "shell:allow-open",
     "clipboard-manager:allow-read-text",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all",
+    "global-shortcut:allow-is-registered",
     "opener:default",
     {
       "identifier": "opener:allow-open-path",

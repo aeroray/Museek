@@ -1087,6 +1087,12 @@ export async function exitMiniPlayer(): Promise<void> {
       } catch {
         /* best-effort */
       }
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("reapply_macos_traffic_lights");
+      } catch {
+        /* overlay inset is best-effort */
+      }
     }
 
     if (snapshot?.maximized) {

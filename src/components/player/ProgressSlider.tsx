@@ -13,6 +13,7 @@ export function ProgressSlider({ className }: { className?: string }) {
   const duration = usePlayerStore((s) => s.duration);
   const status = usePlayerStore((s) => s.status);
   const currentSong = usePlayerStore((s) => s.currentSong);
+  const sourceReady = usePlayerStore((s) => s.sourceReady);
   const seek = usePlayerStore((s) => s.seek);
   const playbackTime = usePlaybackTime();
 
@@ -24,6 +25,7 @@ export function ProgressSlider({ className }: { className?: string }) {
 
   const disabled =
     !currentSong ||
+    !sourceReady ||
     status === "loading" ||
     status === "idle" ||
     status === "error";

@@ -1,20 +1,13 @@
-import { createLxApi, parseScriptMeta } from "./lxApi";
 import { createSourceRegistry } from "./sourceRegistry";
+import { SourceWorkerHost } from "./sources/sourceWorkerHost";
 import { t } from "@/lib/i18n";
-import { qualityCandidates } from "@/lib/quality";
+import { qualityCandidates, qualityUpgradeCandidates } from "@/lib/quality";
 import { toLxMusicInfo } from "@/lib/lxMusicInfo";
 import { looksLikeRealAudio } from "@/lib/audioUrlProbe";
 import { createAsyncCache } from "@/lib/cache";
 import { getWyBuiltinMusicUrl } from "@/lib/playlists/wyUrl";
-import type {
-  SourceScript,
-  SourceRegistry,
-  LxRequestPayload,
-  LxRequestResult,
-} from "@/types/source";
+import type { SourceScript, SourceRegistry, LxRequestPayload } from "@/types/source";
 import type { LyricInfo, MusicInfo, Quality } from "@/types/music";
-
-type LxHandler = (payload: unknown) => Promise<LxRequestResult>;
 
 /** Parallel musicUrl probes per wave — higher so 10–20 sources don't serialize. */
 const MUSIC_URL_WAVE = 12;
@@ -87,112 +80,63 @@ export class SourceRunner {
 
   // Multiple enabled sources can be loaded simultaneously; musicUrl races them
   // in small waves and takes the first valid full-track URL. Keyed by script id.
-  private handlers = new Map<string, LxHandler>();
+  private sessions = new Map<string, SourceWorkerHost>();
 
   async loadScript(
     script: SourceScript,
   ): Promise<Record<string, unknown> | undefined> {
-    // Reloading the same script: drop its previous handler first.
-    this.handlers.delete(script.id);
-
-    const meta = parseScriptMeta(script.rawScript);
-
-    let initedResolved = false;
-    let capturedHandler: LxHandler | null = null;
-    // Captured so importScript can attach `sources` to a brand-new script that
-    // isn't in the store yet when `inited` fires (setScriptSources would no-op).
-    let capturedSources: Record<string, unknown> | undefined;
-    let resolveInited: () => void = () => {};
-    const initedPromise = new Promise<void>((resolve) => {
-      resolveInited = () => {
-        initedResolved = true;
-        resolve();
-      };
-    });
-
-    const lx = createLxApi({
-      scriptInfo: { ...meta, rawScript: script.rawScript },
-      onRequestRegister: (handler) => {
-        capturedHandler = handler as LxHandler;
-      },
-      onInited: (data) => {
-        if (data && typeof data === "object" && "sources" in data) {
-          capturedSources = data.sources as Record<string, unknown>;
-        }
-        resolveInited();
-      },
-      onUpdateAlert: () => {},
-    });
-
-    (globalThis as unknown as Record<string, unknown>).lx = lx;
-
-    // Scripts often throw inside async init (.catch → throw) which becomes an
-    // unhandled rejection — capture it so import shows the real reason.
-    let asyncInitError: Error | null = null;
-    const onUnhandled = (ev: PromiseRejectionEvent) => {
-      const reason = ev.reason;
-      asyncInitError =
-        reason instanceof Error
-          ? reason
-          : new Error(String(reason ?? "init failed"));
-      ev.preventDefault?.();
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("unhandledrejection", onUnhandled);
-    }
-
+    this.unloadScript(script.id);
+    const host = new SourceWorkerHost();
     try {
-      // eslint-disable-next-line no-new-func
-      const fn = new Function(script.rawScript);
-      fn();
+      const sources = await host.start(script);
+      this.sessions.set(script.id, host);
+      return sources;
     } catch (err) {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("unhandledrejection", onUnhandled);
-      }
-      throw new Error(`Script execution failed: ${(err as Error).message}`);
-    }
-
-    // Wait for lx.send('inited') — 10s to allow for slow init HTTP requests
-    const timeout = new Promise<void>((_, reject) =>
-      setTimeout(() => {
-        if (!initedResolved) {
-          reject(
-            new Error(
-              asyncInitError?.message ||
-                "Script did not call lx.send('inited') within 10s (init API may be blocked)",
-            ),
-          );
-        }
-      }, 10000),
-    );
-
-    try {
-      await Promise.race([initedPromise, timeout]);
-    } catch (err) {
-      if (asyncInitError) throw asyncInitError;
+      host.terminate();
       throw err;
-    } finally {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("unhandledrejection", onUnhandled);
-      }
     }
-
-    if (!capturedHandler)
-      throw new Error("Script did not register a request handler");
-    this.handlers.set(script.id, capturedHandler);
-    return capturedSources;
   }
 
   unloadScript(id: string): void {
-    this.handlers.delete(id);
+    this.sessions.get(id)?.terminate();
+    this.sessions.delete(id);
   }
 
   isLoaded(id: string): boolean {
-    return this.handlers.has(id);
+    return this.sessions.has(id);
   }
 
   isReady(): boolean {
-    return this.handlers.size > 0;
+    return this.sessions.size > 0;
+  }
+
+  /**
+   * Ask one script for a play URL. Does not race other sources or write the
+   * playback cache — used by the Sources “test all” health check.
+   */
+  async probeMusicUrl(scriptId: string, payload: LxRequestPayload): Promise<boolean> {
+    const session = this.sessions.get(scriptId);
+    if (!session) return false;
+    const quality = (payload.type ?? "128k") as Quality;
+    const request = this.buildRequest("musicUrl", payload);
+    try {
+      const url = await withTimeout(
+        (async () => {
+          const result = await session.invoke(request);
+          if (typeof result === "string" && result.startsWith("http")) {
+            if (await looksLikeRealAudio(result, payload.info, quality)) {
+              return result;
+            }
+          }
+          return null;
+        })(),
+        MUSIC_URL_ATTEMPT_MS,
+        `probe:${scriptId}`,
+      );
+      return Boolean(url);
+    } catch {
+      return false;
+    }
   }
 
   // Enabled+loaded sources in UI list order (used for lyric/pic failover and
@@ -200,8 +144,13 @@ export class SourceRunner {
   private getOrderedIds(): string[] {
     return this.registry
       .getScripts()
-      .filter((s) => s.enabled && this.handlers.has(s.id))
+      .filter((s) => s.enabled && this.sessions.has(s.id))
       .map((s) => s.id);
+  }
+
+  /** Enabled, loaded source ids in list order — changes when the user edits sources. */
+  layoutKey(): string {
+    return this.getOrderedIds().join("|");
   }
 
   private buildRequest(
@@ -246,12 +195,12 @@ export class SourceRunner {
 
       const tryOne = async (id: string): Promise<Outcome> => {
         if (settled) return { ok: false };
-        const handler = this.handlers.get(id);
-        if (!handler) return { ok: false };
+        const session = this.sessions.get(id);
+        if (!session) return { ok: false };
         try {
           const url = await withTimeout(
             (async () => {
-              const result = await handler(request);
+              const result = await session.invoke(request);
               if (settled) return null;
               if (typeof result === "string" && result.startsWith("http")) {
                 if (
@@ -333,8 +282,14 @@ export class SourceRunner {
   async getMusicUrlAdaptive(
     song: MusicInfo,
     preferred: Quality,
+    opts?: { betterThan?: Quality },
   ): Promise<{ url: string; quality: Quality }> {
-    const candidates = qualityCandidates(preferred);
+    const candidates = opts?.betterThan
+      ? qualityUpgradeCandidates(preferred, opts.betterThan)
+      : qualityCandidates(preferred);
+    if (!candidates.length) {
+      throw new Error("no higher quality to try");
+    }
     let lastErr: unknown;
 
     const tryBuiltin = async (quality: Quality): Promise<string> => {
@@ -404,10 +359,10 @@ export class SourceRunner {
 
   async getLyric(payload: LxRequestPayload): Promise<LyricInfo | null> {
     for (const id of this.getOrderedIds()) {
-      const handler = this.handlers.get(id);
-      if (!handler) continue;
+      const session = this.sessions.get(id);
+      if (!session) continue;
       try {
-        const result = await handler(this.buildRequest("lyric", payload));
+        const result = await session.invoke(this.buildRequest("lyric", payload));
         if (result && typeof result === "object" && "lyric" in result)
           return result as LyricInfo;
       } catch {
@@ -421,10 +376,10 @@ export class SourceRunner {
     const key = `${payload.source}:${payload.info.meta.songId}`;
     return picCache(key, async () => {
       for (const id of this.getOrderedIds()) {
-        const handler = this.handlers.get(id);
-        if (!handler) continue;
+        const session = this.sessions.get(id);
+        if (!session) continue;
         try {
-          const result = await handler(this.buildRequest("pic", payload));
+          const result = await session.invoke(this.buildRequest("pic", payload));
           if (typeof result === "string" && result.startsWith("http"))
             return result;
         } catch {

@@ -3,6 +3,16 @@ import { readData, writeData } from "@/lib/db";
 import { normalizeLocalScanDepth } from "@/lib/localMusic/depth";
 import { setTrayVisible } from "@/lib/power";
 import { syncOpenAtLogin } from "@/lib/autostart";
+import {
+  DEFAULT_SHORTCUTS,
+  parseShortcutMap,
+  shortcutMapEquals,
+  canonicalizeShortcut,
+  isValidGlobalShortcut,
+  shortcutConflict,
+  type ShortcutAction,
+  type ShortcutMap,
+} from "@/lib/shortcutKeys";
 import type { LocalNameMode, OnlineSource, Quality } from "@/types/music";
 
 export type NamingScheme = "singer-name" | "name-singer" | "name";
@@ -11,6 +21,16 @@ export type LocalSort = FavoritesSort;
 export type FavoritesPlatform = OnlineSource | "all";
 // Close-button behavior: quit the app outright, or hide to the system tray.
 export type CloseBehavior = "exit" | "tray";
+/** First page after launch. Ids match the main sidebar routes (without settings). */
+export type StartupPage =
+  | "search"
+  | "hot-playlists"
+  | "hot-albums"
+  | "library"
+  | "favorites"
+  | "local"
+  | "recognize"
+  | "downloads";
 
 interface Persisted {
   playQuality: Quality;
@@ -57,6 +77,10 @@ interface Persisted {
    * showing the main window. Requires openAtLogin; forces closeBehavior tray.
    */
   startHiddenToTray: boolean;
+  /** Page shown when the app opens. Synced across devices via settings.json. */
+  startupPage: StartupPage;
+  /** Global hotkeys. Canonical CommandOrControl so Win Ctrl ↔ Mac ⌘ on sync. */
+  shortcuts: ShortcutMap;
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
   syncFolder: string | null;
   // Stored so auto-sync can run silently; the cloud file stays encrypted regardless.
@@ -91,11 +115,16 @@ interface SettingsState extends Persisted {
   setCloseConfirmDismissed: (v: boolean) => void | Promise<void>;
   setOpenAtLogin: (v: boolean) => void;
   setStartHiddenToTray: (v: boolean) => void;
+  setStartupPage: (p: StartupPage) => void;
+  setShortcut: (action: ShortcutAction, accel: string) => boolean;
+  resetShortcuts: () => void;
   setSyncFolder: (dir: string | null) => void;
   setSyncPassphrase: (p: string | null) => void;
   setAutoBackupOnExit: (v: boolean) => void;
   setSyncLastAt: (iso: string | null) => void;
   loadFromDisk: () => Promise<void>;
+  /** True after settings.json has been read (startup redirect waits on this). */
+  hydrated: boolean;
 }
 
 const DEFAULTS: Persisted = {
@@ -122,6 +151,8 @@ const DEFAULTS: Persisted = {
   closeConfirmDismissed: false,
   openAtLogin: false,
   startHiddenToTray: false,
+  startupPage: "search",
+  shortcuts: { ...DEFAULT_SHORTCUTS },
   syncFolder: null,
   syncPassphrase: null,
   autoBackupOnExit: true,
@@ -141,7 +172,21 @@ const FAV_PLATFORMS: FavoritesPlatform[] = [
 ];
 const LOCAL_NAME_MODES: LocalNameMode[] = ["filename", "smart"];
 const CLOSE_BEHAVIORS: CloseBehavior[] = ["exit", "tray"];
+export const STARTUP_PAGES: StartupPage[] = [
+  "search",
+  "hot-playlists",
+  "hot-albums",
+  "library",
+  "favorites",
+  "local",
+  "recognize",
+  "downloads",
+];
 export const CACHE_LIMITS_MB = [512, 1024, 2048, 4096];
+
+export function pathForStartupPage(page: StartupPage): string {
+  return `/${page}`;
+}
 
 export const useSettingsStore = create<SettingsState>((set, get) => {
   const persist = () => {
@@ -169,6 +214,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       closeConfirmDismissed,
       openAtLogin,
       startHiddenToTray,
+      startupPage,
+      shortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -198,6 +245,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       closeConfirmDismissed,
       openAtLogin,
       startHiddenToTray,
+      startupPage,
+      shortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -207,6 +256,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
 
   return {
     ...DEFAULTS,
+    hydrated: false,
 
     setPlayQuality(q) {
       set({ playQuality: q });
@@ -319,6 +369,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       }
       persist();
     },
+    setStartupPage(p) {
+      set({ startupPage: p });
+      persist();
+    },
+    setShortcut(action, accel) {
+      const canonical = canonicalizeShortcut(accel);
+      if (!canonical || !isValidGlobalShortcut(canonical)) return false;
+      if (shortcutConflict(get().shortcuts, action, canonical)) return false;
+      set({ shortcuts: { ...get().shortcuts, [action]: canonical } });
+      persist();
+      return true;
+    },
+    resetShortcuts() {
+      set({ shortcuts: { ...DEFAULT_SHORTCUTS } });
+      persist();
+    },
     setSyncFolder(dir) {
       set({ syncFolder: dir });
       persist();
@@ -337,11 +403,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
 
     async loadFromDisk() {
-      const data = await readData<Partial<Persisted>>(
-        "settings.json",
-        DEFAULTS,
-      );
-      set({
+      try {
+        const data = await readData<Partial<Persisted>>(
+          "settings.json",
+          DEFAULTS,
+        );
+        const shortcuts = parseShortcutMap(data.shortcuts);
+        set({
         playQuality: QUALITIES.includes(data.playQuality as Quality)
           ? (data.playQuality as Quality)
           : DEFAULTS.playQuality,
@@ -433,6 +501,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.startHiddenToTray === "boolean"
             ? data.startHiddenToTray
             : DEFAULTS.startHiddenToTray,
+        startupPage: STARTUP_PAGES.includes(data.startupPage as StartupPage)
+          ? (data.startupPage as StartupPage)
+          : DEFAULTS.startupPage,
+        shortcuts,
         syncFolder:
           typeof data.syncFolder === "string" ? data.syncFolder : null,
         syncPassphrase:
@@ -443,7 +515,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
             : DEFAULTS.autoBackupOnExit,
         syncLastAt:
           typeof data.syncLastAt === "string" ? data.syncLastAt : null,
+        hydrated: true,
       });
+      if (!shortcutMapEquals(shortcuts, data.shortcuts)) persist();
       // Keep the OS login item in sync with the saved preference.
       const openAtLogin = get().openAtLogin;
       // Silent start without openAtLogin is invalid after load.
@@ -458,6 +532,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         setTrayVisible(true);
       }
       void syncOpenAtLogin(openAtLogin);
+      } finally {
+        if (!get().hydrated) set({ hydrated: true });
+      }
     },
   };
 });

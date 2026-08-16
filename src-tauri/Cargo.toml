@@ -46,6 +46,26 @@ windows = { version = "0.61", features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 screencapturekit = { version = "8", features = ["macos_13_0"] }
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSGeometry",
+    "NSNotification",
+    "NSObject",
+    "NSOperation",
+    "NSString",
+    "block2",
+] }
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "NSButton",
+    "NSControl",
+    "NSGraphics",
+    "NSView",
+    "NSWindow",
+    "NSWorkspace",
+] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

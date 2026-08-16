@@ -81,6 +81,7 @@ export function LyricsPanel() {
   const [loadedHeroSrc, setLoadedHeroSrc] = useState<string | null>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const closingRef = useRef(false);
 
   const thumbSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null;
   const heroSrc = thumbSrc
@@ -91,6 +92,7 @@ export function LyricsPanel() {
 
   useEffect(() => {
     if (showLyrics) {
+      closingRef.current = false;
       setRendered(true);
       const id = requestAnimationFrame(() => {
         requestAnimationFrame(() => setEntered(true));
@@ -185,10 +187,20 @@ export function LyricsPanel() {
   };
 
   const closeLyrics = () => {
-    void exitLyricsFullscreen().finally(() => {
-      setImmersive(false);
-      setShowLyrics(false);
-    });
+    if (closingRef.current) return;
+    closingRef.current = true;
+    void (async () => {
+      try {
+        if (immersive || isLyricsFullscreenSession()) {
+          await exitLyricsFullscreen();
+          setImmersive(false);
+        }
+        setShowLyrics(false);
+      } catch {
+        setImmersive(false);
+        setShowLyrics(false);
+      }
+    })();
   };
 
   if (!rendered) return null;

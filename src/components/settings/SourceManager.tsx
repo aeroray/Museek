@@ -11,6 +11,10 @@ import {
   FileCode2,
   Link2,
   FolderOpen,
+  AudioLines,
+  CheckCircle2,
+  XCircle,
+  Info,
 } from "lucide-react"
 import {
   DndContext,
@@ -43,10 +47,22 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSourceStore } from "@/stores/sourceStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { sourceRunner } from "@/lib/sourceRunner"
+import {
+  loadProbeCatalog,
+  mapPool,
+  probeAllFailed,
+  probeAllPassed,
+  probeSourceScript,
+  PROBE_SOURCE_CONCURRENCY,
+  testablePlatforms,
+  type SourceProbeResult,
+} from "@/lib/sources/probe"
 import type { SourceScript } from "@/types/source"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -215,90 +231,178 @@ function OriginBadge({ origin }: { origin: ScriptOrigin }) {
   )
 }
 
+function platformList(
+  ids: string[],
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  return ids.map((id) => t(`platform.${id}`)).join(t("sources.importJoin"))
+}
+
+function ProbeStatusIcon({ result }: { result: SourceProbeResult }) {
+  const t = useT()
+  const ids = Object.keys(result.platforms)
+  if (!ids.length) return null
+  const ok = ids.filter((id) => result.platforms[id])
+  const fail = ids.filter((id) => !result.platforms[id])
+  const allOk = probeAllPassed(result)
+  const allFail = probeAllFailed(result)
+  const tip = allOk
+    ? t("sources.testOk", { list: platformList(ok, t) })
+    : allFail
+      ? t("sources.testFail", { list: platformList(fail, t) })
+      : t("sources.testMixed", {
+          ok: platformList(ok, t),
+          fail: platformList(fail, t),
+        })
+  const Icon = allOk ? CheckCircle2 : allFail ? XCircle : Info
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex size-5 shrink-0 items-center justify-center",
+            allOk
+              ? "text-emerald-600 dark:text-emerald-400"
+              : allFail
+                ? "text-destructive"
+                : "text-sky-600 dark:text-sky-400",
+          )}
+          aria-label={tip}
+        >
+          <Icon size={14} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs whitespace-pre-line text-xs leading-relaxed">
+        {tip}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function SortableSourceRow({
   script,
   isLoading,
+  isTesting,
+  dragDisabled,
+  probe,
   onToggle,
   onRemove,
 }: {
   script: SourceScript
   isLoading: boolean
+  isTesting: boolean
+  dragDisabled: boolean
+  probe?: SourceProbeResult
   onToggle: () => void
   onRemove: () => void
 }) {
   const t = useT()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: script.id,
+    disabled: dragDisabled,
   })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   }
   const platforms = script.sources ? Object.keys(script.sources).join("、") : ""
+  const dim = isTesting && "pointer-events-none blur-[2px] opacity-40 transition-[filter,opacity] duration-200"
 
   return (
     <TableRow
       ref={setNodeRef}
       style={style}
+      data-script-id={script.id}
       className={cn(
         "group",
+        isTesting && "bg-muted/50",
         isDragging && "relative z-10 bg-muted/80 opacity-80 shadow-sm",
       )}
       data-state={isDragging ? "selected" : undefined}
     >
       <TableCell className="w-8 px-1.5 py-1.5">
-        <button
-          type="button"
-          className="flex size-7 cursor-grab items-center justify-center rounded-md text-muted-foreground touch-none hover:bg-muted hover:text-foreground active:cursor-grabbing"
-          title={t("sources.dragHint")}
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical size={14} />
-        </button>
-      </TableCell>
-      <TableCell className="max-w-0 min-w-0 px-2 py-1.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 truncate text-sm font-medium" title={script.name}>
-            {script.name}
-          </span>
-          <Badge
-            variant="outline"
-            className="max-w-[5.5rem] shrink-0 truncate px-1 py-0 text-[10px] font-normal"
-            title={script.version}
+        <div className={cn(dim)}>
+          <button
+            type="button"
+            className="flex size-7 cursor-grab items-center justify-center rounded-md text-muted-foreground touch-none hover:bg-muted hover:text-foreground active:cursor-grabbing disabled:cursor-default"
+            title={t("sources.dragHint")}
+            disabled={dragDisabled}
+            {...attributes}
+            {...listeners}
           >
-            {versionBadgeLabel(script.version)}
-          </Badge>
+            <GripVertical size={14} />
+          </button>
         </div>
-        {script.author ? (
-          <p
-            className="mt-0.5 truncate text-[11px] text-muted-foreground"
-            title={script.author}
-          >
-            {t("sources.author", { name: script.author })}
-          </p>
+      </TableCell>
+      <TableCell className="relative max-w-0 min-w-0 px-2 py-1.5">
+        <div className={cn("min-w-0", dim)}>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-sm font-medium" title={script.name}>
+              {script.name}
+            </span>
+            <Badge
+              variant="outline"
+              className="max-w-[5.5rem] shrink-0 truncate px-1 py-0 text-[10px] font-normal"
+              title={script.version}
+            >
+              {versionBadgeLabel(script.version)}
+            </Badge>
+            {probe && !isTesting ? <ProbeStatusIcon result={probe} /> : null}
+          </div>
+          {script.author ? (
+            <p
+              className="mt-0.5 truncate text-[11px] text-muted-foreground"
+              title={script.author}
+            >
+              {t("sources.author", { name: script.author })}
+            </p>
+          ) : null}
+        </div>
+        {isTesting ? (
+          <div className="absolute inset-0 z-[1] flex items-center justify-center">
+            <Loader2 size={16} className="animate-spin text-primary" />
+          </div>
         ) : null}
       </TableCell>
       <TableCell className="w-[4.5rem] px-2 py-1.5">
-        <OriginBadge origin={scriptOrigin(script)} />
+        <div className={cn(dim)}>
+          <OriginBadge origin={scriptOrigin(script)} />
+        </div>
       </TableCell>
       <TableCell className="w-[9rem] max-w-[9rem] px-2 py-1.5">
-        <span className="block truncate text-xs text-muted-foreground" title={platforms || undefined}>
+        <span
+          className={cn(
+            "block truncate text-xs text-muted-foreground",
+            dim,
+          )}
+          title={platforms || undefined}
+        >
           {platforms || "—"}
         </span>
       </TableCell>
       <TableCell className="w-14 px-2 py-1.5">
-        <Switch checked={script.enabled} disabled={isLoading} onCheckedChange={onToggle} />
+        <div className={cn(dim)}>
+          <Switch
+            checked={script.enabled}
+            disabled={isLoading || isTesting || dragDisabled}
+            onCheckedChange={onToggle}
+          />
+        </div>
       </TableCell>
       <TableCell className="w-10 px-1.5 py-1.5">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 text-muted-foreground opacity-70 hover:text-destructive group-hover:opacity-100"
-          onClick={onRemove}
-        >
-          <Trash2 size={13} />
-        </Button>
+        <div className={cn(dim)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 text-muted-foreground opacity-70 hover:text-destructive group-hover:opacity-100"
+            onClick={onRemove}
+            disabled={dragDisabled}
+          >
+            <Trash2 size={13} />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   )
@@ -323,7 +427,11 @@ export function SourceManager() {
     importScriptFromUrl,
     removeScript,
     toggleEnabled,
+    setEnabled,
     reorderScripts,
+    setScriptSources,
+    setProbeResult,
+    probeResults,
     clearError,
   } = useSourceStore()
   const t = useT()
@@ -334,6 +442,9 @@ export function SourceManager() {
   const [getOpen, setGetOpen] = useState(false)
   const [fileDragOver, setFileDragOver] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [testingIds, setTestingIds] = useState<string[]>([])
+  const [testingAll, setTestingAll] = useState(false)
+  const testGen = useRef(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
   const modeRef = useRef(mode)
@@ -341,7 +452,7 @@ export function SourceManager() {
   const importLocalFilesRef = useRef<(files: { label: string; content: string }[]) => Promise<void>>(
     async () => {},
   )
-  const busy = importingKind !== null
+  const busy = importingKind !== null || testingAll
   modeRef.current = mode
   busyRef.current = busy
   const scriptIds = useMemo(() => scripts.map((s) => s.id), [scripts])
@@ -560,6 +671,92 @@ export function SourceManager() {
     reorderScripts(oldIndex, newIndex)
   }
 
+  async function handleTestAll() {
+    if (testingAll || !scripts.length) return
+    const gen = ++testGen.current
+    setTestingAll(true)
+    setTestingIds([])
+    try {
+      const catalog = await loadProbeCatalog()
+      if (gen !== testGen.current) return
+
+      const listedScripts = useSourceStore.getState().scripts
+      const disabledFlags = await mapPool(
+        listedScripts,
+        PROBE_SOURCE_CONCURRENCY,
+        async (listed) => {
+          if (gen !== testGen.current) return false
+          setTestingIds((prev) => (prev.includes(listed.id) ? prev : [...prev, listed.id]))
+          const wasEnabled = listed.enabled
+          let script = listed
+          try {
+            if (!sourceRunner.isLoaded(script.id)) {
+              try {
+                const sources = await sourceRunner.loadScript(script)
+                if (gen !== testGen.current) return false
+                if (sources) {
+                  setScriptSources(script.id, sources)
+                  script =
+                    useSourceStore.getState().scripts.find((s) => s.id === script.id) ??
+                    script
+                }
+              } catch {
+                const failed = Object.fromEntries(
+                  testablePlatforms(script).map((id) => [id, false]),
+                )
+                if (Object.keys(failed).length) {
+                  setProbeResult(script.id, { platforms: failed })
+                }
+                if (wasEnabled) {
+                  await setEnabled(script.id, false)
+                  return true
+                }
+                return false
+              }
+            }
+
+            const result = await probeSourceScript(script, catalog)
+            if (gen !== testGen.current) return false
+            if (Object.keys(result.platforms).length) {
+              setProbeResult(script.id, result)
+              if (probeAllFailed(result) && wasEnabled) {
+                await setEnabled(script.id, false)
+                return true
+              }
+            }
+            return false
+          } finally {
+            if (!wasEnabled && sourceRunner.isLoaded(script.id)) {
+              sourceRunner.unloadScript(script.id)
+            }
+            setTestingIds((prev) => prev.filter((id) => id !== listed.id))
+          }
+        },
+      )
+
+      if (gen !== testGen.current) return
+      const disabled = disabledFlags.filter(Boolean).length
+      const total = useSourceStore.getState().scripts.length
+      const parts = [t("sources.testDone", { total })]
+      if (disabled) parts.push(t("sources.testDisabled", { n: disabled }))
+      useUiStore.getState().notify({
+        message: parts.join(t("sources.importJoin")),
+        variant: disabled ? "info" : "success",
+      })
+    } catch {
+      if (gen !== testGen.current) return
+      useUiStore.getState().notify({
+        message: t("sources.testNone"),
+        variant: "error",
+      })
+    } finally {
+      if (gen === testGen.current) {
+        setTestingIds([])
+        setTestingAll(false)
+      }
+    }
+  }
+
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex shrink-0 flex-col gap-3">
@@ -571,8 +768,26 @@ export function SourceManager() {
                 {t("sources.count", { total: scripts.length, enabled: enabledCount })}
               </span>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto h-8"
+              onClick={() => void handleTestAll()}
+              disabled={busy || scripts.length === 0}
+            >
+              {testingAll ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : (
+                <AudioLines size={14} className="mr-1.5" />
+              )}
+              {testingAll ? t("sources.testing") : t("sources.testAll")}
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground">{t("sources.hint")}</p>
+          <div className="flex items-center gap-2 rounded-md border border-border/80 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <AlertCircle size={14} className="shrink-0" />
+            <span>{t("sources.trustWarning")}</span>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -750,6 +965,9 @@ export function SourceManager() {
                         key={script.id}
                         script={script}
                         isLoading={isLoading}
+                        isTesting={testingIds.includes(script.id)}
+                        dragDisabled={testingAll}
+                        probe={probeResults[script.id]}
                         onToggle={() => toggleEnabled(script.id)}
                         onRemove={() => removeScript(script.id)}
                       />

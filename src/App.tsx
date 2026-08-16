@@ -14,7 +14,7 @@ import { Settings } from "@/routes/Settings";
 import { useSourceStore } from "@/stores/sourceStore";
 import { usePlaylistStore } from "@/stores/playlistStore";
 import { useSearchStore } from "@/stores/searchStore";
-import { useSettingsStore } from "@/stores/settingsStore";
+import { useSettingsStore, pathForStartupPage } from "@/stores/settingsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { bindNotify, bindDownloadLocationPrompt } from "@/lib/notify";
@@ -40,6 +40,13 @@ bindDownloadLocationPrompt(() =>
 );
 bindPlayAll((songs) => usePlayerStore.getState().playAll(songs));
 
+function StartupRedirect() {
+  const hydrated = useSettingsStore((s) => s.hydrated);
+  const startupPage = useSettingsStore((s) => s.startupPage);
+  if (!hydrated) return null;
+  return <Navigate to={pathForStartupPage(startupPage)} replace />;
+}
+
 function AppInit() {
   const { loadFromDisk: loadSources } = useSourceStore();
   const { loadFromDisk: loadPlaylists } = usePlaylistStore();
@@ -49,7 +56,7 @@ function AppInit() {
   const { loadFromDisk: loadLocalMusic } = useLocalMusicStore();
   const { loadFromDisk: loadPlayerPrefs } = usePlayerStore();
 
-  // Global media keyboard shortcuts (space / arrows / M / L), gated by settings.
+  // Global hotkeys (play / seek / lyrics / …), registered after settings hydrate.
   useGlobalShortcuts();
 
   useEffect(() => {
@@ -83,6 +90,7 @@ function AppInit() {
         void loadLocalMusic().then(() => {
           if (cancelled) return;
           stopOpenFiles = startOpenLocalFilesListener();
+          void usePlayerStore.getState().restorePlaybackSource();
         });
       });
     });
@@ -112,7 +120,7 @@ export default function App() {
         <AppInit />
         <Routes>
           <Route element={<RootLayout />}>
-            <Route index element={<Navigate to="/search" replace />} />
+            <Route index element={<StartupRedirect />} />
             <Route path="/search" element={<Search />} />
             <Route path="/hot-playlists" element={<HotPlaylists />} />
             <Route path="/hot-albums" element={<HotAlbums />} />

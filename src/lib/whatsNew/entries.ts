@@ -17,6 +17,76 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.3.0": {
+    zh: {
+      sections: [
+        {
+          title: "⌨️ 快捷键",
+          bullets: [
+            "播放相关快捷键改为系统全局热键，最小化后也能用",
+            "「设置 → 快捷键」可点击按键改组合；默认 Ctrl/⌘ + Shift",
+            "Windows 的 Ctrl 与 Mac 的 ⌘ 会一起同步；可一键恢复默认",
+          ],
+        },
+        {
+          title: "▶️ 播放",
+          bullets: [
+            "重启后恢复上次队列、当前歌曲和进度；有缓存则直接可播，没有则等你按播放",
+            "「设置 → 播放」可选启动进入的页面",
+            "缓存音质低于偏好时会再试更高音质，不再被低码率缓存卡住",
+            "无效音频链接时提示换其他音源",
+          ],
+        },
+        {
+          title: "🔌 音源",
+          bullets: [
+            "导入的音源在沙箱中运行，并限制可疑网络请求",
+            "导入前会提示：只导入你信任的脚本",
+          ],
+        },
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "修复睡眠唤醒后红绿灯按钮逐渐右移的问题",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "⌨️ Shortcuts",
+          bullets: [
+            "Playback shortcuts are now OS global hotkeys, including when Museek is minimized",
+            "Change combos in Settings → Shortcuts by clicking a keycap; defaults use Ctrl/⌘ + Shift",
+            "Windows Ctrl and Mac ⌘ stay in sync; restore defaults in one click",
+          ],
+        },
+        {
+          title: "▶️ Playback",
+          bullets: [
+            "Relaunch restores the last queue, current song, and position; play immediately from cache, or wait until you press play",
+            "Choose the page that opens on launch in Settings → Playback",
+            "If a cache is below your preferred quality, Museek tries a higher tier instead of staying stuck on 128k",
+            "Invalid audio links now say to try another source",
+          ],
+        },
+        {
+          title: "🔌 Sources",
+          bullets: [
+            "Imported source scripts run in a sandbox, with junk network requests blocked",
+            "Import shows a reminder to only add scripts you trust",
+          ],
+        },
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "Fix traffic lights walking right after sleep and wake",
+          ],
+        },
+      ],
+    },
+  },
   "3.2.1": {
     zh: {
       sections: [

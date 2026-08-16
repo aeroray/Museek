@@ -6,9 +6,10 @@ import { LYRIC_FONT_SCALE_KEY } from "@/lib/lyrics/fontScale";
 // plus the direct-localStorage prefs (language, theme, sidebar, lyric font,
 // top-bar lyrics). Deliberately excludes the on-disk audio/lyric cache,
 // downloaded files, localMusic.json, downloads.json, player.json (volume/
-// mute), miniPlayer.json (mini-bar position), desktopLyrics.json,
-// desktopLyricsGeometry.json, and museek.whatsNew.seenVersion /
-// AppData whats-new-*.json — those are device-local.
+// mute), playbackSession.json (queue / now-playing), sourceProbe.json (source
+// health-check results), miniPlayer.json (mini-bar
+// position), desktopLyrics.json, desktopLyricsGeometry.json, and
+// museek.whatsNew.seenVersion / AppData whats-new-*.json — those are device-local.
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;

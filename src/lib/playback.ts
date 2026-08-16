@@ -8,7 +8,7 @@ import {
 import { cdnFetchStrategies, isNetEaseCdnUrl } from "@/lib/cdnHeaders"
 import { httpFetch } from "@/lib/http"
 import { getCachedAudioUrl, listCachedAudioQualities, putCachedAudio } from "@/lib/mediaCache"
-import { qualityCandidates } from "@/lib/quality"
+import { QUALITY_LADDER } from "@/lib/quality"
 import { sourceRunner } from "@/lib/sourceRunner"
 import type { MusicInfo, Quality } from "@/types/music"
 
@@ -49,29 +49,96 @@ export function revokeCurrentObjectUrl(): void {
   }
 }
 
+type CachedSrc = { src: string; quality: Quality }
+
+let sourceLayoutKey = ""
+const skipQualityUpgrade = new Set<string>()
+
+function upgradeSkipKey(song: MusicInfo, preferred: Quality): string {
+  return `${song.source}:${song.meta.songId}:${preferred}`
+}
+
+function refreshUpgradeSkipFromSources() {
+  const key = sourceRunner.layoutKey()
+  if (key === sourceLayoutKey) return
+  sourceLayoutKey = key
+  skipQualityUpgrade.clear()
+}
+
+/** After a miss, don't retry higher tiers until the enabled source list changes. */
+export function shouldAttemptQualityUpgrade(
+  song: MusicInfo,
+  preferred: Quality,
+): boolean {
+  refreshUpgradeSkipFromSources()
+  return !skipQualityUpgrade.has(upgradeSkipKey(song, preferred))
+}
+
+export function rememberQualityUpgradeMiss(
+  song: MusicInfo,
+  preferred: Quality,
+): void {
+  refreshUpgradeSkipFromSources()
+  skipQualityUpgrade.add(upgradeSkipKey(song, preferred))
+}
+
+async function cachedUrl(
+  song: MusicInfo,
+  quality: Quality,
+): Promise<CachedSrc | null> {
+  const src = await getCachedAudioUrl(song.source, song.meta.songId, quality)
+  return src ? { src, quality } : null
+}
+
 /**
- * Probe disk cache for a playable copy before any remote URL resolve.
- * Walks preferred quality downward first, then any other cached tier for the
- * song (so switching play quality down doesn't force a re-download).
+ * Best on-disk copy that already meets `preferred` (FLAC counts for 320k).
+ * Null if only a lower tier is cached — callers may try the network first.
+ */
+export async function findCachedMeetingPreferred(
+  song: MusicInfo,
+  preferred: Quality,
+  audioCache: boolean,
+): Promise<CachedSrc | null> {
+  if (!isTauri || !audioCache) return null
+  const need = QUALITY_LADDER.indexOf(preferred)
+  const eligible =
+    need < 0 ? QUALITY_LADDER : QUALITY_LADDER.slice(0, need + 1)
+  for (const quality of eligible) {
+    const hit = await cachedUrl(song, quality)
+    if (hit) return hit
+  }
+  return null
+}
+
+/** Best cached copy of this song, including tiers below the current setting. */
+export async function findBestCachedSrc(
+  song: MusicInfo,
+  audioCache: boolean,
+): Promise<CachedSrc | null> {
+  if (!isTauri || !audioCache) return null
+  for (const quality of await listCachedAudioQualities(
+    song.source,
+    song.meta.songId,
+  )) {
+    const hit = await cachedUrl(song, quality)
+    if (hit) return hit
+  }
+  return null
+}
+
+/**
+ * Any playable cached copy: preferred-or-better first, then a lower tier.
+ * Used on session restore so startup is not blocked on a quality upgrade.
  */
 export async function findCachedPlayableSrc(
   song: MusicInfo,
   preferred: Quality,
   audioCache: boolean,
-): Promise<{ src: string; quality: Quality } | null> {
-  if (!isTauri || !audioCache) return null
-  const tried = new Set<Quality>()
-  for (const quality of qualityCandidates(preferred)) {
-    tried.add(quality)
-    const src = await getCachedAudioUrl(song.source, song.meta.songId, quality)
-    if (src) return { src, quality }
-  }
-  for (const quality of await listCachedAudioQualities(song.source, song.meta.songId)) {
-    if (tried.has(quality)) continue
-    const src = await getCachedAudioUrl(song.source, song.meta.songId, quality)
-    if (src) return { src, quality }
-  }
-  return null
+): Promise<CachedSrc | null> {
+  return (
+    (await findCachedMeetingPreferred(song, preferred, audioCache)) ??
+    (await findBestCachedSrc(song, audioCache))
+  )
 }
 
 function mimeForQuality(quality: Quality): { ext: string; mime: string } {
