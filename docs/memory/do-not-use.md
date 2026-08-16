@@ -32,5 +32,9 @@ Do not accept Win/Super in user shortcuts. Cross-OS sync only maps Ctrl ↔ Comm
 
 Do not compute macOS Overlay traffic-light gaps from live button frames. After display sleep AppKit can reset only some buttons, and a measured gap walks the cluster to the right. Use a fixed 20pt origin-to-origin spacing.
 
+## Tauri manage() for AppKit observers
+
+Do not store `ProtocolObject<dyn NSObjectProtocol>` in `app.manage()`. It is !Send/!Sync and fails the macOS CI. Keep wake observers alive with `mem::forget`.
+
 
 

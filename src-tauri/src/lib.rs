@@ -1242,14 +1242,14 @@ pub fn run() {
                         let _ = window.show();
                         let _ = window.set_focus();
                         refresh_macos_window_shadow(&window);
-                        macos_traffic_lights::install(app.handle(), &window);
+                        macos_traffic_lights::install(&window);
                         let w = window.clone();
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(120));
                             refresh_macos_window_shadow(&w);
                         });
                     } else {
-                        macos_traffic_lights::install(app.handle(), &window);
+                        macos_traffic_lights::install(&window);
                     }
                 }
                 // Non-macOS: frameless + custom WindowControls (conf uses

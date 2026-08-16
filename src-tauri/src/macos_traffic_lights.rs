@@ -23,12 +23,10 @@ const TRAFFIC_LIGHT_Y: f64 = 18.0;
 /// macOS default origin-to-origin gap (12pt button + 8pt spacing).
 const TRAFFIC_LIGHT_SPACING: f64 = 20.0;
 
-struct TrafficLightObservers(Vec<Retained<ProtocolObject<dyn NSObjectProtocol>>>);
-
-pub fn install(app: &AppHandle, window: &WebviewWindow) {
+pub fn install(window: &WebviewWindow) {
     apply(window);
     listen_window_events(window);
-    observe_wake(app, window);
+    observe_wake(window);
 }
 
 pub fn refresh_main(app: &AppHandle) {
@@ -60,7 +58,7 @@ fn listen_window_events(window: &WebviewWindow) {
     });
 }
 
-fn observe_wake(app: &AppHandle, window: &WebviewWindow) {
+fn observe_wake(window: &WebviewWindow) {
     let workspace = NSWorkspace::sharedWorkspace();
     let center = workspace.notificationCenter();
     let mut observers = Vec::new();
@@ -70,7 +68,9 @@ fn observe_wake(app: &AppHandle, window: &WebviewWindow) {
     ] {
         observers.push(observe_notification(&center, name, window));
     }
-    app.manage(TrafficLightObservers(observers));
+    // Keep the notification tokens alive for the process lifetime.
+    // Do not app.manage() them: ProtocolObject is !Send/!Sync.
+    std::mem::forget(observers);
 }
 
 fn observe_notification(
