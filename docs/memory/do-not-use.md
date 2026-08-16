@@ -36,5 +36,9 @@ Do not compute macOS Overlay traffic-light gaps from live button frames. After d
 
 Do not store `ProtocolObject<dyn NSObjectProtocol>` in `app.manage()`. It is !Send/!Sync and fails the macOS CI. Keep wake observers alive with `mem::forget`.
 
+## objc2 extern notification statics
+
+Do not read `NSWorkspaceDidWakeNotification` (and similar `extern static`s) from safe Rust. rustc reports E0133. Use `ns_string!("NSWorkspaceDidWakeNotification")` with the Apple constant name.
+
 
 

@@ -10,11 +10,10 @@ use std::time::Duration;
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2_app_kit::{
-    NSWindow, NSWindowButton, NSWorkspace, NSWorkspaceDidWakeNotification,
-    NSWorkspaceScreensDidWakeNotification,
+use objc2_app_kit::{NSWindow, NSWindowButton, NSWorkspace};
+use objc2_foundation::{
+    ns_string, NSNotification, NSNotificationCenter, NSNotificationName, NSObjectProtocol,
 };
-use objc2_foundation::{NSNotification, NSNotificationCenter, NSObjectProtocol};
 use tauri::{AppHandle, Manager, WebviewWindow, WindowEvent};
 
 /// Keep in sync with `trafficLightPosition` in tauri.conf.json.
@@ -61,11 +60,14 @@ fn listen_window_events(window: &WebviewWindow) {
 fn observe_wake(window: &WebviewWindow) {
     let workspace = NSWorkspace::sharedWorkspace();
     let center = workspace.notificationCenter();
+    // Apple's NSWorkspace*DidWakeNotification values are these string names.
+    // Do not read the objc2 `extern static`s from safe Rust (E0133).
+    let names: [&NSNotificationName; 2] = [
+        ns_string!("NSWorkspaceScreensDidWakeNotification"),
+        ns_string!("NSWorkspaceDidWakeNotification"),
+    ];
     let mut observers = Vec::new();
-    for name in [
-        NSWorkspaceScreensDidWakeNotification,
-        NSWorkspaceDidWakeNotification,
-    ] {
+    for name in names {
         observers.push(observe_notification(&center, name, window));
     }
     // Keep the notification tokens alive for the process lifetime.
@@ -75,7 +77,7 @@ fn observe_wake(window: &WebviewWindow) {
 
 fn observe_notification(
     center: &NSNotificationCenter,
-    name: &objc2_foundation::NSNotificationName,
+    name: &NSNotificationName,
     window: &WebviewWindow,
 ) -> Retained<ProtocolObject<dyn NSObjectProtocol>> {
     let window = window.clone();
