@@ -67,16 +67,18 @@ mod windows_impl {
 
 #[cfg(target_os = "macos")]
 mod macos_impl {
+    use objc2::MainThreadMarker;
     use objc2_app_kit::NSFontManager;
 
     pub fn list() -> Vec<String> {
-        unsafe {
-            let manager = NSFontManager::sharedFontManager();
-            let families = manager.availableFontFamilies();
-            let mut list: Vec<String> = families.iter().map(|name| name.to_string()).collect();
-            list.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
-            list
-        }
+        let Some(mtm) = MainThreadMarker::new() else {
+            return Vec::new();
+        };
+        let manager = NSFontManager::sharedFontManager(mtm);
+        let families = manager.availableFontFamilies();
+        let mut list: Vec<String> = families.iter().map(|name| name.to_string()).collect();
+        list.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        list
     }
 }
 

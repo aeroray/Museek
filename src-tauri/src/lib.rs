@@ -271,6 +271,40 @@ fn media_position(seconds: Option<f64>) -> Option<MediaPosition> {
     )))
 }
 
+#[cfg(target_os = "macos")]
+fn set_macos_dock_progress(
+    app: &tauri::AppHandle,
+    position: Option<f64>,
+    duration: Option<f64>,
+    active: bool,
+) {
+    use tauri::window::{ProgressBarState, ProgressBarStatus};
+
+    let progress = if active {
+        position
+            .zip(duration)
+            .filter(|(position, duration)| {
+                position.is_finite()
+                    && *position >= 0.0
+                    && duration.is_finite()
+                    && *duration > 0.0
+                    && *position < *duration
+            })
+            .map(|(position, duration)| ((position / duration) * 100.0).round() as u64)
+    } else {
+        None
+    };
+    let status = if progress.is_some() {
+        Some(ProgressBarStatus::Normal)
+    } else {
+        Some(ProgressBarStatus::None)
+    };
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_progress_bar(ProgressBarState { status, progress });
+    }
+}
+
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn set_media_playback(controls: &mut MediaControls, playing: bool, position: Option<f64>) {
     let progress = media_position(position);
@@ -356,6 +390,8 @@ fn media_update(
         // Reflect the play/pause state on the Windows taskbar thumbnail toolbar too.
         #[cfg(target_os = "windows")]
         taskbar::set_playing(&handle, playing);
+        #[cfg(target_os = "macos")]
+        set_macos_dock_progress(&handle, position, duration, !title.trim().is_empty());
         // Keep the tray tooltip in sync with Now Playing (when the tray is shown).
         if let Some(tray) = handle.tray_by_id("main-tray") {
             let tip = if title.trim().is_empty() {
@@ -385,7 +421,13 @@ fn media_update(
 
 /// Playback position only — used on a throttle so we do not rewrite metadata/cover.
 #[tauri::command]
-fn media_progress(app: tauri::AppHandle, position: f64, playing: bool) {
+fn media_progress(
+    app: tauri::AppHandle,
+    position: f64,
+    playing: bool,
+    duration: Option<f64>,
+    active: bool,
+) {
     let handle = app.clone();
     let update = move || {
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -396,6 +438,8 @@ fn media_progress(app: tauri::AppHandle, position: f64, playing: bool) {
                 }
             }
         }
+        #[cfg(target_os = "macos")]
+        set_macos_dock_progress(&handle, Some(position), duration, active);
     };
 
     #[cfg(target_os = "macos")]

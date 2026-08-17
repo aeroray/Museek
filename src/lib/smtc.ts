@@ -39,7 +39,10 @@ function clockSnapshot(): { position?: number; duration?: number } {
   const state = audioPlayer.getState();
   return {
     position: finiteSecs(state.currentTime),
-    duration: finiteSecs(state.duration) && state.duration > 0 ? state.duration : undefined,
+    duration:
+      finiteSecs(state.duration) && state.duration > 0
+        ? state.duration
+        : undefined,
   };
 }
 
@@ -88,11 +91,21 @@ function updateBrowserMediaControls(
   }
 }
 
-async function invokeMediaProgress(position: number, playing: boolean) {
+async function invokeMediaProgress(
+  position: number,
+  playing: boolean,
+  duration?: number,
+  active = true,
+) {
   if (!isTauri) return;
   try {
     const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("media_progress", { position, playing });
+    await invoke("media_progress", {
+      position,
+      playing,
+      duration: duration ?? null,
+      active,
+    });
   } catch {
     /* media controls are best-effort */
   }
@@ -125,7 +138,12 @@ function wireProgressBridge() {
     if (!jumped && !due) return;
     rememberProgress(currentTime);
     updateBrowserPosition(playing);
-    void invokeMediaProgress(currentTime, playing);
+    void invokeMediaProgress(
+      currentTime,
+      playing,
+      duration,
+      Boolean(lastMedia?.title.trim()),
+    );
   });
 }
 
@@ -199,7 +217,8 @@ export async function attachMediaControls(handlers: {
     if (handlers.seek) {
       try {
         mediaSession.setActionHandler("seekto", (details) => {
-          if (typeof details.seekTime === "number") handlers.seek?.(details.seekTime);
+          if (typeof details.seekTime === "number")
+            handlers.seek?.(details.seekTime);
         });
       } catch {
         /* action is not supported by this WebView */

@@ -1,5 +1,21 @@
 # Confirmed Decisions
 
+## macOS Dock tile playback progress
+
+Decision:
+Reuse the existing throttled native media timeline and Tauri/Tao's built-in macOS Dock progress implementation. Send a 0-100 progress value through `set_progress_bar`, preserve the bar while paused, and hide it when there is no valid duration or playback reaches the end.
+
+Reason:
+Tao already owns a custom `NSProgressIndicator` subclass that draws and refreshes the Dock tile correctly. Reusing it avoids a second AppKit view hierarchy and keeps the progress clock aligned with the existing media controls.
+
+## macOS Overlay traffic-light ownership
+
+Decision:
+Omit `trafficLightPosition` from Tauri's macOS window config when using the fixed-position traffic-light module. The module owns the button coordinates and wake refresh; Tao must not remeasure the live close-to-miniaturize gap from `drawRect:`.
+
+Reason:
+After display sleep, AppKit can restore only part of the title-bar button row. Tao's live-gap calculation can then spread the wrong spacing across all three buttons and override the fixed placement.
+
 ## 2026-08-17 - Device-local UI fonts, system default
 
 Decision:
