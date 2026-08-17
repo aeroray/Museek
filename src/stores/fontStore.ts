@@ -16,12 +16,16 @@ import {
 
 interface FontState extends FontPrefs {
   families: string[];
+  familiesStatus: "idle" | "loading" | "ready";
   ready: boolean;
+  ensureFamilies: () => void;
   setUiMode: (mode: UiFontMode) => void;
   setUiFamily: (family: string) => void;
   setDesktopLyricsMode: (mode: DesktopLyricsFontMode) => void;
   setDesktopLyricsFamily: (family: string) => void;
 }
+
+let familiesPromise: Promise<void> | null = null;
 
 function publish(prefs: FontPrefs, persist: boolean) {
   const stacks = resolveFontStacks(prefs);
@@ -33,7 +37,35 @@ function publish(prefs: FontPrefs, persist: boolean) {
 export const useFontStore = create<FontState>((set, get) => ({
   ...DEFAULT_FONT_PREFS,
   families: [],
+  familiesStatus: "idle",
   ready: false,
+  ensureFamilies() {
+    if (get().familiesStatus === "ready" || familiesPromise) return;
+    set({ familiesStatus: "loading" });
+    familiesPromise = (async () => {
+      try {
+        const families = await listInstalledFontFamilies();
+        const current = get();
+        const prefs = dropMissingFamilies(
+          { version: 1, ui: current.ui, desktopLyrics: current.desktopLyrics },
+          families,
+        );
+        if (JSON.stringify(prefs) !== JSON.stringify({ version: 1, ui: current.ui, desktopLyrics: current.desktopLyrics })) {
+          void saveFontPrefs(prefs);
+          publish(prefs, false);
+        }
+        set({
+          ...prefs,
+          families,
+          familiesStatus: "ready",
+        });
+      } catch {
+        set({ families: [], familiesStatus: "ready" });
+      } finally {
+        familiesPromise = null;
+      }
+    })();
+  },
   setUiMode(mode) {
     const prefs: FontPrefs = {
       version: 1,
@@ -87,16 +119,10 @@ export function initFonts(useLocalCache = true) {
   }
   void (async () => {
     const loaded = await loadFontPrefs();
-    const families = useLocalCache ? await listInstalledFontFamilies() : [];
-    const prefs = dropMissingFamilies(loaded, families);
-    if (JSON.stringify(prefs) !== JSON.stringify(loaded)) {
-      void saveFontPrefs(prefs);
-    }
     useFontStore.setState({
-      ...prefs,
-      families,
+      ...loaded,
       ready: true,
     });
-    publish(prefs, false);
+    publish(loaded, false);
   })();
 }

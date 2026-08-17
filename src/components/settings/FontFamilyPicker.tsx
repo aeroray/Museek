@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,27 +11,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { quoteFontFamily } from "@/lib/uiFonts";
+import { useFontStore } from "@/stores/fontStore";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 
 export function FontFamilyPicker({
   value,
-  families,
   extraLabel,
   extraSelected,
   onSelectExtra,
   onChange,
 }: {
   value: string | null;
-  families: string[];
   extraLabel?: string;
   extraSelected?: boolean;
   onSelectExtra?: () => void;
   onChange: (family: string) => void;
 }) {
   const t = useT();
+  const families = useFontStore((s) => s.families);
+  const familiesStatus = useFontStore((s) => s.familiesStatus);
+  const ensureFamilies = useFontStore((s) => s.ensureFamilies);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const loading = familiesStatus !== "ready";
   const preview = t("theme.fontPreview");
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -51,7 +53,8 @@ export function FontFamilyPicker({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setQuery("");
+        if (next) ensureFamilies();
+        else setQuery("");
       }}
     >
       <DropdownMenuTrigger asChild>
@@ -67,7 +70,11 @@ export function FontFamilyPicker({
           >
             {triggerLabel}
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+          {open && loading ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin opacity-70" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -81,6 +88,7 @@ export function FontFamilyPicker({
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("theme.fontSearch")}
             className="h-8"
+            disabled={loading}
             onKeyDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
           />
@@ -98,7 +106,12 @@ export function FontFamilyPicker({
                 <DropdownMenuSeparator />
               </>
             )}
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin" />
+                <p className="text-xs">{t("theme.fontLoading")}</p>
+              </div>
+            ) : filtered.length === 0 ? (
               <p className="px-2.5 py-2 text-xs text-muted-foreground">
                 {t("theme.fontEmpty")}
               </p>
@@ -139,12 +152,13 @@ function FontMenuRow({
       className="items-center gap-3 py-2"
       onSelect={onSelect}
     >
-      <Check
-        className={cn(
-          "size-4 shrink-0",
-          active ? "opacity-100" : "opacity-0",
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        {active ? (
+          <Check className="size-4" />
+        ) : (
+          <span className="size-1.5 rounded-full bg-muted-foreground/45" />
         )}
-      />
+      </span>
       <span
         className="min-w-0 flex-1 truncate"
         style={face ? { fontFamily: face } : undefined}

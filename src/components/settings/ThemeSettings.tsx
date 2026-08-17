@@ -25,7 +25,6 @@ export function ThemeSettings() {
   const {
     ui,
     desktopLyrics,
-    families,
     setUiMode,
     setUiFamily,
     setDesktopLyricsMode,
@@ -111,7 +110,6 @@ export function ThemeSettings() {
           <SettingRow title={t("theme.fontUiTitle")} desc={t("theme.fontUiDesc")}>
             <FontFamilyPicker
               value={ui.family}
-              families={families}
               extraLabel={t("theme.fontSystem")}
               extraSelected={ui.mode === "system"}
               onSelectExtra={() => setUiMode("system")}
@@ -125,7 +123,6 @@ export function ThemeSettings() {
           >
             <FontFamilyPicker
               value={desktopLyrics.family}
-              families={families}
               extraLabel={t("theme.fontLyricsFollow")}
               extraSelected={lyricsFollowApp}
               onSelectExtra={() => setDesktopLyricsMode("follow-app")}

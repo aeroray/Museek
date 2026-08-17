@@ -440,6 +440,8 @@ fn media_progress(
         }
         #[cfg(target_os = "macos")]
         set_macos_dock_progress(&handle, Some(position), duration, active);
+        #[cfg(not(target_os = "macos"))]
+        let _ = (duration, active);
     };
 
     #[cfg(target_os = "macos")]

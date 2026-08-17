@@ -17,6 +17,72 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.4.0": {
+    zh: {
+      sections: [
+        {
+          title: "💬 歌词",
+          bullets: [
+            "歌词页可用快进 / 快退微调时间轴（每步 0.5 秒），只存在本地缓存，清理缓存即清除",
+            "把播放进度写入系统媒体会话，方便其他本地歌词软件跟词",
+          ],
+        },
+        {
+          title: "🎨 外观",
+          bullets: [
+            "默认跟随系统字体，不再捆绑中文衬线包",
+            "可从本机已安装字体中选择；桌面歌词默认同软件字体，也可分开",
+            "打开字体列表时会显示加载状态",
+          ],
+        },
+        {
+          title: "⌨️ 快捷键",
+          bullets: [
+            "播放控件悬停显示当前全局快捷键，不再写死组合",
+          ],
+        },
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "Dock 图标显示播放进度；暂停时保留，播完或无效时隐藏",
+            "继续稳住睡眠唤醒后的红绿灯位置",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "💬 Lyrics",
+          bullets: [
+            "Nudge the lyric timeline forward or back by 0.5s on the lyrics page; stored in local cache and cleared with it",
+            "Publish playback position to the system media session so other local lyrics apps can follow along",
+          ],
+        },
+        {
+          title: "🎨 Appearance",
+          bullets: [
+            "Follow the system UI font by default; bundled CJK serif files are gone",
+            "Pick from fonts installed on this device; desktop lyrics follow the app font unless you choose another",
+            "The font list shows a loading state while system fonts are enumerated",
+          ],
+        },
+        {
+          title: "⌨️ Shortcuts",
+          bullets: [
+            "Hovering playback controls shows the current global hotkey instead of a hardcoded combo",
+          ],
+        },
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "Dock icon shows playback progress; it stays while paused and hides when finished or invalid",
+            "Keep traffic-light placement stable after sleep and wake",
+          ],
+        },
+      ],
+    },
+  },
   "3.3.0": {
     zh: {
       sections: [
