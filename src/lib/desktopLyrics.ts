@@ -5,9 +5,12 @@ import { usePlayerStore } from "@/stores/playerStore";
 import { useLangStore } from "@/lib/i18n";
 import { useThemeStore } from "@/stores/themeStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { formatShortcut } from "@/lib/shortcutKeys";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
+import { currentFontStacks, useFontStore } from "@/stores/fontStore";
 import { findActiveLyricIndex } from "@/lib/lyrics";
-import { getPlaybackTime } from "@/lib/playback/clock";
+import { getLyricTime } from "@/lib/playback/clock";
+import { subscribeLyricOffset } from "@/lib/lyrics/offset";
 import {
   loadDesktopLyricsInteractionMode,
   saveDesktopLyricsInteractionMode,
@@ -42,7 +45,7 @@ function createSnapshot(state: PlayerSnapshotState): DesktopLyricsSnapshot {
   const currentTime =
     state.status === "loading" || state.status === "idle"
       ? 0
-      : getPlaybackTime();
+      : getLyricTime();
   return {
     song: state.currentSong
       ? {
@@ -70,7 +73,7 @@ function snapshotKey(state: PlayerSnapshotState): string {
   const currentTime =
     state.status === "loading" || state.status === "idle"
       ? 0
-      : getPlaybackTime();
+      : getLyricTime();
   const currentLyricIndex = findActiveLyricIndex(state.lyricLines, currentTime);
   return [
     state.currentSong?.id ?? "",
@@ -86,16 +89,22 @@ function snapshotKey(state: PlayerSnapshotState): string {
 
 function createAppearanceSnapshot(): DesktopLyricsAppearanceSnapshot {
   const theme = useThemeStore.getState();
+  const shortcuts = useSettingsStore.getState().shortcuts;
+  const fonts = currentFontStacks();
   return {
     lang: useLangStore.getState().lang,
     themeMode: theme.mode,
     palette: theme.palette,
     capsuleVisible: useSettingsStore.getState().desktopLyricsCapsuleVisible,
+    lockShortcut: formatShortcut(shortcuts.desktopLyricsLock),
+    hideShortcut: formatShortcut(shortcuts.desktopLyrics),
+    fontUi: fonts.ui,
+    fontLyrics: fonts.lyrics,
   };
 }
 
 function appearanceKey(snapshot: DesktopLyricsAppearanceSnapshot): string {
-  return `${snapshot.lang}|${snapshot.themeMode}|${snapshot.palette}|${snapshot.capsuleVisible}`;
+  return `${snapshot.lang}|${snapshot.themeMode}|${snapshot.palette}|${snapshot.capsuleVisible}|${snapshot.lockShortcut}|${snapshot.hideShortcut}|${snapshot.fontUi ?? ""}|${snapshot.fontLyrics ?? ""}`;
 }
 
 async function ensureInteractionModeLoaded(): Promise<void> {
@@ -238,7 +247,19 @@ export function startDesktopLyricsBridge(): () => void {
   });
   const unsubscribeSettings = useSettingsStore.subscribe((state, previous) => {
     if (
-      state.desktopLyricsCapsuleVisible !== previous.desktopLyricsCapsuleVisible
+      state.desktopLyricsCapsuleVisible !==
+        previous.desktopLyricsCapsuleVisible ||
+      state.shortcuts.desktopLyricsLock !==
+        previous.shortcuts.desktopLyricsLock ||
+      state.shortcuts.desktopLyrics !== previous.shortcuts.desktopLyrics
+    ) {
+      void publishAppearance();
+    }
+  });
+  const unsubscribeFonts = useFontStore.subscribe((state, previous) => {
+    if (
+      state.ui !== previous.ui ||
+      state.desktopLyrics !== previous.desktopLyrics
     ) {
       void publishAppearance();
     }
@@ -278,11 +299,22 @@ export function startDesktopLyricsBridge(): () => void {
         }
       })();
     };
-    unsubscribeTime = audioPlayer.subscribeTime((currentTime) => {
+    unsubscribeTime = audioPlayer.subscribeTime(() => {
       if (!useDesktopLyricsStore.getState().isVisible) return;
-      pendingTime = Math.max(0, currentTime);
+      pendingTime = getLyricTime();
       flushTime();
     });
+    const stopOffset = subscribeLyricOffset(() => {
+      if (!useDesktopLyricsStore.getState().isVisible) return;
+      pendingTime = getLyricTime();
+      flushTime();
+      void publishSnapshot(true);
+    });
+    const stopAudio = unsubscribeTime;
+    unsubscribeTime = () => {
+      stopAudio();
+      stopOffset();
+    };
   };
   const stopTimeBridge = () => {
     unsubscribeTime?.();
@@ -340,6 +372,7 @@ export function startDesktopLyricsBridge(): () => void {
     unsubscribeTheme();
     unsubscribeLang();
     unsubscribeSettings();
+    unsubscribeFonts();
     unsubscribeVisibility();
     stopTimeBridge();
     systemTheme?.removeEventListener?.("change", onSystemThemeChange);

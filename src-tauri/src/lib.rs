@@ -6,7 +6,8 @@ use lofty::tag::{Accessor, ItemKey, Tag, TagType};
 use base64::Engine;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use souvlaki::{
-    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, PlatformConfig,
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
+    PlatformConfig, SeekDirection,
 };
 use std::io::Cursor;
 use std::sync::Mutex;
@@ -17,6 +18,8 @@ use tauri_plugin_fs::FsExt;
 
 #[cfg(target_os = "macos")]
 mod macos_traffic_lights;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod system_fonts;
 
 const MAX_EMBEDDED_COVER_BYTES: usize = 10 * 1024 * 1024;
 
@@ -254,6 +257,72 @@ unsafe impl Send for MediaState {}
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 unsafe impl Sync for MediaState {}
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn media_duration(seconds: Option<f64>) -> Option<std::time::Duration> {
+    let seconds = seconds.filter(|value| value.is_finite() && *value > 0.0)?;
+    Some(std::time::Duration::from_secs_f64(seconds.min(86_400.0)))
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn media_position(seconds: Option<f64>) -> Option<MediaPosition> {
+    let seconds = seconds.filter(|value| value.is_finite() && *value >= 0.0)?;
+    Some(MediaPosition(std::time::Duration::from_secs_f64(
+        seconds.min(86_400.0),
+    )))
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn set_media_playback(controls: &mut MediaControls, playing: bool, position: Option<f64>) {
+    let progress = media_position(position);
+    let _ = controls.set_playback(if playing {
+        MediaPlayback::Playing { progress }
+    } else {
+        MediaPlayback::Paused { progress }
+    });
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn emit_os_media_event(handle: &tauri::AppHandle, event: MediaControlEvent) {
+    match event {
+        MediaControlEvent::Play => {
+            let _ = handle.emit("media-control", "play");
+        }
+        MediaControlEvent::Pause => {
+            let _ = handle.emit("media-control", "pause");
+        }
+        MediaControlEvent::Toggle => {
+            let _ = handle.emit("media-control", "toggle");
+        }
+        MediaControlEvent::Next => {
+            let _ = handle.emit("media-control", "next");
+        }
+        MediaControlEvent::Previous => {
+            let _ = handle.emit("media-control", "previous");
+        }
+        MediaControlEvent::Stop => {
+            let _ = handle.emit("media-control", "pause");
+        }
+        MediaControlEvent::SetPosition(MediaPosition(position)) => {
+            let _ = handle.emit("media-seek", position.as_secs_f64());
+        }
+        MediaControlEvent::Seek(direction) => {
+            let delta = match direction {
+                SeekDirection::Forward => 5.0,
+                SeekDirection::Backward => -5.0,
+            };
+            let _ = handle.emit("media-seek-by", delta);
+        }
+        MediaControlEvent::SeekBy(direction, amount) => {
+            let mut delta = amount.as_secs_f64();
+            if matches!(direction, SeekDirection::Backward) {
+                delta = -delta;
+            }
+            let _ = handle.emit("media-seek-by", delta);
+        }
+        _ => {}
+    }
+}
+
 #[tauri::command]
 fn media_update(
     app: tauri::AppHandle,
@@ -262,6 +331,8 @@ fn media_update(
     album: String,
     cover: Option<String>,
     playing: bool,
+    position: Option<f64>,
+    duration: Option<f64>,
 ) {
     let handle = app.clone();
     let update = move || {
@@ -276,13 +347,9 @@ fn media_update(
                         artist: Some(&artist),
                         album: Some(&album),
                         cover_url,
-                        ..Default::default()
+                        duration: media_duration(duration),
                     });
-                    let _ = controls.set_playback(if playing {
-                        MediaPlayback::Playing { progress: None }
-                    } else {
-                        MediaPlayback::Paused { progress: None }
-                    });
+                    set_media_playback(controls, playing, position);
                 }
             }
         }
@@ -314,6 +381,41 @@ fn media_update(
     }
     #[cfg(not(target_os = "macos"))]
     update();
+}
+
+/// Playback position only — used on a throttle so we do not rewrite metadata/cover.
+#[tauri::command]
+fn media_progress(app: tauri::AppHandle, position: f64, playing: bool) {
+    let handle = app.clone();
+    let update = move || {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            if let Ok(mut guard) = handle.state::<MediaState>().0.lock() {
+                if let Some(controls) = guard.as_mut() {
+                    set_media_playback(controls, playing, Some(position));
+                }
+            }
+        }
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.run_on_main_thread(update);
+    }
+    #[cfg(not(target_os = "macos"))]
+    update();
+}
+
+#[tauri::command]
+fn list_font_families() -> Vec<String> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        system_fonts::list_font_families()
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        Vec::new()
+    }
 }
 
 // Keep-awake: prevent the system from *sleeping* while music plays, but still let
@@ -1298,16 +1400,7 @@ pub fn run() {
                                 MediaControls::new(config).ok().map(|mut controls| {
                                     let handle = app_handle.clone();
                                     let _ = controls.attach(move |event: MediaControlEvent| {
-                                        let action = match event {
-                                            MediaControlEvent::Play => "play",
-                                            MediaControlEvent::Pause => "pause",
-                                            MediaControlEvent::Toggle => "toggle",
-                                            MediaControlEvent::Next => "next",
-                                            MediaControlEvent::Previous => "previous",
-                                            MediaControlEvent::Stop => "pause",
-                                            _ => return,
-                                        };
-                                        let _ = handle.emit("media-control", action);
+                                        emit_os_media_event(&handle, event);
                                     });
                                     controls
                                 })
@@ -1323,16 +1416,7 @@ pub fn run() {
                             MediaControls::new(config).ok().map(|mut controls| {
                                 let handle = app_handle.clone();
                                 let _ = controls.attach(move |event: MediaControlEvent| {
-                                    let action = match event {
-                                        MediaControlEvent::Play => "play",
-                                        MediaControlEvent::Pause => "pause",
-                                        MediaControlEvent::Toggle => "toggle",
-                                        MediaControlEvent::Next => "next",
-                                        MediaControlEvent::Previous => "previous",
-                                        MediaControlEvent::Stop => "pause",
-                                        _ => return,
-                                    };
-                                    let _ = handle.emit("media-control", action);
+                                    emit_os_media_event(&handle, event);
                                 });
                                 controls
                             })
@@ -1356,6 +1440,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             embed_download_metadata,
             media_update,
+            media_progress,
             set_prevent_sleep,
             quit_app,
             set_tray_visible,
@@ -1370,7 +1455,8 @@ pub fn run() {
             take_opened_unsupported_files,
             is_autostart_launch,
             should_start_hidden,
-            reapply_macos_traffic_lights
+            reapply_macos_traffic_lights,
+            list_font_families
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

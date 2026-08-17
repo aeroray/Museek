@@ -14,6 +14,7 @@ import { useUiStore } from "@/stores/uiStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useSearchStore } from "@/stores/searchStore";
 import { useT } from "@/lib/i18n";
+import { shortcutTitle, useShortcutCombo } from "@/components/ui/shortcut-tooltip";
 import { usePlaybackLyricIndex } from "@/lib/playback/clock";
 import { cn } from "@/lib/utils";
 import { PlaybackKaraokeText } from "@/components/lyrics/KaraokeText";
@@ -22,6 +23,7 @@ import { LyricTransition } from "@/components/lyrics/LyricTransition";
 /** Current lyric line for the top bar, or a warm welcome when no song is loaded. */
 function TopBarLyrics() {
   const t = useT();
+  const lyricsCombo = useShortcutCombo("lyrics");
   const location = useLocation();
   const enabled = useUiStore((s) => s.topBarLyrics);
   const currentSong = usePlayerStore((s) => s.currentSong);
@@ -81,7 +83,7 @@ function TopBarLyrics() {
           "transition-[background-color,color] duration-200 ease-out hover:bg-accent/60",
         )}
         onClick={() => setShowLyrics(true)}
-        title={t("player.lyrics")}
+        title={shortcutTitle(t("player.lyrics"), lyricsCombo)}
       >
         <LyricTransition
           transitionKey={`${currentSong.id}-${currentLyricIndex}-${text}`}

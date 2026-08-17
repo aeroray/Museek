@@ -3,6 +3,7 @@ import { audioPlayer } from "@/lib/audio";
 import { readData, writeData } from "@/lib/db";
 import { sourceRunner } from "@/lib/sourceRunner";
 import { loadLyric } from "@/lib/lyrics";
+import { applyLyricOffsetForSong } from "@/lib/lyrics/offset";
 import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic";
 import {
   applyAudioSource,
@@ -212,6 +213,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       toggle: () => get().togglePlay(),
       next: () => get().next(),
       previous: () => get().prev(),
+      seek: (seconds) => get().seek(seconds),
+      seekBy: (delta) => get().seek(audioPlayer.getCurrentTime() + delta),
     });
   }, 0);
 
@@ -440,6 +443,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               false,
             );
           }
+          void applyLyricOffsetForSong(null);
           set({
             currentSong: null,
             queueIndex: -1,
@@ -517,6 +521,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           get().currentPicUrl ?? currentSong.meta.picUrl ?? null,
           false,
         );
+        void applyLyricOffsetForSong(null);
         set({
           currentSong: null,
           queue: nextQueue,
@@ -857,6 +862,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             false,
           );
         }
+        void applyLyricOffsetForSong(null);
         set({
           currentSong: null,
           queueIndex: -1,
@@ -887,6 +893,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     async _loadLyric(song) {
       const songId = song.id;
+      void applyLyricOffsetForSong(song);
       set({ lyricsLoading: true });
       try {
         const lines = await loadLyric(song);

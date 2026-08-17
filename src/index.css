@@ -34,8 +34,11 @@
     --radius: 0.75rem;
     --sidebar: 40 18% 95.5%;
     --player: 40 20% 98%;
-    --font-lyrics:
-      "Source Serif 4", "Noto Serif SC", "Songti SC", SimSun, Georgia, serif;
+    --font-system:
+      system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei UI",
+      "Microsoft YaHei", sans-serif;
+    --font-ui: var(--font-system);
+    --font-lyrics: var(--font-ui);
 
     /* Hot-search heat scale — warm → cool, desaturated for both themes */
     --heat-1: 350 52% 46%;
@@ -128,8 +131,8 @@
     margin: 0;
     overflow: hidden;
     background: transparent !important;
-    /* Bundled serifs everywhere — Source Serif 4 (Latin) + Noto Serif SC (CJK) */
-    font-family: var(--font-lyrics);
+    /* UI chrome follows the device-local font prefs (--font-ui). */
+    font-family: var(--font-ui);
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
@@ -1331,6 +1334,12 @@ html[data-mini-peek="true"] .app-shell > * {
     animation: iconFontIncrease 360ms ease;
   }
   .icon-hover-font-decrease:hover svg {
+    animation: iconFontDecrease 360ms ease;
+  }
+  .icon-hover-offset-faster:hover svg {
+    animation: iconFontIncrease 360ms ease;
+  }
+  .icon-hover-offset-slower:hover svg {
     animation: iconFontDecrease 360ms ease;
   }
 

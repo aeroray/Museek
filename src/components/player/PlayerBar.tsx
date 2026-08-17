@@ -14,6 +14,7 @@ import { Controls } from "./Controls";
 import { ProgressSlider } from "./ProgressSlider";
 import { VolumeControl } from "./VolumeControl";
 import { Button } from "@/components/ui/button";
+import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,10 +84,10 @@ export function PlayerBar() {
         {/* Left: Song info */}
         <div className="flex items-center gap-3.5 w-72 shrink-0">
           {coverSrc ? (
+            <ShortcutTooltip label={t("player.lyrics")} action="lyrics">
             <button
               type="button"
               onClick={() => !loading && setShowLyrics(true)}
-              title={t("player.lyrics")}
               disabled={loading}
               // Outer owns shadow + scale; inner clips overlay so it never paints past rounded corners.
               className="group relative h-12 w-12 shrink-0 transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.96] disabled:pointer-events-none"
@@ -111,6 +112,7 @@ export function PlayerBar() {
                 )}
               </span>
             </button>
+            </ShortcutTooltip>
           ) : (
             <div className="relative h-12 w-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-[var(--shadow-border)]">
               {loading ? (
@@ -187,44 +189,49 @@ export function PlayerBar() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-9 w-9 shrink-0 icon-hover-mic",
-              showLyrics && "text-primary",
-            )}
-            onClick={() => setShowLyrics(!showLyrics)}
-            disabled={!currentSong}
-            title={t("player.lyrics")}
-          >
-            <MicVocal size={16} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-9 w-9 shrink-0 icon-hover-captions",
-              desktopLyricsVisible && "text-primary",
-            )}
-            onClick={() =>
-              void (desktopLyricsVisible
-                ? hideDesktopLyrics()
-                : openDesktopLyrics())
-            }
-            disabled={desktopLyricsControlsDisabled}
-            title={t(
+          <ShortcutTooltip label={t("player.lyrics")} action="lyrics">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-9 w-9 shrink-0 icon-hover-mic",
+                showLyrics && "text-primary",
+              )}
+              onClick={() => setShowLyrics(!showLyrics)}
+              disabled={!currentSong}
+            >
+              <MicVocal size={16} />
+            </Button>
+          </ShortcutTooltip>
+          <ShortcutTooltip
+            label={t(
               desktopLyricsVisible
                 ? "player.desktopLyricsClose"
                 : "player.desktopLyrics",
             )}
+            action="desktopLyrics"
           >
-            {desktopLyricsVisible ? (
-              <CaptionsOff size={16} />
-            ) : (
-              <Captions size={16} />
-            )}
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-9 w-9 shrink-0 icon-hover-captions",
+                desktopLyricsVisible && "text-primary",
+              )}
+              onClick={() =>
+                void (desktopLyricsVisible
+                  ? hideDesktopLyrics()
+                  : openDesktopLyrics())
+              }
+              disabled={desktopLyricsControlsDisabled}
+            >
+              {desktopLyricsVisible ? (
+                <CaptionsOff size={16} />
+              ) : (
+                <Captions size={16} />
+              )}
+            </Button>
+          </ShortcutTooltip>
           <Button
             variant="ghost"
             size="icon"
@@ -238,16 +245,17 @@ export function PlayerBar() {
           >
             <ListMusic size={16} />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 shrink-0 icon-hover-pip"
-            onClick={() => void enterMiniPlayer()}
-            disabled={!currentSong}
-            title={t("player.miniMode")}
-          >
-            <PictureInPicture2 size={16} />
-          </Button>
+          <ShortcutTooltip label={t("player.miniMode")} action="mini">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 icon-hover-pip"
+              onClick={() => void enterMiniPlayer()}
+              disabled={!currentSong}
+            >
+              <PictureInPicture2 size={16} />
+            </Button>
+          </ShortcutTooltip>
         </div>
       </div>
     </footer>

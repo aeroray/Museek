@@ -2,7 +2,9 @@ import { Sun, Moon, Monitor, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
+import { FontFamilyPicker } from "@/components/settings/FontFamilyPicker"
 import { useThemeStore, PALETTES, type ThemeMode } from "@/stores/themeStore"
+import { useFontStore } from "@/stores/fontStore"
 import { useLangStore, useT, type Lang } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -20,8 +22,18 @@ const LANGS: { id: Lang; labelKey: string; glyph: string }[] = [
 
 export function ThemeSettings() {
   const { mode, palette, setMode, setPalette } = useThemeStore()
+  const {
+    ui,
+    desktopLyrics,
+    families,
+    setUiMode,
+    setUiFamily,
+    setDesktopLyricsMode,
+    setDesktopLyricsFamily,
+  } = useFontStore()
   const { lang, setLang } = useLangStore()
   const t = useT()
+  const lyricsFollowApp = desktopLyrics.mode !== "custom"
 
   return (
     <ScrollArea className="h-full">
@@ -92,6 +104,33 @@ export function ThemeSettings() {
                 )
               })}
             </div>
+          </SettingRow>
+        </SettingsCard>
+
+        <SettingsCard className="mt-3">
+          <SettingRow title={t("theme.fontUiTitle")} desc={t("theme.fontUiDesc")}>
+            <FontFamilyPicker
+              value={ui.family}
+              families={families}
+              extraLabel={t("theme.fontSystem")}
+              extraSelected={ui.mode === "system"}
+              onSelectExtra={() => setUiMode("system")}
+              onChange={setUiFamily}
+            />
+          </SettingRow>
+
+          <SettingRow
+            title={t("theme.fontLyricsTitle")}
+            desc={t("theme.fontLyricsDesc")}
+          >
+            <FontFamilyPicker
+              value={desktopLyrics.family}
+              families={families}
+              extraLabel={t("theme.fontLyricsFollow")}
+              extraSelected={lyricsFollowApp}
+              onSelectExtra={() => setDesktopLyricsMode("follow-app")}
+              onChange={setDesktopLyricsFamily}
+            />
           </SettingRow>
         </SettingsCard>
       </div>

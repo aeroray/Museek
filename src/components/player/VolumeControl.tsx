@@ -1,10 +1,13 @@
 import { Volume, Volume1, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
 import { Slider } from "@/components/ui/slider"
 import { usePlayerStore } from "@/stores/playerStore"
+import { useT } from "@/lib/i18n"
 
 export function VolumeControl() {
   const { volume, muted, setVolume, setMuted } = usePlayerStore()
+  const t = useT()
 
   const pct = Math.round((muted ? 0 : volume) * 100)
 
@@ -13,11 +16,16 @@ export function VolumeControl() {
 
   return (
     <div className="flex items-center gap-2">
-      <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setMuted(!muted)}>
-        <span key={level} className="icon-pop-in">
-          <VolumeIcon size={16} />
-        </span>
-      </Button>
+      <ShortcutTooltip
+        label={t(muted ? "player.unmute" : "player.mute")}
+        action="mute"
+      >
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setMuted(!muted)}>
+          <span key={level} className="icon-pop-in">
+            <VolumeIcon size={16} />
+          </span>
+        </Button>
+      </ShortcutTooltip>
       <div className="group relative flex items-center">
         {/* value bubble on hover */}
         <span className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 rounded bg-popover px-1.5 py-0.5 text-xs font-medium text-popover-foreground shadow border opacity-0 transition-opacity group-hover:opacity-100 tabular-nums">

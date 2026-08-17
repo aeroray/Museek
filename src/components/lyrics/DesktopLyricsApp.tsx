@@ -13,6 +13,7 @@ import {
   type Monitor,
 } from "@tauri-apps/api/window";
 import { Lock, LockOpen, X } from "lucide-react";
+import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip";
 import { applyLanguageSnapshot, useT } from "@/lib/i18n";
 import { KaraokeText } from "./KaraokeText";
 import { LyricTransition } from "./LyricTransition";
@@ -24,6 +25,8 @@ import {
 import { isMacOs } from "@/lib/os";
 import { findActiveLyricIndex } from "@/lib/lyrics";
 import { applyThemeSnapshot } from "@/stores/themeStore";
+import { applyFontStacks } from "@/lib/uiFonts";
+import { DEFAULT_SHORTCUTS, formatShortcut } from "@/lib/shortcutKeys";
 import {
   DEFAULT_FONT_SCALE,
   FONT_MAX,
@@ -85,6 +88,12 @@ export function DesktopLyricsApp() {
   const [interactionMode, setInteractionMode] =
     useState<DesktopLyricsInteractionMode>("interactive");
   const [capsuleVisible, setCapsuleVisible] = useState(true);
+  const [lockShortcut, setLockShortcut] = useState(() =>
+    formatShortcut(DEFAULT_SHORTCUTS.desktopLyricsLock),
+  );
+  const [hideShortcut, setHideShortcut] = useState(() =>
+    formatShortcut(DEFAULT_SHORTCUTS.desktopLyrics),
+  );
   const [fontScale, setFontScale] = useState(() =>
     readLyricFontScale(DESKTOP_FONT_POLICY),
   );
@@ -164,7 +173,7 @@ export function DesktopLyricsApp() {
             ),
             listen<number>(DESKTOP_LYRICS_TIME_EVENT, (event) => {
               if (Number.isFinite(event.payload)) {
-                setCurrentTime(Math.max(0, event.payload));
+                setCurrentTime(event.payload);
               }
             }),
             listen<DesktopLyricsAppearanceSnapshot>(
@@ -175,7 +184,16 @@ export function DesktopLyricsApp() {
                   event.payload.palette,
                 );
                 applyLanguageSnapshot(event.payload.lang);
+                if (event.payload.fontUi && event.payload.fontLyrics) {
+                  applyFontStacks(event.payload.fontUi, event.payload.fontLyrics);
+                }
                 setCapsuleVisible(event.payload.capsuleVisible !== false);
+                if (event.payload.lockShortcut) {
+                  setLockShortcut(event.payload.lockShortcut);
+                }
+                if (event.payload.hideShortcut) {
+                  setHideShortcut(event.payload.hideShortcut);
+                }
               },
             ),
             listen<DesktopLyricsInteractionMode>(
@@ -569,41 +587,45 @@ export function DesktopLyricsApp() {
                 role="toolbar"
                 aria-label={t("desktopLyrics.controls")}
               >
-                <button
-                  type="button"
-                  className="desktop-lyrics-mode"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={toggleInteractionMode}
-                  aria-pressed={interactionMode === "locked"}
-                  aria-label={t(
+                <ShortcutTooltip
+                  label={t(
                     interactionMode === "interactive"
                       ? "desktopLyrics.lock"
                       : "desktopLyrics.unlock",
                   )}
-                  tabIndex={actionTabIndex}
-                  title={t(
-                    interactionMode === "interactive"
-                      ? "desktopLyrics.lock"
-                      : "desktopLyrics.unlock",
-                  )}
+                  action="desktopLyricsLock"
+                  combo={lockShortcut}
                 >
-                  {interactionMode === "interactive" ? (
-                    <Lock size={14} strokeWidth={1.8} />
-                  ) : (
-                    <LockOpen size={14} strokeWidth={1.8} />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="desktop-lyrics-close"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={close}
-                  aria-label={t("desktopLyrics.close")}
-                  tabIndex={actionTabIndex}
-                  title={t("desktopLyrics.close")}
+                  <button
+                    type="button"
+                    className="desktop-lyrics-mode"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={toggleInteractionMode}
+                    aria-pressed={interactionMode === "locked"}
+                    tabIndex={actionTabIndex}
+                  >
+                    {interactionMode === "interactive" ? (
+                      <Lock size={14} strokeWidth={1.8} />
+                    ) : (
+                      <LockOpen size={14} strokeWidth={1.8} />
+                    )}
+                  </button>
+                </ShortcutTooltip>
+                <ShortcutTooltip
+                  label={t("desktopLyrics.close")}
+                  action="desktopLyrics"
+                  combo={hideShortcut}
                 >
-                  <X size={15} strokeWidth={1.8} />
-                </button>
+                  <button
+                    type="button"
+                    className="desktop-lyrics-close"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={close}
+                    tabIndex={actionTabIndex}
+                  >
+                    <X size={15} strokeWidth={1.8} />
+                  </button>
+                </ShortcutTooltip>
               </div>
               <div
                 ref={lyricShellRef}

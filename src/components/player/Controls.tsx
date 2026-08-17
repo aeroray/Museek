@@ -1,5 +1,6 @@
 import { SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Loader2, Heart, ListOrdered } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
 import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useT } from "@/lib/i18n"
@@ -57,59 +58,68 @@ export function Controls() {
         </span>
       </Button>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 icon-hover-skip-prev"
-        onClick={prev}
-        disabled={!canPlay || loading}
-      >
-        <SkipBack size={18} />
-      </Button>
+      <ShortcutTooltip label={t("player.prev")} action="prev">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 icon-hover-skip-prev"
+          onClick={prev}
+          disabled={!canPlay || loading}
+        >
+          <SkipBack size={18} />
+        </Button>
+      </ShortcutTooltip>
 
-      <Button
-        variant="default"
-        size="icon"
-        className="h-11 w-11 rounded-full shadow-[var(--shadow-elevated)] hover:scale-[1.04] transition-transform duration-200"
-        onClick={togglePlay}
-        disabled={!canPlay || loading}
+      <ShortcutTooltip
+        label={t(isPlaying ? "player.pause" : "player.play")}
+        action="playPause"
       >
-        {loading ? (
-          <Loader2 size={18} className="animate-spin" />
-        ) : (
-          <span className="relative block size-[19px]">
-            <span
-              className={cn(
-                "icon-swap",
-                isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
-              )}
-              aria-hidden={!isPlaying}
-            >
-              <Pause size={19} fill="currentColor" strokeWidth={0} />
+        <Button
+          variant="default"
+          size="icon"
+          className="h-11 w-11 rounded-full shadow-[var(--shadow-elevated)] hover:scale-[1.04] transition-transform duration-200"
+          onClick={togglePlay}
+          disabled={!canPlay || loading}
+        >
+          {loading ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <span className="relative block size-[19px]">
+              <span
+                className={cn(
+                  "icon-swap",
+                  isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
+                )}
+                aria-hidden={!isPlaying}
+              >
+                <Pause size={19} fill="currentColor" strokeWidth={0} />
+              </span>
+              <span
+                className={cn(
+                  "icon-swap",
+                  !isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
+                )}
+                aria-hidden={isPlaying}
+              >
+                {/* Optical shift: play triangles read left-heavy when geometrically centered. */}
+                <Play size={19} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+              </span>
             </span>
-            <span
-              className={cn(
-                "icon-swap",
-                !isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
-              )}
-              aria-hidden={isPlaying}
-            >
-              {/* Optical shift: play triangles read left-heavy when geometrically centered. */}
-              <Play size={19} fill="currentColor" strokeWidth={0} className="ml-0.5" />
-            </span>
-          </span>
-        )}
-      </Button>
+          )}
+        </Button>
+      </ShortcutTooltip>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 icon-hover-skip-next"
-        onClick={next}
-        disabled={!canPlay || loading}
-      >
-        <SkipForward size={18} />
-      </Button>
+      <ShortcutTooltip label={t("player.next")} action="next">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 icon-hover-skip-next"
+          onClick={next}
+          disabled={!canPlay || loading}
+        >
+          <SkipForward size={18} />
+        </Button>
+      </ShortcutTooltip>
 
       <Button
         variant="ghost"

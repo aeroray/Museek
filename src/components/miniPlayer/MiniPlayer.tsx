@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
 import {
   exitMiniPlayer,
   notifyMiniPointerEnter,
@@ -297,42 +298,51 @@ export function MiniPlayer() {
               <ModeIcon playMode={playMode} />
             </span>
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground icon-hover-skip-prev"
-            disabled={!canPlay || playBusy}
-            onClick={() => void prev()}
+          <ShortcutTooltip label={t("player.prev")} action="prev">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground icon-hover-skip-prev"
+              disabled={!canPlay || playBusy}
+              onClick={() => void prev()}
+            >
+              <SkipBack size={15} />
+            </Button>
+          </ShortcutTooltip>
+          <ShortcutTooltip
+            label={t(isPlaying ? "player.pause" : "player.play")}
+            action="playPause"
           >
-            <SkipBack size={15} />
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="icon"
-            className="h-9 w-9 rounded-full shadow-[var(--shadow-elevated)]"
-            disabled={!canPlay || playBusy}
-            onClick={() => togglePlay()}
-          >
-            {playBusy ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : isPlaying ? (
-              <Pause size={15} fill="currentColor" strokeWidth={0} />
-            ) : (
-              <Play size={15} fill="currentColor" strokeWidth={0} className="ml-0.5" />
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground icon-hover-skip-next"
-            disabled={!canPlay || playBusy}
-            onClick={() => void next()}
-          >
-            <SkipForward size={15} />
-          </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="icon"
+              className="h-9 w-9 rounded-full shadow-[var(--shadow-elevated)]"
+              disabled={!canPlay || playBusy}
+              onClick={() => togglePlay()}
+            >
+              {playBusy ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : isPlaying ? (
+                <Pause size={15} fill="currentColor" strokeWidth={0} />
+              ) : (
+                <Play size={15} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+              )}
+            </Button>
+          </ShortcutTooltip>
+          <ShortcutTooltip label={t("player.next")} action="next">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground icon-hover-skip-next"
+              disabled={!canPlay || playBusy}
+              onClick={() => void next()}
+            >
+              <SkipForward size={15} />
+            </Button>
+          </ShortcutTooltip>
           <Button
             type="button"
             variant="ghost"
@@ -366,16 +376,17 @@ export function MiniPlayer() {
           >
             <ListMusic size={14} />
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground icon-hover-maximize"
-            title={t("player.exitMini")}
-            onClick={() => void exitMiniPlayer()}
-          >
-            <Expand size={14} />
-          </Button>
+          <ShortcutTooltip label={t("player.exitMini")} action="mini">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground icon-hover-maximize"
+              onClick={() => void exitMiniPlayer()}
+            >
+              <Expand size={14} />
+            </Button>
+          </ShortcutTooltip>
         </div>
       </div>
 

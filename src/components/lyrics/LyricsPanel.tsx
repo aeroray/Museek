@@ -7,8 +7,8 @@ import {
 } from "react";
 import {
   X,
-  AArrowUp,
-  AArrowDown,
+  ChevronsUp,
+  ChevronsDown,
   Loader2,
   Music,
   Captions,
@@ -18,6 +18,10 @@ import {
   ScanEye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  HintTooltip,
+  ShortcutTooltip,
+} from "@/components/ui/shortcut-tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Controls } from "@/components/player/Controls";
 import { CoverImage } from "@/components/common/CoverImage";
@@ -41,7 +45,15 @@ import {
 } from "@/lib/lyrics";
 import { useT } from "@/lib/i18n";
 import { isMacOs } from "@/lib/os";
-import { getPlaybackTime, usePlaybackLyricIndex } from "@/lib/playback/clock";
+import { getLyricTime, usePlaybackLyricIndex } from "@/lib/playback/clock";
+import {
+  LYRIC_OFFSET_STEP,
+  bumpLyricOffset,
+  canBumpLyricOffset,
+  formatLyricOffset,
+  lyricSeekTime,
+  useLyricOffset,
+} from "@/lib/lyrics/offset";
 import { cn } from "@/lib/utils";
 import { hasKaraokeTiming, PlaybackKaraokeText } from "./KaraokeText";
 
@@ -59,6 +71,7 @@ export function LyricsPanel() {
   const currentSong = usePlayerStore((s) => s.currentSong);
   const lyricLines = usePlayerStore((s) => s.lyricLines);
   const currentLyricIndex = usePlaybackLyricIndex(lyricLines);
+  const lyricOffset = useLyricOffset();
   const showLyrics = usePlayerStore((s) => s.showLyrics);
   const lyricsLoading = usePlayerStore((s) => s.lyricsLoading);
   const currentPicUrl = usePlayerStore((s) => s.currentPicUrl);
@@ -128,7 +141,7 @@ export function LyricsPanel() {
 
   const centerActiveLine = useCallback((behavior: ScrollBehavior) => {
     const state = usePlayerStore.getState();
-    const idx = findActiveLyricIndex(state.lyricLines, getPlaybackTime());
+    const idx = findActiveLyricIndex(state.lyricLines, getLyricTime());
     const line = lineRefs.current[idx];
     const root = scrollRef.current;
     if (idx < 0 || !line || !root) return;
@@ -228,10 +241,10 @@ export function LyricsPanel() {
       +(fontScaleRef.current + direction * FONT_STEP * steps).toFixed(2),
     );
   };
-  const dec = () =>
-    setScale(Math.max(FONT_MIN, +(fontScale - FONT_STEP).toFixed(2)));
-  const inc = () =>
-    setScale(Math.min(FONT_MAX, +(fontScale + FONT_STEP).toFixed(2)));
+  const nudgeOffset = (delta: number) => {
+    if (!currentSong) return;
+    void bumpLyricOffset(currentSong, delta);
+  };
   const showBlur = !!thumbSrc;
 
   const coverArt = (
@@ -343,26 +356,36 @@ export function LyricsPanel() {
           </Button>
         )}
         <div className="relative flex flex-col items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-increase"
-            onClick={inc}
-            disabled={fontScale >= FONT_MAX}
-            title={t("lyrics.fontIncrease", { shortcut: fontShortcut })}
+          <HintTooltip
+            label={t("lyrics.offsetFaster")}
+            hint={formatLyricOffset(lyricOffset)}
+            side="left"
           >
-            <AArrowUp size={20} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-font-decrease"
-            onClick={dec}
-            disabled={fontScale <= FONT_MIN}
-            title={t("lyrics.fontDecrease", { shortcut: fontShortcut })}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-offset-faster"
+              onClick={() => nudgeOffset(LYRIC_OFFSET_STEP)}
+              disabled={!currentSong || !canBumpLyricOffset(LYRIC_OFFSET_STEP)}
+            >
+              <ChevronsUp size={20} />
+            </Button>
+          </HintTooltip>
+          <HintTooltip
+            label={t("lyrics.offsetSlower")}
+            hint={formatLyricOffset(lyricOffset)}
+            side="left"
           >
-            <AArrowDown size={20} />
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-offset-slower"
+              onClick={() => nudgeOffset(-LYRIC_OFFSET_STEP)}
+              disabled={!currentSong || !canBumpLyricOffset(-LYRIC_OFFSET_STEP)}
+            >
+              <ChevronsDown size={20} />
+            </Button>
+          </HintTooltip>
         </div>
         <DownloadSongButton
           song={currentSong}
@@ -370,33 +393,38 @@ export function LyricsPanel() {
           side="left"
           align="center"
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-9 w-9 icon-hover-captions",
-            desktopLyricsVisible
-              ? "text-primary"
-              : "text-muted-foreground/55 hover:text-muted-foreground",
-          )}
-          onClick={() =>
-            void (desktopLyricsVisible
-              ? hideDesktopLyrics()
-              : openDesktopLyrics())
-          }
-          disabled={desktopLyricsControlsDisabled}
-          title={t(
+        <ShortcutTooltip
+          label={t(
             desktopLyricsVisible
               ? "player.desktopLyricsClose"
               : "player.desktopLyrics",
           )}
+          action="desktopLyrics"
+          side="left"
         >
-          {desktopLyricsVisible ? (
-            <CaptionsOff size={16} />
-          ) : (
-            <Captions size={16} />
-          )}
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-9 w-9 icon-hover-captions",
+              desktopLyricsVisible
+                ? "text-primary"
+                : "text-muted-foreground/55 hover:text-muted-foreground",
+            )}
+            onClick={() =>
+              void (desktopLyricsVisible
+                ? hideDesktopLyrics()
+                : openDesktopLyrics())
+            }
+            disabled={desktopLyricsControlsDisabled}
+          >
+            {desktopLyricsVisible ? (
+              <CaptionsOff size={16} />
+            ) : (
+              <Captions size={16} />
+            )}
+          </Button>
+        </ShortcutTooltip>
       </div>
 
       <div className="relative z-10 flex h-full min-h-0">
@@ -482,7 +510,7 @@ export function LyricsPanel() {
                         ref={(el) => {
                           lineRefs.current[i] = el;
                         }}
-                        onClick={() => seek(line.time)}
+                        onClick={() => seek(lyricSeekTime(line.time))}
                         className={cn(
                           "py-2.5 cursor-pointer transition-[color,font-size] duration-300 ease-out",
                           active

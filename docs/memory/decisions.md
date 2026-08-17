@@ -1,5 +1,37 @@
 # Confirmed Decisions
 
+## 2026-08-17 - Device-local UI fonts, system default
+
+Decision:
+Default the app and desktop lyrics to the OS UI font stack. Let users pick installed families; desktop lyrics follows the app font unless overridden. Store choices in device-local fonts.json. Do not bundle webfonts or sync family names.
+
+Reason:
+Bundled Noto Serif SC added ~4.5 MB, and font names are not portable across Windows and macOS.
+
+## 2026-08-17 - Publish SMTC playback timeline
+
+Decision:
+Keep native souvlaki SMTC as the only media-session owner, and publish duration plus throttled audio-clock position (not lyric offset) so other local lyrics apps can follow Museek.
+
+Reason:
+GSMTC consumers need EndTime and Position; a metadata-only card cannot sync lyrics.
+
+## 2026-08-17 - Per-song lyric timeline offset in local cache
+
+Decision:
+Store lyric delay/advance as a per-song cache file (0.5s steps, ±10s). Apply it on the lyric clock only. Do not sync it; clearing the media cache drops it.
+
+Reason:
+Some LRC/YRC timings drift from the audio; a local nudge is enough, and it should die with that song's cache.
+
+## 2026-08-17 - Show live shortcut hints on matching controls
+
+Decision:
+Hover tooltips on playback controls read the current synced shortcut map (formatted via `formatShortcut`). Do not hardcode accelerators in button titles.
+
+Reason:
+Users forget global hotkeys; the binding can change in Settings → Shortcuts.
+
 ## 2026-08-17 - Reapply macOS traffic lights after sleep
 
 Decision:

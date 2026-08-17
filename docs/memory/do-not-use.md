@@ -40,5 +40,17 @@ Do not store `ProtocolObject<dyn NSObjectProtocol>` in `app.manage()`. It is !Se
 
 Do not read `NSWorkspaceDidWakeNotification` (and similar `extern static`s) from safe Rust. rustc reports E0133. Use `ns_string!("NSWorkspaceDidWakeNotification")` with the Apple constant name.
 
+## Synced lyric timeline offsets
+
+Do not put per-song lyric delay/advance in settings.json or config sync. Keep it in the on-disk media cache so a full cache clear removes it.
+
+## Synced UI font families
+
+Do not put UI or desktop-lyrics font family names in settings.json or config sync. Windows and macOS do not share the same family names; keep them in device-local fonts.json.
+
+## Bundled CJK webfonts for UI chrome
+
+Do not ship Noto Serif SC (or similar CJK webfonts) as the default UI face. Follow the system font stack, and let users pick from fonts already installed on the device.
+
 
 

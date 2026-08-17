@@ -14,6 +14,7 @@ import {
 import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { useSettingsStore, CACHE_LIMITS_MB } from "@/stores/settingsStore"
 import { getCacheBytes, clearCache, enforceLimit, formatBytes } from "@/lib/mediaCache"
+import { resetLyricOffset } from "@/lib/lyrics/offset"
 import { useT } from "@/lib/i18n"
 
 function limitLabel(mb: number): string {
@@ -34,6 +35,7 @@ export function CacheSettings() {
   const handleClearCache = async () => {
     setClearing(true)
     await clearCache()
+    resetLyricOffset()
     setCacheSize(0)
     setClearing(false)
   }

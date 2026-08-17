@@ -4,9 +4,10 @@ import { LYRIC_FONT_SCALE_KEY } from "@/lib/lyrics/fontScale";
 // Import/export of all user config as one JSON file, so it can be synced across
 // devices. Covers the db.ts JSON files (settings, sources, favorites, history)
 // plus the direct-localStorage prefs (language, theme, sidebar, lyric font,
-// top-bar lyrics). Deliberately excludes the on-disk audio/lyric cache,
+// top-bar lyrics). Deliberately excludes the on-disk audio/lyric cache
+// (including per-song lyric timeline offsets),
 // downloaded files, localMusic.json, downloads.json, player.json (volume/
-// mute), playbackSession.json (queue / now-playing), sourceProbe.json (source
+// mute), fonts.json (UI / desktop-lyrics families), playbackSession.json (queue / now-playing), sourceProbe.json (source
 // health-check results), miniPlayer.json (mini-bar
 // position), desktopLyrics.json, desktopLyricsGeometry.json, and
 // museek.whatsNew.seenVersion / AppData whats-new-*.json — those are device-local.

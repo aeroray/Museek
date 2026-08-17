@@ -1,4 +1,4 @@
-import { usePlaybackTime } from "@/lib/playback/clock";
+import { useLyricTime } from "@/lib/playback/clock";
 import type { LyricLine } from "@/types/music";
 import type { CSSProperties, PointerEventHandler } from "react";
 
@@ -82,6 +82,6 @@ export function KaraokeText({
 export function PlaybackKaraokeText(
   props: Omit<KaraokeTextProps, "currentTime">,
 ) {
-  const currentTime = usePlaybackTime();
+  const currentTime = useLyricTime();
   return <KaraokeText {...props} currentTime={currentTime} />;
 }
