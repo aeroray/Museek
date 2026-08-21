@@ -1,5 +1,13 @@
 # Confirmed Decisions
 
+## 2026-08-21 - Desktop lyrics two-line and custom color
+
+Decision:
+Optional two-line desktop lyrics: translation when present, otherwise the next sung line, smaller than the current line. Optional `#rrggbb` color in synced settings; null follows `--primary`. Use the OS color picker, not a bundled color-picker kit.
+
+Reason:
+Users want upcoming/translated context on the overlay, and a color that stays readable on their wallpaper independent of the app theme.
+
 ## macOS Dock tile playback progress
 
 Decision:

@@ -469,6 +469,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "lyricsSettings.autoLockTitle": "打开桌面歌词后自动锁定",
     "lyricsSettings.autoLockDesc":
       "打开后桌面歌词不响应鼠标；可用快捷键快速解锁。",
+    "lyricsSettings.twoLinesTitle": "桌面歌词显示双行",
+    "lyricsSettings.twoLinesDesc":
+      "有翻译时第二行显示译文；否则显示下一句。",
+    "lyricsSettings.colorTitle": "桌面歌词颜色",
+    "lyricsSettings.colorDesc": "默认跟随主题色，也可点色块自选。",
+    "lyricsSettings.colorTheme": "跟随主题",
+    "lyricsSettings.colorPick": "选择歌词颜色",
     "playback.openAtLoginTitle": "开机自启动",
     "playback.openAtLoginDesc": "登录系统后自动打开拾音（默认关闭）。",
     "playback.startHiddenToTrayTitle": "静默启动",
@@ -504,7 +511,12 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.mini": "迷你播放（开关）",
     "shortcuts.recording": "按下快捷键…",
     "shortcuts.invalid": "请使用 Ctrl、Alt、Shift（Mac 上 Ctrl 为 ⌘），或 F1–F12。",
-    "shortcuts.conflict": "已用于「{action}」",
+    "shortcuts.conflict": "{combo} 已被本软件注册为「{action}」，请换一组",
+    "shortcuts.saved": "已设为 {combo}",
+    "shortcuts.osBusy": "无法注册 {combo}：已被系统或其他程序占用",
+    "shortcuts.osFailed": "无法注册 {combo}",
+    "shortcuts.winHeld": "不能使用 Win 键，请改用 Ctrl、Alt、Shift。",
+    "shortcuts.macCtrlHeld": "Mac 上请用 ⌘，不要用 Control。",
     "shortcuts.reset": "恢复默认",
     "shortcuts.fontHint": "歌词页内仍可用 Ctrl/⌘ + 滚轮调节字号（仅当前窗口）。",
     "shortcuts.registerFailed": "系统无法注册快捷键 {combo}",
@@ -1131,6 +1143,14 @@ const dict: Record<Lang, Record<string, string>> = {
     "lyricsSettings.autoLockTitle": "Auto-lock desktop lyrics on open",
     "lyricsSettings.autoLockDesc":
       "Open desktop lyrics without mouse interaction; use the shortcut to unlock.",
+    "lyricsSettings.twoLinesTitle": "Two-line desktop lyrics",
+    "lyricsSettings.twoLinesDesc":
+      "Show the translation on the second line when available; otherwise the upcoming line.",
+    "lyricsSettings.colorTitle": "Desktop lyrics color",
+    "lyricsSettings.colorDesc":
+      "Follows the theme color by default, or pick your own.",
+    "lyricsSettings.colorTheme": "Match theme",
+    "lyricsSettings.colorPick": "Choose lyrics color",
     "playback.openAtLoginTitle": "Open at login",
     "playback.openAtLoginDesc":
       "Launch Museek when you sign in to your computer (off by default).",
@@ -1172,7 +1192,14 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.recording": "Press a shortcut…",
     "shortcuts.invalid":
       "Use Ctrl, Alt, or Shift (⌘ on Mac), or F1–F12.",
-    "shortcuts.conflict": "Already used by “{action}”",
+    "shortcuts.conflict":
+      "{combo} is already registered by Museek for “{action}”. Choose another.",
+    "shortcuts.saved": "Saved as {combo}",
+    "shortcuts.osBusy":
+      "Could not register {combo}: already taken by the OS or another app",
+    "shortcuts.osFailed": "Could not register {combo}",
+    "shortcuts.winHeld": "The Windows key cannot be used. Use Ctrl, Alt, or Shift.",
+    "shortcuts.macCtrlHeld": "On Mac use ⌘, not Control.",
     "shortcuts.reset": "Restore defaults",
     "shortcuts.fontHint":
       "In the lyrics view, Ctrl/⌘ + scroll still changes font size (this window only).",

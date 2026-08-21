@@ -22,6 +22,8 @@ export interface DesktopLyricsAppearanceSnapshot {
   themeMode: ThemeMode;
   palette: Palette;
   capsuleVisible: boolean;
+  twoLines: boolean;
+  lyricColor: string | null;
   lockShortcut: string;
   hideShortcut: string;
   fontUi?: string;

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,18 @@ import { useT } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import {
+  formatHeldShortcut,
   formatShortcut,
+  hasForbiddenModifier,
+  isModifierKey,
   isValidGlobalShortcut,
   setShortcutCaptureLock,
   shortcutConflict,
   shortcutFromEvent,
   type ShortcutAction,
 } from "@/lib/shortcutKeys";
+import { formatShortcutOsFailure, probeGlobalShortcut, resumeGlobalShortcuts, suspendGlobalShortcuts } from "@/lib/shortcuts";
+import { isMacOs } from "@/lib/os";
 
 const ACTION_LABEL: Record<ShortcutAction, string> = {
   playPause: "shortcuts.playPause",
@@ -61,7 +66,7 @@ function Keycap({
   onClick?: () => void;
 }) {
   const className = cn(
-    "inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-md border border-border/80 bg-muted px-1.5 text-[11px] font-medium leading-none text-foreground/75",
+    "inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-md border border-border/80 bg-muted px-1.5 text-[11px] font-medium leading-none whitespace-nowrap text-foreground/75",
     onClick && "hover:bg-accent hover:text-foreground",
     active && "border-primary/50 bg-accent text-foreground",
   );
@@ -81,46 +86,117 @@ export function ShortcutsSettings() {
   const setShortcut = useSettingsStore((s) => s.setShortcut);
   const resetShortcuts = useSettingsStore((s) => s.resetShortcuts);
   const [recording, setRecording] = useState<ShortcutAction | null>(null);
+  const [draft, setDraft] = useState("");
+  const shortcutsRef = useRef(shortcuts);
+  const tRef = useRef(t);
+  shortcutsRef.current = shortcuts;
+  tRef.current = t;
 
   useEffect(() => {
-    if (!recording) return;
+    if (!recording) {
+      setDraft("");
+      return;
+    }
+
+    let cancelled = false;
+    let probing = false;
     setShortcutCaptureLock(true);
-    const onKey = (e: KeyboardEvent) => {
+    setDraft("");
+
+    const failConflict = (combo: string, action: ShortcutAction) => {
+      const tr = tRef.current;
+      notify({
+        message: tr("shortcuts.conflict", {
+          combo,
+          action: tr(ACTION_LABEL[action]),
+        }),
+        variant: "error",
+      });
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      setDraft(formatHeldShortcut(e));
       if (e.key === "Escape") {
         setRecording(null);
         return;
       }
-      if (e.key === "Control" || e.key === "Meta" || e.key === "Alt" || e.key === "Shift") {
-        return;
-      }
-      const accel = shortcutFromEvent(e);
-      if (!accel || !isValidGlobalShortcut(accel)) {
-        notify({ message: t("shortcuts.invalid"), variant: "error" });
-        setRecording(null);
-        return;
-      }
-      const conflict = shortcutConflict(shortcuts, recording, accel);
-      if (conflict) {
+      if (isModifierKey(e) || probing) return;
+
+      const tr = tRef.current;
+      const map = shortcutsRef.current;
+
+      if (hasForbiddenModifier(e)) {
         notify({
-          message: t("shortcuts.conflict", { action: t(ACTION_LABEL[conflict]) }),
+          message: tr(isMacOs() ? "shortcuts.macCtrlHeld" : "shortcuts.winHeld"),
           variant: "error",
         });
+        return;
+      }
+
+      const accel = shortcutFromEvent(e);
+      const combo = accel ? formatShortcut(accel) : formatHeldShortcut(e);
+      if (!accel || !isValidGlobalShortcut(accel)) {
+        notify({ message: tr("shortcuts.invalid"), variant: "error" });
+        return;
+      }
+      const conflict = shortcutConflict(map, recording, accel);
+      if (conflict) {
+        failConflict(combo, conflict);
+        return;
+      }
+      if (map[recording] === accel) {
+        notify({ message: tr("shortcuts.saved", { combo }), variant: "success" });
         setRecording(null);
         return;
       }
-      if (!setShortcut(recording, accel)) {
-        notify({ message: t("shortcuts.invalid"), variant: "error" });
-      }
-      setRecording(null);
+
+      probing = true;
+      void (async () => {
+        const probe = await probeGlobalShortcut(accel);
+        if (cancelled) return;
+        if (!probe.ok) {
+          const taken = shortcutConflict(map, recording, accel);
+          if (taken) failConflict(combo, taken);
+          else {
+            notify({
+              message: formatShortcutOsFailure(combo, probe.reason),
+              variant: "error",
+            });
+          }
+          probing = false;
+          return;
+        }
+        if (!setShortcut(recording, accel)) {
+          const taken = shortcutConflict(shortcutsRef.current, recording, accel);
+          if (taken) failConflict(combo, taken);
+          else notify({ message: tr("shortcuts.invalid"), variant: "error" });
+          probing = false;
+          return;
+        }
+        notify({ message: tr("shortcuts.saved", { combo }), variant: "success" });
+        setRecording(null);
+      })();
     };
-    window.addEventListener("keydown", onKey, true);
+    const onKeyUp = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDraft(formatHeldShortcut(e));
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    void suspendGlobalShortcuts();
+
     return () => {
+      cancelled = true;
       setShortcutCaptureLock(false);
-      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      void resumeGlobalShortcuts();
     };
-  }, [recording, shortcuts, setShortcut, t]);
+  }, [recording, setShortcut]);
 
   return (
     <ScrollArea className="h-full">
@@ -164,7 +240,7 @@ export function ShortcutsSettings() {
                         }
                       >
                         {recording === action
-                          ? t("shortcuts.recording")
+                          ? draft || t("shortcuts.recording")
                           : formatShortcut(shortcuts[action])}
                       </Keycap>
                     ))}

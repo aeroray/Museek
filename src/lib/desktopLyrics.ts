@@ -96,6 +96,8 @@ function createAppearanceSnapshot(): DesktopLyricsAppearanceSnapshot {
     themeMode: theme.mode,
     palette: theme.palette,
     capsuleVisible: useSettingsStore.getState().desktopLyricsCapsuleVisible,
+    twoLines: useSettingsStore.getState().desktopLyricsTwoLines,
+    lyricColor: useSettingsStore.getState().desktopLyricsColor,
     lockShortcut: formatShortcut(shortcuts.desktopLyricsLock),
     hideShortcut: formatShortcut(shortcuts.desktopLyrics),
     fontUi: fonts.ui,
@@ -104,7 +106,7 @@ function createAppearanceSnapshot(): DesktopLyricsAppearanceSnapshot {
 }
 
 function appearanceKey(snapshot: DesktopLyricsAppearanceSnapshot): string {
-  return `${snapshot.lang}|${snapshot.themeMode}|${snapshot.palette}|${snapshot.capsuleVisible}|${snapshot.lockShortcut}|${snapshot.hideShortcut}|${snapshot.fontUi ?? ""}|${snapshot.fontLyrics ?? ""}`;
+  return `${snapshot.lang}|${snapshot.themeMode}|${snapshot.palette}|${snapshot.capsuleVisible}|${snapshot.twoLines}|${snapshot.lyricColor ?? ""}|${snapshot.lockShortcut}|${snapshot.hideShortcut}|${snapshot.fontUi ?? ""}|${snapshot.fontLyrics ?? ""}`;
 }
 
 async function ensureInteractionModeLoaded(): Promise<void> {
@@ -249,6 +251,8 @@ export function startDesktopLyricsBridge(): () => void {
     if (
       state.desktopLyricsCapsuleVisible !==
         previous.desktopLyricsCapsuleVisible ||
+      state.desktopLyricsTwoLines !== previous.desktopLyricsTwoLines ||
+      state.desktopLyricsColor !== previous.desktopLyricsColor ||
       state.shortcuts.desktopLyricsLock !==
         previous.shortcuts.desktopLyricsLock ||
       state.shortcuts.desktopLyrics !== previous.shortcuts.desktopLyrics

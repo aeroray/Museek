@@ -324,6 +324,46 @@ export async function resizeDesktopLyricsWindowForFontScale(
   }
 }
 
+export async function nudgeDesktopLyricsHeight(
+  delta: number,
+  visualElement?: HTMLElement | null,
+): Promise<void> {
+  if (!delta) return;
+  try {
+    const window = getCurrentWindow();
+    const [position, size, scaleFactor] = await Promise.all([
+      window.outerPosition(),
+      window.outerSize(),
+      window.scaleFactor(),
+    ]);
+    const scale = scaleFactor || 1;
+    const currentSize = size.toLogical(scale);
+    const height = clamp(
+      Math.round(currentSize.height + delta),
+      MIN_HEIGHT,
+      MAX_HEIGHT,
+    );
+    if (height === currentSize.height) {
+      await clampAndPersistDesktopLyricsGeometry(visualElement);
+      return;
+    }
+    const nextPhysicalSize = new LogicalSize(
+      currentSize.width,
+      height,
+    ).toPhysical(scale);
+    await window.setSize(new LogicalSize(currentSize.width, height));
+    await window.setPosition(
+      new PhysicalPosition(
+        position.x,
+        position.y + Math.round((size.height - nextPhysicalSize.height) / 2),
+      ),
+    );
+    await clampAndPersistDesktopLyricsGeometry(visualElement);
+  } catch {
+    /* Best-effort while the native window is being resized or hidden. */
+  }
+}
+
 export async function applyDesktopLyricsInteractionMode(
   mode: DesktopLyricsInteractionMode,
 ): Promise<void> {

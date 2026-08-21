@@ -267,18 +267,47 @@ export function keyTokenFromEvent(e: KeyboardEvent): string | null {
   return fromCode[e.code] ?? null;
 }
 
+export function isModifierKey(e: KeyboardEvent): boolean {
+  return (
+    e.key === "Control" ||
+    e.key === "Meta" ||
+    e.key === "Alt" ||
+    e.key === "Shift" ||
+    e.key === "OS"
+  );
+}
+
+/** True when Win (Windows) or Control (macOS) is held — outside the shared set. */
+export function hasForbiddenModifier(e: KeyboardEvent): boolean {
+  return isMacOs() ? e.ctrlKey : e.metaKey;
+}
+
 export function shortcutFromEvent(e: KeyboardEvent): string | null {
   const key = keyTokenFromEvent(e);
   if (!key) return null;
+  if (hasForbiddenModifier(e)) return null;
   const mac = isMacOs();
-  // Win (Windows) and Control (macOS) are outside the shared Ctrl/⌘ · Alt/⌥ · Shift set.
-  if (mac ? e.ctrlKey : e.metaKey) return null;
   const parts: string[] = [];
   if (mac ? e.metaKey : e.ctrlKey) parts.push("CommandOrControl");
   if (e.altKey) parts.push("Alt");
   if (e.shiftKey) parts.push("Shift");
   parts.push(key);
   return canonicalizeShortcut(parts.join("+"));
+}
+
+/** Live combo while keys are held, including incomplete modifier-only chords. */
+export function formatHeldShortcut(e: KeyboardEvent): string {
+  const mac = isMacOs();
+  const parts: string[] = [];
+  if (e.ctrlKey) parts.push(mac ? "Ctrl" : "Ctrl/⌘");
+  if (e.metaKey) parts.push(mac ? "⌘" : "Win");
+  if (e.altKey) parts.push("Alt/⌥");
+  if (e.shiftKey) parts.push("Shift");
+  if (!isModifierKey(e)) {
+    const key = keyTokenFromEvent(e);
+    if (key) parts.push(formatKey(key));
+  }
+  return parts.join(" + ");
 }
 
 export function eventMatchesShortcut(e: KeyboardEvent, accel: string): boolean {

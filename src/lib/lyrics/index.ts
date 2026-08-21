@@ -3,7 +3,7 @@
  * Prefer `@/lib/lyrics` over the older `lyric` / `lyrics` split paths.
  */
 export { parseLrc } from "./parser"
-export { findActiveLyricIndex } from "./activeLine"
+export { findActiveLyricIndex, desktopLyricSecondaryText } from "./activeLine"
 export {
   LYRIC_OFFSET_STEP,
   applyLyricOffsetForSong,

@@ -13,6 +13,7 @@ import {
   type ShortcutAction,
   type ShortcutMap,
 } from "@/lib/shortcutKeys";
+import { parseLyricColor } from "@/lib/lyricColor";
 import type { LocalNameMode, OnlineSource, Quality } from "@/types/music";
 
 export type NamingScheme = "singer-name" | "name-singer" | "name";
@@ -63,6 +64,10 @@ interface Persisted {
   autoLockDesktopLyrics: boolean;
   // Keep a readable translucent capsule behind desktop lyrics.
   desktopLyricsCapsuleVisible: boolean;
+  /** Two-line desktop lyrics: translation, or the upcoming line. */
+  desktopLyricsTwoLines: boolean;
+  /** Custom desktop-lyric color (`#rrggbb`), or null to follow the theme. */
+  desktopLyricsColor: string | null;
   // Favorites list view preferences.
   favoritesSort: FavoritesSort;
   favoritesPlatform: FavoritesPlatform;
@@ -108,6 +113,8 @@ interface SettingsState extends Persisted {
   setPreventSleepWhilePlaying: (v: boolean) => void;
   setAutoLockDesktopLyrics: (v: boolean) => void;
   setDesktopLyricsCapsuleVisible: (v: boolean) => void;
+  setDesktopLyricsTwoLines: (v: boolean) => void;
+  setDesktopLyricsColor: (color: string | null) => void;
   setFavoritesSort: (s: FavoritesSort) => void;
   setFavoritesPlatform: (p: FavoritesPlatform) => void;
   setLocalSort: (s: LocalSort) => void;
@@ -144,6 +151,8 @@ const DEFAULTS: Persisted = {
   preventSleepWhilePlaying: true,
   autoLockDesktopLyrics: false,
   desktopLyricsCapsuleVisible: true,
+  desktopLyricsTwoLines: false,
+  desktopLyricsColor: null,
   favoritesSort: "added",
   favoritesPlatform: "all",
   localSort: "added",
@@ -207,6 +216,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       preventSleepWhilePlaying,
       autoLockDesktopLyrics,
       desktopLyricsCapsuleVisible,
+      desktopLyricsTwoLines,
+      desktopLyricsColor,
       favoritesSort,
       favoritesPlatform,
       localSort,
@@ -238,6 +249,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       preventSleepWhilePlaying,
       autoLockDesktopLyrics,
       desktopLyricsCapsuleVisible,
+      desktopLyricsTwoLines,
+      desktopLyricsColor,
       favoritesSort,
       favoritesPlatform,
       localSort,
@@ -316,6 +329,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setDesktopLyricsCapsuleVisible(v) {
       set({ desktopLyricsCapsuleVisible: v });
+      persist();
+    },
+    setDesktopLyricsTwoLines(v) {
+      set({ desktopLyricsTwoLines: v });
+      persist();
+    },
+    setDesktopLyricsColor(color) {
+      set({ desktopLyricsColor: parseLyricColor(color) });
       persist();
     },
     setFavoritesSort(s) {
@@ -473,6 +494,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.desktopLyricsCapsuleVisible === "boolean"
             ? data.desktopLyricsCapsuleVisible
             : DEFAULTS.desktopLyricsCapsuleVisible,
+        desktopLyricsTwoLines:
+          typeof data.desktopLyricsTwoLines === "boolean"
+            ? data.desktopLyricsTwoLines
+            : DEFAULTS.desktopLyricsTwoLines,
+        desktopLyricsColor: parseLyricColor(data.desktopLyricsColor),
         favoritesSort: SORTS.includes(data.favoritesSort as FavoritesSort)
           ? (data.favoritesSort as FavoritesSort)
           : DEFAULTS.favoritesSort,
