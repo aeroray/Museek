@@ -435,6 +435,10 @@
   white-space: nowrap;
 }
 
+.lyrics-scroll [data-radix-scroll-area-viewport] {
+  overflow-anchor: none;
+}
+
 .lyrics-edge-blur {
   position: absolute;
   z-index: 10;
@@ -1375,6 +1379,9 @@ html[data-mini-peek="true"] .app-shell > * {
   }
   .icon-hover-offset-slower:hover svg {
     animation: iconFontDecrease 360ms ease;
+  }
+  .icon-hover-comments:hover svg {
+    animation: iconCaptions 400ms ease;
   }
 
   /* Nested icons (TrackRow / overlays) — animate the icon itself on parent hover */

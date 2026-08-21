@@ -1,5 +1,13 @@
 # Confirmed Decisions
 
+## 2026-08-21 - Song comments on the lyrics page
+
+Decision:
+Read-only song comments for wy/kw/kg/tx/mg via each platform's public comment API (not source scripts). Toggle from the lyrics-page right toolbar. Lyrics-only and comments are exclusive: solo shows only lyrics; opening comments turns solo off. Cover hides in either mode. Keep the comment dock at 22rem. Local files stay empty.
+
+Reason:
+Users asked to read comments for the playing song without leaving the lyrics view or covering the spinning cover.
+
 ## 2026-08-21 - Desktop lyrics two-line and custom color
 
 Decision:

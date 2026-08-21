@@ -690,11 +690,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         isPlaying: false,
         sourceReady: false,
         currentPicUrl: session.currentSong?.meta.picUrl ?? null,
+        lyricLines: [],
+        lyricsLoading: Boolean(session.currentSong),
       });
-      if (
-        session.currentSong?.source === "local" &&
-        session.currentSong.meta.localCoverRel
-      ) {
+      if (session.currentSong) {
+        void get()._loadLyric(session.currentSong);
         void get()._loadPic(session.currentSong);
       }
     },

@@ -16,6 +16,7 @@ import {
   Maximize,
   Minimize,
   ScanEye,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Controls } from "@/components/player/Controls";
 import { CoverImage } from "@/components/common/CoverImage";
 import { SpecularFrame } from "@/components/common/SpecularFrame";
-import { DownloadSongButton } from "@/components/common/DownloadSongButton";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { hiResCover } from "@/lib/cover";
@@ -56,11 +56,13 @@ import {
 } from "@/lib/lyrics/offset";
 import { cn } from "@/lib/utils";
 import { hasKaraokeTiming, PlaybackKaraokeText } from "./KaraokeText";
+import { CommentsPanel } from "./CommentsPanel";
 
 const FONT_MIN = 0.85;
 const FONT_MAX = 2.5;
 const FONT_STEP = 0.15;
 const SLIDE_MS = 320;
+const COVER_MS = 300;
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const FADE =
@@ -91,6 +93,11 @@ export function LyricsPanel() {
   const [entered, setEntered] = useState(false);
   const [immersive, setImmersive] = useState(false);
   const [lyricsOnly, setLyricsOnly] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  /** Cover is hidden in either exclusive mode: lyrics-only or comments. */
+  const hideCover = lyricsOnly || commentsOpen;
+  const pinningLayoutRef = useRef(false);
+  const skipLayoutPinRef = useRef(true);
   const [loadedHeroSrc, setLoadedHeroSrc] = useState<string | null>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -114,6 +121,7 @@ export function LyricsPanel() {
     }
     setEntered(false);
     setImmersive(false);
+    setCommentsOpen(false);
     void exitLyricsFullscreen();
     const timer = window.setTimeout(() => setRendered(false), SLIDE_MS);
     return () => window.clearTimeout(timer);
@@ -156,7 +164,9 @@ export function LyricsPanel() {
   }, []);
 
   useEffect(() => {
-    if (currentLyricIndex >= 0 && entered) centerActiveLine("smooth");
+    if (currentLyricIndex >= 0 && entered) {
+      centerActiveLine(pinningLayoutRef.current ? "auto" : "smooth");
+    }
   }, [currentLyricIndex, centerActiveLine, entered]);
 
   useEffect(() => {
@@ -168,12 +178,40 @@ export function LyricsPanel() {
       return;
     const id = requestAnimationFrame(() => centerActiveLine("auto"));
     return () => cancelAnimationFrame(id);
-  }, [entered, lyricsLoading, lyricLines.length, lyricsOnly, centerActiveLine]);
+  }, [entered, lyricsLoading, lyricLines.length, centerActiveLine]);
+
+  useEffect(() => {
+    if (skipLayoutPinRef.current) {
+      skipLayoutPinRef.current = false;
+      return;
+    }
+    pinningLayoutRef.current = true;
+    const started = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      centerActiveLine("auto");
+      if (now - started < COVER_MS + 40) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      pinningLayoutRef.current = false;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      pinningLayoutRef.current = false;
+    };
+  }, [commentsOpen, lyricsOnly, centerActiveLine]);
 
   useEffect(() => {
     if (!showLyrics) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (commentsOpen) {
+        e.preventDefault();
+        setCommentsOpen(false);
+        return;
+      }
       if (isLyricsFullscreenSession() || immersive) {
         e.preventDefault();
         void (async () => {
@@ -186,7 +224,7 @@ export function LyricsPanel() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showLyrics, setShowLyrics, immersive]);
+  }, [showLyrics, setShowLyrics, immersive, commentsOpen]);
 
   const toggleImmersive = async () => {
     if (!isTauri) return;
@@ -240,6 +278,23 @@ export function LyricsPanel() {
     setScale(
       +(fontScaleRef.current + direction * FONT_STEP * steps).toFixed(2),
     );
+  };
+  const toggleLyricsOnly = () => {
+    if (lyricsOnly) {
+      setLyricsOnly(false);
+      return;
+    }
+    setCommentsOpen(false);
+    setLyricsOnly(true);
+  };
+
+  const toggleComments = () => {
+    if (commentsOpen) {
+      setCommentsOpen(false);
+      return;
+    }
+    setLyricsOnly(false);
+    setCommentsOpen(true);
   };
   const nudgeOffset = (delta: number) => {
     if (!currentSong) return;
@@ -337,7 +392,7 @@ export function LyricsPanel() {
               ? "text-primary"
               : "text-muted-foreground/55 hover:text-muted-foreground",
           )}
-          onClick={() => setLyricsOnly((value) => !value)}
+          onClick={toggleLyricsOnly}
           title={t(lyricsOnly ? "lyrics.exitSolo" : "lyrics.solo")}
           aria-label={t(lyricsOnly ? "lyrics.exitSolo" : "lyrics.solo")}
           aria-pressed={lyricsOnly}
@@ -387,12 +442,23 @@ export function LyricsPanel() {
             </Button>
           </HintTooltip>
         </div>
-        <DownloadSongButton
-          song={currentSong}
-          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
-          side="left"
-          align="center"
-        />
+        <HintTooltip label={t("comments.title")} side="left">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-9 w-9 icon-hover-comments",
+              commentsOpen
+                ? "text-primary"
+                : "text-muted-foreground/55 hover:text-muted-foreground",
+            )}
+            onClick={toggleComments}
+            aria-pressed={commentsOpen}
+            disabled={!currentSong}
+          >
+            <MessageCircle size={16} />
+          </Button>
+        </HintTooltip>
         <ShortcutTooltip
           label={t(
             desktopLyricsVisible
@@ -431,7 +497,7 @@ export function LyricsPanel() {
         <div
           className={cn(
             "flex shrink-0 flex-col items-center justify-center gap-6 transition-[width,opacity,transform,padding] duration-300 ease-out",
-            lyricsOnly
+            hideCover
               ? "pointer-events-none w-0 -translate-x-4 overflow-hidden p-0 opacity-0"
               : "w-2/5 overflow-visible p-12",
           )}
@@ -492,11 +558,11 @@ export function LyricsPanel() {
             </div>
           ) : (
             <>
-              <ScrollArea ref={scrollRef} className="h-full">
+              <ScrollArea ref={scrollRef} className="lyrics-scroll h-full">
                 <div
                   className={cn(
                     "py-[42vh] text-center animate-in fade-in duration-300",
-                    lyricsOnly ? "px-4" : "pl-4 pr-24",
+                    hideCover ? "px-4" : "pl-4 pr-24",
                   )}
                 >
                   <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
@@ -559,6 +625,7 @@ export function LyricsPanel() {
             </>
           )}
         </div>
+        <CommentsPanel song={currentSong} open={commentsOpen} />
       </div>
       <div
         data-tauri-drag-region

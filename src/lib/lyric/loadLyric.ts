@@ -9,17 +9,25 @@ import { sourceRunner } from "@/lib/sourceRunner";
 import { applyKaraokeTiming, parseLyricDuration } from "@/lib/lyrics/timing";
 import type { LyricInfo, LyricLine, MusicInfo } from "@/types/music";
 
-// Memory + in-flight dedupe on top of disk cache — covers browser preview
-// (no disk) and rapid A→B→A / double-play before disk write finishes.
-const lyricCache = createAsyncCache<LyricLine[]>(30 * 60_000, 80);
-const lyricInfoCache = createAsyncCache<LyricInfo | null>(30 * 60_000, 80);
-const LYRIC_CACHE_VERSION = "word-timing-v3";
-
 function hasLyricPayload(
   info: LyricInfo | null | undefined,
 ): info is LyricInfo {
   return Boolean(info?.lyric?.trim() || info?.lxlyric?.trim());
 }
+
+// Memory + in-flight dedupe on top of disk cache — covers browser preview
+// (no disk) and rapid A→B→A / double-play before disk write finishes.
+const lyricCache = createAsyncCache<LyricLine[]>(
+  30 * 60_000,
+  80,
+  (lines) => lines.length > 0,
+);
+const lyricInfoCache = createAsyncCache<LyricInfo | null>(
+  30 * 60_000,
+  80,
+  hasLyricPayload,
+);
+const LYRIC_CACHE_VERSION = "word-timing-v3";
 
 function parseLyricInfo(info: LyricInfo, songDuration: number): LyricLine[] {
   const timedLyric = info.lxlyric?.trim();

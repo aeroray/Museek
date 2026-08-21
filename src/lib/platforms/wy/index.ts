@@ -3,6 +3,7 @@
  * re-export specific ops so existing import paths keep working.
  */
 export { eapi, eapiParams } from "./eapi"
+export { weapi } from "./weapi"
 export { searchWangyi } from "@/lib/search/wy"
 export { wyBoards, getWyBoardSongs } from "@/lib/charts/wy"
 export { getWyHotSearch } from "@/lib/hotSearch/wy"
