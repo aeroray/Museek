@@ -17,6 +17,60 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.5.0": {
+    zh: {
+      sections: [
+        {
+          title: "💬 评论",
+          bullets: [
+            "歌词页可查看网易云、酷我、酷狗、QQ 音乐、咪咕的歌曲评论，支持热评和最新",
+            "打开评论时收起封面；「歌词独享」与评论互斥，不会三列挤在一起",
+          ],
+        },
+        {
+          title: "🎶 歌词",
+          bullets: [
+            "桌面歌词可显示双行：有翻译时显示译文，否则显示下一句",
+            "桌面歌词颜色可跟随主题，也可自选",
+            "重启后会立即请求当前歌曲歌词，不必先点播放",
+          ],
+        },
+        {
+          title: "⌨️ 快捷键",
+          bullets: [
+            "录制快捷键时先注销全局热键，避免系统抢走按键",
+            "组合已被本软件占用时会明确提示",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "💬 Comments",
+          bullets: [
+            "Read song comments from NetEase, KuWo, KuGou, QQ Music, and Migu on the lyrics page, with Hot and Latest",
+            "Opening comments hides the cover; Lyrics only and comments are exclusive so the three columns never crowd",
+          ],
+        },
+        {
+          title: "🎶 Lyrics",
+          bullets: [
+            "Desktop lyrics can show two lines: the translation when present, otherwise the upcoming line",
+            "Desktop lyric color can follow the theme or a color you pick",
+            "Lyrics for the restored song load at launch — no need to press Play first",
+          ],
+        },
+        {
+          title: "⌨️ Shortcuts",
+          bullets: [
+            "Recording a shortcut unregisters global hotkeys so the OS does not swallow the keys",
+            "A clear prompt when the combo is already used by Museek",
+          ],
+        },
+      ],
+    },
+  },
   "3.4.0": {
     zh: {
       sections: [
