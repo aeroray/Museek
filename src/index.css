@@ -356,7 +356,7 @@
   justify-content: center;
   border-radius: 9999px;
   /* Inline styles scale this whitespace with the lyric font size. */
-  padding: 10px 14px 8px;
+  padding: 8px 14px;
   background: transparent;
   box-shadow: 0 0 0 transparent;
   transition:
@@ -475,11 +475,23 @@
   );
 }
 
+.desktop-lyrics-heading .lyric-karaoke-word {
+  /* Karaoke words elsewhere keep 0.3em padding so clip-path can cover
+     Latin descenders. That extra box made the single-line capsule look
+     bottom-heavy, as if a second line were reserved. */
+  padding-bottom: 0;
+}
+
 .desktop-lyrics-heading .lyric-karaoke-word-text {
   opacity: 1;
 }
 
 .desktop-lyrics-heading .lyric-karaoke-word-sung {
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: 1.3em;
   color: var(--desktop-lyric);
   text-shadow:
     0 1px 2px hsl(0 0% 0% / 0.3),

@@ -15,7 +15,7 @@ export interface SourceScript {
   rawScript: string;
   enabled: boolean;
   sources?: Record<string, SourceInfo>;
-  /** Remote URL the script was imported from, used for re-fetching/updating. */
+  /** Import origin: `local:` + path for file imports, or a historical remote URL. */
   url?: string;
 }
 

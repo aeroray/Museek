@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { httpFetch as tauriFetch } from "@/lib/http";
 import { parseScriptMeta } from "@/lib/lxApi";
 import {
   sourceRunner,
@@ -23,7 +22,6 @@ interface SourceState {
     rawScript: string,
     url?: string,
   ) => Promise<"added" | "updated">;
-  importScriptFromUrl: (url: string) => Promise<"added" | "updated">;
   removeScript: (id: string) => void;
   toggleEnabled: (id: string) => Promise<void>;
   setEnabled: (id: string, enabled: boolean) => Promise<void>;
@@ -48,7 +46,7 @@ export const useSourceStore = create<SourceState>((set, get) => ({
 
   async importScript(rawScript, url) {
     const meta = parseScriptMeta(rawScript);
-    // Dedupe: re-importing the same URL (or byte-identical content) updates the
+    // Dedupe: re-importing the same origin (or byte-identical content) updates the
     // existing entry in place instead of adding a duplicate.
     const existing = get().scripts.find(
       (s) => (url && s.url === url) || s.rawScript === rawScript,
@@ -84,39 +82,6 @@ export const useSourceStore = create<SourceState>((set, get) => ({
       set({ isLoading: false, error: (err as Error).message });
       throw err;
     }
-  },
-
-  async importScriptFromUrl(url) {
-    set({ isLoading: true, error: null });
-    let rawScript: string;
-    try {
-      const res = await tauriFetch(url, {
-        method: "GET",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      });
-      if (!res.ok)
-        throw new Error(t("sources.err.downloadHttp", { status: res.status }));
-      rawScript = await res.text();
-    } catch (err) {
-      const message = t("sources.err.downloadFailed", {
-        msg: (err as Error).message,
-      });
-      set({ isLoading: false, error: message });
-      throw new Error(message);
-    }
-
-    // Guard against fetching an HTML error page instead of a script
-    if (!rawScript.trim() || /^\s*</.test(rawScript)) {
-      const message = t("sources.err.notAScript");
-      set({ isLoading: false, error: message });
-      throw new Error(message);
-    }
-
-    // importScript handles validation, persistence and isLoading from here
-    return get().importScript(rawScript, url);
   },
 
   removeScript(id) {

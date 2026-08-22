@@ -1,5 +1,13 @@
 # Confirmed Decisions
 
+## 2026-08-22 - Source import is file-only
+
+Decision:
+Source management imports lx-music-compatible scripts from local `.js` files only (picker and drag-drop). URL import UI and `importScriptFromUrl` are removed. Origin badges still show historical link imports.
+
+Reason:
+Link import is no longer supported; files are the only inspectable import path.
+
 ## 2026-08-21 - Song comments on the lyrics page
 
 Decision:

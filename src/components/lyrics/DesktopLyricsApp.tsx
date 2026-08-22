@@ -72,7 +72,7 @@ const EMPTY_SNAPSHOT: DesktopLyricsSnapshot = {
 
 const LYRIC_FONT_SIZE = 28;
 const DEFAULT_LYRIC_PADDING = {
-  top: 10,
+  top: 8,
   horizontal: 14,
   bottom: 8,
 } as const;

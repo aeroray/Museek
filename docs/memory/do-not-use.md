@@ -4,6 +4,10 @@
 
 Do not block imports based on obfuscation heuristics. Legitimate lx sources are often packed and trip `JS.Obfuscated`-style rules.
 
+## Source script URL import
+
+Do not add link/URL import for source scripts. Import is file-only (picker and drag-drop).
+
 ## Main-window source execution fallback
 
 Do not re-run a failed Worker source with `new Function` on the main WebView.

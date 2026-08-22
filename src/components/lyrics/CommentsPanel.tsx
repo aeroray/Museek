@@ -119,7 +119,7 @@ export function CommentsPanel({
       )}
       aria-label={t("comments.title")}
     >
-      <header className="flex items-end justify-between gap-3 px-4 pb-3 pt-16 pr-14">
+      <header className="flex items-start justify-between gap-3 px-4 pb-3 pt-4 pr-14">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold tracking-tight">
             {t("comments.title")}

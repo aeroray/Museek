@@ -629,7 +629,10 @@ export function LyricsPanel() {
       </div>
       <div
         data-tauri-drag-region
-        className="absolute inset-x-0 top-0 z-10 h-10 select-none"
+        className={cn(
+          "absolute left-0 top-0 z-10 h-10 select-none",
+          commentsOpen ? "right-[22rem]" : "right-0",
+        )}
         aria-hidden="true"
       />
     </div>

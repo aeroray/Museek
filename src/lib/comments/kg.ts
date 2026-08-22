@@ -40,7 +40,8 @@ interface KgCommentRaw {
   puser_id?: number | string;
   reply_num?: number;
   atlist?: KgAtUser[];
-  images?: Array<{ url?: string }>;
+  /** KuGou returns `""` when there are no images, otherwise an object array. */
+  images?: Array<{ url?: string }> | string;
   like?: { likenum?: number };
 }
 
@@ -60,13 +61,21 @@ function replaceAt(raw: string, atList: KgAtUser[] | undefined): string {
   return next;
 }
 
+function imageUrls(images: KgCommentRaw["images"]): string[] | undefined {
+  if (!Array.isArray(images) || !images.length) return undefined;
+  const urls = images
+    .map((i) => i.url)
+    .filter((url): url is string => Boolean(url));
+  return urls.length ? urls : undefined;
+}
+
 function mapComment(item: KgCommentRaw): SongComment {
-    const parsed = item.addtime ? new Date(item.addtime).getTime() : NaN;
-    const time = Number.isFinite(parsed) ? parsed : null;
+  const parsed = item.addtime ? new Date(item.addtime).getTime() : NaN;
+  const time = Number.isFinite(parsed) ? parsed : null;
   const data: SongComment = {
     id: String(item.id ?? ""),
     text: decodeName(replaceAt(item.content ?? "", item.atlist)),
-    images: item.images?.map((i) => i.url).filter((url): url is string => Boolean(url)),
+    images: imageUrls(item.images),
     location: item.location,
     time,
     timeStr: formatCommentTime(time),
