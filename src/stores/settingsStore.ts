@@ -5,10 +5,13 @@ import { setTrayVisible } from "@/lib/power";
 import { syncOpenAtLogin } from "@/lib/autostart";
 import {
   DEFAULT_SHORTCUTS,
+  DEFAULT_LOCAL_SHORTCUTS,
   parseShortcutMap,
+  parseLocalShortcutMap,
   shortcutMapEquals,
   canonicalizeShortcut,
   isValidGlobalShortcut,
+  isValidLocalShortcut,
   shortcutConflict,
   type ShortcutAction,
   type ShortcutMap,
@@ -84,8 +87,10 @@ interface Persisted {
   startHiddenToTray: boolean;
   /** Page shown when the app opens. Synced across devices via settings.json. */
   startupPage: StartupPage;
-  /** Global hotkeys. Canonical CommandOrControl so Win Ctrl ↔ Mac ⌘ on sync. */
+  /** OS-global playback shortcuts. Canonical CommandOrControl so Win Ctrl ↔ Mac ⌘ on sync. */
   shortcuts: ShortcutMap;
+  /** Main-window-only shortcuts. Empty string means unset. */
+  localShortcuts: ShortcutMap;
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
   syncFolder: string | null;
   // Stored so auto-sync can run silently; the cloud file stays encrypted regardless.
@@ -123,7 +128,8 @@ interface SettingsState extends Persisted {
   setOpenAtLogin: (v: boolean) => void;
   setStartHiddenToTray: (v: boolean) => void;
   setStartupPage: (p: StartupPage) => void;
-  setShortcut: (action: ShortcutAction, accel: string) => boolean;
+  setShortcut: (action: ShortcutAction, accel: string | null) => boolean;
+  setLocalShortcut: (action: ShortcutAction, accel: string | null) => boolean;
   resetShortcuts: () => void;
   setSyncFolder: (dir: string | null) => void;
   setSyncPassphrase: (p: string | null) => void;
@@ -162,6 +168,7 @@ const DEFAULTS: Persisted = {
   startHiddenToTray: false,
   startupPage: "search",
   shortcuts: { ...DEFAULT_SHORTCUTS },
+  localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS },
   syncFolder: null,
   syncPassphrase: null,
   autoBackupOnExit: true,
@@ -227,6 +234,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       startHiddenToTray,
       startupPage,
       shortcuts,
+      localShortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -260,6 +268,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       startHiddenToTray,
       startupPage,
       shortcuts,
+      localShortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -395,15 +404,40 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       persist();
     },
     setShortcut(action, accel) {
-      const canonical = canonicalizeShortcut(accel);
-      if (!canonical || !isValidGlobalShortcut(canonical)) return false;
-      if (shortcutConflict(get().shortcuts, action, canonical)) return false;
-      set({ shortcuts: { ...get().shortcuts, [action]: canonical } });
+      const next = accel?.trim() ? canonicalizeShortcut(accel) : "";
+      if (accel?.trim() && !next) return false;
+      if (next && !isValidGlobalShortcut(next)) return false;
+      if (
+        next &&
+        shortcutConflict(get().shortcuts, get().localShortcuts, action, next)
+      ) {
+        return false;
+      }
+      set({ shortcuts: { ...get().shortcuts, [action]: next ?? "" } });
+      persist();
+      return true;
+    },
+    setLocalShortcut(action, accel) {
+      const next = accel?.trim() ? canonicalizeShortcut(accel) : "";
+      if (accel?.trim() && !next) return false;
+      if (next && !isValidLocalShortcut(next)) return false;
+      if (
+        next &&
+        shortcutConflict(get().shortcuts, get().localShortcuts, action, next)
+      ) {
+        return false;
+      }
+      set({
+        localShortcuts: { ...get().localShortcuts, [action]: next ?? "" },
+      });
       persist();
       return true;
     },
     resetShortcuts() {
-      set({ shortcuts: { ...DEFAULT_SHORTCUTS } });
+      set({
+        shortcuts: { ...DEFAULT_SHORTCUTS },
+        localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS },
+      });
       persist();
     },
     setSyncFolder(dir) {
@@ -430,6 +464,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           DEFAULTS,
         );
         const shortcuts = parseShortcutMap(data.shortcuts);
+        const localShortcuts = parseLocalShortcutMap(data.localShortcuts);
         set({
         playQuality: QUALITIES.includes(data.playQuality as Quality)
           ? (data.playQuality as Quality)
@@ -531,6 +566,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           ? (data.startupPage as StartupPage)
           : DEFAULTS.startupPage,
         shortcuts,
+        localShortcuts,
         syncFolder:
           typeof data.syncFolder === "string" ? data.syncFolder : null,
         syncPassphrase:
@@ -543,7 +579,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.syncLastAt === "string" ? data.syncLastAt : null,
         hydrated: true,
       });
-      if (!shortcutMapEquals(shortcuts, data.shortcuts)) persist();
+      if (
+        !shortcutMapEquals(shortcuts, data.shortcuts) ||
+        !shortcutMapEquals(localShortcuts, data.localShortcuts)
+      ) {
+        persist();
+      }
       // Keep the OS login item in sync with the saved preference.
       const openAtLogin = get().openAtLogin;
       // Silent start without openAtLogin is invalid after load.

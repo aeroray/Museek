@@ -5,6 +5,7 @@ import {
   eventMatchesShortcut,
   formatShortcut,
   isShortcutCaptureLocked,
+  isValidGlobalShortcut,
   type ShortcutMap,
 } from "@/lib/shortcutKeys";
 import { runShortcutAction } from "@/lib/shortcutActions";
@@ -115,6 +116,7 @@ async function syncGlobalShortcuts(
   if (gen !== registerGeneration) return;
   const reverse = new Map<string, (typeof SHORTCUT_ACTIONS)[number]>();
   for (const action of SHORTCUT_ACTIONS) {
+    if (!map[action] || !isValidGlobalShortcut(map[action])) continue;
     if (!reverse.has(map[action])) reverse.set(map[action], action);
   }
   const failed: { combo: string; reason: string }[] = [];
@@ -147,50 +149,67 @@ async function syncGlobalShortcuts(
   }
 }
 
-function isTypingTarget(el: EventTarget | null): boolean {
+function isShortcutBlockedTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
-  return (
-    el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable
+  if (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.tagName === "SELECT" ||
+    el.isContentEditable
+  ) {
+    return true;
+  }
+  return Boolean(
+    el.closest(
+      '[role="slider"], [role="combobox"], [role="listbox"], [role="menu"], [role="menuitem"], [role="dialog"], [role="tablist"]',
+    ),
   );
 }
 
 /**
- * Registers every playback shortcut as an OS global hotkey (minimized / background).
- * The same map also runs on window keydown while focused (deduped with the OS hook).
+ * Window-local keydown for in-app bindings (and global ones while focused),
+ * plus OS hotkeys for the global map.
  */
 export function useGlobalShortcuts(): void {
   const hydrated = useSettingsStore((s) => s.hydrated);
   const shortcuts = useSettingsStore((s) => s.shortcuts);
+  const localShortcuts = useSettingsStore((s) => s.localShortcuts);
 
   useEffect(() => {
     if (!hydrated) return;
 
     const onKey = (e: KeyboardEvent) => {
-      if (isShortcutCaptureLocked() || isTypingTarget(e.target)) return;
-      for (const action of SHORTCUT_ACTIONS) {
-        if (!eventMatchesShortcut(e, shortcuts[action])) continue;
-        if (!runShortcutAction(action)) return;
-        e.preventDefault();
-        const active = document.activeElement;
-        if (active instanceof HTMLElement && active !== document.body) {
-          active.blur();
-        }
+      if (e.repeat) return;
+      if (isShortcutCaptureLocked() || isShortcutBlockedTarget(e.target))
         return;
+      const maps = [localShortcuts, shortcuts];
+      for (const map of maps) {
+        for (const action of SHORTCUT_ACTIONS) {
+          if (!map[action] || !eventMatchesShortcut(e, map[action])) continue;
+          if (!runShortcutAction(action)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const active = document.activeElement;
+          if (active instanceof HTMLElement && active !== document.body) {
+            active.blur();
+          }
+          return;
+        }
       }
     };
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
 
     if (!isTauri) {
-      return () => window.removeEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey, true);
     }
 
     void syncGlobalShortcuts(shortcuts);
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
       registerGeneration += 1;
       void import("@tauri-apps/plugin-global-shortcut")
         .then((m) => m.unregisterAll())
         .catch(() => {});
     };
-  }, [hydrated, shortcuts]);
+  }, [hydrated, localShortcuts, shortcuts]);
 }

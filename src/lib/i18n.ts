@@ -492,7 +492,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "close.dontRemind": "不再提醒",
     "close.exitNow": "退出",
     "shortcuts.title": "快捷键",
-    "shortcuts.desc": "点击按键修改。可用 Ctrl、Alt、Shift（Mac 上为 ⌘、⌥、⇧），也可用 F1–F12。",
+    "shortcuts.desc": "每项两个快捷键，可同时生效。应用内仅主窗口；全局可在系统任意处，需 Ctrl、Alt 或 F1–F12。点击修改，Backspace 清除。",
     "shortcuts.playPause": "播放 / 暂停",
     "shortcuts.seek": "后退 / 前进 5 秒",
     "shortcuts.seekBack": "后退 5 秒",
@@ -511,6 +511,14 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.mini": "迷你播放（开关）",
     "shortcuts.recording": "按下快捷键…",
     "shortcuts.invalid": "请使用 Ctrl、Alt、Shift（Mac 上 Ctrl 为 ⌘），或 F1–F12。",
+    "shortcuts.invalidLocal": "请使用字母、数字、空格、方向键，或加上 Ctrl、Alt、Shift。",
+    "shortcuts.scopeGlobal": "全局",
+    "shortcuts.scopeLocal": "应用内",
+    "shortcuts.globalHint": "系统任意处生效，最小化后也可用。",
+    "shortcuts.localHint": "仅主窗口聚焦时有效，可用空格、方向键。",
+    "shortcuts.lockGlobalWarn": "没有全局锁定快捷键时，桌面歌词锁定后无法用键盘解锁。",
+    "shortcuts.unset": "未设置",
+    "shortcuts.cleared": "已清除",
     "shortcuts.conflict": "{combo} 已被本软件注册为「{action}」，请换一组",
     "shortcuts.saved": "已设为 {combo}",
     "shortcuts.osBusy": "无法注册 {combo}：已被系统或其他程序占用",
@@ -1174,7 +1182,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "close.exitNow": "Quit",
     "shortcuts.title": "Keyboard shortcuts",
     "shortcuts.desc":
-      "Click a key to change it. Use Ctrl, Alt, or Shift (⌘, ⌥, ⇧ on Mac), or F1–F12.",
+      "Each action has two shortcuts, and both can fire. In-app keys work in the main window (Space and arrows allowed). Global hotkeys work anywhere and need Ctrl, Alt, or F1–F12. Click to change; Backspace clears.",
     "shortcuts.playPause": "Play / pause",
     "shortcuts.seek": "Seek back / forward 5s",
     "shortcuts.seekBack": "Seek back 5s",
@@ -1194,6 +1202,18 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.recording": "Press a shortcut…",
     "shortcuts.invalid":
       "Use Ctrl, Alt, or Shift (⌘ on Mac), or F1–F12.",
+    "shortcuts.invalidLocal":
+      "Use a letter, number, Space, an arrow key, or add Ctrl, Alt, or Shift.",
+    "shortcuts.scopeGlobal": "Global",
+    "shortcuts.scopeLocal": "In-app",
+    "shortcuts.globalHint":
+      "Works anywhere, including while Museek is minimized.",
+    "shortcuts.localHint":
+      "Works only while the main window is focused. Space and arrow keys are allowed.",
+    "shortcuts.lockGlobalWarn":
+      "Without a global lock shortcut, locked desktop lyrics cannot be unlocked from the keyboard.",
+    "shortcuts.unset": "Not set",
+    "shortcuts.cleared": "Cleared",
     "shortcuts.conflict":
       "{combo} is already registered by Museek for “{action}”. Choose another.",
     "shortcuts.saved": "Saved as {combo}",

@@ -1,5 +1,13 @@
 # Confirmed Decisions
 
+## 2026-08-23 - Dual in-app and global shortcuts
+
+Decision:
+Each playback action has two optional bindings that both fire: a simple in-app key (main window) and an OS-global hotkey (Ctrl/⌘, Alt, or F1–F12). In-app defaults are single keys (Space, arrows, P/N, M, L, D, K, U) that do not collide with each other or with global combos. Empty unsets a slot. Do not register in-app keys with the OS.
+
+Reason:
+Users want a short key in the player and a separate system hotkey when minimized, without toggling a single binding’s scope.
+
 ## 2026-08-22 - Source import is file-only
 
 Decision:
@@ -83,7 +91,7 @@ After sleep AppKit can reset only some buttons; Tao/Wry then re-inset from an in
 ## 2026-08-16 - Register every playback shortcut as a global hotkey
 
 Decision:
-Store shortcuts in synced settings as `CommandOrControl` (Win Ctrl ↔ Mac ⌘). Allow only Ctrl/⌘, Alt/⌥, and Shift, plus F1–F12; reject Win/Super. Defaults use Ctrl/⌘+Shift only (no Ctrl+Alt letters, no bare Ctrl+arrows). Register via the Tauri plugin after hydrate. Wheel font-size stays window-local.
+Superseded 2026-08-23: each action has a separate in-app key and an OS-global hotkey. Store accelerators as `CommandOrControl` (Win Ctrl ↔ Mac ⌘). Global still allows only Ctrl/⌘, Alt/⌥, Shift, plus F1–F12; reject Win/Super. Defaults stay Ctrl/⌘+Shift globally, plus simple single-key in-app bindings. Wheel font-size stays window-local.
 
 Reason:
 Minimized Museek cannot see WebView keydown; global registration keeps transport available, and a platform-neutral accelerator avoids per-OS copies in sync.

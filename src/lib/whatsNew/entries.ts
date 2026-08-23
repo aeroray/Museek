@@ -17,6 +17,56 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.5.1": {
+    zh: {
+      sections: [
+        {
+          title: "⌨️ 快捷键",
+          bullets: [
+            "每项功能可同时设置应用内快捷键和全局热键，两套都能触发",
+            "应用内默认单键：空格播放、方向键微调进度、P/N 切歌、M 静音、L 歌词、D 桌面歌词",
+          ],
+        },
+        {
+          title: "🔌 音源",
+          bullets: [
+            "音源只从本地文件导入（选择文件或拖入），不再支持粘贴链接",
+          ],
+        },
+        {
+          title: "🎶 歌词与评论",
+          bullets: [
+            "修复酷狗评论因空图片字段导致面板报错",
+            "单行桌面歌词胶囊上下留白更均衡，评论标题不再被关闭按钮挡住",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "⌨️ Shortcuts",
+          bullets: [
+            "Each action can have an in-app shortcut and a global hotkey at the same time",
+            "Simple in-app defaults: Space to play, arrows to seek, P/N to skip, M mute, L lyrics, D desktop lyrics",
+          ],
+        },
+        {
+          title: "🔌 Sources",
+          bullets: [
+            "Import source scripts from local files only (picker or drag-drop); link import is gone",
+          ],
+        },
+        {
+          title: "🎶 Lyrics and comments",
+          bullets: [
+            "Fix KuGou comments crashing when the API returns an empty images field",
+            "Even padding on the single-line desktop lyric capsule, and the comments title no longer sits under the close button",
+          ],
+        },
+      ],
+    },
+  },
   "3.5.0": {
     zh: {
       sections: [

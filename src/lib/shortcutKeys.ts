@@ -24,6 +24,7 @@ export const SHORTCUT_ACTIONS = [
 
 export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number];
 export type ShortcutMap = Record<ShortcutAction, string>;
+export type ShortcutSlot = "local" | "global";
 
 export const DEFAULT_SHORTCUTS: ShortcutMap = {
   playPause: "CommandOrControl+Shift+Enter",
@@ -39,6 +40,53 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   desktopLyricsLock: "CommandOrControl+Shift+L",
   mini: "CommandOrControl+Shift+U",
 };
+
+/** In-app only. Single keys; must not collide with each other or with DEFAULT_SHORTCUTS. */
+export const DEFAULT_LOCAL_SHORTCUTS: ShortcutMap = {
+  playPause: "Space",
+  seekBack: "Left",
+  seekForward: "Right",
+  prev: "P",
+  next: "N",
+  volumeUp: "Up",
+  volumeDown: "Down",
+  mute: "M",
+  lyrics: "L",
+  desktopLyrics: "D",
+  desktopLyricsLock: "K",
+  mini: "U",
+};
+
+/** Space-only in-app defaults from the first dual-slot build. */
+const LEGACY_LOCAL_DEFAULTS: ShortcutMap = {
+  playPause: "Space",
+  prev: "",
+  next: "",
+  seekBack: "",
+  seekForward: "",
+  volumeUp: "",
+  volumeDown: "",
+  mute: "",
+  lyrics: "",
+  desktopLyrics: "",
+  desktopLyricsLock: "",
+  mini: "",
+};
+
+function assertNoDefaultShortcutCollisions() {
+  const used = new Set<string>();
+  for (const map of [DEFAULT_SHORTCUTS, DEFAULT_LOCAL_SHORTCUTS]) {
+    for (const action of SHORTCUT_ACTIONS) {
+      const accel = map[action];
+      if (!accel) continue;
+      if (used.has(accel)) {
+        throw new Error(`shortcut default collision: ${accel} (${action})`);
+      }
+      used.add(accel);
+    }
+  }
+}
+assertNoDefaultShortcutCollisions();
 
 /** First global-hotkey defaults; migrate unchanged copies to the current set. */
 const LEGACY_DEFAULTS: ShortcutMap = {
@@ -66,6 +114,9 @@ const PRIMARY = new Set([
   "cmdorctrl",
   "cmdorcontrol",
 ]);
+
+/** Never bind these, even as in-app shortcuts. */
+const LOCAL_BLOCKED = new Set(["Escape", "Tab", "Backspace", "Delete"]);
 
 const RESERVED = new Set([
   "Alt+F4",
@@ -183,35 +234,75 @@ export function isValidGlobalShortcut(accel: string): boolean {
   return true;
 }
 
-export function parseShortcutMap(raw: unknown): ShortcutMap {
+/** In-app only: Space, arrows, and letters are allowed; Win/Super is not. */
+export function isValidLocalShortcut(accel: string): boolean {
+  const parsed = parseShortcut(accel);
+  if (!parsed) return false;
+  if (LOCAL_BLOCKED.has(parsed.key)) return false;
+  const canonical = canonicalizeShortcut(accel);
+  if (!canonical || RESERVED.has(canonical)) return false;
+  return true;
+}
+
+function parseBindingMap(
+  raw: unknown,
+  defaults: ShortcutMap,
+  valid: (accel: string) => boolean,
+): ShortcutMap {
   const user: Partial<ShortcutMap> = {};
+  const specified = new Set<ShortcutAction>();
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
     for (const action of SHORTCUT_ACTIONS) {
+      if (obj[action] === "") {
+        user[action] = "";
+        specified.add(action);
+        continue;
+      }
       if (typeof obj[action] !== "string") continue;
       const canonical = canonicalizeShortcut(obj[action]);
-      if (canonical && isValidGlobalShortcut(canonical)) user[action] = canonical;
+      if (canonical && valid(canonical)) {
+        user[action] = canonical;
+        specified.add(action);
+      }
     }
   }
   const used = new Set<string>();
-  const out = { ...DEFAULT_SHORTCUTS };
+  const out = Object.fromEntries(
+    SHORTCUT_ACTIONS.map((action) => [action, ""]),
+  ) as ShortcutMap;
   for (const action of SHORTCUT_ACTIONS) {
-    const binding = user[action];
-    if (binding && !used.has(binding)) {
-      out[action] = binding;
-      used.add(binding);
-    }
+    if (!specified.has(action)) continue;
+    const binding = user[action] ?? "";
+    if (!binding || used.has(binding)) continue;
+    out[action] = binding;
+    used.add(binding);
   }
   for (const action of SHORTCUT_ACTIONS) {
-    if (user[action] && out[action] === user[action]) continue;
-    const def = DEFAULT_SHORTCUTS[action];
-    if (!used.has(def)) {
+    if (specified.has(action)) continue;
+    const def = defaults[action];
+    if (def && !used.has(def)) {
       out[action] = def;
       used.add(def);
     }
   }
+  return out;
+}
+
+export function parseShortcutMap(raw: unknown): ShortcutMap {
+  const out = parseBindingMap(raw, DEFAULT_SHORTCUTS, isValidGlobalShortcut);
   if (SHORTCUT_ACTIONS.every((action) => out[action] === LEGACY_DEFAULTS[action])) {
     return { ...DEFAULT_SHORTCUTS };
+  }
+  return out;
+}
+
+export function parseLocalShortcutMap(raw: unknown): ShortcutMap {
+  const out = parseBindingMap(raw, DEFAULT_LOCAL_SHORTCUTS, isValidLocalShortcut);
+  if (
+    SHORTCUT_ACTIONS.every((action) => out[action] === LEGACY_LOCAL_DEFAULTS[action])
+  ) {
+    return { ...DEFAULT_LOCAL_SHORTCUTS };
   }
   return out;
 }
@@ -223,13 +314,15 @@ export function shortcutMapEquals(a: ShortcutMap, b: unknown): boolean {
 }
 
 export function shortcutConflict(
-  map: ShortcutMap,
+  globals: ShortcutMap,
+  locals: ShortcutMap,
   action: ShortcutAction,
   accel: string,
 ): ShortcutAction | null {
+  if (!accel) return null;
   for (const other of SHORTCUT_ACTIONS) {
     if (other === action) continue;
-    if (map[other] === accel) return other;
+    if (globals[other] === accel || locals[other] === accel) return other;
   }
   return null;
 }
@@ -339,6 +432,7 @@ function formatKey(key: string): string {
     Right: "→",
     Up: "↑",
     Down: "↓",
+    Space: "Space",
   };
   return map[key] ?? key;
 }
