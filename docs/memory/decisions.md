@@ -1,5 +1,13 @@
 # Confirmed Decisions
 
+## 2026-08-24 - Windows window show on the UI thread
+
+Decision:
+Never call main-window show/hide/focus from a background thread on Windows. Marshal through `run_on_main_thread`, and restore the window on taskbar focus if it is hidden or minimized.
+
+Reason:
+Tao window APIs are event-loop-bound. A delayed worker-thread `show()` can hitch dragging and crash a few seconds after launch while the process and taskbar toolbar stay alive.
+
 ## 2026-08-23 - Dual in-app and global shortcuts
 
 Decision:

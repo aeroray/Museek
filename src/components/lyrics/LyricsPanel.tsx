@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/shortcut-tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Controls } from "@/components/player/Controls";
+import { ProgressSlider } from "@/components/player/ProgressSlider";
 import { CoverImage } from "@/components/common/CoverImage";
 import { SpecularFrame } from "@/components/common/SpecularFrame";
 import { usePlayerStore } from "@/stores/playerStore";
@@ -518,26 +519,29 @@ export function LyricsPanel() {
               </p>
             </div>
           )}
-          <div
-            className="lyric-cover-float shrink-0"
-            style={{ animationPlayState: isPlaying ? "running" : "paused" }}
-          >
-            <SpecularFrame
-              autoAnimate
-              paused={!isPlaying}
-              followMouse={false}
-              className="h-60 w-60"
-              radius={16}
-              lineColor="#ffffff"
-              baseColor="#9ca3af"
-              intensity={1.85}
-              shineSize={18}
-              shineFade={28}
-              thickness={0.8}
-              speed={-0.5}
+          <div className="flex w-60 shrink-0 flex-col items-stretch gap-4">
+            <div
+              className="lyric-cover-float shrink-0"
+              style={{ animationPlayState: isPlaying ? "running" : "paused" }}
             >
-              {coverArt}
-            </SpecularFrame>
+              <SpecularFrame
+                autoAnimate
+                paused={!isPlaying}
+                followMouse={false}
+                className="h-60 w-60"
+                radius={16}
+                lineColor="#ffffff"
+                baseColor="#9ca3af"
+                intensity={1.85}
+                shineSize={18}
+                shineFade={28}
+                thickness={0.8}
+                speed={-0.5}
+              >
+                {coverArt}
+              </SpecularFrame>
+            </div>
+            <ProgressSlider compact />
           </div>
           <Controls />
         </div>

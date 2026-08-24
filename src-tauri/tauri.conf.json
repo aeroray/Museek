@@ -37,7 +37,7 @@
         "minHeight": 172,
         "center": true,
         "visible": false,
-        "focus": true,
+        "focus": false,
         "focusable": true,
         "decorations": false,
         "transparent": true,

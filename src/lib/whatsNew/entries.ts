@@ -17,6 +17,54 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.5.2": {
+    zh: {
+      sections: [
+        {
+          title: "🪟 Windows",
+          bullets: [
+            "修复打开数秒后闪退、拖窗口发滞：窗口显示改回界面线程",
+            "主窗口被藏住时，点任务栏图标可以重新打开（缩略图按钮本来就能用）",
+          ],
+        },
+        {
+          title: "🎵 酷狗",
+          bullets: [
+            "搜索页点收藏只会收进当前这一首，不再一次收进多首同名版本",
+          ],
+        },
+        {
+          title: "🎶 歌词",
+          bullets: [
+            "歌词页封面下方可拖动播放进度，盖住底栏时也能微调位置",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🪟 Windows",
+          bullets: [
+            "Fix a crash and drag hitch a few seconds after launch by showing the window on the UI thread",
+            "Clicking the taskbar icon restores a hidden main window (the thumbnail buttons already worked)",
+          ],
+        },
+        {
+          title: "🎵 KuGou",
+          bullets: [
+            "Favoriting a search result adds only that track, not every same-title version in the group",
+          ],
+        },
+        {
+          title: "🎶 Lyrics",
+          bullets: [
+            "Seek from a compact progress bar under the lyrics-page cover while the overlay hides the player bar",
+          ],
+        },
+      ],
+    },
+  },
   "3.5.1": {
     zh: {
       sections: [

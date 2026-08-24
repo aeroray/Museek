@@ -26,6 +26,11 @@ interface KgSongRaw {
   ResFileHash?: string
   ResFileSize?: number
   Image?: string
+  /**
+   * Other album/quality versions of this hit. Do not flatten into the list:
+   * they share a title, and many share `Audioid`, so one favorite would light
+   * up (or appear to collect) every same-name row.
+   */
   Grp?: KgSongRaw[]
 }
 
@@ -75,8 +80,9 @@ function normalizeKgSong(raw: KgSongRaw): MusicInfo {
 
   const _qualitys = indexQualitySizes(qualitys)
 
-  // songId is the album_audio_id (Audioid); hash is the standard FileHash.
-  // KuGou play scripts read hash + albumId at the top level.
+  // songId stays Audioid (lx-music songmid). Play scripts read hash + albumId.
+  // MixSongID is the per-album mix id; do not use it as MusicInfo.id (would
+  // split existing favorites / cache keys).
   const songId = String(raw.Audioid)
 
   return {
@@ -97,20 +103,15 @@ function normalizeKgSong(raw: KgSongRaw): MusicInfo {
   }
 }
 
+/** One row per Audioid. Skip `Grp` (other album cuts of the same title). */
 function handleResult(rawData: KgSongRaw[]): MusicInfo[] {
   const seen = new Set<string>()
   const list: MusicInfo[] = []
   for (const item of rawData) {
-    const key = `${item.Audioid}${item.FileHash}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    list.push(normalizeKgSong(item))
-    for (const child of item.Grp ?? []) {
-      const childKey = `${child.Audioid}${child.FileHash}`
-      if (seen.has(childKey)) continue
-      seen.add(childKey)
-      list.push(normalizeKgSong(child))
-    }
+    const song = normalizeKgSong(item)
+    if (!song.meta.songId || seen.has(song.id)) continue
+    seen.add(song.id)
+    list.push(song)
   }
   return list
 }

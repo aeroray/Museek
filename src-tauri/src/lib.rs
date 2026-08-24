@@ -11,6 +11,7 @@ use souvlaki::{
 };
 use std::io::Cursor;
 use std::sync::Mutex;
+use std::time::Instant;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
@@ -522,6 +523,13 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command]
+fn note_hidden_to_tray(mark: tauri::State<'_, TrayHideAt>) {
+    if let Ok(mut slot) = mark.0.lock() {
+        *slot = Some(Instant::now());
+    }
+}
+
 /// Login-item / silent-start flags resolved once in setup.
 struct LaunchFlags {
     #[allow(dead_code)]
@@ -529,6 +537,9 @@ struct LaunchFlags {
     /// Autostart + startHiddenToTray pref + no open-with audio → stay in tray.
     start_hidden: bool,
 }
+
+/// Hide-to-tray timestamp so a spurious Windows Focused event does not undo hide.
+struct TrayHideAt(Mutex<Option<Instant>>);
 
 #[tauri::command]
 fn is_autostart_launch(flags: tauri::State<'_, LaunchFlags>) -> bool {
@@ -576,6 +587,11 @@ fn refresh_macos_window_shadow(window: &tauri::WebviewWindow) {
 
 // Bring the main window back from hidden / minimized and focus it.
 fn show_main(app: &tauri::AppHandle) {
+    if let Some(mark) = app.try_state::<TrayHideAt>() {
+        if let Ok(mut slot) = mark.0.lock() {
+            *slot = None;
+        }
+    }
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.set_skip_taskbar(false);
         let _ = w.show();
@@ -592,6 +608,27 @@ fn show_main(app: &tauri::AppHandle) {
         }
         // Fallback: flash the taskbar if focus still didn't stick.
         let _ = w.request_user_attention(Some(tauri::UserAttentionType::Informational));
+    }
+}
+
+/// Show the main window only if it is hidden or minimized (safe to call often).
+fn restore_main_if_obscured(app: &tauri::AppHandle) {
+    if let Some(mark) = app.try_state::<TrayHideAt>() {
+        if let Ok(slot) = mark.0.lock() {
+            if let Some(at) = *slot {
+                if at.elapsed() < std::time::Duration::from_millis(800) {
+                    return;
+                }
+            }
+        }
+    }
+    let Some(w) = app.get_webview_window("main") else {
+        return;
+    };
+    let hidden = !matches!(w.is_visible(), Ok(true));
+    let minimized = w.is_minimized().ok() == Some(true);
+    if hidden || minimized {
+        show_main(app);
     }
 }
 
@@ -1327,6 +1364,7 @@ pub fn run() {
         .manage(PendingLocalFiles(Mutex::new(Vec::new())))
         .manage(PendingUnsupportedOpens(Mutex::new(Vec::new())))
         .manage(TrayMarkCache(Mutex::new(None)))
+        .manage(TrayHideAt(Mutex::new(None)))
         .setup(|app| {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
@@ -1414,13 +1452,18 @@ pub fn run() {
                 }
 
                 // Windows/Linux fallback if the frontend never calls show().
-                // macOS is already shown above (unless silent autostart).
+                // Must hop back to the UI thread: Tao window methods are
+                // event-loop-bound, and a worker-thread show() on Windows
+                // hitches (or crashes) a few seconds after launch.
                 #[cfg(not(target_os = "macos"))]
                 if !start_hidden {
-                    let w = window.clone();
+                    let app = app.handle().clone();
                     std::thread::spawn(move || {
                         std::thread::sleep(std::time::Duration::from_millis(4000));
-                        let _ = w.show();
+                        let handle = app.clone();
+                        let _ = app.run_on_main_thread(move || {
+                            restore_main_if_obscured(&handle);
+                        });
                     });
                 }
 
@@ -1489,6 +1532,7 @@ pub fn run() {
             media_progress,
             set_prevent_sleep,
             quit_app,
+            note_hidden_to_tray,
             set_tray_visible,
             capture_audio_clip,
             set_tray_mark_icon,
@@ -1542,6 +1586,19 @@ pub fn run() {
         {
             if !has_visible_windows {
                 show_main(app_handle);
+            }
+        }
+        // Windows has no Dock Reopen: clicking the taskbar icon can focus a
+        // still-hidden HWND (thumbnail toolbar keeps working). Restore it.
+        #[cfg(target_os = "windows")]
+        if let tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Focused(true),
+            ..
+        } = &event
+        {
+            if label == "main" {
+                restore_main_if_obscured(app_handle);
             }
         }
         let _ = (app_handle, &event);
