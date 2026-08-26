@@ -295,6 +295,7 @@ export interface ParsedLocalTags {
 
 /**
  * Read tags from a local audio file. Falls back to filename / placeholders.
+ * Never networks — online fill lives in `enrichLocalSong`.
  */
 export async function parseLocalFile(
   filePath: string,
@@ -399,6 +400,23 @@ export async function parseLocalFile(
     hasArtistTag,
     hasAlbumTag,
     hasCover,
+  };
+}
+
+/** Import-time metadata: basename only, no file read and no network. */
+export function tagsFromFilename(filePath: string): ParsedLocalTags {
+  const filenameName = localFilenameTitle(filePath);
+  const guessed = guessFromFilename(filePath);
+  return {
+    name: filenameName,
+    singer: guessed.singer || t("local.unknownArtist"),
+    albumName: "",
+    interval: "0:00",
+    qualitys: qualityForExt(extOf(filePath)),
+    hasTitleTag: false,
+    hasArtistTag: false,
+    hasAlbumTag: false,
+    hasCover: false,
   };
 }
 

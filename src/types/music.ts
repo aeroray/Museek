@@ -45,8 +45,10 @@ export interface LocalTrack {
   addedAt: number;
   /** One category at most; null / omitted = uncategorized. */
   categoryId?: string | null;
-  /** Per-track naming override; omitted means smart recognition. */
+  /** Title lock: `filename` keeps the basename. New imports set this. Omitted = legacy smart. */
   nameMode?: LocalNameMode;
+  /** Whether local file tags (cover, duration, lyrics) have been read. Omitted = already read (legacy). */
+  hydrated?: boolean;
   /** File missing/moved/unreadable — set after a failed play attempt. */
   unavailable?: boolean;
   song: MusicInfo;

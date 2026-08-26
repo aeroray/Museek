@@ -296,6 +296,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         if (isLocal) {
           const filePath = song.meta.filePath;
           if (!filePath) throw new Error(t("local.missingPath"));
+          const hydrateP = useLocalMusicStore
+            .getState()
+            .hydrateTrackOnPlay(song.id);
           const src = await localFileToObjectUrl(filePath);
           if (!isPlayGenerationCurrent(gen)) return;
           const best = song.meta.qualitys[0]?.type ?? preferred;
@@ -324,8 +327,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             true,
           );
           useLocalMusicStore.getState().setTrackUnavailable(song.id, false);
-          get()._loadLyric(song);
-          get()._loadPic(song);
+          void hydrateP.then((hydrated) => {
+            if (!isPlayGenerationCurrent(gen)) return;
+            if (get().currentSong?.id !== song.id) return;
+            const next = hydrated ?? get().currentSong ?? song;
+            get()._loadLyric(next);
+            get()._loadPic(next);
+          });
           return;
         }
 
@@ -694,7 +702,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         lyricsLoading: Boolean(session.currentSong),
       });
       if (session.currentSong) {
-        void get()._loadLyric(session.currentSong);
+        if (session.currentSong.source !== "local") {
+          void get()._loadLyric(session.currentSong);
+        }
         void get()._loadPic(session.currentSong);
       }
     },
@@ -708,12 +718,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           clearResume();
           return;
         }
-        void get()._loadLyric(song);
+        if (song.source !== "local") {
+          void get()._loadLyric(song);
+        }
         const resumeAt = sessionResumeAt;
         try {
           if (song.source === "local") {
             const filePath = song.meta.filePath;
             if (!filePath) throw new Error("missing");
+            const hydrateP = useLocalMusicStore
+              .getState()
+              .hydrateTrackOnPlay(song.id);
             const src = await localFileToObjectUrl(filePath);
             if (get().currentSong?.id !== song.id) return;
             await audioPlayer.preparePausedSource(src, resumeAt);
@@ -734,6 +749,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               get().currentPicUrl ?? song.meta.picUrl ?? null,
               false,
             );
+            void hydrateP.then((hydrated) => {
+              if (get().currentSong?.id !== song.id) return;
+              const next = hydrated ?? get().currentSong ?? song;
+              get()._loadLyric(next);
+              get()._loadPic(next);
+            });
             return;
           }
 

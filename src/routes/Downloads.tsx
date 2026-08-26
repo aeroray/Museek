@@ -30,21 +30,10 @@ const isTauri =
 // shell.open() validates against a URL pattern in Tauri v2 and rejects plain
 // file paths, so it silently failed for folders.
 async function openDownloadFolder(downloadDir: string | null) {
-  if (!isTauri) return;
+  if (!isTauri || !downloadDir) return;
   try {
     const { openPath } = await import("@tauri-apps/plugin-opener");
-    if (downloadDir) {
-      await openPath(downloadDir);
-    } else {
-      // Default app-data downloads folder — ensure it exists, then open it.
-      const { appDataDir, join } = await import("@tauri-apps/api/path");
-      const { mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
-      await mkdir("museek/downloads", {
-        baseDir: BaseDirectory.AppData,
-        recursive: true,
-      });
-      await openPath(await join(await appDataDir(), "museek", "downloads"));
-    }
+    await openPath(downloadDir);
   } catch (e) {
     console.error("Failed to open download folder:", e);
     useUiStore
@@ -132,15 +121,21 @@ export function Downloads() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           {isTauri && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={() => void openDownloadFolder(downloadDir)}
+            <span
+              className="inline-flex"
+              title={downloadDir ? undefined : t("download.notSet")}
             >
-              <FolderOpen size={14} className="mr-1.5" />
-              {t("download.openFolder")}
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={!downloadDir}
+                onClick={() => void openDownloadFolder(downloadDir)}
+              >
+                <FolderOpen size={14} className="mr-1.5" />
+                {t("download.openFolder")}
+              </Button>
+            </span>
           )}
         </div>
       </div>
@@ -334,11 +329,16 @@ export function Downloads() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                            disabled={!downloadDir}
                             onClick={(e) => {
                               e.stopPropagation();
                               void openDownloadFolder(downloadDir);
                             }}
-                            title={t("download.openFolder")}
+                            title={
+                              downloadDir
+                                ? t("download.openFolder")
+                                : t("download.notSet")
+                            }
                           >
                             <FolderOpen size={14} />
                           </Button>

@@ -17,6 +17,7 @@ import {
   ArrowDownUp,
   MoreHorizontal,
   TriangleAlert,
+  ScanSearch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,8 +65,11 @@ export function LocalMusic() {
   const categories = useLocalMusicStore((s) => s.categories);
   const importing = useLocalMusicStore((s) => s.importing);
   const importProgress = useLocalMusicStore((s) => s.importProgress);
+  const matching = useLocalMusicStore((s) => s.matching);
+  const matchProgress = useLocalMusicStore((s) => s.matchProgress);
   const importFiles = useLocalMusicStore((s) => s.importFiles);
   const importFolder = useLocalMusicStore((s) => s.importFolder);
+  const matchTracksOnline = useLocalMusicStore((s) => s.matchTracksOnline);
   const remove = useLocalMusicStore((s) => s.remove);
   const removeMany = useLocalMusicStore((s) => s.removeMany);
   const setTrackNameMode = useLocalMusicStore((s) => s.setTrackNameMode);
@@ -155,6 +159,25 @@ export function LocalMusic() {
     exitEdit();
   };
 
+  const runMatch = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    try {
+      const n = await matchTracksOnline(ids);
+      if (n > 0) {
+        notify({ message: tr("local.matched", { n }), variant: "success" });
+      }
+    } catch (e) {
+      notify({
+        message: tr("local.matchFailed", { msg: String(e) }),
+        variant: "error",
+      });
+    }
+  };
+
+  const batchMatch = async () => {
+    await runMatch([...selected]);
+  };
+
   const deleteCategory = (id: string) => {
     removeCategory(id);
     if (categoryFilter === id) setCategoryFilter("all");
@@ -214,6 +237,9 @@ export function LocalMusic() {
     },
   );
   const activeCategory = findActiveCategory(categories, categoryFilter);
+  const busy = importing || matching;
+  const progress = matchProgress ?? importProgress;
+  const progressIsMatch = Boolean(matchProgress);
 
   return (
     <div className="flex flex-col h-full">
@@ -224,27 +250,30 @@ export function LocalMusic() {
             {tr("local.title")}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {importing && importProgress && importProgress.total > 0
-              ? tr("local.importProgress", {
-                  done: importProgress.done,
-                  total: importProgress.total,
-                })
+            {progress && progress.total > 0 && busy
+              ? tr(
+                  progressIsMatch
+                    ? "local.matchProgress"
+                    : "local.importProgress",
+                  {
+                    done: progress.done,
+                    total: progress.total,
+                  },
+                )
               : tracks.length === 0
                 ? tr("local.summaryEmpty")
                 : tr("local.summary", { n: tracks.length })}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {importing && importProgress && importProgress.total > 0 && (
+          {busy && progress && progress.total > 0 && (
             <div className="hidden sm:flex items-center gap-2 min-w-0 max-w-[200px]">
               <Progress
-                value={Math.round(
-                  (importProgress.done / importProgress.total) * 100,
-                )}
+                value={Math.round((progress.done / progress.total) * 100)}
                 className="h-1.5 w-24 shrink-0"
               />
               <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                {importProgress.done}/{importProgress.total}
+                {progress.done}/{progress.total}
               </span>
             </div>
           )}
@@ -271,9 +300,9 @@ export function LocalMusic() {
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5"
-                disabled={importing}
+                disabled={busy}
               >
-                {importing ? (
+                {busy ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
                   <FilePlus2 size={14} />
@@ -284,14 +313,14 @@ export function LocalMusic() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                disabled={importing}
+                disabled={busy}
                 onClick={() => void onImportFiles()}
               >
                 <FilePlus2 size={14} className="mr-2" />
                 {tr("local.importFiles")}
               </DropdownMenuItem>
               <DropdownMenuItem
-                disabled={importing}
+                disabled={busy}
                 onClick={() => void onImportFolder()}
               >
                 <FolderPlus size={14} className="mr-2" />
@@ -407,6 +436,20 @@ export function LocalMusic() {
                   variant="outline"
                   size="sm"
                   className="h-8"
+                  disabled={selected.size === 0 || busy}
+                  onClick={() => void batchMatch()}
+                >
+                  {matching ? (
+                    <Loader2 size={14} className="mr-1.5 animate-spin" />
+                  ) : (
+                    <ScanSearch size={14} className="mr-1.5" />
+                  )}
+                  {tr("local.matchOnline")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
                   disabled={selected.size === 0}
                   onClick={() =>
                     addToQueue(
@@ -448,29 +491,32 @@ export function LocalMusic() {
           <div className="mx-auto w-full max-w-5xl p-4">
             <div className="flex min-h-[18rem] flex-col items-center justify-center px-4 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
-                {importing ? (
+                {busy ? (
                   <Loader2 size={28} className="animate-spin" />
                 ) : (
                   <HardDrive size={28} strokeWidth={1.6} />
                 )}
               </div>
-              {importing && importProgress && importProgress.total > 0 ? (
+              {busy && progress && progress.total > 0 ? (
                 <>
                   <p className="mt-4 text-sm font-medium">
-                    {tr("local.importProgress", {
-                      done: importProgress.done,
-                      total: importProgress.total,
-                    })}
+                    {tr(
+                      progressIsMatch
+                        ? "local.matchProgress"
+                        : "local.importProgress",
+                      {
+                        done: progress.done,
+                        total: progress.total,
+                      },
+                    )}
                   </p>
                   <Progress
-                    value={Math.round(
-                      (importProgress.done / importProgress.total) * 100,
-                    )}
+                    value={Math.round((progress.done / progress.total) * 100)}
                     className="mt-3 h-1.5 w-48"
                   />
-                  {importProgress.current ? (
+                  {progress.current ? (
                     <p className="mt-2 max-w-sm truncate text-xs text-muted-foreground">
-                      {importProgress.current}
+                      {progress.current}
                     </p>
                   ) : null}
                 </>
@@ -639,10 +685,17 @@ export function LocalMusic() {
                             <DropdownMenuLabel>
                               {tr("local.trackNameMode")}
                             </DropdownMenuLabel>
+                            <DropdownMenuItem
+                              disabled={busy || missing}
+                              onClick={() => void runMatch([track.id])}
+                            >
+                              <ScanSearch size={14} className="mr-2" />
+                              {tr("local.matchOnline")}
+                            </DropdownMenuItem>
                             <DropdownMenuCheckboxItem
                               checked={track.nameMode === "filename"}
                               showUncheckedIndicator
-                              disabled={importing}
+                              disabled={busy}
                               onCheckedChange={(checked) =>
                                 void setTrackNameMode(
                                   track.id,

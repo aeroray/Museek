@@ -17,6 +17,44 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.5.3": {
+    zh: {
+      sections: [
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "导入立刻按文件名入列，封面和标签从文件后台补全，默认不上网",
+            "只有点「在线匹配」或打开「导入时匹配」才会上网补缺；勾选「显示原文件名」只锁定歌名",
+            "播放、勾选或取消「显示原文件名」都不会触发在线匹配",
+          ],
+        },
+        {
+          title: "⬇️ 下载",
+          bullets: [
+            "未设置下载目录时，「打开文件夹」会禁用，避免点了没反应",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Import lists filenames immediately; covers and tags fill from the file in the background with no network",
+            "Online fill only from Match online or Match on import; Show original filename only locks the title",
+            "Playing or toggling the filename checkbox never matches online",
+          ],
+        },
+        {
+          title: "⬇️ Downloads",
+          bullets: [
+            "Disable Open folder when no download directory is set",
+          ],
+        },
+      ],
+    },
+  },
   "3.5.2": {
     zh: {
       sections: [

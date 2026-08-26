@@ -306,8 +306,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.trackNameMode": "歌曲名称",
     "local.categoryLabel": "分类",
     "local.keepFilename": "显示原文件名",
-    "local.empty": "还没有本地音乐",
-    "local.emptyHint": "点右上角导入；列表与分类仅保存在本机，不同步",
+    "local.matchOnline": "在线匹配",
+    "local.matchProgress": "正在匹配 {done}/{total}",
+    "local.matched": "已匹配 {n} 首",
+    "local.matchFailed": "匹配失败：{msg}",
+    "local.empty": "暂无本地音乐",
+    "local.emptyHint":
+      "列表立刻按文件名出现，封面和标签从文件里补全。到「设置 → 本地」打开「导入时匹配」才会上网。",
     "local.noMatch": "没有匹配的歌曲",
     "local.reveal": "打开目录",
     "local.remove": "移除",
@@ -330,6 +335,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.settings.depthDesc":
       "导入文件夹时包含几层子目录，最后一项为不限深度",
     "local.settings.depthUnlimited": "不限深度",
+    "local.settings.matchOnImportTitle": "导入时匹配",
+    "local.settings.matchOnImportDesc":
+      "读完本地标签后再上网补封面、歌手和专辑，文件夹会明显变慢。关闭时仍会从文件读取封面和标签；之后可在本地音乐页单独或批量「在线匹配」。",
     "local.settings.deleteFilesTitle": "同时删除本地文件",
     "local.settings.deleteFilesDesc": "关闭时只从列表移除",
     "local.settings.localOnlyNote":
@@ -984,9 +992,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.trackNameMode": "Track title",
     "local.categoryLabel": "Category",
     "local.keepFilename": "Show original filename",
-    "local.empty": "No local music yet",
+    "local.matchOnline": "Match online",
+    "local.matchProgress": "Matching {done}/{total}",
+    "local.matched": "Matched {n} tracks",
+    "local.matchFailed": "Match failed: {msg}",
+    "local.empty": "No local music",
     "local.emptyHint":
-      "Import from the top right. Library and categories stay on this device — not synced",
+      "Files appear immediately by filename; covers and tags fill in from the file. Turn on Match on import in Settings → Local to look them up online.",
     "local.noMatch": "No matching tracks",
     "local.reveal": "Show in folder",
     "local.remove": "Remove",
@@ -1010,6 +1022,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.settings.depthDesc":
       "Subfolder levels when importing a folder. Last option = unlimited",
     "local.settings.depthUnlimited": "Unlimited",
+    "local.settings.matchOnImportTitle": "Match on import",
+    "local.settings.matchOnImportDesc":
+      "After reading local tags, look up missing cover, artist, and album online — folders will be much slower. When off, files still get embedded covers and tags; you can Match online later from the library.",
     "local.settings.deleteFilesTitle": "Also delete files",
     "local.settings.deleteFilesDesc": "When off, only remove from the list",
     "local.settings.localOnlyNote":

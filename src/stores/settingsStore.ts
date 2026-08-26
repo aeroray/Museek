@@ -52,11 +52,12 @@ interface Persisted {
   deleteDownloadFiles: boolean;
   // Folder import recursion depth (0–2 finite levels; -1 = unlimited).
   localScanDepth: number;
-  // Legacy migration only. New local imports use smart recognition by default,
-  // with naming overrides stored on individual LocalTrack records.
+  // Legacy migration only. New imports persist per-track `nameMode: filename`.
   localNameMode: LocalNameMode;
   // When removing a local-library entry, also delete the audio file on disk.
   deleteLocalFiles: boolean;
+  /** After local tags, look up missing cover/artist/album online. Default off. */
+  localMatchOnImport: boolean;
   // Cache the audio of played songs to disk (faster replays + offline).
   audioCache: boolean;
   // Disk cache size cap in MB; least-recently-used audio is evicted beyond this.
@@ -113,6 +114,7 @@ interface SettingsState extends Persisted {
   setDeleteDownloadFiles: (v: boolean) => void;
   setLocalScanDepth: (n: number) => void;
   setDeleteLocalFiles: (v: boolean) => void;
+  setLocalMatchOnImport: (v: boolean) => void;
   setAudioCache: (v: boolean) => void;
   setMaxCacheMB: (n: number) => void;
   setPreventSleepWhilePlaying: (v: boolean) => void;
@@ -152,6 +154,7 @@ const DEFAULTS: Persisted = {
   localScanDepth: 0,
   localNameMode: "smart",
   deleteLocalFiles: false,
+  localMatchOnImport: false,
   audioCache: true,
   maxCacheMB: 1024,
   preventSleepWhilePlaying: true,
@@ -218,6 +221,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localScanDepth,
       localNameMode,
       deleteLocalFiles,
+      localMatchOnImport,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
@@ -252,6 +256,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localScanDepth,
       localNameMode,
       deleteLocalFiles,
+      localMatchOnImport,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
@@ -318,6 +323,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setDeleteLocalFiles(v) {
       set({ deleteLocalFiles: v });
+      persist();
+    },
+    setLocalMatchOnImport(v) {
+      set({ localMatchOnImport: v });
       persist();
     },
     setAudioCache(v) {
@@ -510,6 +519,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.deleteLocalFiles === "boolean"
             ? data.deleteLocalFiles
             : DEFAULTS.deleteLocalFiles,
+        localMatchOnImport:
+          typeof data.localMatchOnImport === "boolean"
+            ? data.localMatchOnImport
+            : DEFAULTS.localMatchOnImport,
         audioCache:
           typeof data.audioCache === "boolean"
             ? data.audioCache

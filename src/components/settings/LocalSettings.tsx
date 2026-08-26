@@ -13,8 +13,10 @@ export function LocalSettings() {
   const {
     localScanDepth,
     deleteLocalFiles,
+    localMatchOnImport,
     setLocalScanDepth,
     setDeleteLocalFiles,
+    setLocalMatchOnImport,
   } = useSettingsStore();
   const t = useT();
 
@@ -44,6 +46,16 @@ export function LocalSettings() {
                 </Button>
               ))}
             </div>
+          </SettingRow>
+
+          <SettingRow
+            title={t("local.settings.matchOnImportTitle")}
+            desc={t("local.settings.matchOnImportDesc")}
+          >
+            <Switch
+              checked={localMatchOnImport}
+              onCheckedChange={setLocalMatchOnImport}
+            />
           </SettingRow>
 
           <SettingRow

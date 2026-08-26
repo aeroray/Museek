@@ -1,6 +1,7 @@
 export {
   parseLocalFile,
   buildLocalSong,
+  tagsFromFilename,
   localTrackId,
   localFilenameTitle,
   isLocalAudioPath,
@@ -9,6 +10,7 @@ export {
   peekLocalQuality,
   LOCAL_AUDIO_EXTS,
 } from "./tags";
+export type { ParsedLocalTags } from "./tags";
 export { pickLocalAudioFiles, pickLocalAudioFolder } from "./scan";
 export { normalizeLocalScanDepth, isUnlimitedLocalScanDepth } from "./depth";
 export { enrichLocalSong } from "./enrich";

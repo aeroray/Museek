@@ -25,7 +25,9 @@ function needsEnrich(tags: ParsedLocalTags): boolean {
 
 /**
  * Fill missing display fields from the first NetEase search hit.
+ * Call only from explicit Match online / Match on import.
  * Never changes source / filePath / id. Only fills fields that lacked tags.
+ * Filename lock keeps the displayed title even when other gaps are filled.
  */
 export async function enrichLocalSong(
   song: MusicInfo,
@@ -33,7 +35,8 @@ export async function enrichLocalSong(
   nameMode: LocalNameMode = "smart",
   isCurrent?: () => boolean,
 ): Promise<MusicInfo> {
-  if (nameMode === "filename" || !needsEnrich(tags)) return song;
+  const preserveTitle = nameMode === "filename";
+  if (!needsEnrich(tags)) return song;
 
   const q = [song.name, song.singer].filter(Boolean).join(" ").trim();
   if (!q) return song;
@@ -49,7 +52,8 @@ export async function enrichLocalSong(
 
     return {
       ...song,
-      name: tags.hasTitleTag ? song.name : hit.name || song.name,
+      name:
+        preserveTitle || tags.hasTitleTag ? song.name : hit.name || song.name,
       singer: tags.hasArtistTag ? song.singer : hit.singer || song.singer,
       albumName: tags.hasAlbumTag
         ? song.albumName

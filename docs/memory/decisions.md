@@ -1,5 +1,13 @@
 # Confirmed Decisions
 
+## 2026-08-26 - Local import pipeline
+
+Decision:
+Import enqueues by path with `nameMode: filename`. Background `readLocalTags` fills cover, duration, lyrics, artist, and album with no network; the filename checkbox (on by default) only locks the title. Network runs only from Match online or Match on import (`matchOnline`); play and the checkbox never enrich. Online fill is gap-only and never overwrites ID3 or a locked title.
+
+Reason:
+One `refreshTrack` mixed tags and NetEase, so checking a box or playing looked like matching.
+
 ## 2026-08-24 - Windows window show on the UI thread
 
 Decision:
@@ -571,21 +579,18 @@ Window-scoped keys stopped working once Museek was minimized.
 ## 2026-08-10 - Make local naming a per-track override
 
 Decision:
-Use smart recognition for new local imports by default, and store an optional `filename` naming override on each `LocalTrack`. Expose the override as a checkbox in that track's local-library options menu; clearing it restores tag-first smart recognition and online enrichment. Migrate the previous global filename setting to per-track overrides once, preserving legacy filenames.
+Superseded 2026-08-26: the checkbox is a title lock only (no network). Keep the per-track filename checkbox; the previous global filename setting still migrates once.
 
 Reason:
-Most local songs benefit from automatic tag and online recognition, while fragments, covers, remixes, and other special files may have names that should remain untouched. A per-track override keeps the common path automatic without forcing a library-wide choice.
-
-Reason:
-The locked lyrics window ignores pointer and keyboard input by design, so an in-window shortcut cannot unlock it. A native global registration remains available while the lyrics window is click-through or the main window is unfocused, while limiting global scope avoids surprising conflicts for ordinary playback commands.
+Fragments and remixes still need a way to keep the original filename after catalog matching.
 
 ## 2026-08-09 - Make local song naming explicit and reversible
 
 Decision:
-Default local imports to preserve the file basename as the song title and expose a Local settings choice between filename-preserving and smart recognition modes. Filename mode still reads embedded local tags but skips online enrichment; smart mode keeps the existing tag-first and NetEase fallback behavior. Changing modes refreshes existing tracks, and the selected mode is persisted with regular settings.
+Superseded 2026-08-26: do not restore a global filename/smart setting. New imports lock the title to the basename; online fill is Match online or Match on import only.
 
 Reason:
-Local fragments, covers, remixes, and other non-mainstream versions often use intentionally meaningful names that online matching can erase. A conservative default protects that intent while keeping automatic recognition available for users who prefer it.
+A global mode fought the per-track lock and mixed tag reads with NetEase.
 
 ## 2026-08-10 - Deepen runtime boundaries without changing UX
 

@@ -44,6 +44,7 @@ const DEVICE_LOCAL_SETTINGS = [
   "localScanDepth",
   "deleteLocalFiles",
   "localSort",
+  "localMatchOnImport",
   "openAtLogin",
   "startHiddenToTray",
 ];
