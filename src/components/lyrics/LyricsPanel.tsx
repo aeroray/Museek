@@ -7,8 +7,6 @@ import {
 } from "react";
 import {
   X,
-  ChevronsUp,
-  ChevronsDown,
   Loader2,
   Music,
   Captions,
@@ -47,17 +45,10 @@ import {
 import { useT } from "@/lib/i18n";
 import { isMacOs } from "@/lib/os";
 import { getLyricTime, usePlaybackLyricIndex } from "@/lib/playback/clock";
-import {
-  LYRIC_OFFSET_STEP,
-  bumpLyricOffset,
-  canBumpLyricOffset,
-  formatLyricOffset,
-  lyricSeekTime,
-  useLyricOffset,
-} from "@/lib/lyrics/offset";
 import { cn } from "@/lib/utils";
 import { hasKaraokeTiming, PlaybackKaraokeText } from "./KaraokeText";
 import { CommentsPanel } from "./CommentsPanel";
+import { LyricSourceMenu } from "./LyricSourceMenu";
 
 const FONT_MIN = 0.85;
 const FONT_MAX = 2.5;
@@ -74,7 +65,6 @@ export function LyricsPanel() {
   const currentSong = usePlayerStore((s) => s.currentSong);
   const lyricLines = usePlayerStore((s) => s.lyricLines);
   const currentLyricIndex = usePlaybackLyricIndex(lyricLines);
-  const lyricOffset = useLyricOffset();
   const showLyrics = usePlayerStore((s) => s.showLyrics);
   const lyricsLoading = usePlayerStore((s) => s.lyricsLoading);
   const currentPicUrl = usePlayerStore((s) => s.currentPicUrl);
@@ -297,10 +287,6 @@ export function LyricsPanel() {
     setLyricsOnly(false);
     setCommentsOpen(true);
   };
-  const nudgeOffset = (delta: number) => {
-    if (!currentSong) return;
-    void bumpLyricOffset(currentSong, delta);
-  };
   const showBlur = !!thumbSrc;
 
   const coverArt = (
@@ -411,38 +397,7 @@ export function LyricsPanel() {
             {immersive ? <Minimize size={18} /> : <Maximize size={18} />}
           </Button>
         )}
-        <div className="relative flex flex-col items-center gap-1">
-          <HintTooltip
-            label={t("lyrics.offsetFaster")}
-            hint={formatLyricOffset(lyricOffset)}
-            side="left"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-offset-faster"
-              onClick={() => nudgeOffset(LYRIC_OFFSET_STEP)}
-              disabled={!currentSong || !canBumpLyricOffset(LYRIC_OFFSET_STEP)}
-            >
-              <ChevronsUp size={20} />
-            </Button>
-          </HintTooltip>
-          <HintTooltip
-            label={t("lyrics.offsetSlower")}
-            hint={formatLyricOffset(lyricOffset)}
-            side="left"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-offset-slower"
-              onClick={() => nudgeOffset(-LYRIC_OFFSET_STEP)}
-              disabled={!currentSong || !canBumpLyricOffset(-LYRIC_OFFSET_STEP)}
-            >
-              <ChevronsDown size={20} />
-            </Button>
-          </HintTooltip>
-        </div>
+        <LyricSourceMenu song={currentSong} />
         <HintTooltip label={t("comments.title")} side="left">
           <Button
             variant="ghost"
@@ -580,7 +535,7 @@ export function LyricsPanel() {
                         ref={(el) => {
                           lineRefs.current[i] = el;
                         }}
-                        onClick={() => seek(lyricSeekTime(line.time))}
+                        onClick={() => seek(line.time)}
                         className={cn(
                           "py-2.5 cursor-pointer transition-[color,font-size] duration-300 ease-out",
                           active

@@ -3,7 +3,6 @@ import { audioPlayer } from "@/lib/audio";
 import { readData, writeData } from "@/lib/db";
 import { sourceRunner } from "@/lib/sourceRunner";
 import { loadLyric } from "@/lib/lyrics";
-import { applyLyricOffsetForSong } from "@/lib/lyrics/offset";
 import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic";
 import {
   applyAudioSource,
@@ -88,6 +87,29 @@ function consumeResume(songId: string): number {
 function clearResume() {
   sessionResumeAt = 0;
   sessionResumeSongId = null;
+}
+
+/** After a local file starts, read tags then fill missing cover/catalog before lyrics. */
+function loadLocalMetaAfterPlay(
+  song: MusicInfo,
+  hydrateP: Promise<MusicInfo | null>,
+  isCurrent: () => boolean,
+) {
+  void (async () => {
+    const hydrated = await hydrateP;
+    if (!isCurrent()) return;
+    const fill = await useLocalMusicStore.getState().fillOnlineMetaOnPlay(song.id);
+    if (!isCurrent()) return;
+    if (fill?.applied) return;
+    const next =
+      fill?.song ??
+      hydrated ??
+      usePlayerStore.getState().currentSong ??
+      song;
+    const player = usePlayerStore.getState();
+    player._loadLyric(next);
+    void player._loadPic(next);
+  })();
 }
 
 function playWithTimeout(): Promise<void> {
@@ -274,7 +296,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         error: null,
         lyricLines: [],
         lyricsLoading: true,
-        currentPicUrl: null,
+        currentPicUrl: song.meta.picUrl ?? null,
         duration: 0,
         isPlaying: false,
         sourceReady: false,
@@ -327,12 +349,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             true,
           );
           useLocalMusicStore.getState().setTrackUnavailable(song.id, false);
-          void hydrateP.then((hydrated) => {
-            if (!isPlayGenerationCurrent(gen)) return;
-            if (get().currentSong?.id !== song.id) return;
-            const next = hydrated ?? get().currentSong ?? song;
-            get()._loadLyric(next);
-            get()._loadPic(next);
+          loadLocalMetaAfterPlay(song, hydrateP, () => {
+            return (
+              isPlayGenerationCurrent(gen) && get().currentSong?.id === song.id
+            );
           });
           return;
         }
@@ -451,7 +471,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               false,
             );
           }
-          void applyLyricOffsetForSong(null);
           set({
             currentSong: null,
             queueIndex: -1,
@@ -529,7 +548,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           get().currentPicUrl ?? currentSong.meta.picUrl ?? null,
           false,
         );
-        void applyLyricOffsetForSong(null);
         set({
           currentSong: null,
           queue: nextQueue,
@@ -653,7 +671,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       persistPlaybackSession(true);
     },
     setShowQueue: (v) => set({ showQueue: v }),
-    setShowLyrics: (v) => set({ showLyrics: v }),
+    setShowLyrics: (v) => {
+      if (v && get().lyricLines.length === 0) return;
+      set({ showLyrics: v });
+    },
 
     async loadFromDisk() {
       const data = await readData<Partial<PlayerPrefs>>(PLAYER_PREFS_FILE, {});
@@ -749,11 +770,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               get().currentPicUrl ?? song.meta.picUrl ?? null,
               false,
             );
-            void hydrateP.then((hydrated) => {
-              if (get().currentSong?.id !== song.id) return;
-              const next = hydrated ?? get().currentSong ?? song;
-              get()._loadLyric(next);
-              get()._loadPic(next);
+            loadLocalMetaAfterPlay(song, hydrateP, () => {
+              return get().currentSong?.id === song.id;
             });
             return;
           }
@@ -883,7 +901,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             false,
           );
         }
-        void applyLyricOffsetForSong(null);
         set({
           currentSong: null,
           queueIndex: -1,
@@ -914,15 +931,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     async _loadLyric(song) {
       const songId = song.id;
-      void applyLyricOffsetForSong(song);
       set({ lyricsLoading: true });
       try {
         const lines = await loadLyric(song);
         if (get().currentSong?.id !== songId) return;
-        set({ lyricLines: lines, lyricsLoading: false });
+        set({
+          lyricLines: lines,
+          lyricsLoading: false,
+          ...(lines.length === 0 ? { showLyrics: false } : {}),
+        });
       } catch {
         if (get().currentSong?.id !== songId) return;
-        set({ lyricLines: [], lyricsLoading: false });
+        set({ lyricLines: [], lyricsLoading: false, showLyrics: false });
       }
     },
 

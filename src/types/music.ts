@@ -26,6 +26,10 @@ export interface MusicInfoMeta {
   localCoverRel?: string;
   /** Timed LRC text extracted from tags at import (local only). */
   embeddedLyric?: string;
+  /** NetEase id from Match online — used to fetch lyrics/cover without a second guess. */
+  wySongId?: string;
+  /** Catalog title from Match online. Shown when filename lock is off and there is no ID3 title. */
+  catalogName?: string;
 }
 
 export interface MusicInfo {
@@ -82,7 +86,7 @@ export interface LyricWord {
   text: string;
 }
 
-export type LyricKaraokeMode = "native" | "estimated" | "none";
+export type LyricKaraokeMode = "native" | "none";
 
 export interface LyricLine {
   time: number;

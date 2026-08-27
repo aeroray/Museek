@@ -4,12 +4,6 @@
  */
 export { parseLrc } from "./parser"
 export { findActiveLyricIndex, desktopLyricSecondaryText } from "./activeLine"
-export {
-  LYRIC_OFFSET_STEP,
-  applyLyricOffsetForSong,
-  bumpLyricOffset,
-  resetLyricOffset,
-} from "./offset"
 export { loadLyric } from "@/lib/lyric/loadLyric"
 export { getBuiltinLyric } from "@/lib/lyric"
 export {

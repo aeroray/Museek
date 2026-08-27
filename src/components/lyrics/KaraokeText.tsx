@@ -17,7 +17,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function hasKaraokeTiming(line: KaraokeLine): boolean {
-  if (line.karaoke !== "native" && line.karaoke !== "estimated") return false;
+  if (line.karaoke !== "native") return false;
   const words = line.words;
   return Boolean(
     words?.length &&

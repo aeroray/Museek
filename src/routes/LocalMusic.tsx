@@ -45,8 +45,8 @@ import { cn } from "@/lib/utils";
 import {
   categoryNameMap,
   filterByCategoryId,
-  findActiveCategory,
   labelForCategoryFilter,
+  sharedCategoryId,
   type CategoryFilter,
 } from "@/lib/songCategories";
 import { CategoryAssignItems } from "@/components/songCategories/CategoryAssignItems";
@@ -97,8 +97,6 @@ export function LocalMusic() {
       if (assignSelected && selected.size > 0) {
         setTracksCategory([...selected], cat.id);
         exitEdit();
-      } else {
-        setCategoryFilter(cat.id);
       }
     },
   });
@@ -162,9 +160,16 @@ export function LocalMusic() {
   const runMatch = async (ids: string[]) => {
     if (ids.length === 0) return;
     try {
-      const n = await matchTracksOnline(ids);
-      if (n > 0) {
-        notify({ message: tr("local.matched", { n }), variant: "success" });
+      const { applied, miss, unchanged } = await matchTracksOnline(ids);
+      if (applied > 0) {
+        notify({
+          message: tr("local.matched", { n: applied }),
+          variant: "success",
+        });
+      } else if (miss > 0) {
+        notify({ message: tr("local.matchNone"), variant: "info" });
+      } else if (unchanged > 0) {
+        notify({ message: tr("local.matchUnchanged"), variant: "info" });
       }
     } catch (e) {
       notify({
@@ -236,7 +241,6 @@ export function LocalMusic() {
       none: tr("local.categoryNone"),
     },
   );
-  const activeCategory = findActiveCategory(categories, categoryFilter);
   const busy = importing || matching;
   const progress = matchProgress ?? importProgress;
   const progressIsMatch = Boolean(matchProgress);
@@ -350,16 +354,14 @@ export function LocalMusic() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   {SORTS.map((s) => (
-                    <DropdownMenuItem key={s} onClick={() => setLocalSort(s)}>
-                      <Check
-                        size={14}
-                        className={cn(
-                          "mr-2",
-                          localSort === s ? "opacity-100" : "opacity-0",
-                        )}
-                      />
+                    <DropdownMenuCheckboxItem
+                      key={s}
+                      checked={localSort === s}
+                      showUncheckedIndicator
+                      onCheckedChange={() => setLocalSort(s)}
+                    >
                       {tr(`favorites.sort.${s}`)}
-                    </DropdownMenuItem>
+                    </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -368,9 +370,8 @@ export function LocalMusic() {
                 categories={categories}
                 filter={categoryFilter}
                 filterLabel={categoryFilterLabel}
-                activeCategory={activeCategory}
                 onFilter={setCategoryFilter}
-                onCreate={categoryDialog.openCreate}
+                onCreate={() => categoryDialog.openCreate()}
                 onRename={categoryDialog.openRename}
                 onDelete={deleteCategory}
                 labels={{
@@ -424,6 +425,13 @@ export function LocalMusic() {
                 <CategoryAssignMenu
                   categories={categories}
                   disabled={selected.size === 0}
+                  selectedId={sharedCategoryId(
+                    [...selected].map(
+                      (id) =>
+                        tracks.find((track) => track.id === id)?.categoryId ??
+                        null,
+                    ),
+                  )}
                   onAssign={batchMove}
                   onCreate={() => categoryDialog.openCreate(true)}
                   labels={{
@@ -711,6 +719,7 @@ export function LocalMusic() {
                             </DropdownMenuLabel>
                             <CategoryAssignItems
                               categories={categories}
+                              selectedId={track.categoryId ?? null}
                               onAssign={(categoryId) =>
                                 setTracksCategory([track.id], categoryId)
                               }

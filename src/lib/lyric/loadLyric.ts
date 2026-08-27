@@ -1,12 +1,11 @@
 import { createAsyncCache } from "@/lib/cache";
-import { getBuiltinLyric } from "@/lib/lyric";
-import { getWyLyric } from "@/lib/lyric/extra";
 import { fetchLocalFileLyric } from "@/lib/localMusic";
-import { parseLrc } from "@/lib/lyrics/parser";
+import { fetchPreferredLyric } from "@/lib/lyrics/sources";
+import {
+  isWordByWordLyric,
+  linesFromLyricInfo,
+} from "@/lib/lyrics/timing";
 import { getCachedLyric, putCachedLyric } from "@/lib/mediaCache";
-import { searchWangyi } from "@/lib/search/wy";
-import { sourceRunner } from "@/lib/sourceRunner";
-import { applyKaraokeTiming, parseLyricDuration } from "@/lib/lyrics/timing";
 import type { LyricInfo, LyricLine, MusicInfo } from "@/types/music";
 
 function hasLyricPayload(
@@ -27,47 +26,22 @@ const lyricInfoCache = createAsyncCache<LyricInfo | null>(
   80,
   hasLyricPayload,
 );
-const LYRIC_CACHE_VERSION = "word-timing-v3";
+const LYRIC_CACHE_VERSION = "wbw-prefer-v3";
 
-function parseLyricInfo(info: LyricInfo, songDuration: number): LyricLine[] {
-  const timedLyric = info.lxlyric?.trim();
-  const primary =
-    timedLyric && /\[\d{1,2}:\d{2}/.test(timedLyric) ? timedLyric : info.lyric;
-  if (!primary?.trim()) return [];
-  return applyKaraokeTiming(
-    parseLrc(primary, info.tlyric ?? undefined),
-    songDuration,
-  );
-}
-
-/** Fallback when no sidecar / embedded timed lyric: NetEase search by title/artist. */
-async function fetchLocalLyricOnline(
-  song: MusicInfo,
-): Promise<LyricInfo | null> {
-  const q = [song.name, song.singer].filter(Boolean).join(" ").trim();
-  if (!q) return null;
-  try {
-    const result = await searchWangyi(q, 1, 5);
-    const hit = result.list[0];
-    if (!hit?.meta.songId) return null;
-    return await getWyLyric(hit);
-  } catch {
-    return null;
-  }
-}
+export { isWordByWordLyric, linesFromLyricInfo };
 
 async function fetchLyricInfo(
   song: MusicInfo,
   cacheSongId: string,
 ): Promise<LyricInfo | null> {
-  // Local: prefer file-side sources every time (.lrc may appear after import).
+  // Local file lyrics win every time (.lrc may appear after import).
   if (song.source === "local") {
     const fromFile = await fetchLocalFileLyric({
       filePath: song.meta.filePath,
       embeddedLyric: song.meta.embeddedLyric,
     });
     if (hasLyricPayload(fromFile)) {
-      putCachedLyric(song.source, cacheSongId, fromFile);
+      await putCachedLyric(song.source, cacheSongId, fromFile);
       return fromFile;
     }
   }
@@ -77,27 +51,28 @@ async function fetchLyricInfo(
     cacheSongId,
   );
   if (!hasLyricPayload(lyricInfo)) {
-    if (song.source === "local") {
-      lyricInfo = await fetchLocalLyricOnline(song);
-    } else {
-      lyricInfo = await getBuiltinLyric(song);
-      if (!hasLyricPayload(lyricInfo)) {
-        try {
-          lyricInfo = await sourceRunner.getLyric({
-            source: song.source,
-            action: "lyric",
-            info: song,
-          });
-        } catch {
-          lyricInfo = null;
-        }
-      }
-    }
+    lyricInfo = await fetchPreferredLyric(song);
     if (hasLyricPayload(lyricInfo)) {
-      putCachedLyric(song.source, cacheSongId, lyricInfo);
+      await putCachedLyric(song.source, cacheSongId, lyricInfo);
     }
   }
   return hasLyricPayload(lyricInfo) ? lyricInfo : null;
+}
+
+/** Write a chosen lyric payload into memory + disk cache for this playing song. */
+export async function applyLyricInfo(
+  song: MusicInfo,
+  info: LyricInfo,
+): Promise<LyricLine[]> {
+  const cacheSongId = `${song.meta.songId}:${LYRIC_CACHE_VERSION}`;
+  const key = `${song.source}:${cacheSongId}`;
+  const lines = linesFromLyricInfo(info);
+  if (hasLyricPayload(info)) {
+    await putCachedLyric(song.source, cacheSongId, info);
+    lyricInfoCache.prime(key, info);
+  }
+  lyricCache.prime(key, lines);
+  return lines;
 }
 
 async function fetchLyricLines(
@@ -106,12 +81,12 @@ async function fetchLyricLines(
 ): Promise<LyricLine[]> {
   const lyricInfo = await fetchLyricInfo(song, cacheSongId);
   if (!lyricInfo) return [];
-  return parseLyricInfo(lyricInfo, parseLyricDuration(song.interval));
+  return linesFromLyricInfo(lyricInfo);
 }
 
 /**
- * Cache → builtin platform APIs → source script → parse.
- * Local: sidecar .lrc / embedded tags → cache → NetEase search.
+ * Local: sidecar / embedded tags, else search platforms and stop at
+ * word-by-word. Online: own platform first, then others for word-by-word.
  * Returns [] when nothing is available (caller owns loading UI).
  */
 export async function loadLyric(song: MusicInfo): Promise<LyricLine[]> {

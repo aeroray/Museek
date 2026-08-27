@@ -19,7 +19,7 @@ export function useCategoryDialog(opts: {
   const catInputRef = useRef<HTMLInputElement>(null)
 
   const openCreate = (assignSelected = false) => {
-    setAssignAfterCreate(assignSelected)
+    setAssignAfterCreate(assignSelected === true)
     setCatName("")
     setCatDialog({ mode: "create" })
   }

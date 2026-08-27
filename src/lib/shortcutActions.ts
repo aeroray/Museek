@@ -73,6 +73,7 @@ export function runShortcutAction(action: ShortcutAction): boolean {
       return true;
     case "lyrics":
       if (!p.currentSong) return false;
+      if (!p.showLyrics && p.lyricLines.length === 0) return false;
       p.setShowLyrics(!p.showLyrics);
       return true;
     case "desktopLyrics":

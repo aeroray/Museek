@@ -1,7 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { audioPlayer } from "@/lib/audio";
 import { findActiveLyricIndex } from "@/lib/lyrics/activeLine";
-import { getLyricOffset, subscribeLyricOffset } from "@/lib/lyrics/offset";
 import type { LyricLine } from "@/types/music";
 
 /**
@@ -19,29 +18,20 @@ export function getPlaybackTime(): number {
   return audioPlayer.getCurrentTime();
 }
 
-/** Playback time shifted by the per-song lyric offset (for highlighting / karaoke). */
+/** Playback time used for lyric highlighting / karaoke. */
 export function getLyricTime(): number {
-  return getPlaybackTime() + getLyricOffset();
+  return getPlaybackTime();
 }
 
 const subscribePlaybackStore = (onStoreChange: () => void): (() => void) =>
   subscribePlaybackTime(() => onStoreChange());
-
-const subscribeLyricClock = (onStoreChange: () => void): (() => void) => {
-  const stopTime = subscribePlaybackTime(() => onStoreChange());
-  const stopOffset = subscribeLyricOffset(onStoreChange);
-  return () => {
-    stopTime();
-    stopOffset();
-  };
-};
 
 export function usePlaybackTime(): number {
   return useSyncExternalStore(subscribePlaybackStore, getPlaybackTime, () => 0);
 }
 
 export function useLyricTime(): number {
-  return useSyncExternalStore(subscribeLyricClock, getLyricTime, () => 0);
+  return useSyncExternalStore(subscribePlaybackStore, getLyricTime, () => 0);
 }
 
 export function usePlaybackLyricIndex(lines: LyricLine[]): number {
@@ -54,7 +44,7 @@ export function usePlaybackLyricIndex(lines: LyricLine[]): number {
     [lines],
   );
   return useSyncExternalStore(
-    subscribeLyricClock,
+    subscribePlaybackStore,
     getSnapshot,
     getServerSnapshot,
   );

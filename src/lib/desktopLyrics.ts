@@ -10,7 +10,6 @@ import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { currentFontStacks, useFontStore } from "@/stores/fontStore";
 import { findActiveLyricIndex } from "@/lib/lyrics";
 import { getLyricTime } from "@/lib/playback/clock";
-import { subscribeLyricOffset } from "@/lib/lyrics/offset";
 import {
   loadDesktopLyricsInteractionMode,
   saveDesktopLyricsInteractionMode,
@@ -308,17 +307,6 @@ export function startDesktopLyricsBridge(): () => void {
       pendingTime = getLyricTime();
       flushTime();
     });
-    const stopOffset = subscribeLyricOffset(() => {
-      if (!useDesktopLyricsStore.getState().isVisible) return;
-      pendingTime = getLyricTime();
-      flushTime();
-      void publishSnapshot(true);
-    });
-    const stopAudio = unsubscribeTime;
-    unsubscribeTime = () => {
-      stopAudio();
-      stopOffset();
-    };
   };
   const stopTimeBridge = () => {
     unsubscribeTime?.();

@@ -1,6 +1,6 @@
 import {
   Music,
-  ListMusic,
+  List,
   MicVocal,
   Captions,
   CaptionsOff,
@@ -45,6 +45,7 @@ export function PlayerBar() {
     queue,
     showQueue,
     showLyrics,
+    lyricLines,
     status,
     setShowQueue,
     setShowLyrics,
@@ -57,6 +58,7 @@ export function PlayerBar() {
   const desktopLyricsControlsDisabled = !currentSong && !desktopLyricsVisible;
 
   const loading = status === "loading";
+  const hasLyrics = lyricLines.length > 0;
   // Prefer the resolved cover; while loading fall back to the song's own pic so
   // the art doesn't blank out — the spinner overlay still signals resolving.
   const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null;
@@ -87,8 +89,8 @@ export function PlayerBar() {
             <ShortcutTooltip label={t("player.lyrics")} action="lyrics">
             <button
               type="button"
-              onClick={() => !loading && setShowLyrics(true)}
-              disabled={loading}
+              onClick={() => !loading && hasLyrics && setShowLyrics(true)}
+              disabled={loading || !hasLyrics}
               // Outer owns shadow + scale; inner clips overlay so it never paints past rounded corners.
               className="group relative h-12 w-12 shrink-0 transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.96] disabled:pointer-events-none"
             >
@@ -198,7 +200,7 @@ export function PlayerBar() {
                 showLyrics && "text-primary",
               )}
               onClick={() => setShowLyrics(!showLyrics)}
-              disabled={!currentSong}
+              disabled={!currentSong || !hasLyrics}
             >
               <MicVocal size={16} />
             </Button>
@@ -243,7 +245,7 @@ export function PlayerBar() {
             disabled={queue.length === 0}
             title={t("player.queue")}
           >
-            <ListMusic size={16} />
+            <List size={16} />
           </Button>
           <ShortcutTooltip label={t("player.miniMode")} action="mini">
             <Button

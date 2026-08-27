@@ -23,7 +23,6 @@ interface CacheEntry {
 const INDEX_FILE = "cacheIndex.json"
 const AUDIO_DIR = "museek/cache/audio"
 const LYRIC_DIR = "museek/cache/lyrics"
-const LYRIC_OFFSET_DIR = "museek/cache/lyric-offset"
 
 let index: CacheEntry[] = []
 let loaded = false
@@ -74,8 +73,8 @@ export async function clearCache(): Promise<void> {
   persistIndex()
 }
 
-// Evict least-recently-used AUDIO entries until under the limit (lyrics and
-// lyric offsets are tiny and kept). Called after each audio write and on startup.
+// Evict least-recently-used AUDIO entries until under the limit (lyrics are
+// tiny and kept). Called after each audio write and on startup.
 export async function enforceLimit(maxBytes: number): Promise<void> {
   if (!isTauri) return
   await ensureLoaded()
@@ -123,63 +122,6 @@ export async function putCachedLyric(source: Source, songId: string, data: Lyric
     const json = JSON.stringify(data)
     await writeTextFile(path, json, { baseDir: BaseDirectory.AppData })
     upsert(`lyric:${source}:${songId}`, path, json.length, "lyric")
-  } catch {
-    /* cache write best-effort */
-  }
-}
-
-function offsetKey(source: Source, songId: string): string {
-  return `lyric-offset:${source}:${songId}`
-}
-
-function offsetPath(source: Source, songId: string): string {
-  return `${LYRIC_OFFSET_DIR}/${source}_${safe(songId)}.json`
-}
-
-/** Per-song lyric timeline shift in seconds. Cleared with the cache folder. */
-export async function getCachedLyricOffset(
-  source: Source,
-  songId: string,
-): Promise<number | null> {
-  if (!isTauri) return null
-  await ensureLoaded()
-  const key = offsetKey(source, songId)
-  const entry = index.find((e) => e.key === key)
-  if (!entry) return null
-  try {
-    const { readTextFile, BaseDirectory } = await import("@tauri-apps/plugin-fs")
-    const text = await readTextFile(entry.path, { baseDir: BaseDirectory.AppData })
-    const parsed = JSON.parse(text) as { seconds?: unknown }
-    const seconds = typeof parsed.seconds === "number" ? parsed.seconds : Number.NaN
-    if (!Number.isFinite(seconds) || seconds === 0) return null
-    entry.lastUsed = Date.now()
-    persistIndex()
-    return seconds
-  } catch {
-    return null
-  }
-}
-
-export async function putCachedLyricOffset(
-  source: Source,
-  songId: string,
-  seconds: number,
-): Promise<void> {
-  if (!isTauri) return
-  await ensureLoaded()
-  const key = offsetKey(source, songId)
-  const path = offsetPath(source, songId)
-  if (!Number.isFinite(seconds) || seconds === 0) {
-    const entry = index.find((e) => e.key === key)
-    if (entry) await dropCacheEntry(key, entry.path)
-    return
-  }
-  try {
-    const { writeTextFile, mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs")
-    await mkdir(LYRIC_OFFSET_DIR, { baseDir: BaseDirectory.AppData, recursive: true })
-    const json = JSON.stringify({ seconds })
-    await writeTextFile(path, json, { baseDir: BaseDirectory.AppData })
-    upsert(key, path, json.length, "lyric-offset")
   } catch {
     /* cache write best-effort */
   }

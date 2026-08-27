@@ -1,12 +1,30 @@
 # Confirmed Decisions
 
-## 2026-08-26 - Local import pipeline
+## 2026-08-27 - Fill local cover on play
 
 Decision:
-Import enqueues by path with `nameMode: filename`. Background `readLocalTags` fills cover, duration, lyrics, artist, and album with no network; the filename checkbox (on by default) only locks the title. Network runs only from Match online or Match on import (`matchOnline`); play and the checkbox never enrich. Online fill is gap-only and never overwrites ID3 or a locked title.
+Playing a local file fills missing cover, NetEase id, and catalog title in the background after tags. Filename lock still hides the catalog title. Import still does not network unless Match on import is on.
 
 Reason:
-One `refreshTrack` mixed tags and NetEase, so checking a box or playing looked like matching.
+Artwork and cross-platform lyric search need catalog identity; waiting for Match online left empty covers and `Artist - Title` filenames unmatched.
+
+## 2026-08-27 - Native karaoke only; prefer word-by-word sources
+
+Decision:
+Karaoke fill uses platform-native word timestamps only. Plain LRC keeps the default whole-line treatment. On play, local sidecar or embedded lyrics win; otherwise search wy/kw/kg/tx/mg and stop at the first word-by-word hit. Online songs try their own platform first, then the others for word-by-word, else keep that platform’s plain lyric.
+
+Reason:
+Estimated karaoke looked like word-by-word but was not. Users want real YRC/QRC/KRC or a normal line lyric, and a word-timed source when playing.
+
+## 2026-08-26 - Local import pipeline
+
+Superseded in part 2026-08-27: play may fill missing cover, NetEase id, and catalog title. Import still has no network; the filename checkbox is title lock only.
+
+Decision:
+Import enqueues by path with `nameMode: filename`. Background `readLocalTags` fills cover, duration, lyrics, artist, and album with no network. The filename checkbox only changes the displayed title. Match online / Match on import store the catalog title (`catalogName`) and fill gaps; unchecking shows ID3 or that catalog title.
+
+Reason:
+Mixing tags and NetEase in one refresh made a checkbox or play look like matching, and locking the title used to discard the catalog name.
 
 ## 2026-08-24 - Windows window show on the UI thread
 
@@ -81,6 +99,8 @@ Reason:
 GSMTC consumers need EndTime and Position; a metadata-only card cannot sync lyrics.
 
 ## 2026-08-17 - Per-song lyric timeline offset in local cache
+
+Superseded 2026-08-27: delay/advance controls are gone. The lyrics page lists each platform’s lyrics (word-by-word badge vs plain) so the user can switch instead of nudging time.
 
 Decision:
 Store lyric delay/advance as a per-song cache file (0.5s steps, ±10s). Apply it on the lyric clock only. Do not sync it; clearing the media cache drops it.
@@ -530,6 +550,8 @@ Pointer-up can race the last cursor sample and otherwise save a position outside
 
 ## 2026-08-09 - Preserve available word-timed lyric data
 
+Superseded 2026-08-27: no estimated fill from line LRC; plain lyrics use the default whole-line treatment.
+
 Decision:
 Parse inline word timings from LRC, KuWo, KRC, MRC, and external `lxlyric` data into optional `LyricLine.words`; use per-word theme-color fill when present and line-level interpolation otherwise.
 
@@ -537,6 +559,8 @@ Reason:
 Line-only LRC cannot provide perfect karaoke timing, while discarding available word timings made supported sources visibly lag the vocal timing.
 
 ## 2026-08-09 - Prefer validated native karaoke timing
+
+Superseded 2026-08-27: do not estimate word timings from line-timed lyrics.
 
 Decision:
 Use validated platform-native word timing first: NetEase YRC, QQ QRC, KuWo lyricx, KuGou KRC, Migu MRC, and inline `lxlyric` data. Estimate word timing only for line-timed lyrics when the next-line or song-duration interval is defensible; otherwise render stable themed text with karaoke disabled.

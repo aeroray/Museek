@@ -49,3 +49,12 @@ export function findActiveCategory(
   if (filter === "all" || filter === "none") return undefined
   return categories.find((c) => c.id === filter)
 }
+
+/** Shared category of a selection: `null` = all uncategorized, `undefined` = mixed. */
+export function sharedCategoryId(
+  values: Array<string | null | undefined>,
+): string | null | undefined {
+  if (values.length === 0) return undefined
+  const first = values[0] ?? null
+  return values.every((value) => (value ?? null) === first) ? first : undefined
+}

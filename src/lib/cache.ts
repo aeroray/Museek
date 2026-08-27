@@ -11,14 +11,19 @@
 // Failures are NOT cached: a rejected promise is evicted so a manual retry (or
 // the next visit) re-fetches. A simple LRU bound keeps memory in check.
 
+export type AsyncCache<T> = {
+  (key: string, fn: () => Promise<T>): Promise<T>
+  prime(key: string, value: T): void
+}
+
 export function createAsyncCache<T>(
   ttlMs: number,
   max = 60,
   keep?: (value: T) => boolean,
-) {
+): AsyncCache<T> {
   const map = new Map<string, { promise: Promise<T>; expires: number }>()
 
-  return function cached(key: string, fn: () => Promise<T>): Promise<T> {
+  const cached = ((key: string, fn: () => Promise<T>): Promise<T> => {
     const hit = map.get(key)
     if (hit && Date.now() < hit.expires) {
       // Refresh recency (Map keeps insertion order → re-insert = most recent).
@@ -49,5 +54,11 @@ export function createAsyncCache<T>(
     }
 
     return promise
+  }) as AsyncCache<T>
+
+  cached.prime = (key, value) => {
+    map.set(key, { promise: Promise.resolve(value), expires: Date.now() + ttlMs })
   }
+
+  return cached
 }

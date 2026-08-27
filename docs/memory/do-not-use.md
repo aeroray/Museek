@@ -44,9 +44,9 @@ Do not store `ProtocolObject<dyn NSObjectProtocol>` in `app.manage()`. It is !Se
 
 Do not read `NSWorkspaceDidWakeNotification` (and similar `extern static`s) from safe Rust. rustc reports E0133. Use `ns_string!("NSWorkspaceDidWakeNotification")` with the Apple constant name.
 
-## Synced lyric timeline offsets
+## Lyric timeline offset controls
 
-Do not put per-song lyric delay/advance in settings.json or config sync. Keep it in the on-disk media cache so a full cache clear removes it.
+Do not add per-song lyric delay/advance (±0.5s) buttons or cache. Switch to another platform’s lyrics from the lyrics-page toolbar instead. Do not put offsets in settings.json.
 
 ## Synced UI font families
 
@@ -55,6 +55,18 @@ Do not put UI or desktop-lyrics font family names in settings.json or config syn
 ## Bundled CJK webfonts for UI chrome
 
 Do not ship Noto Serif SC (or similar CJK webfonts) as the default UI face. Follow the system font stack, and let users pick from fonts already installed on the device.
+
+## Category filter manage submenu
+
+Do not hide rename/delete behind a “管理分类” submenu. Put trailing pencil/trash icons on each custom category row in the All Categories dropdown.
+
+## Estimated line-LRC karaoke
+
+Do not invent per-word timings from line-timed lyrics. Karaoke fill is native timestamps only; plain lyrics use the default whole-line treatment.
+
+## Auto-select on category create or rename
+
+Do not switch the All Categories filter (or assign tracks) just because a category was created from that menu, and do not treat rename/delete icon clicks as selecting the row. Pass `openCreate(true)` only from “move to category”. Do not pass `openCreate` itself as an `onClick` handler — the click event is truthy.
 
 
 

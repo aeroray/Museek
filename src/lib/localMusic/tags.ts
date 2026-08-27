@@ -50,6 +50,25 @@ export function localFilenameTitle(path: string): string {
   return basenameNoExt(path).trim() || t("local.unknownTitle");
 }
 
+/** Display title: filename lock, else ID3, else Match-online catalog name. */
+export function localResolvedTitle(opts: {
+  filePath: string;
+  nameMode: LocalNameMode;
+  hasTitleTag: boolean;
+  parsedName: string;
+  catalogName?: string | null;
+}): string {
+  if (opts.nameMode === "filename") {
+    return localFilenameTitle(opts.filePath);
+  }
+  if (opts.hasTitleTag && opts.parsedName.trim()) {
+    return opts.parsedName.trim();
+  }
+  const catalog = opts.catalogName?.trim();
+  if (catalog) return catalog;
+  return opts.parsedName.trim() || localFilenameTitle(opts.filePath);
+}
+
 /** Guess "Artist - Title" from filename. */
 export function guessFromFilename(path: string): {
   name: string;
