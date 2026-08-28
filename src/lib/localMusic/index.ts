@@ -19,6 +19,7 @@ export type { LocalEnrichStatus } from "./enrich";
 export {
   localCatalogQuery,
   catalogIdentity,
+  lyricSearchIdentity,
   isPlaceholderArtist,
   isPlaceholderTitle,
 } from "./catalogQuery";

@@ -26,7 +26,7 @@ const lyricInfoCache = createAsyncCache<LyricInfo | null>(
   80,
   hasLyricPayload,
 );
-const LYRIC_CACHE_VERSION = "wbw-prefer-v3";
+const LYRIC_CACHE_VERSION = "match-strict-v1";
 
 export { isWordByWordLyric, linesFromLyricInfo };
 

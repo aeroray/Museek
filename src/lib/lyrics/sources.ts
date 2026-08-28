@@ -40,6 +40,28 @@ function isWordByWordInfo(info: LyricInfo, lines: ReturnType<typeof linesFromLyr
   )
 }
 
+const INSTRUMENTAL_HINT =
+  /没有填词的纯音乐|纯音乐，请欣赏|纯音乐 请欣赏/i
+const CREDIT_LINE =
+  /^(作词|作曲|编曲|制作人|混音|录音师|出品人|监制|lyricist|composer|arranger)\s*[:：]/i
+
+/** Platform "this is instrumental" notices are not lyrics. */
+function lyricLooksInstrumental(
+  info: LyricInfo,
+  lines: ReturnType<typeof linesFromLyricInfo>,
+): boolean {
+  const sung = lines.filter((line) => {
+    const text = line.text.trim()
+    if (!text) return false
+    if (INSTRUMENTAL_HINT.test(text)) return false
+    if (CREDIT_LINE.test(text)) return false
+    return true
+  })
+  if (sung.length === 0) return true
+  const blob = `${info.lyric}\n${info.lxlyric ?? ""}`
+  return sung.length <= 2 && INSTRUMENTAL_HINT.test(blob)
+}
+
 type FetchedLyric = { info: LyricInfo; wordByWord: boolean }
 type Payload = { info: LyricInfo }
 
@@ -82,14 +104,6 @@ async function resolvePlatformSong(
   platform: OnlineSource,
 ): Promise<MusicInfo | null> {
   if (song.source === platform) return song
-  if (platform === "wy" && song.meta.wySongId) {
-    return {
-      ...song,
-      id: `wy_${song.meta.wySongId}`,
-      source: "wy",
-      meta: { ...song.meta, songId: song.meta.wySongId },
-    }
-  }
 
   const probe = lyricProbeSong(song)
   const seen = new Set<string>()
@@ -115,7 +129,7 @@ async function probeOne(
     const cached = payloads.get(payloadKey(song, platform))
     if (cached) {
       const lines = linesFromLyricInfo(cached.info)
-      if (!lines.length) {
+      if (!lines.length || lyricLooksInstrumental(cached.info, lines)) {
         return { source: platform, status: "empty", wordByWord: false }
       }
       return {
@@ -131,7 +145,7 @@ async function probeOne(
       return { source: platform, status: "empty", wordByWord: false }
     }
     const lines = linesFromLyricInfo(info)
-    if (!lines.length) {
+    if (!lines.length || lyricLooksInstrumental(info, lines)) {
       return { source: platform, status: "empty", wordByWord: false }
     }
     payloads.set(payloadKey(song, platform), { info })
@@ -204,7 +218,7 @@ async function lyricFromPlatform(
   }
   if (!hasLyricPayload(info)) return null
   const lines = linesFromLyricInfo(info)
-  if (!lines.length) return null
+  if (!lines.length || lyricLooksInstrumental(info, lines)) return null
   payloads.set(payloadKey(song, platform), { info })
   return { info, wordByWord: isWordByWordInfo(info, lines) }
 }

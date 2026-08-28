@@ -1,13 +1,15 @@
 import {
-  catalogIdentity,
+  lyricSearchIdentity,
   isPlaceholderArtist,
   isPlaceholderTitle,
 } from "@/lib/localMusic/catalogQuery"
 import { parseLyricDuration } from "@/lib/lyrics/timing"
 import type { MusicInfo } from "@/types/music"
 
-const TITLE_MIN = 0.72
-const ARTIST_MIN = 0.5
+const TITLE_MIN = 0.88
+const ARTIST_MIN = 0.55
+const DURATION_REJECT_SEC = 15
+const UNKNOWN_ARTIST_DURATION_SEC = 8
 
 function fold(value: string): string {
   return value
@@ -50,9 +52,13 @@ function textScore(left: string, right: string): number {
   if (a.includes(b) || b.includes(a)) {
     const shorter = Math.min(a.length, b.length)
     const longer = Math.max(a.length, b.length)
-    return 0.72 + 0.2 * (shorter / longer)
+    const ratio = shorter / longer
+    // A short token inside a long title ("BGM" ⊂ "Epic Battle BGM") is not a match.
+    if (ratio < 0.85) return 0
+    return 0.88 + 0.12 * ratio
   }
-  return jaccard(tokenSet(left), tokenSet(right))
+  const jac = jaccard(tokenSet(left), tokenSet(right))
+  return jac >= 0.85 ? jac : 0
 }
 
 function durationScore(left: string, right: string): number {
@@ -62,29 +68,48 @@ function durationScore(left: string, right: string): number {
   const diff = Math.abs(a - b)
   if (diff <= 3) return 1
   if (diff <= 8) return 0.7
-  if (diff <= 15) return 0.35
+  if (diff <= DURATION_REJECT_SEC) return 0.35
   return 0
 }
 
-/** Title/artist used to search and score lyrics — catalog match, not filename lock. */
+/** Title/artist used to search and score lyrics — file identity, not catalog fill. */
 export function lyricProbeSong(song: MusicInfo): MusicInfo {
-  const { name, singer } = catalogIdentity(song)
+  const { name, singer } = lyricSearchIdentity(song)
   const nextName = name || song.name
   const nextSinger = singer || song.singer
   if (nextName === song.name && nextSinger === song.singer) return song
   return { ...song, name: nextName, singer: nextSinger }
 }
 
-/** 0 = reject. Title and artist must both look like the same recording. */
+/** 0 = reject. Same recording only: tight title, artist (when known), duration. */
 export function matchScore(song: MusicInfo, hit: MusicInfo): number {
   const probe = lyricProbeSong(song)
   const title = textScore(probe.name, hit.name)
   if (title < TITLE_MIN) return 0
-  const artist = isPlaceholderArtist(probe.singer)
-    ? 0.6
-    : textScore(probe.singer, hit.singer)
-  if (artist < ARTIST_MIN) return 0
+
+  const localDur = parseLyricDuration(probe.interval)
+  const hitDur = parseLyricDuration(hit.interval)
+  if (localDur && hitDur && Math.abs(localDur - hitDur) > DURATION_REJECT_SEC) {
+    return 0
+  }
   const duration = durationScore(probe.interval, hit.interval)
+
+  const artistUnknown =
+    isPlaceholderArtist(probe.singer) || isPlaceholderArtist(hit.singer)
+  if (artistUnknown) {
+    if (title < 0.95) return 0
+    if (
+      !localDur ||
+      !hitDur ||
+      Math.abs(localDur - hitDur) > UNKNOWN_ARTIST_DURATION_SEC
+    ) {
+      return 0
+    }
+    return title * 0.9 + duration * 0.1
+  }
+
+  const artist = textScore(probe.singer, hit.singer)
+  if (artist < ARTIST_MIN) return 0
   return title * 0.55 + artist * 0.35 + duration * 0.1
 }
 
@@ -109,12 +134,14 @@ export function lyricSearchQueries(song: MusicInfo): string[] {
   const name = isPlaceholderTitle(probe.name) ? "" : probe.name.trim()
   const singer = isPlaceholderArtist(probe.singer) ? "" : probe.singer.trim()
   const core = coreTitle(probe.name)
+  const catalog = song.meta.catalogName?.trim()
   const queries: string[] = []
   for (const query of [
     [name, singer].filter(Boolean).join(" "),
     [core, singer].filter(Boolean).join(" "),
-    name,
-    core,
+    catalog && catalog !== name ? [catalog, singer].filter(Boolean).join(" ") : "",
+    singer ? "" : name,
+    singer ? "" : core,
   ]) {
     if (query && !queries.includes(query)) queries.push(query)
   }

@@ -17,6 +17,58 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.6.0": {
+    zh: {
+      sections: [
+        {
+          title: "🎤 歌词",
+          bullets: [
+            "卡拉 OK 只用平台原生逐字时间；普通歌词整行显示，不再估算逐字",
+            "歌词页可切换网易云、酷我、酷狗、QQ 音乐、咪咕；播放时优先选有逐字的源",
+            "去掉歌词时间轴微调，改从各平台里选一份更准的词",
+          ],
+        },
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "播放时补缺失封面和目录信息；勾选「显示原文件名」仍只锁定歌名",
+            "无歌词的 BGM、播客不再错配其他歌曲的词；歌名和时长对不上就留空",
+          ],
+        },
+        {
+          title: "🏷️ 分类",
+          bullets: [
+            "全部分类菜单里，自定义分类可直接改名或删除",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎤 Lyrics",
+          bullets: [
+            "Karaoke uses platform-native word timing only; plain lyrics stay whole-line",
+            "Switch NetEase, KuWo, KuGou, QQ Music, or Migu on the lyrics page; playback prefers a word-timed source",
+            "Timeline nudge is gone — pick another platform’s lyrics instead",
+          ],
+        },
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Playing fills missing cover and catalog info; Show original filename still only locks the title",
+            "Instrumental BGM and podcasts no longer get another song’s lyrics; weak title or duration matches stay empty",
+          ],
+        },
+        {
+          title: "🏷️ Categories",
+          bullets: [
+            "Rename or delete a custom category from the All Categories menu",
+          ],
+        },
+      ],
+    },
+  },
   "3.5.3": {
     zh: {
       sections: [

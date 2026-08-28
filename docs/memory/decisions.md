@@ -1,5 +1,13 @@
 # Confirmed Decisions
 
+## 2026-08-28 - Reject weak local lyric matches
+
+Decision:
+Local lyric and catalog fills require a tight title, a known artist or a close duration, and reject duration gaps over 15s. Do not bind lyrics to a stored NetEase id or first search hit. Treat platform “instrumental / 纯音乐” notices as no lyrics.
+
+Reason:
+AI BGM and podcast files were matching unrelated songs via substring titles, unknown-artist passes, and play-time first-hit `wySongId`.
+
 ## 2026-08-27 - Fill local cover on play
 
 Decision:

@@ -1,11 +1,12 @@
 import { searchWangyi, fetchWySongDetail } from "@/lib/search/wy";
+import { pickBestMatch } from "@/lib/lyrics/matchSong";
 import type { LocalNameMode, MusicInfo } from "@/types/music";
 import type { ParsedLocalTags } from "./tags";
 import { LocalEnrichmentQueue } from "./enrichmentQueue";
 import { localCatalogQuery } from "./catalogQuery";
 import { localResolvedTitle } from "./tags";
 
-const enrichmentQueue = new LocalEnrichmentQueue<MusicInfo | null>({
+const enrichmentQueue = new LocalEnrichmentQueue<MusicInfo[]>({
   concurrency: 2,
   minIntervalMs: 120,
   cacheTtlMs: 5 * 60_000,
@@ -30,7 +31,7 @@ function catalogChanged(prev: MusicInfo, next: MusicInfo): boolean {
 }
 
 /**
- * Fill missing display fields from the first NetEase search hit.
+ * Fill missing display fields from a confident NetEase catalog match.
  * Call from Match online / Match on import, or play-time gap fill.
  * Never changes source / filePath / id. Only fills fields that lacked tags.
  * Filename lock only hides the catalog title; the match is still stored.
@@ -46,11 +47,12 @@ export async function enrichLocalSong(
   if (isCurrent && !isCurrent()) return { song, status: "unchanged" };
 
   try {
-    const hit = await enrichmentQueue.enqueue(normalizeQuery(q), async () => {
-      const result = await searchWangyi(q, 1, 5);
-      return result.list[0] ?? null;
+    const list = await enrichmentQueue.enqueue(normalizeQuery(q), async () => {
+      const result = await searchWangyi(q, 1, 20);
+      return result.list;
     });
     if (isCurrent && !isCurrent()) return { song, status: "unchanged" };
+    const hit = pickBestMatch(song, list);
     if (!hit) return { song, status: "miss" };
 
     let picUrl = hit.meta.picUrl ?? null;
