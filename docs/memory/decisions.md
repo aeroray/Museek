@@ -1,4 +1,74 @@
-# Confirmed Decisions
+## 2026-08-29 - Matched local lyrics use catalog identity
+
+Decision:
+A local file with `wySongId` searches other platforms as the bound NetEase song (catalog title, matched artist, catalog duration). Do not score those searches against the file clock or filename lock. Unmatched files stay on file identity.
+
+Reason:
+Lyric search on a matched local track showed only NetEase because pickBestMatch used the file duration and display name, while the same NetEase track played online used catalog fields.
+
+## 2026-08-29 - Local play does not search unless matched
+
+Decision:
+Playing a local file never searches cover, artist, or lyrics online unless that track already has a NetEase match (`wySongId` from Match on import or Match online). Unmatched play uses the file plus sidecar/embedded lyrics only.
+
+Reason:
+Implicit play-time matching was easy to get wrong and blocked playback on file reads. Catalog work stays an explicit import or picker action.
+
+## 2026-08-29 - Local lossy quality uses real bitrate
+
+Decision:
+Local lossy files map measured bitrate to 128k / 192k / 256k / 320k. Do not fold ≥256 kbps into 320k. Online playback still requests only 128k / 320k / flac / flac24bit.
+
+Reason:
+256 kbps AAC was shown as 320K because the local probe had only two lossy buckets.
+
+## 2026-08-29 - Match picker search must not restart
+
+Decision:
+The single-track match-picker search effect depends only on `open` and `trackId`. Do not list `useT()` there. Stop the spinner after 8s without cancelling the in-flight NetEase request so late hits can still appear.
+
+Reason:
+`useT()` was a new function every render, so background tag hydration re-rendered the parent, reset the search, and the 12s Promise.race never settled in the UI.
+
+## 2026-08-29 - Match picker stays dismissible
+
+Decision:
+The single-track online-match picker stays closeable (Cancel, X, overlay/Esc) while search, fingerprint, or apply is in flight.
+
+Reason:
+NetEase search and large-file work can stall; locking the modal made the app look frozen.
+
+## 2026-08-29 - Untagged picker keeps 识曲
+
+Decision:
+The single-track match picker shows 识曲 for files missing title or artist tags when search has no recommended hit or the filename match is weak. Hint with “找不到想要的结果？” or “匹配不准确？”. Do not offer 识曲 when both tags exist.
+
+Reason:
+Filename-only tracks used to hide 识曲 because the basename looked like a title, even when NetEase had no confident recommendation.
+
+## 2026-08-29 - Local match picker; file fingerprint fallback
+
+Decision:
+Batch Match online and Match on import stay automatic NetEase fills. A single-track Match online opens a NetEase picker with a recommended hit. Fingerprint the local file only as a fallback when title or artist tags are missing. Do not search other platforms.
+
+Reason:
+Filename guesses are weak, and silent first-hit fills were easy to get wrong. Confirming one song is cheap; batch dialogs and five-platform search are not.
+
+## 2026-08-29 - QQ external playlists via Dissinfo
+
+Decision:
+Plaza QQ lists keep `fcg_ucc_getcdinfo_byids_cp`. External/personal lists that return a non-zero subcode or songs without songmid fall back to `uniform_get_Dissinfo`, and mobile share `hosteuin` is passed as `enc_host_uin`. Remote play errors must stop audio and clear `isPlaying`.
+
+Reason:
+User-created QQ lists opened by link used the old endpoint’s incomplete tracks, so every song failed while the player bar stayed in a playing state.
+
+## 2026-08-28 - Desktop whole-line theme fill
+
+Decision:
+Desktop lyrics keep native per-word karaoke when timestamps exist. Plain LRC uses a whole-line theme-color fill across the line interval (next line or song duration). Do not invent per-word timings.
+
+Reason:
+After dropping estimated karaoke, plain desktop lines stayed at unsung opacity with no accent highlight.
 
 ## 2026-08-28 - Reject weak local lyric matches
 
@@ -8,13 +78,9 @@ Local lyric and catalog fills require a tight title, a known artist or a close d
 Reason:
 AI BGM and podcast files were matching unrelated songs via substring titles, unknown-artist passes, and play-time first-hit `wySongId`.
 
-## 2026-08-27 - Fill local cover on play
+## 2026-08-27 - Fill local cover on play (superseded)
 
-Decision:
-Playing a local file fills missing cover, NetEase id, and catalog title in the background after tags. Filename lock still hides the catalog title. Import still does not network unless Match on import is on.
-
-Reason:
-Artwork and cross-platform lyric search need catalog identity; waiting for Match online left empty covers and `Artist - Title` filenames unmatched.
+Superseded by 2026-08-29 local play does not search unless matched. Do not fill cover or catalog on play.
 
 ## 2026-08-27 - Native karaoke only; prefer word-by-word sources
 
@@ -61,7 +127,7 @@ Link import is no longer supported; files are the only inspectable import path.
 ## 2026-08-21 - Song comments on the lyrics page
 
 Decision:
-Read-only song comments for wy/kw/kg/tx/mg via each platform's public comment API (not source scripts). Toggle from the lyrics-page right toolbar. Lyrics-only and comments are exclusive: solo shows only lyrics; opening comments turns solo off. Cover hides in either mode. Keep the comment dock at 22rem. Local files stay empty.
+Read-only song comments for wy/kw/kg/tx/mg via each platform's public comment API (not source scripts). Toggle from the lyrics-page right toolbar. Lyrics-only and comments are exclusive: solo shows only lyrics; opening comments turns solo off. Cover hides in either mode. Keep the comment dock at 22rem. Local files stay empty; disable the comments button.
 
 Reason:
 Users asked to read comments for the playing song without leaving the lyrics view or covering the spinning cover.
@@ -259,7 +325,7 @@ Alignment is a presentation preference owned by the render-only lyrics window. K
 ## 2026-08-09 - Keep global shortcuts aligned with disabled controls
 
 Decision:
-Global playback shortcuts must use the same availability conditions as their UI controls: transport actions respect idle/loading state, seeking respects idle/loading/error and current-song state, desktop lyrics respects current-song or visible-window state, and mini-player respects a non-empty queue. The lock recovery shortcut remains available while the desktop lyrics window is visible, including locked mode.
+Global playback shortcuts must use the same availability conditions as their UI controls: transport actions respect idle/loading state, seeking respects idle/loading/error and current-song state, desktop lyrics respect a current song with lyrics (or an already-visible window so it can close), and mini-player respects a non-empty queue. The lock recovery shortcut remains available while the desktop lyrics window is visible, including locked mode.
 Reason:
 A disabled control establishes that the corresponding action is unavailable, so a global key path should not bypass that contract. The lock shortcut is intentionally different because locked mode hides the toolbar and needs a keyboard recovery path.
 

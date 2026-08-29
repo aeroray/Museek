@@ -72,11 +72,21 @@ function durationScore(left: string, right: string): number {
   return 0
 }
 
-/** Title/artist used to search and score lyrics — file identity, not catalog fill. */
+/** Title/artist used to search and score lyrics. Matched local uses catalog, not the file clock. */
 export function lyricProbeSong(song: MusicInfo): MusicInfo {
   const { name, singer } = lyricSearchIdentity(song)
   const nextName = name || song.name
   const nextSinger = singer || song.singer
+  const matchedLocal = song.source === "local" && Boolean(song.meta.wySongId)
+  if (matchedLocal) {
+    const catalogInterval = song.meta.catalogInterval?.trim()
+    return {
+      ...song,
+      name: nextName,
+      singer: nextSinger,
+      interval: catalogInterval || "",
+    }
+  }
   if (nextName === song.name && nextSinger === song.singer) return song
   return { ...song, name: nextName, singer: nextSinger }
 }

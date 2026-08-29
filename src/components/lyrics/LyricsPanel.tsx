@@ -29,7 +29,7 @@ import { SpecularFrame } from "@/components/common/SpecularFrame";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { hiResCover } from "@/lib/cover";
-import { hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
+import { canToggleDesktopLyrics, hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
 import {
   clampLyricFontScale,
   readLyricFontScale,
@@ -75,7 +75,13 @@ export function LyricsPanel() {
   const setShowLyrics = usePlayerStore((s) => s.setShowLyrics);
   const seek = usePlayerStore((s) => s.seek);
   const t = useT();
-  const desktopLyricsControlsDisabled = !currentSong && !desktopLyricsVisible;
+  const desktopLyricsControlsDisabled = !canToggleDesktopLyrics({
+    hasSong: Boolean(currentSong),
+    hasLyrics: lyricLines.length > 0,
+    visible: desktopLyricsVisible,
+  });
+  const isLocalSong = currentSong?.source === "local";
+  const commentsDisabled = !currentSong || isLocalSong;
   const [fontScale, setFontScale] = useState(() =>
     readLyricFontScale(MAIN_FONT_POLICY),
   );
@@ -100,6 +106,10 @@ export function LyricsPanel() {
     : null;
   const needsHeroUpgrade = !!heroSrc && !!thumbSrc && heroSrc !== thumbSrc;
   const heroReady = !needsHeroUpgrade || loadedHeroSrc === heroSrc;
+
+  useEffect(() => {
+    if (isLocalSong) setCommentsOpen(false);
+  }, [isLocalSong]);
 
   useEffect(() => {
     if (showLyrics) {
@@ -284,6 +294,7 @@ export function LyricsPanel() {
       setCommentsOpen(false);
       return;
     }
+    if (commentsDisabled) return;
     setLyricsOnly(false);
     setCommentsOpen(true);
   };
@@ -398,7 +409,10 @@ export function LyricsPanel() {
           </Button>
         )}
         <LyricSourceMenu song={currentSong} />
-        <HintTooltip label={t("comments.title")} side="left">
+        <HintTooltip
+          label={isLocalSong ? t("comments.local") : t("comments.title")}
+          side="left"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -410,7 +424,7 @@ export function LyricsPanel() {
             )}
             onClick={toggleComments}
             aria-pressed={commentsOpen}
-            disabled={!currentSong}
+            disabled={commentsDisabled}
           >
             <MessageCircle size={16} />
           </Button>

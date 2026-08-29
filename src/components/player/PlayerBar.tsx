@@ -30,7 +30,7 @@ import {
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs";
 import { DownloadSongButton } from "@/components/common/DownloadSongButton";
 import { enterMiniPlayer } from "@/lib/miniPlayer";
-import { hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
+import { canToggleDesktopLyrics, hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { useT } from "@/lib/i18n";
@@ -55,10 +55,13 @@ export function PlayerBar() {
   const desktopLyricsVisible = useDesktopLyricsStore(
     (state) => state.isVisible,
   );
-  const desktopLyricsControlsDisabled = !currentSong && !desktopLyricsVisible;
-
-  const loading = status === "loading";
   const hasLyrics = lyricLines.length > 0;
+  const desktopLyricsControlsDisabled = !canToggleDesktopLyrics({
+    hasSong: Boolean(currentSong),
+    hasLyrics,
+    visible: desktopLyricsVisible,
+  });
+  const loading = status === "loading";
   // Prefer the resolved cover; while loading fall back to the song's own pic so
   // the art doesn't blank out — the spinner overlay still signals resolving.
   const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null;

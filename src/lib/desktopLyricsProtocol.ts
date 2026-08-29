@@ -39,6 +39,7 @@ export interface DesktopLyricsSnapshot {
   lines: LyricLine[];
   currentTime: number;
   currentLyricIndex: number;
+  duration: number;
   isPlaying: boolean;
   status: PlayerStatus;
   lyricsLoading: boolean;

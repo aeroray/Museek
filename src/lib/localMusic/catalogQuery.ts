@@ -15,7 +15,10 @@ export function isPlaceholderTitle(name: string): boolean {
 }
 
 type CatalogSong = Pick<MusicInfo, "name" | "singer"> & {
-  meta?: Pick<MusicInfo["meta"], "catalogName" | "filePath">;
+  meta?: Pick<
+    MusicInfo["meta"],
+    "catalogName" | "catalogSinger" | "catalogInterval" | "filePath" | "wySongId"
+  >;
 };
 
 function splitArtistTitle(
@@ -66,15 +69,27 @@ export function catalogIdentity(song: CatalogSong): {
   return { name, singer };
 }
 
+/** Import-time or manual NetEase match — play may use this catalog identity. */
+export function localSongMatched(
+  song: Pick<MusicInfo, "source"> & { meta?: { wySongId?: string } },
+): boolean {
+  return song.source === "local" && Boolean(song.meta?.wySongId);
+}
+
 /**
  * Identity used to *score* lyric hits for a local file.
- * Ignore catalogName: play-time first-hit fills used to poison it, which then
- * made the wrong NetEase song look like an exact title match.
+ * Matched tracks use the confirmed catalog title. Unmatched files stay on
+ * the filename so play-time search is not silently bound to a guess.
  */
 export function lyricSearchIdentity(
   song: CatalogSong & { source?: Source },
 ): { name: string; singer: string } {
   if (song.source && song.source !== "local") return catalogIdentity(song);
+  if (song.meta?.wySongId) {
+    const catalog = catalogIdentity(song);
+    const singer = song.meta.catalogSinger?.trim() || catalog.singer;
+    return { name: catalog.name, singer };
+  }
 
   const path = song.meta?.filePath ?? "";
   const display = catalogIdentity({

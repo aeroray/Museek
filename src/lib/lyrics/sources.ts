@@ -96,7 +96,14 @@ function payloadKey(song: MusicInfo, platform: OnlineSource): string {
 }
 
 export function selectedLyricSource(song: MusicInfo): OnlineSource | null {
-  return picks.get(songKey(song)) ?? (song.source === "local" ? null : song.source)
+  return (
+    picks.get(songKey(song)) ??
+    (song.source === "local"
+      ? song.meta.wySongId
+        ? "wy"
+        : null
+      : song.source)
+  )
 }
 
 async function resolvePlatformSong(
@@ -104,6 +111,18 @@ async function resolvePlatformSong(
   platform: OnlineSource,
 ): Promise<MusicInfo | null> {
   if (song.source === platform) return song
+  if (
+    platform === "wy" &&
+    song.source === "local" &&
+    song.meta.wySongId
+  ) {
+    const probe = lyricProbeSong(song)
+    return {
+      ...probe,
+      source: "wy",
+      meta: { ...probe.meta, songId: song.meta.wySongId },
+    }
+  }
 
   const probe = lyricProbeSong(song)
   const seen = new Set<string>()

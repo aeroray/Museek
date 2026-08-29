@@ -8,6 +8,8 @@ import type { Quality } from "@/types/music"
 
 const BR: Record<Quality, number> = {
   "128k": 128000,
+  "192k": 192000,
+  "256k": 256000,
   "320k": 320000,
   flac: 999000,
   flac24bit: 1999000,

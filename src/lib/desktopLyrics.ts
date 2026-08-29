@@ -31,6 +31,16 @@ import {
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/** Same rule as the player-bar button: close if open; else need a song with lyrics. */
+export function canToggleDesktopLyrics(opts: {
+  hasSong: boolean;
+  hasLyrics: boolean;
+  visible: boolean;
+}): boolean {
+  if (opts.visible) return true;
+  return opts.hasSong && opts.hasLyrics;
+}
+
 type PlayerSnapshotState = ReturnType<typeof usePlayerStore.getState>;
 
 let bridgeStarted = false;
@@ -62,6 +72,7 @@ function createSnapshot(state: PlayerSnapshotState): DesktopLyricsSnapshot {
     })),
     currentTime,
     currentLyricIndex: findActiveLyricIndex(state.lyricLines, currentTime),
+    duration: state.duration,
     isPlaying: state.isPlaying,
     status: state.status,
     lyricsLoading: state.lyricsLoading,

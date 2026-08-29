@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { create } from "zustand";
 
 export type Lang = "zh" | "en";
@@ -311,6 +312,20 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.matchNone": "没有找到可补全的在线资料",
     "local.matchUnchanged": "本地标签已完整，无需补全",
     "local.matchFailed": "匹配失败：{msg}",
+    "local.matchPickTitle": "选择匹配结果",
+    "local.matchPickDesc": "从网易云结果中选一首，用于补全封面和资料。",
+    "local.matchRecommended": "推荐",
+    "local.matchConfirm": "使用这首",
+    "local.matchSearching": "正在搜索…",
+    "local.matchEmpty": "没有搜到合适的结果",
+    "local.matchQuery": "搜索：{q}",
+    "local.matchRecognize": "识曲",
+    "local.matchRecognizing": "正在识曲…",
+    "local.matchRecognizeHintEmpty": "找不到想要的结果？",
+    "local.matchRecognizeHintWeak": "匹配不准确？",
+    "local.matchRecognizeResults": "识曲结果",
+    "local.matchRecognizeNone": "没有从音频中识别到歌曲",
+    "local.matchRecognizeFailed": "无法从文件识曲",
     "local.empty": "暂无本地音乐",
     "local.emptyHint":
       "列表立刻按文件名出现，封面和标签从文件里补全。到「设置 → 本地」打开「导入时匹配」才会上网。",
@@ -338,7 +353,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.settings.depthUnlimited": "不限深度",
     "local.settings.matchOnImportTitle": "导入时匹配",
     "local.settings.matchOnImportDesc":
-      "读完本地标签后再上网补封面、歌手和专辑，文件夹会明显变慢。关闭时仍会从文件读取封面和标签；之后可在本地音乐页单独或批量「在线匹配」。",
+      "导入时自动上网补封面和资料，文件夹会变慢。关闭后只读本地文件。",
     "local.settings.deleteFilesTitle": "同时删除本地文件",
     "local.settings.deleteFilesDesc": "关闭时只从列表移除",
     "local.settings.localOnlyNote":
@@ -418,7 +433,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.tab.data": "数据",
     "settings.tab.about": "关于",
     "settings.about.version": "版本 {version}",
-    "settings.about.description": "多平台音乐聚合软件",
+    "settings.about.description": "跨平台桌面端音乐聚合软件",
     "about.checkUpdate": "检查更新",
     "about.whatsNew": "更新日志",
     "about.installUpdate": "安装更新",
@@ -458,6 +473,8 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Quality labels
     "quality.128k": "标准 128k",
+    "quality.192k": "较高 192k",
+    "quality.256k": "高品 256k",
     "quality.320k": "高品 320k",
     "quality.flac": "无损 FLAC",
     "quality.flac24bit": "Hi-Res 母带",
@@ -1003,6 +1020,21 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.matchNone": "No online match to fill in",
     "local.matchUnchanged": "Local tags are already complete",
     "local.matchFailed": "Match failed: {msg}",
+    "local.matchPickTitle": "Choose a match",
+    "local.matchPickDesc":
+      "Pick a NetEase result to fill cover art and catalog info.",
+    "local.matchRecommended": "Recommended",
+    "local.matchConfirm": "Use this track",
+    "local.matchSearching": "Searching…",
+    "local.matchEmpty": "No suitable results",
+    "local.matchQuery": "Search: {q}",
+    "local.matchRecognize": "Identify",
+    "local.matchRecognizing": "Identifying…",
+    "local.matchRecognizeHintEmpty": "Can't find the right match?",
+    "local.matchRecognizeHintWeak": "Not an accurate match?",
+    "local.matchRecognizeResults": "Identified from audio",
+    "local.matchRecognizeNone": "Could not identify the song from the audio",
+    "local.matchRecognizeFailed": "Could not identify this file",
     "local.empty": "No local music",
     "local.emptyHint":
       "Files appear immediately by filename; covers and tags fill in from the file. Turn on Match on import in Settings → Local to look them up online.",
@@ -1031,7 +1063,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "local.settings.depthUnlimited": "Unlimited",
     "local.settings.matchOnImportTitle": "Match on import",
     "local.settings.matchOnImportDesc":
-      "After reading local tags, look up missing cover, artist, and album online — folders will be much slower. When off, files still get embedded covers and tags; you can Match online later from the library.",
+      "Look up cover and info online when importing. Folders will be slower. When off, only read the file.",
     "local.settings.deleteFilesTitle": "Also delete files",
     "local.settings.deleteFilesDesc": "When off, only remove from the list",
     "local.settings.localOnlyNote":
@@ -1112,7 +1144,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "settings.tab.data": "Data",
     "settings.tab.about": "About",
     "settings.about.version": "Version {version}",
-    "settings.about.description": "A cross-platform music aggregator",
+    "settings.about.description": "A cross-platform desktop music aggregator",
     "about.checkUpdate": "Check for updates",
     "about.whatsNew": "Changelog",
     "about.installUpdate": "Install update",
@@ -1153,6 +1185,8 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Quality labels
     "quality.128k": "Standard 128k",
+    "quality.192k": "Higher 192k",
+    "quality.256k": "High 256k",
     "quality.320k": "High 320k",
     "quality.flac": "Lossless FLAC",
     "quality.flac24bit": "Hi-Res",
@@ -1487,8 +1521,11 @@ function translate(
  */
 export function useT() {
   const lang = useLangStore((s) => s.lang);
-  return (key: string, vars?: Record<string, string | number>) =>
-    translate(lang, key, vars);
+  return useCallback(
+    (key: string, vars?: Record<string, string | number>) =>
+      translate(lang, key, vars),
+    [lang],
+  );
 }
 
 /**

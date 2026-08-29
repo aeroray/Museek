@@ -1,5 +1,9 @@
 import { createAsyncCache } from "@/lib/cache";
 import { fetchLocalFileLyric } from "@/lib/localMusic";
+import {
+  lyricSearchIdentity,
+  localSongMatched,
+} from "@/lib/localMusic/catalogQuery";
 import { fetchPreferredLyric } from "@/lib/lyrics/sources";
 import {
   isWordByWordLyric,
@@ -26,7 +30,15 @@ const lyricInfoCache = createAsyncCache<LyricInfo | null>(
   80,
   hasLyricPayload,
 );
-const LYRIC_CACHE_VERSION = "match-strict-v1";
+const LYRIC_CACHE_VERSION = "local-matched-v1";
+
+function lyricCacheSongId(song: MusicInfo): string {
+  if (song.source === "local") {
+    const { name, singer } = lyricSearchIdentity(song);
+    return `${song.meta.songId}:${LYRIC_CACHE_VERSION}:${song.meta.wySongId ?? ""}:${name}:${singer}:${song.interval}`;
+  }
+  return `${song.meta.songId}:${LYRIC_CACHE_VERSION}`;
+}
 
 export { isWordByWordLyric, linesFromLyricInfo };
 
@@ -44,6 +56,7 @@ async function fetchLyricInfo(
       await putCachedLyric(song.source, cacheSongId, fromFile);
       return fromFile;
     }
+    if (!localSongMatched(song)) return null;
   }
 
   let lyricInfo: LyricInfo | null = await getCachedLyric(
@@ -64,7 +77,7 @@ export async function applyLyricInfo(
   song: MusicInfo,
   info: LyricInfo,
 ): Promise<LyricLine[]> {
-  const cacheSongId = `${song.meta.songId}:${LYRIC_CACHE_VERSION}`;
+  const cacheSongId = lyricCacheSongId(song);
   const key = `${song.source}:${cacheSongId}`;
   const lines = linesFromLyricInfo(info);
   if (hasLyricPayload(info)) {
@@ -85,12 +98,13 @@ async function fetchLyricLines(
 }
 
 /**
- * Local: sidecar / embedded tags, else search platforms and stop at
- * word-by-word. Online: own platform first, then others for word-by-word.
+ * Local unmatched: sidecar / embedded tags only. Matched local or online:
+ * search platforms and stop at word-by-word. Online songs try their platform
+ * first.
  * Returns [] when nothing is available (caller owns loading UI).
  */
 export async function loadLyric(song: MusicInfo): Promise<LyricLine[]> {
-  const cacheSongId = `${song.meta.songId}:${LYRIC_CACHE_VERSION}`;
+  const cacheSongId = lyricCacheSongId(song);
   const key = `${song.source}:${cacheSongId}`;
   return lyricCache(key, () => fetchLyricLines(song, cacheSongId));
 }
@@ -99,7 +113,7 @@ export async function loadLyric(song: MusicInfo): Promise<LyricLine[]> {
 export async function loadLyricInfo(
   song: MusicInfo,
 ): Promise<LyricInfo | null> {
-  const cacheSongId = `${song.meta.songId}:${LYRIC_CACHE_VERSION}`;
+  const cacheSongId = lyricCacheSongId(song);
   const key = `${song.source}:${cacheSongId}`;
   return lyricInfoCache(key, () => fetchLyricInfo(song, cacheSongId));
 }

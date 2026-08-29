@@ -11,6 +11,7 @@ export function toLxMusicInfo(m: MusicInfo): Record<string, unknown> {
     source: m.source,
     songmid: m.meta.songId,
     albumId: m.meta.albumId ?? "",
+    albumMid: m.meta.albumId ?? "",
     albumName: m.albumName,
     interval: m.interval,
     img: m.meta.picUrl ?? null,

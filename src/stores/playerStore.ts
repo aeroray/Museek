@@ -89,26 +89,40 @@ function clearResume() {
   sessionResumeSongId = null;
 }
 
-/** After a local file starts, read tags then fill missing cover/catalog before lyrics. */
+let lyricLoadGen = 0;
+
+function invalidateLyricLoad() {
+  lyricLoadGen += 1;
+}
+
+/** After a local file starts, apply on-disk tags/lyrics. Do not search online unless already matched. */
 function loadLocalMetaAfterPlay(
   song: MusicInfo,
   hydrateP: Promise<MusicInfo | null>,
   isCurrent: () => boolean,
 ) {
   void (async () => {
+    if (!isCurrent()) return;
+    usePlayerStore.getState()._loadLyric(song);
+
     const hydrated = await hydrateP;
     if (!isCurrent()) return;
-    const fill = await useLocalMusicStore.getState().fillOnlineMetaOnPlay(song.id);
-    if (!isCurrent()) return;
-    if (fill?.applied) return;
     const next =
-      fill?.song ??
+      useLocalMusicStore.getState().tracks.find((item) => item.id === song.id)
+        ?.song ??
       hydrated ??
       usePlayerStore.getState().currentSong ??
       song;
     const player = usePlayerStore.getState();
-    player._loadLyric(next);
+    if (player.currentSong?.id !== song.id) return;
+    usePlayerStore.setState({
+      currentSong: next,
+      queue: player.queue.map((item) =>
+        item.music.id === song.id ? { ...item, music: next } : item,
+      ),
+    });
     void player._loadPic(next);
+    void player._loadLyric(next);
   })();
 }
 
@@ -286,6 +300,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       // Immediately silence the previous track so switching feels instant — don't
       // let the old song keep playing while the new URL is being resolved.
       audioPlayer.pause();
+      invalidateLyricLoad();
 
       // status:"loading" must survive audio pause/timeupdate sync (see _syncFromAudio).
       // Clear progress so the bar reads as inactive while the new URL resolves.
@@ -490,7 +505,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         }
         const isTimeout = raw === t("player.err.playTimeout");
         const message = isTimeout ? raw : formatRemotePlayError(raw);
-        set({ status: "error", error: message, lyricsLoading: false });
+        audioPlayer.stop();
+        revokeCurrentObjectUrl();
+        lastMediaPlaying = false;
+        set({
+          status: "error",
+          error: message,
+          lyricsLoading: false,
+          isPlaying: false,
+          playPending: false,
+          sourceReady: false,
+        });
         notify({ message, variant: "error" });
         return;
       }
@@ -844,7 +869,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       // Use the *computed* status for isPlaying — if we keyed off storeStatus==="loading"
       // after already promoting status to "playing", one frame shows Play instead of Pause.
       set({
-        isPlaying: status === "loading" ? false : state.isPlaying,
+        isPlaying:
+          status === "loading" || status === "error" ? false : state.isPlaying,
         duration: status === "loading" ? 0 : state.duration || get().duration,
         status,
         playPending:
@@ -921,27 +947,32 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     _handleError(msg) {
+      audioPlayer.stop();
+      revokeCurrentObjectUrl();
+      lastMediaPlaying = false;
       set({
         status: "error",
         error: formatRemotePlayError(msg),
         isPlaying: false,
         playPending: false,
+        sourceReady: false,
       });
     },
 
     async _loadLyric(song) {
       const songId = song.id;
+      const gen = ++lyricLoadGen;
       set({ lyricsLoading: true });
       try {
         const lines = await loadLyric(song);
-        if (get().currentSong?.id !== songId) return;
+        if (gen !== lyricLoadGen || get().currentSong?.id !== songId) return;
         set({
           lyricLines: lines,
           lyricsLoading: false,
           ...(lines.length === 0 ? { showLyrics: false } : {}),
         });
       } catch {
-        if (get().currentSong?.id !== songId) return;
+        if (gen !== lyricLoadGen || get().currentSong?.id !== songId) return;
         set({ lyricLines: [], lyricsLoading: false, showLyrics: false });
       }
     },
@@ -960,6 +991,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           return;
         }
       }
+      if (song.source === "local") return;
       const picUrl = await sourceRunner.getPic({
         source: song.source,
         action: "pic",

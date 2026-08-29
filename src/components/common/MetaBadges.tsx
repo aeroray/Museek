@@ -32,6 +32,8 @@ export function PlatformBadge({ source, className }: { source: Source; className
 // Tint by tier so lossless/Hi-Res stand out at a glance.
 const QUALITY_TIER: Record<Quality, string> = {
   "128k": "border-border text-muted-foreground",
+  "192k": "border-border text-muted-foreground",
+  "256k": "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
   "320k": "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
   flac: "border-violet-500/40 text-violet-600 dark:text-violet-400",
   flac24bit: "border-amber-500/50 text-amber-600 dark:text-amber-400",

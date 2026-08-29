@@ -54,6 +54,7 @@ import { CategoryAssignMenu } from "@/components/songCategories/CategoryAssignMe
 import { CategoryFilterMenu } from "@/components/songCategories/CategoryFilterMenu";
 import { CategoryNameDialog } from "@/components/songCategories/CategoryNameDialog";
 import { useCategoryDialog } from "@/components/songCategories/useCategoryDialog";
+import { MatchOnlineDialog } from "@/components/localMusic/MatchOnlineDialog";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -88,6 +89,7 @@ export function LocalMusic() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [matchTrackId, setMatchTrackId] = useState<string | null>(null);
   const categoryDialog = useCategoryDialog({
     addCategory,
     renameCategory,
@@ -181,6 +183,21 @@ export function LocalMusic() {
 
   const batchMatch = async () => {
     await runMatch([...selected]);
+  };
+
+  const onMatchApplied = (
+    status: "applied" | "unchanged" | "miss" | "error",
+  ) => {
+    if (status === "applied") {
+      notify({ message: tr("local.matched", { n: 1 }), variant: "success" });
+    } else if (status === "unchanged") {
+      notify({ message: tr("local.matchUnchanged"), variant: "info" });
+    } else if (status === "error") {
+      notify({
+        message: tr("local.matchFailed", { msg: tr("local.fileUnreadable") }),
+        variant: "error",
+      });
+    }
   };
 
   const deleteCategory = (id: string) => {
@@ -695,7 +712,7 @@ export function LocalMusic() {
                             </DropdownMenuLabel>
                             <DropdownMenuItem
                               disabled={busy || missing}
-                              onClick={() => void runMatch([track.id])}
+                              onClick={() => setMatchTrackId(track.id)}
                             >
                               <ScanSearch size={14} className="mr-2" />
                               {tr("local.matchOnline")}
@@ -770,6 +787,14 @@ export function LocalMusic() {
         </ScrollArea>
       )}
 
+      <MatchOnlineDialog
+        trackId={matchTrackId}
+        open={!!matchTrackId}
+        onOpenChange={(next) => {
+          if (!next) setMatchTrackId(null);
+        }}
+        onApplied={onMatchApplied}
+      />
       <CategoryNameDialog
         dialog={categoryDialog.catDialog}
         name={categoryDialog.catName}

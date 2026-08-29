@@ -1,6 +1,6 @@
 export type OnlineSource = "kw" | "kg" | "tx" | "wy" | "mg";
 export type Source = OnlineSource | "local";
-export type Quality = "128k" | "320k" | "flac" | "flac24bit";
+export type Quality = "128k" | "192k" | "256k" | "320k" | "flac" | "flac24bit";
 export type LocalNameMode = "filename" | "smart";
 
 export interface MusicQuality {
@@ -30,6 +30,10 @@ export interface MusicInfoMeta {
   wySongId?: string;
   /** Catalog title from Match online. Shown when filename lock is off and there is no ID3 title. */
   catalogName?: string;
+  /** Artist from the matched NetEase hit — lyric search, not the filename lock. */
+  catalogSinger?: string;
+  /** Duration from the matched NetEase hit — lyric scoring, not the file clock. */
+  catalogInterval?: string;
 }
 
 export interface MusicInfo {
@@ -53,6 +57,10 @@ export interface LocalTrack {
   nameMode?: LocalNameMode;
   /** Whether local file tags (cover, duration, lyrics) have been read. Omitted = already read (legacy). */
   hydrated?: boolean;
+  /** True when ID3/Vorbis title exists. Omitted on legacy rows. */
+  hasTitleTag?: boolean;
+  /** True when ID3/Vorbis artist exists. Omitted on legacy rows. */
+  hasArtistTag?: boolean;
   /** File missing/moved/unreadable — set after a failed play attempt. */
   unavailable?: boolean;
   song: MusicInfo;

@@ -1,5 +1,9 @@
 # Do Not Use
 
+## Play-time implicit local match
+
+Do not search cover, artist, or lyrics online when the user plays an unmatched local file. Match on import and Match online stay explicit. Sidecar `.lrc` and embedded tags may still load from disk.
+
 ## Source-script obfuscation scanning
 
 Do not block imports based on obfuscation heuristics. Legitimate lx sources are often packed and trip `JS.Obfuscated`-style rules.

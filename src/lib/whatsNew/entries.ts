@@ -17,6 +17,60 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.7.0": {
+    zh: {
+      sections: [
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "单曲「在线匹配」改为网易云候选列表，缺标签时可识曲；搜索中可取消",
+            "未匹配的文件点播放不再偷偷上网补封面、歌手和歌词",
+            "已匹配的歌曲按网易云目录搜歌词，其它平台也能出结果",
+            "本地有损音质按真实码率显示 128K / 192K / 256K / 320K",
+          ],
+        },
+        {
+          title: "🎤 歌词",
+          bullets: [
+            "没有歌词时，底部播放栏的桌面歌词按钮会禁用",
+            "桌面歌词的普通 LRC 会按整行用主题色填满",
+          ],
+        },
+        {
+          title: "📋 歌单",
+          bullets: [
+            "用链接打开的 QQ 个人歌单能正确列出歌曲",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Single-track Match online opens a NetEase picker, with fingerprint when tags are missing; you can cancel while it searches",
+            "Unmatched files no longer look up cover, artist, or lyrics when you press play",
+            "Matched tracks search lyrics as the bound NetEase song, so other platforms can appear too",
+            "Local lossy files show 128K / 192K / 256K / 320K from the real bitrate",
+          ],
+        },
+        {
+          title: "🎤 Lyrics",
+          bullets: [
+            "The desktop lyrics button in the player bar is disabled when there are no lyrics",
+            "Plain desktop LRC fills the whole line with the theme color",
+          ],
+        },
+        {
+          title: "📋 Playlists",
+          bullets: [
+            "QQ playlists opened from a personal or share link list their songs correctly",
+          ],
+        },
+      ],
+    },
+  },
   "3.6.0": {
     zh: {
       sections: [

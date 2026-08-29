@@ -6,11 +6,11 @@ import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/tx/songList.js
 // Hot playlists use the unsigned musicu.fcg get_playlist_by_tag method
-// (PlayListPlazaServer) with order=5 (最热). Detail uses the legacy
-// fcg_ucc_getcdinfo_byids_cp.fcg endpoint (disstid=), whose songlist items have
-// the same file/singer/album shape as the QQ search/chart song objects.
-// Neither uses the zzcSign scheme search/tx.ts needs, so no signing is reused.
-// Song normalization mirrors src/lib/charts/tx.ts.
+// (PlayListPlazaServer) with order=5 (最热). Detail prefers the legacy
+// fcg_ucc_getcdinfo_byids_cp.fcg endpoint (disstid=); personal and mobile-share
+// lists fall back to uniform_get_Dissinfo when that endpoint returns a non-zero
+// subcode or songs without songmid. Neither uses the zzcSign scheme search/tx.ts
+// needs, so no signing is reused. Song normalization mirrors albums/tx.ts.
 
 const LIMIT_LIST = 36
 // 最热 sort id (sortList[0] in the reference).
@@ -260,21 +260,54 @@ interface TxFileRaw {
 interface TxListSongRaw {
   id?: number | string
   mid?: string
+  songmid?: string
   title?: string
+  songname?: string
   interval?: number
   singer?: TxSingerRaw[]
   album?: TxAlbumRaw
   file?: TxFileRaw
+  strMediaMid?: string
+  media_mid?: string
+  size128?: number
+  size320?: number
+  sizeflac?: number
+  size_hires?: number
 }
 
 interface TxListDetailResponse {
   code?: number
+  subcode?: number
   cdlist?: Array<{
     songlist?: TxListSongRaw[]
     dissname?: string
     logo?: string
     nickname?: string
   }>
+}
+
+interface TxDissinfoResponse {
+  code?: number
+  req_1?: {
+    code?: number
+    data?: {
+      songlist?: TxListSongRaw[]
+      dirinfo?: {
+        title?: string
+        picurl?: string
+        host_nick?: string
+      }
+    }
+  }
+}
+
+/** Paste URLs may carry `id::euin::hosteuin` from mobile share links. */
+const TX_EUIN_SEP = "::euin::"
+
+function splitTxPlaylistId(id: string): { dissid: string; encHostUin: string } {
+  const i = id.indexOf(TX_EUIN_SEP)
+  if (i === -1) return { dissid: id, encHostUin: "" }
+  return { dissid: id.slice(0, i), encHostUin: id.slice(i + TX_EUIN_SEP.length) }
 }
 
 function formatSingers(singers: TxSingerRaw[] | undefined): string {
@@ -286,14 +319,21 @@ function formatSingers(singers: TxSingerRaw[] | undefined): string {
 }
 
 function normalizeTxListSong(raw: TxListSongRaw): MusicInfo | null {
-  const file = raw.file
-  if (!file?.media_mid) return null
+  const songmid = String(raw.mid ?? raw.songmid ?? "")
+  if (!songmid) return null
+
+  const mediaMid =
+    raw.file?.media_mid ?? raw.strMediaMid ?? raw.media_mid ?? songmid
 
   const qualitys: MusicQuality[] = []
-  if (file.size_128mp3) qualitys.push({ type: "128k", size: sizeFormate(file.size_128mp3) })
-  if (file.size_320mp3) qualitys.push({ type: "320k", size: sizeFormate(file.size_320mp3) })
-  if (file.size_flac) qualitys.push({ type: "flac", size: sizeFormate(file.size_flac) })
-  if (file.size_hires) qualitys.push({ type: "flac24bit", size: sizeFormate(file.size_hires) })
+  const size128 = raw.file?.size_128mp3 ?? raw.size128
+  const size320 = raw.file?.size_320mp3 ?? raw.size320
+  const sizeFlac = raw.file?.size_flac ?? raw.sizeflac
+  const sizeHires = raw.file?.size_hires ?? raw.size_hires
+  if (size128) qualitys.push({ type: "128k", size: sizeFormate(size128) })
+  if (size320) qualitys.push({ type: "320k", size: sizeFormate(size320) })
+  if (sizeFlac) qualitys.push({ type: "flac", size: sizeFormate(sizeFlac) })
+  if (sizeHires) qualitys.push({ type: "flac24bit", size: sizeFormate(sizeHires) })
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
 
   const _qualitys = indexQualitySizes(qualitys)
@@ -308,12 +348,9 @@ function normalizeTxListSong(raw: TxListSongRaw): MusicInfo | null {
     picUrl = `https://y.gtimg.cn/music/photo_new/T001R500x500M000${raw.singer[0].mid}.jpg`
   }
 
-  // songId is the songmid (string mid like "0039MnYb0qxYhV"); play scripts read it.
-  const songmid = raw.mid ?? ""
-
   return {
     id: `tx_${songmid}`,
-    name: raw.title ?? "",
+    name: raw.title ?? raw.songname ?? "",
     singer: formatSingers(raw.singer),
     source: "tx",
     interval: formatDuration(raw.interval || 0),
@@ -321,12 +358,21 @@ function normalizeTxListSong(raw: TxListSongRaw): MusicInfo | null {
     meta: {
       songId: songmid,
       albumId,
-      strMediaMid: file.media_mid,
+      strMediaMid: mediaMid,
       picUrl,
       qualitys,
       _qualitys,
     },
   }
+}
+
+function songsFromRawList(rawList: TxListSongRaw[] | undefined): MusicInfo[] {
+  const list: MusicInfo[] = []
+  for (const item of rawList ?? []) {
+    const song = normalizeTxListSong(item)
+    if (song) list.push(song)
+  }
+  return list
 }
 
 // fcg_ucc_getcdinfo_byids_cp returns the full playlist in one response, so page
@@ -339,10 +385,90 @@ function retryDelayMs(tryNum: number): number {
   return 400 * (tryNum + 1) + Math.floor(Math.random() * 200)
 }
 
+/** Newer personal / mobile-share lists: old getcdinfo returns subcode 4000 or no usable mids. */
+async function getTxPlaylistDetailViaDissinfo(
+  dissid: string,
+  encHostUin: string,
+  tryNum = 0,
+): Promise<PlaylistDetail> {
+  const dissIdNum = parseInt(dissid, 10)
+  if (!Number.isFinite(dissIdNum)) {
+    throw new Error("QQ playlist detail failed: bad id")
+  }
+
+  const res = await tauriFetch("https://u.y.qq.com/cgi-bin/musicu.fcg", {
+    method: "POST",
+    headers: {
+      Origin: "https://y.qq.com",
+      Referer: `https://y.qq.com/n/yqq/playsquare/${dissid}.html`,
+      "User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      comm: {
+        cv: 4747474,
+        ct: 24,
+        format: "json",
+        inCharset: "utf-8",
+        outCharset: "utf-8",
+        platform: "yqq.json",
+        needNewCode: 1,
+        uin: 0,
+      },
+      req_1: {
+        module: "music.srfDissInfo.aiDissInfo",
+        method: "uniform_get_Dissinfo",
+        param: {
+          disstid: dissIdNum,
+          userinfo: 1,
+          tag: 1,
+          orderlist: 1,
+          song_begin: 0,
+          song_num: 100000,
+          onlysonglist: 0,
+          enc_host_uin: encHostUin,
+        },
+      },
+    }),
+  })
+
+  if (!res.ok) {
+    if (tryNum < 2) {
+      await new Promise((r) => setTimeout(r, retryDelayMs(tryNum)))
+      return getTxPlaylistDetailViaDissinfo(dissid, encHostUin, tryNum + 1)
+    }
+    throw new Error(`QQ playlist detail failed: ${res.status}`)
+  }
+
+  const body = (await res.json()) as TxDissinfoResponse
+  if (body.code !== 0) {
+    if (tryNum < 2) {
+      await new Promise((r) => setTimeout(r, retryDelayMs(tryNum)))
+      return getTxPlaylistDetailViaDissinfo(dissid, encHostUin, tryNum + 1)
+    }
+    throw new Error("QQ playlist detail failed: bad response")
+  }
+  if (body.req_1?.code !== 0 || !body.req_1.data) {
+    throw new Error("QQ playlist detail failed: bad response")
+  }
+
+  const result = body.req_1.data
+  const dirinfo = result.dirinfo
+  return {
+    info: {
+      name: dirinfo?.title ?? "",
+      img: dirinfo?.picurl || null,
+      author: dirinfo?.host_nick,
+    },
+    list: songsFromRawList(result.songlist),
+  }
+}
+
 export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Promise<PlaylistDetail> {
+  const { dissid, encHostUin } = splitTxPlaylistId(id)
   const url =
     `https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg` +
-    `?type=1&json=1&utf8=1&onlysong=0&new_format=1&disstid=${id}` +
+    `?type=1&json=1&utf8=1&onlysong=0&new_format=1&disstid=${encodeURIComponent(dissid)}` +
     `&loginUin=0&hostUin=0&format=json&inCharset=utf8&outCharset=utf-8&notice=0` +
     `&platform=yqq.json&needNewCode=0`
 
@@ -350,7 +476,7 @@ export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Pr
     method: "GET",
     headers: {
       Origin: "https://y.qq.com",
-      Referer: `https://y.qq.com/n/yqq/playsquare/${id}.html`,
+      Referer: `https://y.qq.com/n/yqq/playsquare/${dissid}.html`,
       "User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)",
     },
   })
@@ -360,24 +486,30 @@ export async function getTxPlaylistDetail(id: string, _page = 1, tryNum = 0): Pr
       await new Promise((r) => setTimeout(r, retryDelayMs(tryNum)))
       return getTxPlaylistDetail(id, _page, tryNum + 1)
     }
-    throw new Error(`QQ playlist detail failed: ${res.status}`)
+    return getTxPlaylistDetailViaDissinfo(dissid, encHostUin)
   }
 
   const data = (await res.json()) as TxListDetailResponse
-  if (!data || data.code !== 0 || !data.cdlist?.length) {
+  if (!data || data.code !== 0) {
     if (tryNum < 2) {
       await new Promise((r) => setTimeout(r, retryDelayMs(tryNum)))
       return getTxPlaylistDetail(id, _page, tryNum + 1)
     }
-    throw new Error("QQ playlist detail failed: bad response")
+    return getTxPlaylistDetailViaDissinfo(dissid, encHostUin)
+  }
+
+  // Personal / mobile-share lists: code 0 but subcode 4000, or a cdlist whose
+  // songs lack songmid. Same fallback lx-music added as getListDetail2.
+  if (data.subcode !== 0 || !data.cdlist?.length) {
+    return getTxPlaylistDetailViaDissinfo(dissid, encHostUin)
   }
 
   const cd = data.cdlist[0]
-  const list: MusicInfo[] = []
-  for (const item of cd.songlist ?? []) {
-    const song = normalizeTxListSong(item)
-    if (song) list.push(song)
+  const list = songsFromRawList(cd.songlist)
+  if (list.length === 0 && (cd.songlist?.length ?? 0) > 0) {
+    return getTxPlaylistDetailViaDissinfo(dissid, encHostUin)
   }
+
   return {
     info: {
       name: cd.dissname ?? "",
