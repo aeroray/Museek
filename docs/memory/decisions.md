@@ -1,3 +1,27 @@
+## 2026-08-30 - Presence scan on Downloads and Local
+
+Decision:
+Entering Downloads or Local runs one background native batch `exists` (metadata only, off the UI thread). Missing files get the existing missing badge; restored files clear it. Do not block the page or toast.
+
+Reason:
+Users delete files in the OS while Museek still lists them. Per-file frontend IPC would hitch large libraries; one Rust pass is cheap.
+
+## 2026-08-30 - Favorited playlist songs stay on disk
+
+Decision:
+Once a favorited platform playlist or album is opened or played, persist its song metadata on that favorite in `playlists.json` (already synced). Reopen shows the snapshot first, refreshes in the background, and keeps the snapshot if the remote fails or returns empty.
+
+Reason:
+Authors can delete a list after it was favorited; a stub-only favorite then opened with no tracks. The snapshot is metadata only, not audio.
+
+## 2026-08-30 - Downloads import to local is explicit
+
+Decision:
+Completed downloads stay a download list and are not playable there. Import to Local uses the existing file path (no copy) and does not auto-play or switch pages.
+
+Reason:
+Users expected a finished download to play; Local Music is the playable library, so one-click import is the bridge.
+
 ## 2026-08-29 - Matched local lyrics use catalog identity
 
 Decision:

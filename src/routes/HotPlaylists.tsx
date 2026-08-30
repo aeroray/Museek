@@ -17,15 +17,15 @@ import { PlaylistCardSkeleton, TrackRowSkeleton } from "@/components/common/List
 import { VirtualList } from "@/components/common/VirtualList"
 import {
   getHotPlaylists,
-  getPlaylistDetail,
   getPlaylistTags,
   playlistKind,
   type Playlist,
   type PlaylistTag,
 } from "@/lib/playlists"
-import { getAlbumDetail, type Album } from "@/lib/albums"
+import { type Album } from "@/lib/albums"
 import { parsePlaylistLink } from "@/lib/playlists/openLink"
 import { playPlaylist } from "@/lib/playlists/play"
+import { loadFavoriteDetail, readFavoriteSongs } from "@/lib/playlists/favoriteCache"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -82,13 +82,49 @@ export function HotPlaylists() {
   const [detailKind, setDetailKind] = useState<"playlist" | "album">(
     openAlbumFromNav ? "album" : "playlist",
   )
-  const [songs, setSongs] = useState<MusicInfo[]>([])
+  const [songs, setSongs] = useState<MusicInfo[]>(() => {
+    const store = usePlaylistStore.getState()
+    if (openFromNav) {
+      return store.getFavoritePlaylistSongs(
+        openFromNav.source,
+        openFromNav.id,
+        "playlist",
+      )
+    }
+    if (openAlbumFromNav) {
+      return store.getFavoritePlaylistSongs(
+        openAlbumFromNav.source,
+        openAlbumFromNav.id,
+        "album",
+      )
+    }
+    return []
+  })
   // Grid (hot list) and detail have SEPARATE loading/error so the cached hot-list
   // fetch can't flip the detail view out of its skeleton mid-load (which showed a
   // blank "empty" flash when opening a favorited playlist).
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
-  const [detailLoading, setDetailLoading] = useState(!!openFromNav || !!openAlbumFromNav)
+  const [detailLoading, setDetailLoading] = useState(() => {
+    if (!openFromNav && !openAlbumFromNav) return false
+    const store = usePlaylistStore.getState()
+    if (openFromNav) {
+      return (
+        store.getFavoritePlaylistSongs(
+          openFromNav.source,
+          openFromNav.id,
+          "playlist",
+        ).length === 0
+      )
+    }
+    return (
+      store.getFavoritePlaylistSongs(
+        openAlbumFromNav!.source,
+        openAlbumFromNav!.id,
+        "album",
+      ).length === 0
+    )
+  })
   const [detailError, setDetailError] = useState<string | null>(null)
   // Category filter: null = "全部" (platform default recommend). Hide the bar
   // when tags fail or come back empty (e.g. transient API outage).
@@ -114,6 +150,7 @@ export function HotPlaylists() {
   const [openError, setOpenError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const detailSeq = useRef(0)
 
   // Bind the Radix viewport once mounted (needed for virtualization + scroll reset).
   useEffect(() => {
@@ -197,54 +234,94 @@ export function HotPlaylists() {
 
   const openPlaylist = (pl: Playlist) => {
     const entry = { ...pl, kind: "playlist" as const }
+    const seq = ++detailSeq.current
+    const cached = readFavoriteSongs(pl.source, pl.id, "playlist")
     setDetailKind("playlist")
     setSelected(entry)
-    setDetailLoading(true)
     setDetailError(null)
-    setSongs([])
+    if (cached.length) {
+      setSongs(cached)
+      setDetailLoading(false)
+    } else {
+      setSongs([])
+      setDetailLoading(true)
+    }
     // Use the playlist's own platform (so opening from Favorites works regardless
     // of the currently-selected platform tab).
-    getPlaylistDetail(pl.source, pl.id)
-      .then(({ info, list }) => {
-        setSelected((prev) =>
-          prev && prev.source === entry.source && prev.id === entry.id && playlistKind(prev) === "playlist"
-            ? {
-                ...prev,
-                name: info.name || prev.name,
-                img: info.img ?? prev.img,
-                author: info.author ?? prev.author,
-              }
-            : prev,
-        )
+    loadFavoriteDetail("playlist", pl.source, pl.id)
+      .then(({ songs: list, info, usedCacheOnly }) => {
+        if (seq !== detailSeq.current) return
+        if (info && !usedCacheOnly) {
+          setSelected((prev) =>
+            prev &&
+            prev.source === entry.source &&
+            prev.id === entry.id &&
+            playlistKind(prev) === "playlist"
+              ? {
+                  ...prev,
+                  name: info.name || prev.name,
+                  img: info.img ?? prev.img,
+                  author: info.author ?? prev.author,
+                }
+              : prev,
+          )
+        }
         setSongs(list)
+        setDetailError(null)
       })
-      .catch((e) => setDetailError((e as Error).message))
-      .finally(() => setDetailLoading(false))
+      .catch((e) => {
+        if (seq !== detailSeq.current) return
+        setDetailError((e as Error).message)
+      })
+      .finally(() => {
+        if (seq !== detailSeq.current) return
+        setDetailLoading(false)
+      })
   }
 
   const openAlbum = (album: Album) => {
     const pl = albumToPlaylist(album)
+    const seq = ++detailSeq.current
+    const cached = readFavoriteSongs(album.source, album.id, "album")
     setDetailKind("album")
     setSelected(pl)
-    setDetailLoading(true)
     setDetailError(null)
-    setSongs([])
-    getAlbumDetail(album.source, album.id)
-      .then(({ info, list }) => {
-        setSelected((prev) =>
-          prev && prev.source === pl.source && prev.id === pl.id && playlistKind(prev) === "album"
-            ? {
-                ...prev,
-                name: info.name || prev.name,
-                img: info.img ?? prev.img,
-                author: info.author ?? prev.author,
-              }
-            : prev,
-        )
+    if (cached.length) {
+      setSongs(cached)
+      setDetailLoading(false)
+    } else {
+      setSongs([])
+      setDetailLoading(true)
+    }
+    loadFavoriteDetail("album", album.source, album.id)
+      .then(({ songs: list, info, usedCacheOnly }) => {
+        if (seq !== detailSeq.current) return
+        if (info && !usedCacheOnly) {
+          setSelected((prev) =>
+            prev &&
+            prev.source === pl.source &&
+            prev.id === pl.id &&
+            playlistKind(prev) === "album"
+              ? {
+                  ...prev,
+                  name: info.name || prev.name,
+                  img: info.img ?? prev.img,
+                  author: info.author ?? prev.author,
+                }
+              : prev,
+          )
+        }
         setSongs(list)
+        setDetailError(null)
       })
-      .catch((e) => setDetailError((e as Error).message))
-      .finally(() => setDetailLoading(false))
+      .catch((e) => {
+        if (seq !== detailSeq.current) return
+        setDetailError((e as Error).message)
+      })
+      .finally(() => {
+        if (seq !== detailSeq.current) return
+        setDetailLoading(false)
+      })
   }
 
   const openByLink = async () => {
@@ -289,8 +366,19 @@ export function HotPlaylists() {
       (p) => p.source === pl.source && p.id === pl.id && playlistKind(p) === playlistKind(pl),
     )
   const toggleFavFor = (pl: Playlist) => {
-    if (isPlFav(pl)) removeFavoritePlaylist(pl.source, pl.id, playlistKind(pl))
-    else addFavoritePlaylist(pl)
+    const kind = playlistKind(pl)
+    if (isPlFav(pl)) {
+      removeFavoritePlaylist(pl.source, pl.id, kind)
+      return
+    }
+    const snapshot =
+      selected &&
+      selected.source === pl.source &&
+      selected.id === pl.id &&
+      playlistKind(selected) === kind
+        ? songs
+        : undefined
+    addFavoritePlaylist({ ...pl, kind }, snapshot)
   }
 
   // Auto-open a playlist/album passed from Search or Favorites (one-time on mount).

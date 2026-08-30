@@ -1,16 +1,18 @@
-import { getPlaylistDetail, type Playlist } from "./index"
+import type { Playlist } from "./index"
 import { playAllSongs } from "@/lib/playback/playAllPort"
 import { notify } from "@/lib/notify"
 import { t } from "@/lib/i18n"
+import { loadFavoriteDetail } from "./favoriteCache"
 
 /**
  * Fetch a playlist's songs, replace the play queue with them, and start playing
  * from the top. Used by the play button on playlist cards (Playlists / Search /
  * Favorites) so "play whole list" is one click without opening the detail.
+ * Favorited lists fall back to the last saved snapshot if the remote is gone.
  */
 export async function playPlaylist(pl: Playlist): Promise<void> {
   try {
-    const { list: songs } = await getPlaylistDetail(pl.source, pl.id)
+    const { songs } = await loadFavoriteDetail("playlist", pl.source, pl.id)
     if (!songs.length) {
       notify({ message: t("hotPlaylists.playlistEmpty"), variant: "info" })
       return

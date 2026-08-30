@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Trash2,
   X,
@@ -10,6 +10,9 @@ import {
   Check,
   CheckCheck,
   Eraser,
+  HardDrive,
+  Loader2,
+  TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { CoverImage } from "@/components/common/CoverImage";
 import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges";
 import { useDownloadStore } from "@/stores/downloadStore";
+import { useLocalMusicStore } from "@/stores/localMusicStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useT, t } from "@/lib/i18n";
@@ -25,6 +29,88 @@ import { cn } from "@/lib/utils";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+function pathKey(filePath: string): string {
+  return filePath.replace(/\\/g, "/").toLowerCase();
+}
+
+async function isMissingFile(filePath: string): Promise<boolean> {
+  try {
+    const { exists } = await import("@tauri-apps/plugin-fs");
+    return !(await exists(filePath));
+  } catch {
+    return false;
+  }
+}
+
+async function importDownloadFilePaths(filePaths: Array<string | undefined>) {
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  let missing = 0;
+
+  for (const filePath of filePaths) {
+    if (!filePath) {
+      missing += 1;
+      continue;
+    }
+    const key = pathKey(filePath);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(filePath);
+  }
+
+  const byPath = new Map(
+    useLocalMusicStore
+      .getState()
+      .tracks.map((track) => [pathKey(track.filePath), track]),
+  );
+
+  const toImport: string[] = [];
+  for (const filePath of unique) {
+    const existing = byPath.get(pathKey(filePath));
+    if (existing && !existing.unavailable) continue;
+    if (await isMissingFile(filePath)) {
+      missing += 1;
+      continue;
+    }
+    toImport.push(filePath);
+  }
+
+  const added =
+    toImport.length > 0
+      ? await useLocalMusicStore.getState().importPaths(toImport)
+      : 0;
+
+  return { added, missing };
+}
+
+function notifyImportResult(added: number, missing: number) {
+  if (added > 0 && missing > 0) {
+    useUiStore.getState().notify({
+      message: t("downloads.importLocalPartial", { n: added, missing }),
+      variant: "info",
+    });
+    return;
+  }
+  if (added > 0) {
+    useUiStore.getState().notify({
+      message: t("local.imported", { n: added }),
+      variant: "success",
+    });
+    return;
+  }
+  if (missing > 0) {
+    useUiStore.getState().notify({
+      message: t("local.fileMissing"),
+      variant: "error",
+    });
+    return;
+  }
+  useUiStore.getState().notify({
+    message: t("downloads.importedAlready"),
+    variant: "info",
+  });
+}
 
 // Open the download folder in the OS file manager. Uses the opener plugin —
 // shell.open() validates against a URL pattern in Tauri v2 and rejects plain
@@ -36,23 +122,37 @@ async function openDownloadFolder(downloadDir: string | null) {
     await openPath(downloadDir);
   } catch (e) {
     console.error("Failed to open download folder:", e);
-    useUiStore
-      .getState()
-      .notify({
-        message: t("download.openFolderFailed", { msg: String(e) }),
-        variant: "error",
-      });
+    useUiStore.getState().notify({
+      message: t("download.openFolderFailed", { msg: String(e) }),
+      variant: "error",
+    });
   }
 }
 
 export function Downloads() {
   const { tasks, removeTask, removeTasks, clearCompleted } = useDownloadStore();
   const downloadDir = useSettingsStore((s) => s.downloadDir);
+  const localTracks = useLocalMusicStore((s) => s.tracks);
+  const importing = useLocalMusicStore((s) => s.importing);
   const t = useT();
 
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    void useDownloadStore.getState().syncFilePresence();
+  }, []);
+
+  const importedKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const track of localTracks) {
+      if (track.unavailable) continue;
+      keys.add(pathKey(track.filePath));
+    }
+    return keys;
+  }, [localTracks]);
 
   const displayed = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -107,6 +207,55 @@ export function Downloads() {
   const batchDelete = () => {
     removeTasks([...selected]);
     exitEdit();
+  };
+
+  const importOne = async (id: string, filePath: string | undefined) => {
+    if (!isTauri) {
+      useUiStore.getState().notify({
+        message: t("local.desktopOnly"),
+        variant: "error",
+      });
+      return;
+    }
+    setBusyKey(id);
+    try {
+      const result = await importDownloadFilePaths([filePath]);
+      notifyImportResult(result.added, result.missing);
+    } catch (e) {
+      useUiStore.getState().notify({
+        message: t("local.importFailed", { msg: String(e) }),
+        variant: "error",
+      });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const batchImportLocal = async () => {
+    const completed = tasks.filter(
+      (task) => selected.has(task.id) && task.status === "completed",
+    );
+    if (completed.length === 0) {
+      useUiStore.getState().notify({
+        message: t("downloads.importLocalNeedCompleted"),
+        variant: "info",
+      });
+      return;
+    }
+    setBusyKey("batch");
+    try {
+      const result = await importDownloadFilePaths(
+        completed.map((task) => task.filePath),
+      );
+      notifyImportResult(result.added, result.missing);
+    } catch (e) {
+      useUiStore.getState().notify({
+        message: t("local.importFailed", { msg: String(e) }),
+        variant: "error",
+      });
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   return (
@@ -195,6 +344,24 @@ export function Downloads() {
                     ? t("downloads.deselectAll")
                     : t("downloads.selectAll")}
                 </Button>
+                {isTauri && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    disabled={
+                      selected.size === 0 || importing || busyKey !== null
+                    }
+                    onClick={() => void batchImportLocal()}
+                  >
+                    {busyKey === "batch" ? (
+                      <Loader2 size={14} className="mr-1.5 animate-spin" />
+                    ) : (
+                      <HardDrive size={14} className="mr-1.5" />
+                    )}
+                    {t("downloads.importLocal")}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -243,6 +410,11 @@ export function Downloads() {
             ) : (
               displayed.map((task) => {
                 const sel = selected.has(task.id);
+                const alreadyImported = Boolean(
+                  task.filePath && importedKeys.has(pathKey(task.filePath)),
+                );
+                const fileGone =
+                  task.status === "completed" && !!task.fileMissing;
                 return (
                   <div
                     key={task.id}
@@ -250,6 +422,7 @@ export function Downloads() {
                       "flex items-center gap-3 px-3 py-2 rounded-xl group transition-[background-color] duration-200 hover:bg-accent/55",
                       editing && "cursor-pointer",
                       editing && sel && "bg-primary/10",
+                      fileGone && "opacity-80",
                     )}
                     onClick={editing ? () => toggleOne(task.id) : undefined}
                   >
@@ -274,11 +447,24 @@ export function Downloads() {
                           <Music size={16} />
                         </div>
                       )}
+                      {fileGone && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/50">
+                          <TriangleAlert
+                            size={16}
+                            className="text-amber-300"
+                          />
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex-1 min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2 min-w-0">
-                        <p className="text-sm truncate font-medium">
+                        <p
+                          className={cn(
+                            "text-sm truncate font-medium",
+                            fileGone && "text-muted-foreground",
+                          )}
+                        >
                           {task.song.name}
                         </p>
                         <PlatformBadge source={task.song.source} />
@@ -305,7 +491,10 @@ export function Downloads() {
                     <span
                       className={cn(
                         "text-xs shrink-0 tabular-nums",
-                        task.status === "completed" && "text-green-600",
+                        task.status === "completed" &&
+                          !fileGone &&
+                          "text-green-600",
+                        fileGone && "text-amber-700 dark:text-amber-400",
                         task.status === "error" && "text-destructive",
                         task.status === "downloading" && "text-primary",
                         task.status === "waiting" && "text-muted-foreground",
@@ -315,7 +504,9 @@ export function Downloads() {
                         ? task.progress >= 86
                           ? t("download.writingTags")
                           : `${task.progress}%`
-                        : t(`downloads.status.${task.status}`)}
+                        : fileGone
+                          ? t("local.fileMissingBadge")
+                          : t(`downloads.status.${task.status}`)}
                     </span>
 
                     <span className="text-xs text-muted-foreground w-12 text-right shrink-0 tabular-nums">
@@ -325,23 +516,65 @@ export function Downloads() {
                     {!editing && (
                       <div className="flex items-center gap-0.5 shrink-0">
                         {task.status === "completed" && isTauri && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                            disabled={!downloadDir}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void openDownloadFolder(downloadDir);
-                            }}
-                            title={
-                              downloadDir
-                                ? t("download.openFolder")
-                                : t("download.notSet")
-                            }
-                          >
-                            <FolderOpen size={14} />
-                          </Button>
+                          <>
+                            {!fileGone && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-8 w-8",
+                                  busyKey === task.id
+                                    ? "opacity-100"
+                                    : "opacity-0 group-hover:opacity-100",
+                                )}
+                                disabled={
+                                  alreadyImported ||
+                                  importing ||
+                                  busyKey !== null ||
+                                  !task.filePath
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void importOne(task.id, task.filePath);
+                                }}
+                                title={
+                                  alreadyImported
+                                    ? t("downloads.importedAlready")
+                                    : task.filePath
+                                      ? t("downloads.importLocal")
+                                      : t("local.missingPath")
+                                }
+                              >
+                                {busyKey === task.id ? (
+                                  <Loader2
+                                    size={14}
+                                    className="animate-spin"
+                                  />
+                                ) : alreadyImported ? (
+                                  <Check size={14} />
+                                ) : (
+                                  <HardDrive size={14} />
+                                )}
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                              disabled={!downloadDir}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void openDownloadFolder(downloadDir);
+                              }}
+                              title={
+                                downloadDir
+                                  ? t("download.openFolder")
+                                  : t("download.notSet")
+                              }
+                            >
+                              <FolderOpen size={14} />
+                            </Button>
+                          </>
                         )}
                         <Button
                           variant="ghost"

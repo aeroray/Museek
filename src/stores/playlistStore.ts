@@ -34,9 +34,21 @@ interface PlaylistState extends PersistShape {
   removeFromFavorites: (songId: string) => void
   isFavorite: (songId: string) => boolean
   // Favorite a whole platform playlist / album (from 歌单 or 专辑详情).
-  addFavoritePlaylist: (pl: SourcePlaylist) => void
+  addFavoritePlaylist: (pl: SourcePlaylist, songs?: MusicInfo[]) => void
   removeFavoritePlaylist: (source: Source, id: string, kind?: "playlist" | "album") => void
   isFavoritePlaylist: (source: Source, id: string, kind?: "playlist" | "album") => boolean
+  cacheFavoritePlaylistSongs: (
+    source: Source,
+    id: string,
+    kind: "playlist" | "album",
+    songs: MusicInfo[],
+    info?: { name?: string; img?: string | null; author?: string },
+  ) => void
+  getFavoritePlaylistSongs: (
+    source: Source,
+    id: string,
+    kind?: "playlist" | "album",
+  ) => MusicInfo[]
   createPlaylist: (name: string) => Playlist
   renamePlaylist: (id: string, name: string) => void
   deletePlaylist: (id: string) => void
@@ -53,6 +65,45 @@ function isFavoriteCategory(v: unknown): v is FavoriteCategory {
   if (!v || typeof v !== "object") return false
   const c = v as FavoriteCategory
   return typeof c.id === "string" && typeof c.name === "string" && typeof c.createdAt === "number"
+}
+
+function isPlayableMusicInfo(v: unknown): v is MusicInfo {
+  if (!v || typeof v !== "object") return false
+  const song = v as MusicInfo
+  return (
+    typeof song.id === "string" &&
+    typeof song.name === "string" &&
+    typeof song.singer === "string" &&
+    typeof song.source === "string" &&
+    !!song.meta &&
+    typeof song.meta === "object" &&
+    typeof song.meta.songId === "string"
+  )
+}
+
+function sanitizeFavoritePlaylist(v: unknown): SourcePlaylist | null {
+  if (!v || typeof v !== "object") return null
+  const p = v as SourcePlaylist
+  if (typeof p.id !== "string" || typeof p.name !== "string" || typeof p.source !== "string") {
+    return null
+  }
+  const songs = Array.isArray(p.songs) ? p.songs.filter(isPlayableMusicInfo) : undefined
+  const cachedAt = typeof p.cachedAt === "number" ? p.cachedAt : undefined
+  return {
+    id: p.id,
+    name: p.name,
+    img: typeof p.img === "string" || p.img === null ? p.img : null,
+    playCount: typeof p.playCount === "string" ? p.playCount : undefined,
+    author: typeof p.author === "string" ? p.author : undefined,
+    publishTime: typeof p.publishTime === "string" ? p.publishTime : undefined,
+    songCount:
+      typeof p.songCount === "number"
+        ? p.songCount
+        : songs?.length,
+    source: p.source,
+    kind: p.kind === "album" ? "album" : "playlist",
+    ...(songs && songs.length ? { songs, cachedAt } : {}),
+  }
 }
 
 export const usePlaylistStore = create<PlaylistState>((set, get) => {
@@ -111,16 +162,33 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => {
       return get().favorites.some((f) => f.id === songId)
     },
 
-    addFavoritePlaylist(pl) {
+    addFavoritePlaylist(pl, songs) {
       const kind = playlistKind(pl)
+      const snapshot = (songs ?? pl.songs)?.filter(isPlayableMusicInfo) ?? []
       if (
         get().favoritePlaylists.some(
           (p) => p.source === pl.source && p.id === pl.id && playlistKind(p) === kind,
         )
-      )
+      ) {
+        if (snapshot.length) {
+          get().cacheFavoritePlaylistSongs(pl.source, pl.id, kind, snapshot)
+        }
         return
+      }
+      const entry: SourcePlaylist = {
+        id: pl.id,
+        name: pl.name,
+        img: pl.img,
+        playCount: pl.playCount,
+        author: pl.author,
+        publishTime: pl.publishTime,
+        songCount: snapshot.length || pl.songCount,
+        source: pl.source,
+        kind,
+        ...(snapshot.length ? { songs: snapshot, cachedAt: Date.now() } : {}),
+      }
       set((s) => ({
-        favoritePlaylists: [{ ...pl, kind }, ...s.favoritePlaylists],
+        favoritePlaylists: [entry, ...s.favoritePlaylists],
       }))
       persist()
     },
@@ -138,6 +206,35 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => {
       return get().favoritePlaylists.some(
         (p) => p.source === source && p.id === id && playlistKind(p) === kind,
       )
+    },
+
+    cacheFavoritePlaylistSongs(source, id, kind, songs, info) {
+      const playable = songs.filter(isPlayableMusicInfo)
+      if (!playable.length) return
+      let changed = false
+      set((s) => ({
+        favoritePlaylists: s.favoritePlaylists.map((p) => {
+          if (p.source !== source || p.id !== id || playlistKind(p) !== kind) return p
+          changed = true
+          return {
+            ...p,
+            name: info?.name || p.name,
+            img: info?.img !== undefined ? info.img : p.img,
+            author: info?.author ?? p.author,
+            songCount: playable.length,
+            songs: playable,
+            cachedAt: Date.now(),
+          }
+        }),
+      }))
+      if (changed) persist()
+    },
+
+    getFavoritePlaylistSongs(source, id, kind = "playlist") {
+      const p = get().favoritePlaylists.find(
+        (x) => x.source === source && x.id === id && playlistKind(x) === kind,
+      )
+      return p?.songs?.length ? p.songs : []
     },
 
     createPlaylist(name) {
@@ -258,7 +355,9 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => {
       set({
         favorites,
         userLists: data.userLists ?? [],
-        favoritePlaylists: data.favoritePlaylists ?? [],
+        favoritePlaylists: (data.favoritePlaylists ?? [])
+          .map(sanitizeFavoritePlaylist)
+          .filter((p): p is SourcePlaylist => p !== null),
         favoriteCategories,
         favoriteSongCategories,
       })

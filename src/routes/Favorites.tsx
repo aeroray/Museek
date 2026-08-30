@@ -739,7 +739,18 @@ export function Favorites() {
                             },
                           })
                         : navigate("/hot-playlists", {
-                            state: { openPlaylist: pl, fromFavorites: true },
+                            state: {
+                              openPlaylist: {
+                                id: pl.id,
+                                name: pl.name,
+                                img: pl.img,
+                                playCount: pl.playCount,
+                                author: pl.author,
+                                source: pl.source,
+                                kind: "playlist" as const,
+                              },
+                              fromFavorites: true,
+                            },
                           })
                     }
                     onPlay={() =>

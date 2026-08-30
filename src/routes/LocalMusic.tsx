@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   HardDrive,
   FolderOpen,
@@ -84,6 +84,10 @@ export function LocalMusic() {
   const localSort = useSettingsStore((s) => s.localSort);
   const setLocalSort = useSettingsStore((s) => s.setLocalSort);
   const notify = useUiStore((s) => s.notify);
+
+  useEffect(() => {
+    void useLocalMusicStore.getState().syncFilePresence();
+  }, []);
 
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());

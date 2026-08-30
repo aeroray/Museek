@@ -17,6 +17,56 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.7.1": {
+    zh: {
+      sections: [
+        {
+          title: "⬇️ 下载",
+          bullets: [
+            "已完成的下载可一键导入本地音乐；悬停显示图标",
+            "进入下载页时后台检查文件是否还在，已删除的会标成「文件缺失」",
+          ],
+        },
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "进入本地页时后台检查文件是否还在，缺失或找回都会更新标记",
+          ],
+        },
+        {
+          title: "📋 歌单",
+          bullets: [
+            "打开过的收藏歌单会保存歌曲列表；远程被删后仍能打开和播放",
+            "这份快照会随配置同步到其他设备",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "⬇️ Downloads",
+          bullets: [
+            "Import a finished download into Local music from a hover icon",
+            "Opening Downloads checks files in the background and marks deleted ones as missing",
+          ],
+        },
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Opening Local checks files in the background and updates missing or restored tracks",
+          ],
+        },
+        {
+          title: "📋 Playlists",
+          bullets: [
+            "Opened favorite playlists keep a song snapshot, so they still open and play if the remote list is deleted",
+            "The snapshot syncs with your config to other devices",
+          ],
+        },
+      ],
+    },
+  },
   "3.7.0": {
     zh: {
       sections: [

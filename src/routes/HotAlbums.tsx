@@ -7,9 +7,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { TrackRow } from "@/components/common/TrackRow"
 import { PlaylistCardSkeleton, TrackRowSkeleton } from "@/components/common/ListSkeletons"
 import { VirtualList } from "@/components/common/VirtualList"
-import { getHotAlbums, getAlbumTags, getAlbumDetail, type Album, type AlbumTag } from "@/lib/albums"
+import { getHotAlbums, getAlbumTags, type Album, type AlbumTag } from "@/lib/albums"
 import { playAlbum } from "@/lib/albums/play"
 import { playlistKind, type Playlist } from "@/lib/playlists"
+import { loadFavoriteDetail, readFavoriteSongs } from "@/lib/playlists/favoriteCache"
 import { PlatformTabs } from "@/components/common/PlatformTabs"
 import { PlaylistCard } from "@/components/common/PlaylistCard"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -58,10 +59,31 @@ export function HotAlbums() {
   const [selected, setSelected] = useState<Playlist | null>(
     openAlbumFromNav ? albumToPlaylist(openAlbumFromNav) : null,
   )
-  const [songs, setSongs] = useState<MusicInfo[]>([])
+  const [songs, setSongs] = useState<MusicInfo[]>(() =>
+    openAlbumFromNav
+      ? usePlaylistStore
+          .getState()
+          .getFavoritePlaylistSongs(
+            openAlbumFromNav.source,
+            openAlbumFromNav.id,
+            "album",
+          )
+      : [],
+  )
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
-  const [detailLoading, setDetailLoading] = useState(!!openAlbumFromNav)
+  const [detailLoading, setDetailLoading] = useState(() => {
+    if (!openAlbumFromNav) return false
+    return (
+      usePlaylistStore
+        .getState()
+        .getFavoritePlaylistSongs(
+          openAlbumFromNav.source,
+          openAlbumFromNav.id,
+          "album",
+        ).length === 0
+    )
+  })
   const [detailError, setDetailError] = useState<string | null>(null)
   const [tags, setTags] = useState<AlbumTag[]>([])
   const [tagId, setTagId] = useState<string | null>(null)
@@ -78,6 +100,7 @@ export function HotAlbums() {
   const [filter, setFilter] = useState("")
   const [editing, setEditing] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const detailSeq = useRef(0)
 
   useEffect(() => {
     const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
@@ -140,26 +163,43 @@ export function HotAlbums() {
 
   const openAlbum = (album: Album) => {
     const pl = albumToPlaylist(album)
+    const seq = ++detailSeq.current
+    const cached = readFavoriteSongs(album.source, album.id, "album")
     setSelected(pl)
-    setDetailLoading(true)
     setDetailError(null)
-    setSongs([])
-    getAlbumDetail(album.source, album.id)
-      .then(({ info, list }) => {
-        setSelected((prev) =>
-          prev && prev.source === pl.source && prev.id === pl.id
-            ? {
-                ...prev,
-                name: info.name || prev.name,
-                img: info.img ?? prev.img,
-                author: info.author ?? prev.author,
-              }
-            : prev,
-        )
+    if (cached.length) {
+      setSongs(cached)
+      setDetailLoading(false)
+    } else {
+      setSongs([])
+      setDetailLoading(true)
+    }
+    loadFavoriteDetail("album", album.source, album.id)
+      .then(({ songs: list, info, usedCacheOnly }) => {
+        if (seq !== detailSeq.current) return
+        if (info && !usedCacheOnly) {
+          setSelected((prev) =>
+            prev && prev.source === pl.source && prev.id === pl.id
+              ? {
+                  ...prev,
+                  name: info.name || prev.name,
+                  img: info.img ?? prev.img,
+                  author: info.author ?? prev.author,
+                }
+              : prev,
+          )
+        }
         setSongs(list)
+        setDetailError(null)
       })
-      .catch((e) => setDetailError((e as Error).message))
-      .finally(() => setDetailLoading(false))
+      .catch((e) => {
+        if (seq !== detailSeq.current) return
+        setDetailError((e as Error).message)
+      })
+      .finally(() => {
+        if (seq !== detailSeq.current) return
+        setDetailLoading(false)
+      })
   }
 
   const retry = () => {
@@ -181,8 +221,18 @@ export function HotAlbums() {
       (p) => p.source === pl.source && p.id === pl.id && playlistKind(p) === "album",
     )
   const toggleFavFor = (pl: Playlist) => {
-    if (isPlFav(pl)) removeFavoritePlaylist(pl.source, pl.id, "album")
-    else addFavoritePlaylist({ ...pl, kind: "album" })
+    if (isPlFav(pl)) {
+      removeFavoritePlaylist(pl.source, pl.id, "album")
+      return
+    }
+    const snapshot =
+      selected &&
+      selected.source === pl.source &&
+      selected.id === pl.id &&
+      playlistKind(selected) === "album"
+        ? songs
+        : undefined
+    addFavoritePlaylist({ ...pl, kind: "album" }, snapshot)
   }
 
   useEffect(() => {

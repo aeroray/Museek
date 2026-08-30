@@ -13,6 +13,7 @@ import { t } from "@/lib/i18n";
 import { loadLyricInfo } from "@/lib/lyric/loadLyric";
 import { sourceRunner } from "@/lib/sourceRunner";
 import { maybeGunzipAudio, suggestedDownloadExtension } from "@/lib/audioBytes";
+import { checkPathsExist } from "@/lib/fsPresence";
 
 export type DownloadStatus = "waiting" | "downloading" | "completed" | "error";
 
@@ -27,6 +28,8 @@ export interface DownloadTask {
   error?: string;
   /** Absolute path written on disk when completed (used if delete-with-task is on). */
   filePath?: string;
+  /** True when a completed download's file is gone from disk. */
+  fileMissing?: boolean;
 }
 
 interface DownloadState {
@@ -42,6 +45,8 @@ interface DownloadState {
   _pump: () => void;
   /** Device-local history (not synced). Restores queue across restarts. */
   loadFromDisk: () => Promise<void>;
+  /** Background metadata check; marks completed tasks whose files were deleted. */
+  syncFilePresence: () => Promise<void>;
 }
 
 type DownloadTaskSnapshot = Omit<DownloadTask, "embedLyrics" | "embedCover"> & {
@@ -343,8 +348,11 @@ function normalizeTask(task: DownloadTaskSnapshot): DownloadTask {
     ...task,
     embedLyrics: task.embedLyrics ?? true,
     embedCover: task.embedCover ?? true,
+    fileMissing: task.fileMissing === true ? true : undefined,
   };
 }
+
+let presenceScan: Promise<void> | null = null;
 
 export const useDownloadStore = create<DownloadState>((set, get) => ({
   tasks: [],
@@ -462,6 +470,39 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     get()._pump();
   },
 
+  async syncFilePresence() {
+    if (!isTauri) return;
+    if (presenceScan) return presenceScan;
+    presenceScan = (async () => {
+      const snapshot = get().tasks.filter(
+        (t) => t.status === "completed" && t.filePath,
+      );
+      if (!snapshot.length) return;
+      const present = await checkPathsExist(
+        snapshot.map((t) => t.filePath as string),
+      );
+      if (present.length !== snapshot.length) return;
+      const missingById = new Map(
+        snapshot.map((t, i) => [t.id, !present[i]]),
+      );
+      const current = get().tasks;
+      let changed = false;
+      const tasks = current.map((t) => {
+        if (!missingById.has(t.id)) return t;
+        const missing = missingById.get(t.id) === true;
+        if (!!t.fileMissing === missing) return t;
+        changed = true;
+        return { ...t, fileMissing: missing || undefined };
+      });
+      if (!changed) return;
+      persist(tasks);
+      set({ tasks });
+    })().finally(() => {
+      presenceScan = null;
+    });
+    return presenceScan;
+  },
+
   async startTask(id) {
     const task = get().tasks.find((t) => t.id === id);
     if (!task || task.status === "downloading" || task.status === "completed")
@@ -549,7 +590,13 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       set((s) => {
         const tasks = s.tasks.map((t) =>
           t.id === id
-            ? { ...t, status: "completed" as const, progress: 100, filePath }
+            ? {
+                ...t,
+                status: "completed" as const,
+                progress: 100,
+                filePath,
+                fileMissing: undefined,
+              }
             : t,
         );
         persist(tasks);

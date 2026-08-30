@@ -1330,6 +1330,27 @@ async fn race_download_and_install(
     }
 }
 
+/// Metadata-only presence check for many absolute paths in one IPC round-trip.
+/// Permission / IO errors count as present so a locked file is never marked missing.
+#[tauri::command]
+async fn check_paths_exist(paths: Vec<String>) -> Vec<bool> {
+    let n = paths.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        paths
+            .into_iter()
+            .map(|p| match std::path::Path::new(&p).try_exists() {
+                Ok(exists) => exists,
+                Err(_) => true,
+            })
+            .collect::<Vec<bool>>()
+    })
+    .await
+    .unwrap_or_else(|_| vec![true; n])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "windows")]
@@ -1546,7 +1567,8 @@ pub fn run() {
             is_autostart_launch,
             should_start_hidden,
             reapply_macos_traffic_lights,
-            list_font_families
+            list_font_families,
+            check_paths_exist
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

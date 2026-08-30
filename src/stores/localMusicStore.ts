@@ -23,6 +23,7 @@ import {
 } from "@/lib/localMusic";
 import { fetchWySongDetail } from "@/lib/search/wy";
 import { indexQualitySizes } from "@/lib/quality";
+import { checkPathsExist } from "@/lib/fsPresence";
 import { normalizeCategoryName } from "@/lib/songCategories";
 import type {
   LocalCategory,
@@ -34,6 +35,8 @@ import type {
 const STORE_FILE = "localMusic.json";
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+let presenceScan: Promise<void> | null = null;
 
 async function dropRemovedFromPlayback(ids: string[]) {
   const { usePlayerStore } = await import("@/stores/playerStore");
@@ -108,6 +111,8 @@ interface LocalMusicState {
     hit: MusicInfo,
   ) => Promise<LocalEnrichStatus | "error">;
   setTrackUnavailable: (id: string, unavailable: boolean) => void;
+  /** Background metadata check; marks tracks whose files were deleted. */
+  syncFilePresence: () => Promise<void>;
   addCategory: (name: string) => LocalCategory | null;
   renameCategory: (id: string, name: string) => void;
   removeCategory: (id: string) => void;
@@ -950,6 +955,35 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       );
       set({ tracks });
       persist(tracks, get().categories);
+    },
+
+    async syncFilePresence() {
+      if (!isTauri) return;
+      if (presenceScan) return presenceScan;
+      presenceScan = (async () => {
+        const snapshot = get().tracks;
+        if (!snapshot.length) return;
+        const present = await checkPathsExist(snapshot.map((t) => t.filePath));
+        if (present.length !== snapshot.length) return;
+        const missingById = new Map(
+          snapshot.map((t, i) => [t.id, !present[i]]),
+        );
+        const current = get().tracks;
+        let changed = false;
+        const tracks = current.map((t) => {
+          if (!missingById.has(t.id)) return t;
+          const missing = missingById.get(t.id) === true;
+          if (!!t.unavailable === missing) return t;
+          changed = true;
+          return { ...t, unavailable: missing };
+        });
+        if (!changed) return;
+        set({ tracks });
+        persist(tracks, get().categories);
+      })().finally(() => {
+        presenceScan = null;
+      });
+      return presenceScan;
     },
 
     addCategory(name) {
