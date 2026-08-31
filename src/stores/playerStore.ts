@@ -208,6 +208,8 @@ interface PlayerState {
   addToQueue: (songs: MusicInfo[]) => void;
   playAll: (songs: MusicInfo[]) => void;
   clearQueue: () => void;
+  /** Remove one queue row and keep the now-playing index on the same track. */
+  removeFromQueue: (index: number) => void;
   /** Drop songs from the queue; stop playback if the current track is among them. */
   removeSongsFromPlayback: (ids: string[]) => void;
   next: () => Promise<void>;
@@ -553,6 +555,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       persistPlaybackSession(true);
     },
 
+    removeFromQueue(index) {
+      const item = get().queue[index];
+      if (!item) return;
+      get().removeSongsFromPlayback([item.music.id]);
+    },
+
     removeSongsFromPlayback(ids) {
       if (!ids.length) return;
       const idSet = new Set(ids);
@@ -591,7 +599,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         return;
       }
 
-      const playingId = queue[queueIndex]?.music.id;
+      const playingId = currentSong?.id ?? queue[queueIndex]?.music.id;
       const nextIndex = playingId
         ? nextQueue.findIndex((item) => item.music.id === playingId)
         : -1;
@@ -602,16 +610,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       persistPlaybackSession(true);
     },
 
-    // Append `songs` to the current queue (deduped) and start playing. In shuffle
-    // mode it starts from a RANDOM track of the selection — otherwise the first.
+    // Replace the queue with `songs` and start playing. Shuffle picks a random
+    // start track; otherwise play from the first song (index 0).
     playAll(songs) {
       if (!songs.length) return;
-      get().addToQueue(songs);
+      const preferred = useSettingsStore.getState().playQuality;
       const startIdx =
         get().playMode === "shuffle"
           ? Math.floor(Math.random() * songs.length)
           : 0;
-      get().play(songs[startIdx]);
+      set({
+        queue: songs.map((song) => ({ music: song, quality: preferred })),
+        queueIndex: startIdx,
+      });
+      persistPlaybackSession(true);
+      void get().play(songs[startIdx], preferred);
     },
 
     async next() {
@@ -874,7 +887,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         duration: status === "loading" ? 0 : state.duration || get().duration,
         status,
         playPending:
-          status === "playing" || status === "error" ? false : get().playPending,
+          status === "playing" || status === "error"
+            ? false
+            : get().playPending,
       });
 
       if (status === "playing") persistPlaybackSession(false);

@@ -32,6 +32,7 @@ export function PlayQueue() {
     setShowQueue,
     playFromQueue,
     clearQueue,
+    removeFromQueue,
   } = usePlayerStore();
   const t = useT();
   const [confirmClear, setConfirmClear] = useState(false);
@@ -50,12 +51,6 @@ export function PlayQueue() {
 
     return () => window.cancelAnimationFrame(frame);
   }, [queue.length, queueIndex, showQueue]);
-
-  const removeAt = (i: number) => {
-    const next = [...usePlayerStore.getState().queue];
-    next.splice(i, 1);
-    usePlayerStore.setState({ queue: next });
-  };
 
   return (
     <>
@@ -168,7 +163,7 @@ export function PlayQueue() {
                           className="h-8 w-8 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
-                            removeAt(i);
+                            removeFromQueue(i);
                           }}
                         >
                           <X size={14} />

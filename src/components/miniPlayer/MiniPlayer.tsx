@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react";
 import {
   Expand,
   Music,
@@ -14,36 +14,38 @@ import {
   Repeat1,
   Shuffle,
   ListOrdered,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip";
 import {
   exitMiniPlayer,
   notifyMiniPointerEnter,
   notifyMiniPointerLeave,
   setMiniQueueExpanded,
   syncMiniQueueWindowSize,
-} from "@/lib/miniPlayer"
-import { usePlayerStore } from "@/stores/playerStore"
-import { usePlaylistStore } from "@/stores/playlistStore"
-import { useT } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+} from "@/lib/miniPlayer";
+import { usePlayerStore } from "@/stores/playerStore";
+import { usePlaylistStore } from "@/stores/playlistStore";
+import { useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function ModeIcon({ playMode }: { playMode: string }) {
-  const common = { size: 14 as const }
-  if (playMode === "repeat-one") return <Repeat1 {...common} />
-  if (playMode === "shuffle") return <Shuffle {...common} />
-  if (playMode === "repeat-list") return <Repeat {...common} />
-  return <ListOrdered {...common} />
+  const common = { size: 14 as const };
+  if (playMode === "repeat-one") return <Repeat1 {...common} />;
+  if (playMode === "shuffle") return <Shuffle {...common} />;
+  if (playMode === "repeat-list") return <Repeat {...common} />;
+  return <ListOrdered {...common} />;
 }
 
 function modeHoverClass(playMode: string) {
-  if (playMode === "shuffle") return "icon-hover-shuffle"
-  if (playMode === "repeat-one" || playMode === "repeat-list") return "icon-hover-repeat"
-  return "icon-hover-list"
+  if (playMode === "shuffle") return "icon-hover-shuffle";
+  if (playMode === "repeat-one" || playMode === "repeat-list")
+    return "icon-hover-repeat";
+  return "icon-hover-list";
 }
 
 /**
@@ -51,151 +53,153 @@ function modeHoverClass(playMode: string) {
  * hover expands the full transport bar again.
  */
 export function MiniPlayer() {
-  const t = useT()
-  const currentSong = usePlayerStore((s) => s.currentSong)
-  const currentPicUrl = usePlayerStore((s) => s.currentPicUrl)
-  const status = usePlayerStore((s) => s.status)
-  const isPlaying = usePlayerStore((s) => s.isPlaying)
-  const playMode = usePlayerStore((s) => s.playMode)
-  const setPlayMode = usePlayerStore((s) => s.setPlayMode)
-  const queue = usePlayerStore((s) => s.queue)
-  const queueIndex = usePlayerStore((s) => s.queueIndex)
-  const miniPeek = usePlayerStore((s) => s.miniPeek)
-  const miniMorphing = usePlayerStore((s) => s.miniMorphing)
-  const miniDockHint = usePlayerStore((s) => s.miniDockHint)
-  const togglePlay = usePlayerStore((s) => s.togglePlay)
-  const playPending = usePlayerStore((s) => s.playPending)
-  const next = usePlayerStore((s) => s.next)
-  const prev = usePlayerStore((s) => s.prev)
-  const playFromQueue = usePlayerStore((s) => s.playFromQueue)
+  const t = useT();
+  const currentSong = usePlayerStore((s) => s.currentSong);
+  const currentPicUrl = usePlayerStore((s) => s.currentPicUrl);
+  const status = usePlayerStore((s) => s.status);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const playMode = usePlayerStore((s) => s.playMode);
+  const setPlayMode = usePlayerStore((s) => s.setPlayMode);
+  const queue = usePlayerStore((s) => s.queue);
+  const queueIndex = usePlayerStore((s) => s.queueIndex);
+  const miniPeek = usePlayerStore((s) => s.miniPeek);
+  const miniMorphing = usePlayerStore((s) => s.miniMorphing);
+  const miniDockHint = usePlayerStore((s) => s.miniDockHint);
+  const togglePlay = usePlayerStore((s) => s.togglePlay);
+  const playPending = usePlayerStore((s) => s.playPending);
+  const next = usePlayerStore((s) => s.next);
+  const prev = usePlayerStore((s) => s.prev);
+  const playFromQueue = usePlayerStore((s) => s.playFromQueue);
+  const removeFromQueue = usePlayerStore((s) => s.removeFromQueue);
 
-  const favorites = usePlaylistStore((s) => s.favorites)
-  const addToFavorites = usePlaylistStore((s) => s.addToFavorites)
-  const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites)
+  const favorites = usePlaylistStore((s) => s.favorites);
+  const addToFavorites = usePlaylistStore((s) => s.addToFavorites);
+  const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites);
 
-  const [queueOpen, setQueueOpen] = useState(false)
-  const queueScrollTopRef = useRef(0)
-  const queuePanelRef = useRef<HTMLDivElement>(null)
+  const [queueOpen, setQueueOpen] = useState(false);
+  const queueScrollTopRef = useRef(0);
+  const queuePanelRef = useRef<HTMLDivElement>(null);
 
-  const loading = status === "loading"
-  const playBusy = loading || playPending
-  const canPlay = status !== "idle"
-  const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null
-  const isLocal = currentSong?.source === "local"
-  const fav = !!currentSong && !isLocal && favorites.some((f) => f.id === currentSong.id)
+  const loading = status === "loading";
+  const playBusy = loading || playPending;
+  const canPlay = status !== "idle";
+  const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null;
+  const isLocal = currentSong?.source === "local";
+  const fav =
+    !!currentSong && !isLocal && favorites.some((f) => f.id === currentSong.id);
 
   const saveQueueScroll = () => {
     const vp = queuePanelRef.current?.querySelector(
       "[data-radix-scroll-area-viewport]",
-    ) as HTMLElement | null
-    if (vp) queueScrollTopRef.current = vp.scrollTop
-  }
+    ) as HTMLElement | null;
+    if (vp) queueScrollTopRef.current = vp.scrollTop;
+  };
 
   const closeQueue = () => {
     setQueueOpen((open) => {
-      if (!open) return open
-      saveQueueScroll()
-      void setMiniQueueExpanded(false)
-      return false
-    })
-  }
+      if (!open) return open;
+      saveQueueScroll();
+      void setMiniQueueExpanded(false);
+      return false;
+    });
+  };
 
   // Auto-collapse the queue when the mini window loses focus.
   useEffect(() => {
-    if (!queueOpen) return
-    const onBlur = () => closeQueue()
-    window.addEventListener("blur", onBlur)
-    let unlisten: (() => void) | undefined
+    if (!queueOpen) return;
+    const onBlur = () => closeQueue();
+    window.addEventListener("blur", onBlur);
+    let unlisten: (() => void) | undefined;
     if (isTauri) {
       void (async () => {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window")
-        unlisten = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-          if (!focused) closeQueue()
-        })
-      })()
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        unlisten = await getCurrentWindow().onFocusChanged(
+          ({ payload: focused }) => {
+            if (!focused) closeQueue();
+          },
+        );
+      })();
     }
     return () => {
-      window.removeEventListener("blur", onBlur)
-      unlisten?.()
-    }
-  }, [queueOpen])
+      window.removeEventListener("blur", onBlur);
+      unlisten?.();
+    };
+  }, [queueOpen]);
 
   // Restore the last scroll offset after the queue panel remounts.
   useEffect(() => {
-    if (!queueOpen || queue.length === 0) return
-    let cancelled = false
+    if (!queueOpen || queue.length === 0) return;
+    let cancelled = false;
     const restore = () => {
-      if (cancelled) return
+      if (cancelled) return;
       const vp = queuePanelRef.current?.querySelector(
         "[data-radix-scroll-area-viewport]",
-      ) as HTMLElement | null
-      if (vp) vp.scrollTop = queueScrollTopRef.current
-    }
+      ) as HTMLElement | null;
+      if (vp) vp.scrollTop = queueScrollTopRef.current;
+    };
     // Double rAF: wait until Radix viewport has laid out after expand.
     const outer = requestAnimationFrame(() => {
-      requestAnimationFrame(restore)
-    })
+      requestAnimationFrame(restore);
+    });
     return () => {
-      cancelled = true
-      cancelAnimationFrame(outer)
-    }
-  }, [queueOpen, queue.length])
+      cancelled = true;
+      cancelAnimationFrame(outer);
+    };
+  }, [queueOpen, queue.length]);
 
   // Keep the mini window height in sync with queue length (1–4 rows).
   useEffect(() => {
-    if (!queueOpen) return
-    void syncMiniQueueWindowSize()
-  }, [queueOpen, queue.length])
+    if (!queueOpen) return;
+    void syncMiniQueueWindowSize();
+  }, [queueOpen, queue.length]);
 
   const toggleFav = () => {
-    if (!currentSong || isLocal) return
-    if (fav) removeFromFavorites(currentSong.id)
-    else addToFavorites(currentSong)
-  }
+    if (!currentSong || isLocal) return;
+    if (fav) removeFromFavorites(currentSong.id);
+    else addToFavorites(currentSong);
+  };
 
   const cyclePlayMode = () => {
-    const modes = ["sequence", "shuffle", "repeat-list", "repeat-one"] as const
-    const idx = modes.indexOf(playMode)
-    setPlayMode(modes[(idx + 1) % modes.length])
-  }
+    const modes = ["sequence", "shuffle", "repeat-list", "repeat-one"] as const;
+    const idx = modes.indexOf(playMode);
+    setPlayMode(modes[(idx + 1) % modes.length]);
+  };
 
   const toggleQueue = () => {
     if (queueOpen) {
-      saveQueueScroll()
-      setQueueOpen(false)
-      void setMiniQueueExpanded(false)
+      saveQueueScroll();
+      setQueueOpen(false);
+      void setMiniQueueExpanded(false);
     } else {
-      setQueueOpen(true)
-      void setMiniQueueExpanded(true)
+      setQueueOpen(true);
+      void setMiniQueueExpanded(true);
     }
-  }
-
-  const removeAt = (i: number) => {
-    const { queue: q, queueIndex: idx } = usePlayerStore.getState()
-    const nextQ = [...q]
-    nextQ.splice(i, 1)
-    const patch: { queue: typeof nextQ; queueIndex?: number } = { queue: nextQ }
-    if (i < idx) patch.queueIndex = idx - 1
-    else if (i === idx) patch.queueIndex = nextQ.length === 0 ? -1 : Math.min(i, nextQ.length - 1)
-    usePlayerStore.setState(patch)
-  }
+  };
 
   const cover = miniPeek ? (
     <div
       className={cn(
         // Fixed 64px circle — stays round while the window morphs bar ↔ peek.
         "mini-vinyl relative shrink-0 overflow-hidden rounded-full",
-        isPlaying && !loading ? "mini-vinyl-spin" : !miniMorphing && "mini-vinyl-enter",
+        isPlaying && !loading
+          ? "mini-vinyl-spin"
+          : !miniMorphing && "mini-vinyl-enter",
       )}
       data-tauri-drag-region
     >
-      <div className="mini-vinyl-grooves pointer-events-none absolute inset-0 rounded-full" aria-hidden />
+      <div
+        className="mini-vinyl-grooves pointer-events-none absolute inset-0 rounded-full"
+        aria-hidden
+      />
       <div className="mini-vinyl-label absolute inset-[21%] overflow-hidden rounded-full bg-muted">
         {coverSrc ? (
           <img
             src={coverSrc}
             alt=""
-            className={cn("h-full w-full object-cover", loading && "opacity-60")}
+            className={cn(
+              "h-full w-full object-cover",
+              loading && "opacity-60",
+            )}
             draggable={false}
           />
         ) : (
@@ -234,7 +238,7 @@ export function MiniPlayer() {
         </div>
       )}
     </div>
-  )
+  );
 
   if (miniPeek) {
     return (
@@ -246,7 +250,7 @@ export function MiniPlayer() {
       >
         {cover}
       </div>
-    )
+    );
   }
 
   return (
@@ -262,21 +266,30 @@ export function MiniPlayer() {
       )}
       onMouseEnter={() => notifyMiniPointerEnter()}
       onMouseLeave={() => {
-        if (queueOpen) closeQueue()
-        notifyMiniPointerLeave()
+        if (queueOpen) closeQueue();
+        notifyMiniPointerLeave();
       }}
     >
       {/* Transport bar */}
-      <div className="flex h-[72px] shrink-0 items-center gap-2 px-2.5" data-tauri-drag-region>
+      <div
+        className="flex h-[72px] shrink-0 items-center gap-2 px-2.5"
+        data-tauri-drag-region
+      >
         {cover}
 
         <div className="min-w-0 flex-1" data-tauri-drag-region>
           {currentSong ? (
             <>
-              <p className="truncate text-sm font-semibold tracking-tight leading-tight" title={currentSong.name}>
+              <p
+                className="truncate text-sm font-semibold tracking-tight leading-tight"
+                title={currentSong.name}
+              >
                 {currentSong.name}
               </p>
-              <p className="truncate text-[11px] text-muted-foreground leading-tight" title={currentSong.singer}>
+              <p
+                className="truncate text-[11px] text-muted-foreground leading-tight"
+                title={currentSong.singer}
+              >
                 {currentSong.singer}
               </p>
             </>
@@ -290,7 +303,10 @@ export function MiniPlayer() {
             type="button"
             variant="ghost"
             size="icon"
-            className={cn("h-7 w-7 text-muted-foreground", modeHoverClass(playMode))}
+            className={cn(
+              "h-7 w-7 text-muted-foreground",
+              modeHoverClass(playMode),
+            )}
             title={t(`playMode.${playMode}`)}
             onClick={cyclePlayMode}
           >
@@ -327,7 +343,12 @@ export function MiniPlayer() {
               ) : isPlaying ? (
                 <Pause size={15} fill="currentColor" strokeWidth={0} />
               ) : (
-                <Play size={15} fill="currentColor" strokeWidth={0} className="ml-0.5" />
+                <Play
+                  size={15}
+                  fill="currentColor"
+                  strokeWidth={0}
+                  className="ml-0.5"
+                />
               )}
             </Button>
           </ShortcutTooltip>
@@ -369,7 +390,10 @@ export function MiniPlayer() {
             type="button"
             variant="ghost"
             size="icon"
-            className={cn("h-7 w-7 icon-hover-list", queueOpen ? "text-primary" : "text-muted-foreground")}
+            className={cn(
+              "h-7 w-7 icon-hover-list",
+              queueOpen ? "text-primary" : "text-muted-foreground",
+            )}
             title={t("player.queue")}
             disabled={queue.length === 0 && !queueOpen}
             onClick={toggleQueue}
@@ -391,7 +415,10 @@ export function MiniPlayer() {
       </div>
 
       {queueOpen && (
-        <div ref={queuePanelRef} className="flex min-h-0 flex-1 flex-col border-t border-border/50">
+        <div
+          ref={queuePanelRef}
+          className="flex min-h-0 flex-1 flex-col border-t border-border/50"
+        >
           {queue.length === 0 ? (
             <div className="flex flex-1 items-center justify-center px-3 text-xs text-muted-foreground">
               {t("queue.empty")}
@@ -400,15 +427,15 @@ export function MiniPlayer() {
             <ScrollArea
               className="h-full"
               onScrollCapture={(e) => {
-                const t = e.target as HTMLElement
+                const t = e.target as HTMLElement;
                 if (t.getAttribute("data-radix-scroll-area-viewport") != null) {
-                  queueScrollTopRef.current = t.scrollTop
+                  queueScrollTopRef.current = t.scrollTop;
                 }
               }}
             >
               <ul className="flex flex-col gap-0.5 p-1.5">
                 {queue.map((item, i) => {
-                  const active = i === queueIndex
+                  const active = i === queueIndex;
                   return (
                     <li key={`${item.music.id}-${i}`}>
                       <div
@@ -421,8 +448,8 @@ export function MiniPlayer() {
                         onClick={() => void playFromQueue(i)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault()
-                            void playFromQueue(i)
+                            e.preventDefault();
+                            void playFromQueue(i);
                           }
                         }}
                       >
@@ -456,15 +483,15 @@ export function MiniPlayer() {
                           )}
                           title={t("local.remove")}
                           onClick={(e) => {
-                            e.stopPropagation()
-                            removeAt(i)
+                            e.stopPropagation();
+                            removeFromQueue(i);
                           }}
                         >
                           <X size={13} />
                         </Button>
                       </div>
                     </li>
-                  )
+                  );
                 })}
               </ul>
             </ScrollArea>
@@ -472,5 +499,5 @@ export function MiniPlayer() {
         </div>
       )}
     </div>
-  )
+  );
 }
