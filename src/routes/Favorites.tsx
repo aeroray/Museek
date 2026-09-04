@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -40,8 +41,8 @@ import type { OnlineSource, Quality } from "@/types/music";
 import {
   categoryNameMap,
   filterByCategoryId,
-  findActiveCategory,
   labelForCategoryFilter,
+  sharedCategoryId,
   type CategoryFilter,
 } from "@/lib/songCategories";
 import { CategoryAssignItems } from "@/components/songCategories/CategoryAssignItems";
@@ -99,8 +100,6 @@ export function Favorites() {
       if (assignSelected && selected.size > 0) {
         setFavoritesCategory([...selected], cat.id);
         exitEdit();
-      } else {
-        setCategoryFilter(cat.id);
       }
     },
   });
@@ -195,7 +194,6 @@ export function Favorites() {
       none: t("local.categoryNone"),
     },
   );
-  const activeCategory = findActiveCategory(favoriteCategories, categoryFilter);
 
   const toggleOne = (key: string) =>
     setSelected((s) => {
@@ -333,19 +331,14 @@ export function Favorites() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   {SORTS.map((s) => (
-                    <DropdownMenuItem
+                    <DropdownMenuCheckboxItem
                       key={s}
-                      onClick={() => setFavoritesSort(s)}
+                      checked={favoritesSort === s}
+                      showUncheckedIndicator
+                      onCheckedChange={() => setFavoritesSort(s)}
                     >
-                      <Check
-                        size={14}
-                        className={cn(
-                          "mr-2",
-                          favoritesSort === s ? "opacity-100" : "opacity-0",
-                        )}
-                      />
                       {t(`favorites.sort.${s}`)}
-                    </DropdownMenuItem>
+                    </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -366,32 +359,22 @@ export function Favorites() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={() => setFavoritesPlatform("all")}>
-                    <Check
-                      size={14}
-                      className={cn(
-                        "mr-2",
-                        favoritesPlatform === "all"
-                          ? "opacity-100"
-                          : "opacity-0",
-                      )}
-                    />
+                  <DropdownMenuCheckboxItem
+                    checked={favoritesPlatform === "all"}
+                    showUncheckedIndicator
+                    onCheckedChange={() => setFavoritesPlatform("all")}
+                  >
                     {t("favorites.allPlatforms")}
-                  </DropdownMenuItem>
+                  </DropdownMenuCheckboxItem>
                   {PLATFORMS.map((p) => (
-                    <DropdownMenuItem
+                    <DropdownMenuCheckboxItem
                       key={p}
-                      onClick={() => setFavoritesPlatform(p)}
+                      checked={favoritesPlatform === p}
+                      showUncheckedIndicator
+                      onCheckedChange={() => setFavoritesPlatform(p)}
                     >
-                      <Check
-                        size={14}
-                        className={cn(
-                          "mr-2",
-                          favoritesPlatform === p ? "opacity-100" : "opacity-0",
-                        )}
-                      />
                       {t(`platform.${p}`)}
-                    </DropdownMenuItem>
+                    </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -401,9 +384,8 @@ export function Favorites() {
                   categories={favoriteCategories}
                   filter={categoryFilter}
                   filterLabel={categoryFilterLabel}
-                  activeCategory={activeCategory}
                   onFilter={setCategoryFilter}
-                  onCreate={categoryDialog.openCreate}
+                  onCreate={() => categoryDialog.openCreate()}
                   onRename={categoryDialog.openRename}
                   onDelete={deleteCategory}
                   labels={{
@@ -461,6 +443,11 @@ export function Favorites() {
                     <CategoryAssignMenu
                       categories={favoriteCategories}
                       disabled={selected.size === 0}
+                      selectedId={sharedCategoryId(
+                        [...selected].map(
+                          (id) => favoriteSongCategories[id] ?? null,
+                        ),
+                      )}
                       onAssign={batchMove}
                       onCreate={() => categoryDialog.openCreate(true)}
                       labels={{
@@ -652,6 +639,7 @@ export function Favorites() {
                           >
                             <CategoryAssignItems
                               categories={favoriteCategories}
+                              selectedId={catId ?? null}
                               onAssign={(categoryId) =>
                                 setFavoritesCategory([song.id], categoryId)
                               }
@@ -751,7 +739,18 @@ export function Favorites() {
                             },
                           })
                         : navigate("/hot-playlists", {
-                            state: { openPlaylist: pl, fromFavorites: true },
+                            state: {
+                              openPlaylist: {
+                                id: pl.id,
+                                name: pl.name,
+                                img: pl.img,
+                                playCount: pl.playCount,
+                                author: pl.author,
+                                source: pl.source,
+                                kind: "playlist" as const,
+                              },
+                              fromFavorites: true,
+                            },
                           })
                     }
                     onPlay={() =>

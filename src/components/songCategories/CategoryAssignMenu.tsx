@@ -1,17 +1,18 @@
-import { Plus, Tags } from "lucide-react"
+import { Tags } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { CategoryAssignItems } from "@/components/songCategories/CategoryAssignItems"
 import type { CategoryRecord } from "@/lib/songCategories"
 
 type Props = {
   categories: CategoryRecord[]
   disabled?: boolean
+  /** `null` = uncategorized. Omit when the selection is mixed. */
+  selectedId?: string | null
   onAssign: (categoryId: string | null) => void
   onCreate: () => void
   labels: {
@@ -25,6 +26,7 @@ type Props = {
 export function CategoryAssignMenu({
   categories,
   disabled,
+  selectedId,
   onAssign,
   onCreate,
   labels,
@@ -38,18 +40,13 @@ export function CategoryAssignMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
-        <DropdownMenuItem onClick={() => onAssign(null)}>{labels.none}</DropdownMenuItem>
-        {categories.length > 0 && <DropdownMenuSeparator />}
-        {categories.map((cat) => (
-          <DropdownMenuItem key={cat.id} onClick={() => onAssign(cat.id)}>
-            {cat.name}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onCreate}>
-          <Plus size={14} className="mr-2" />
-          {labels.add}
-        </DropdownMenuItem>
+        <CategoryAssignItems
+          categories={categories}
+          selectedId={selectedId}
+          onAssign={onAssign}
+          onCreate={onCreate}
+          labels={{ none: labels.none, add: labels.add }}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   )

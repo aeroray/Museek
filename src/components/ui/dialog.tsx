@@ -50,8 +50,8 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2",
-          "gap-4 rounded-2xl bg-popover p-4 text-sm text-popover-foreground outline-none",
+          "fixed left-1/2 top-1/2 z-50 grid w-full min-w-0 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2",
+          "gap-4 overflow-hidden rounded-2xl bg-popover p-4 text-sm text-popover-foreground outline-none",
           "ring-1 ring-foreground/10 shadow-[var(--shadow-elevated)]",
           "sm:max-w-md",
           "transition-[opacity,transform] duration-150 ease-out",
@@ -86,7 +86,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-1.5 text-left", className)}
+      className={cn("flex min-w-0 flex-col gap-1.5 text-left", className)}
       {...props}
     />
   )
@@ -104,7 +104,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-2xl border-t border-border/60 bg-muted/40 p-3",
+        "-mx-4 -mb-4 flex min-w-0 flex-col-reverse gap-2 overflow-hidden rounded-b-2xl border-t border-border/60 bg-muted/40 p-3",
         "sm:flex-row sm:justify-end sm:gap-2",
         // Only shrink real action Buttons (they use inline-flex); leave checkboxes alone.
         "[&_button.inline-flex]:h-8 [&_button.inline-flex]:rounded-lg [&_button.inline-flex]:px-3 [&_button.inline-flex]:text-xs",

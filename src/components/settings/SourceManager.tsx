@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react"
 import {
-  Upload,
   Trash2,
   AlertCircle,
   Loader2,
-  ClipboardPaste,
   GripVertical,
   X,
   QrCode,
@@ -67,17 +65,7 @@ import type { SourceScript } from "@/types/source"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
-type ImportMode = "url" | "file"
 type ScriptOrigin = "url" | "file" | "unknown"
-
-function isHttpUrl(line: string): boolean {
-  try {
-    const u = new URL(line)
-    return u.protocol === "http:" || u.protocol === "https:"
-  } catch {
-    return false
-  }
-}
 
 function looksLikeScript(raw: string): boolean {
   return Boolean(raw.trim()) && !/^\s*</.test(raw)
@@ -424,7 +412,6 @@ export function SourceManager() {
     isLoading,
     error,
     importScript,
-    importScriptFromUrl,
     removeScript,
     toggleEnabled,
     setEnabled,
@@ -436,24 +423,19 @@ export function SourceManager() {
   } = useSourceStore()
   const t = useT()
   const enabledCount = scripts.filter((s) => s.enabled).length
-  const [mode, setMode] = useState<ImportMode>("url")
-  const [url, setUrl] = useState("")
-  const [importingKind, setImportingKind] = useState<"url" | "file" | null>(null)
+  const [importing, setImporting] = useState(false)
   const [getOpen, setGetOpen] = useState(false)
   const [fileDragOver, setFileDragOver] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [testingIds, setTestingIds] = useState<string[]>([])
   const [testingAll, setTestingAll] = useState(false)
   const testGen = useRef(0)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
-  const modeRef = useRef(mode)
   const busyRef = useRef(false)
   const importLocalFilesRef = useRef<(files: { label: string; content: string }[]) => Promise<void>>(
     async () => {},
   )
-  const busy = importingKind !== null || testingAll
-  modeRef.current = mode
+  const busy = importing || testingAll
   busyRef.current = busy
   const scriptIds = useMemo(() => scripts.map((s) => s.id), [scripts])
   const activeScript = activeId ? scripts.find((s) => s.id === activeId) : null
@@ -463,51 +445,9 @@ export function SourceManager() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  async function handleImportUrls() {
-    const urls = url
-      .split(/\r?\n/)
-      .map((u) => u.trim())
-      .filter(Boolean)
-    if (!urls.length) return
-
-    const invalid = urls.filter((u) => !isHttpUrl(u))
-    if (invalid.length) {
-      useUiStore.getState().notify({
-        message:
-          invalid.length === urls.length
-            ? t("sources.invalidUrl")
-            : t("sources.invalidUrlLines", {
-                lines: invalid.map((l) => (l.length > 48 ? `${l.slice(0, 48)}…` : l)).join(" · "),
-              }),
-        variant: "error",
-      })
-      return
-    }
-
-    setImportingKind("url")
-    let added = 0
-    let updated = 0
-    const failed: string[] = []
-    try {
-      for (const u of urls) {
-        try {
-          const result = await importScriptFromUrl(u)
-          if (result === "added") added++
-          else updated++
-        } catch {
-          failed.push(u)
-        }
-      }
-    } finally {
-      setImportingKind(null)
-    }
-    setUrl(failed.join("\n"))
-    notifyImportResult(added, updated, failed.length, t)
-  }
-
   async function importLocalFiles(files: { label: string; content: string }[]) {
     if (!files.length) return
-    setImportingKind("file")
+    setImporting(true)
     try {
       let added = 0
       let updated = 0
@@ -524,7 +464,7 @@ export function SourceManager() {
       }
       notifyImportResult(added, updated, fail, t)
     } finally {
-      setImportingKind(null)
+      setImporting(false)
     }
   }
   importLocalFilesRef.current = importLocalFiles
@@ -555,10 +495,6 @@ export function SourceManager() {
         }
 
         if (payload.type === "enter" || payload.type === "over") {
-          if (modeRef.current !== "file") {
-            setFileDragOver(false)
-            return
-          }
           const { x, y } = await toClientPoint(payload.position)
           setFileDragOver(pointInRect(x, y, dropZoneRef.current))
           return
@@ -566,9 +502,9 @@ export function SourceManager() {
 
         if (payload.type !== "drop") return
         setFileDragOver(false)
-        // While the file-import panel is open, accept drops anywhere in the window —
-        // hit-testing the dashed zone is unreliable with Overlay title bars / DPI.
-        if (modeRef.current !== "file" || busyRef.current) return
+        // Accept drops anywhere in the window — hit-testing the dashed zone is
+        // unreliable with Overlay title bars / DPI.
+        if (busyRef.current) return
 
         try {
           const files = await readScriptsFromPaths(payload.paths)
@@ -636,25 +572,6 @@ export function SourceManager() {
         variant: "error",
       })
     }
-  }
-
-  async function handlePaste() {
-    try {
-      let text: string | null = null
-      if (isTauri) {
-        const { readText } = await import("@tauri-apps/plugin-clipboard-manager")
-        text = await readText()
-      } else {
-        text = await navigator.clipboard.readText()
-      }
-      if (text?.trim()) {
-        setUrl(text.trim())
-        return
-      }
-    } catch {
-      /* clipboard unavailable */
-    }
-    inputRef.current?.focus()
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -790,126 +707,53 @@ export function SourceManager() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
-            {(["url", "file"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                  mode === m
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {t(m === "url" ? "sources.modeUrl" : "sources.modeFile")}
-              </button>
-            ))}
+        <div className="flex h-[calc(2.25rem*2+0.5rem)] items-stretch gap-2">
+          <div
+            ref={dropZoneRef}
+            onDragEnter={(e) => {
+              e.preventDefault()
+              setFileDragOver(true)
+            }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = "copy"
+              setFileDragOver(true)
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return
+              setFileDragOver(false)
+            }}
+            onDrop={handleFileDrop}
+            className={cn(
+              "flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-md border border-dashed px-4 text-center transition-colors",
+              fileDragOver
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/25 bg-muted/20 hover:border-muted-foreground/40",
+              busy && "pointer-events-none opacity-60",
+            )}
+          >
+            {importing ? (
+              <Loader2 size={18} className="animate-spin text-muted-foreground" />
+            ) : (
+              <FileCode2 size={18} className="text-muted-foreground" />
+            )}
+            <p className="text-xs text-muted-foreground">{t("sources.dropHint")}</p>
+          </div>
+          <div className="flex w-36 shrink-0 flex-col gap-2">
+            <Button variant="outline" onClick={() => setGetOpen(true)} className="h-9" disabled={busy}>
+              <QrCode size={16} className="mr-2" />
+              {t("sources.getSources")}
+            </Button>
+            <Button variant="outline" onClick={handleImportFilePick} disabled={busy} className="h-9">
+              {importing ? (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              ) : (
+                <FolderOpen size={16} className="mr-2" />
+              )}
+              {t("sources.browseFiles")}
+            </Button>
           </div>
         </div>
-
-        {mode === "url" ? (
-          <div className="flex h-[calc(2.25rem*2+0.5rem)] items-stretch gap-2">
-            <div className="relative min-h-0 flex-1">
-              <textarea
-                ref={inputRef}
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder={t("sources.urlPlaceholder")}
-                disabled={busy}
-                className="size-full resize-none break-all rounded-md border border-input bg-transparent px-3 py-2 pr-12 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              />
-              <div className="absolute right-2 top-2 flex flex-col gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-7 text-muted-foreground"
-                  onClick={handlePaste}
-                  disabled={busy}
-                  title={t("sources.paste")}
-                >
-                  <ClipboardPaste size={14} />
-                </Button>
-                {url.trim() ? (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-7 text-muted-foreground"
-                    onClick={() => setUrl("")}
-                    disabled={busy}
-                    title={t("sources.clear")}
-                  >
-                    <X size={14} />
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-            <div className="flex w-36 shrink-0 flex-col gap-2">
-              <Button variant="outline" onClick={() => setGetOpen(true)} className="h-9" disabled={busy}>
-                <QrCode size={16} className="mr-2" />
-                {t("sources.getSources")}
-              </Button>
-              <Button onClick={handleImportUrls} disabled={busy || !url.trim()} className="h-9">
-                {importingKind === "url" ? (
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                ) : (
-                  <Upload size={16} className="mr-2" />
-                )}
-                {t("sources.import")}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex h-[calc(2.25rem*2+0.5rem)] items-stretch gap-2">
-            <div
-              ref={dropZoneRef}
-              onDragEnter={(e) => {
-                e.preventDefault()
-                setFileDragOver(true)
-              }}
-              onDragOver={(e) => {
-                e.preventDefault()
-                e.dataTransfer.dropEffect = "copy"
-                setFileDragOver(true)
-              }}
-              onDragLeave={(e) => {
-                if (e.currentTarget.contains(e.relatedTarget as Node)) return
-                setFileDragOver(false)
-              }}
-              onDrop={handleFileDrop}
-              className={cn(
-                "flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-md border border-dashed px-4 text-center transition-colors",
-                fileDragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/25 bg-muted/20 hover:border-muted-foreground/40",
-                busy && "pointer-events-none opacity-60",
-              )}
-            >
-              {importingKind === "file" ? (
-                <Loader2 size={18} className="animate-spin text-muted-foreground" />
-              ) : (
-                <FileCode2 size={18} className="text-muted-foreground" />
-              )}
-              <p className="text-xs text-muted-foreground">{t("sources.dropHint")}</p>
-            </div>
-            <div className="flex w-36 shrink-0 flex-col gap-2">
-              <Button variant="outline" onClick={() => setGetOpen(true)} className="h-9" disabled={busy}>
-                <QrCode size={16} className="mr-2" />
-                {t("sources.getSources")}
-              </Button>
-              <Button variant="outline" onClick={handleImportFilePick} disabled={busy} className="h-9">
-                {importingKind === "file" ? (
-                  <Loader2 size={16} className="mr-2 animate-spin" />
-                ) : (
-                  <FolderOpen size={16} className="mr-2" />
-                )}
-                {t("sources.browseFiles")}
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
       {error && (

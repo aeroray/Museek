@@ -95,7 +95,11 @@ export const TrackRow = memo(function TrackRow({
         )}
         {!selectable && (
           <button
-            onClick={() => play(song)}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              play(song);
+            }}
             className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
           >
             <Play
@@ -128,6 +132,7 @@ export const TrackRow = memo(function TrackRow({
       {!selectable && (
         <div className="flex items-center gap-0.5 shrink-0">
           <Button
+            type="button"
             variant="ghost"
             size="icon"
             className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
@@ -143,6 +148,7 @@ export const TrackRow = memo(function TrackRow({
           {song.source !== "local" && (
             <>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 className={cn(
@@ -151,6 +157,7 @@ export const TrackRow = memo(function TrackRow({
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
+                  e.preventDefault();
                   if (fav) removeFromFavorites(song.id);
                   else addToFavorites(song);
                 }}
@@ -168,6 +175,7 @@ export const TrackRow = memo(function TrackRow({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 icon-hover-download"

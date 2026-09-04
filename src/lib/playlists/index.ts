@@ -24,6 +24,10 @@ export interface Playlist {
   source: Source
   /** Favorited albums share this list; omit / "playlist" = normal 歌单. */
   kind?: "playlist" | "album"
+  /** Song snapshot after a favorited list was opened or played. Synced. */
+  songs?: MusicInfo[]
+  /** When `songs` was last written from a successful remote fetch. */
+  cachedAt?: number
 }
 
 export function playlistKind(pl: Pick<Playlist, "kind">): "playlist" | "album" {

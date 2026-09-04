@@ -5,14 +5,18 @@ import { setTrayVisible } from "@/lib/power";
 import { syncOpenAtLogin } from "@/lib/autostart";
 import {
   DEFAULT_SHORTCUTS,
+  DEFAULT_LOCAL_SHORTCUTS,
   parseShortcutMap,
+  parseLocalShortcutMap,
   shortcutMapEquals,
   canonicalizeShortcut,
   isValidGlobalShortcut,
+  isValidLocalShortcut,
   shortcutConflict,
   type ShortcutAction,
   type ShortcutMap,
 } from "@/lib/shortcutKeys";
+import { parseLyricColor } from "@/lib/lyricColor";
 import type { LocalNameMode, OnlineSource, Quality } from "@/types/music";
 
 export type NamingScheme = "singer-name" | "name-singer" | "name";
@@ -48,11 +52,12 @@ interface Persisted {
   deleteDownloadFiles: boolean;
   // Folder import recursion depth (0–2 finite levels; -1 = unlimited).
   localScanDepth: number;
-  // Legacy migration only. New local imports use smart recognition by default,
-  // with naming overrides stored on individual LocalTrack records.
+  // Legacy migration only. New imports persist per-track `nameMode: filename`.
   localNameMode: LocalNameMode;
   // When removing a local-library entry, also delete the audio file on disk.
   deleteLocalFiles: boolean;
+  /** After local tags, look up missing cover/artist/album online. Default off. */
+  localMatchOnImport: boolean;
   // Cache the audio of played songs to disk (faster replays + offline).
   audioCache: boolean;
   // Disk cache size cap in MB; least-recently-used audio is evicted beyond this.
@@ -63,6 +68,10 @@ interface Persisted {
   autoLockDesktopLyrics: boolean;
   // Keep a readable translucent capsule behind desktop lyrics.
   desktopLyricsCapsuleVisible: boolean;
+  /** Two-line desktop lyrics: translation, or the upcoming line. */
+  desktopLyricsTwoLines: boolean;
+  /** Custom desktop-lyric color (`#rrggbb`), or null to follow the theme. */
+  desktopLyricsColor: string | null;
   // Favorites list view preferences.
   favoritesSort: FavoritesSort;
   favoritesPlatform: FavoritesPlatform;
@@ -79,8 +88,10 @@ interface Persisted {
   startHiddenToTray: boolean;
   /** Page shown when the app opens. Synced across devices via settings.json. */
   startupPage: StartupPage;
-  /** Global hotkeys. Canonical CommandOrControl so Win Ctrl ↔ Mac ⌘ on sync. */
+  /** OS-global playback shortcuts. Canonical CommandOrControl so Win Ctrl ↔ Mac ⌘ on sync. */
   shortcuts: ShortcutMap;
+  /** Main-window-only shortcuts. Empty string means unset. */
+  localShortcuts: ShortcutMap;
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
   syncFolder: string | null;
   // Stored so auto-sync can run silently; the cloud file stays encrypted regardless.
@@ -103,11 +114,14 @@ interface SettingsState extends Persisted {
   setDeleteDownloadFiles: (v: boolean) => void;
   setLocalScanDepth: (n: number) => void;
   setDeleteLocalFiles: (v: boolean) => void;
+  setLocalMatchOnImport: (v: boolean) => void;
   setAudioCache: (v: boolean) => void;
   setMaxCacheMB: (n: number) => void;
   setPreventSleepWhilePlaying: (v: boolean) => void;
   setAutoLockDesktopLyrics: (v: boolean) => void;
   setDesktopLyricsCapsuleVisible: (v: boolean) => void;
+  setDesktopLyricsTwoLines: (v: boolean) => void;
+  setDesktopLyricsColor: (color: string | null) => void;
   setFavoritesSort: (s: FavoritesSort) => void;
   setFavoritesPlatform: (p: FavoritesPlatform) => void;
   setLocalSort: (s: LocalSort) => void;
@@ -116,7 +130,8 @@ interface SettingsState extends Persisted {
   setOpenAtLogin: (v: boolean) => void;
   setStartHiddenToTray: (v: boolean) => void;
   setStartupPage: (p: StartupPage) => void;
-  setShortcut: (action: ShortcutAction, accel: string) => boolean;
+  setShortcut: (action: ShortcutAction, accel: string | null) => boolean;
+  setLocalShortcut: (action: ShortcutAction, accel: string | null) => boolean;
   resetShortcuts: () => void;
   setSyncFolder: (dir: string | null) => void;
   setSyncPassphrase: (p: string | null) => void;
@@ -139,11 +154,14 @@ const DEFAULTS: Persisted = {
   localScanDepth: 0,
   localNameMode: "smart",
   deleteLocalFiles: false,
+  localMatchOnImport: false,
   audioCache: true,
   maxCacheMB: 1024,
   preventSleepWhilePlaying: true,
   autoLockDesktopLyrics: false,
   desktopLyricsCapsuleVisible: true,
+  desktopLyricsTwoLines: false,
+  desktopLyricsColor: null,
   favoritesSort: "added",
   favoritesPlatform: "all",
   localSort: "added",
@@ -153,6 +171,7 @@ const DEFAULTS: Persisted = {
   startHiddenToTray: false,
   startupPage: "search",
   shortcuts: { ...DEFAULT_SHORTCUTS },
+  localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS },
   syncFolder: null,
   syncPassphrase: null,
   autoBackupOnExit: true,
@@ -202,11 +221,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localScanDepth,
       localNameMode,
       deleteLocalFiles,
+      localMatchOnImport,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
       autoLockDesktopLyrics,
       desktopLyricsCapsuleVisible,
+      desktopLyricsTwoLines,
+      desktopLyricsColor,
       favoritesSort,
       favoritesPlatform,
       localSort,
@@ -216,6 +238,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       startHiddenToTray,
       startupPage,
       shortcuts,
+      localShortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -233,11 +256,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localScanDepth,
       localNameMode,
       deleteLocalFiles,
+      localMatchOnImport,
       audioCache,
       maxCacheMB,
       preventSleepWhilePlaying,
       autoLockDesktopLyrics,
       desktopLyricsCapsuleVisible,
+      desktopLyricsTwoLines,
+      desktopLyricsColor,
       favoritesSort,
       favoritesPlatform,
       localSort,
@@ -247,6 +273,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       startHiddenToTray,
       startupPage,
       shortcuts,
+      localShortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -298,6 +325,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       set({ deleteLocalFiles: v });
       persist();
     },
+    setLocalMatchOnImport(v) {
+      set({ localMatchOnImport: v });
+      persist();
+    },
     setAudioCache(v) {
       set({ audioCache: v });
       persist();
@@ -316,6 +347,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setDesktopLyricsCapsuleVisible(v) {
       set({ desktopLyricsCapsuleVisible: v });
+      persist();
+    },
+    setDesktopLyricsTwoLines(v) {
+      set({ desktopLyricsTwoLines: v });
+      persist();
+    },
+    setDesktopLyricsColor(color) {
+      set({ desktopLyricsColor: parseLyricColor(color) });
       persist();
     },
     setFavoritesSort(s) {
@@ -374,15 +413,40 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       persist();
     },
     setShortcut(action, accel) {
-      const canonical = canonicalizeShortcut(accel);
-      if (!canonical || !isValidGlobalShortcut(canonical)) return false;
-      if (shortcutConflict(get().shortcuts, action, canonical)) return false;
-      set({ shortcuts: { ...get().shortcuts, [action]: canonical } });
+      const next = accel?.trim() ? canonicalizeShortcut(accel) : "";
+      if (accel?.trim() && !next) return false;
+      if (next && !isValidGlobalShortcut(next)) return false;
+      if (
+        next &&
+        shortcutConflict(get().shortcuts, get().localShortcuts, action, next)
+      ) {
+        return false;
+      }
+      set({ shortcuts: { ...get().shortcuts, [action]: next ?? "" } });
+      persist();
+      return true;
+    },
+    setLocalShortcut(action, accel) {
+      const next = accel?.trim() ? canonicalizeShortcut(accel) : "";
+      if (accel?.trim() && !next) return false;
+      if (next && !isValidLocalShortcut(next)) return false;
+      if (
+        next &&
+        shortcutConflict(get().shortcuts, get().localShortcuts, action, next)
+      ) {
+        return false;
+      }
+      set({
+        localShortcuts: { ...get().localShortcuts, [action]: next ?? "" },
+      });
       persist();
       return true;
     },
     resetShortcuts() {
-      set({ shortcuts: { ...DEFAULT_SHORTCUTS } });
+      set({
+        shortcuts: { ...DEFAULT_SHORTCUTS },
+        localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS },
+      });
       persist();
     },
     setSyncFolder(dir) {
@@ -409,6 +473,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           DEFAULTS,
         );
         const shortcuts = parseShortcutMap(data.shortcuts);
+        const localShortcuts = parseLocalShortcutMap(data.localShortcuts);
         set({
         playQuality: QUALITIES.includes(data.playQuality as Quality)
           ? (data.playQuality as Quality)
@@ -454,6 +519,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.deleteLocalFiles === "boolean"
             ? data.deleteLocalFiles
             : DEFAULTS.deleteLocalFiles,
+        localMatchOnImport:
+          typeof data.localMatchOnImport === "boolean"
+            ? data.localMatchOnImport
+            : DEFAULTS.localMatchOnImport,
         audioCache:
           typeof data.audioCache === "boolean"
             ? data.audioCache
@@ -473,6 +542,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.desktopLyricsCapsuleVisible === "boolean"
             ? data.desktopLyricsCapsuleVisible
             : DEFAULTS.desktopLyricsCapsuleVisible,
+        desktopLyricsTwoLines:
+          typeof data.desktopLyricsTwoLines === "boolean"
+            ? data.desktopLyricsTwoLines
+            : DEFAULTS.desktopLyricsTwoLines,
+        desktopLyricsColor: parseLyricColor(data.desktopLyricsColor),
         favoritesSort: SORTS.includes(data.favoritesSort as FavoritesSort)
           ? (data.favoritesSort as FavoritesSort)
           : DEFAULTS.favoritesSort,
@@ -505,6 +579,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           ? (data.startupPage as StartupPage)
           : DEFAULTS.startupPage,
         shortcuts,
+        localShortcuts,
         syncFolder:
           typeof data.syncFolder === "string" ? data.syncFolder : null,
         syncPassphrase:
@@ -517,7 +592,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           typeof data.syncLastAt === "string" ? data.syncLastAt : null,
         hydrated: true,
       });
-      if (!shortcutMapEquals(shortcuts, data.shortcuts)) persist();
+      if (
+        !shortcutMapEquals(shortcuts, data.shortcuts) ||
+        !shortcutMapEquals(localShortcuts, data.localShortcuts)
+      ) {
+        persist();
+      }
       // Keep the OS login item in sync with the saved preference.
       const openAtLogin = get().openAtLogin;
       // Silent start without openAtLogin is invalid after load.

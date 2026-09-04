@@ -4,8 +4,10 @@ import { LYRIC_FONT_SCALE_KEY } from "@/lib/lyrics/fontScale";
 // Import/export of all user config as one JSON file, so it can be synced across
 // devices. Covers the db.ts JSON files (settings, sources, favorites, history)
 // plus the direct-localStorage prefs (language, theme, sidebar, lyric font,
-// top-bar lyrics). Deliberately excludes the on-disk audio/lyric cache
-// (including per-song lyric timeline offsets),
+// top-bar lyrics). playlists.json includes liked songs, user lists, and
+// favorited platform playlists/albums (with a song snapshot after the user
+// opens or plays them, so a later-deleted remote list still plays).
+// Deliberately excludes the on-disk audio/lyric cache,
 // downloaded files, localMusic.json, downloads.json, player.json (volume/
 // mute), fonts.json (UI / desktop-lyrics families), playbackSession.json (queue / now-playing), sourceProbe.json (source
 // health-check results), miniPlayer.json (mini-bar
@@ -44,6 +46,7 @@ const DEVICE_LOCAL_SETTINGS = [
   "localScanDepth",
   "deleteLocalFiles",
   "localSort",
+  "localMatchOnImport",
   "openAtLogin",
   "startHiddenToTray",
 ];

@@ -74,8 +74,7 @@ function AppInit() {
       loadSources();
       loadPlaylists();
       loadHistory();
-      // Device-local volume/mute — restore ASAP so the first play uses it.
-      void loadPlayerPrefs();
+      const playerReady = loadPlayerPrefs();
       // After settings load, trim the cache in case the limit was lowered.
       // Downloads need downloadDir from settings before unfinished tasks resume.
       loadSettings().then(() => {
@@ -87,9 +86,11 @@ function AppInit() {
         void loadDownloads();
         // Local library must be hydrated before OS "Open with" imports, otherwise
         // a parallel loadFromDisk can wipe tracks just imported into memory.
-        void loadLocalMusic().then(() => {
+        void loadLocalMusic().then(async () => {
           if (cancelled) return;
           stopOpenFiles = startOpenLocalFilesListener();
+          await playerReady;
+          if (cancelled) return;
           void usePlayerStore.getState().restorePlaybackSource();
         });
       });

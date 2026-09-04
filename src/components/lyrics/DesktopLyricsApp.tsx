@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent,
   type WheelEvent,
 } from "react";
@@ -23,7 +24,7 @@ import {
   writeLyricFontScale,
 } from "@/lib/lyrics/fontScale";
 import { isMacOs } from "@/lib/os";
-import { findActiveLyricIndex } from "@/lib/lyrics";
+import { findActiveLyricIndex, desktopLyricSecondaryText } from "@/lib/lyrics";
 import { applyThemeSnapshot } from "@/stores/themeStore";
 import { applyFontStacks } from "@/lib/uiFonts";
 import { DEFAULT_SHORTCUTS, formatShortcut } from "@/lib/shortcutKeys";
@@ -36,6 +37,7 @@ import {
   clampAndPersistDesktopLyricsGeometry,
   isInteractionMode,
   monitorForRect,
+  nudgeDesktopLyricsHeight,
   pointInElement,
   pointInMonitor,
   persistDesktopLyricsGeometry,
@@ -63,6 +65,7 @@ const EMPTY_SNAPSHOT: DesktopLyricsSnapshot = {
   lines: [],
   currentTime: 0,
   currentLyricIndex: -1,
+  duration: 0,
   isPlaying: false,
   status: "idle",
   lyricsLoading: false,
@@ -70,7 +73,7 @@ const EMPTY_SNAPSHOT: DesktopLyricsSnapshot = {
 
 const LYRIC_FONT_SIZE = 28;
 const DEFAULT_LYRIC_PADDING = {
-  top: 10,
+  top: 8,
   horizontal: 14,
   bottom: 8,
 } as const;
@@ -88,6 +91,8 @@ export function DesktopLyricsApp() {
   const [interactionMode, setInteractionMode] =
     useState<DesktopLyricsInteractionMode>("interactive");
   const [capsuleVisible, setCapsuleVisible] = useState(true);
+  const [twoLines, setTwoLines] = useState(false);
+  const [lyricColor, setLyricColor] = useState<string | null>(null);
   const [lockShortcut, setLockShortcut] = useState(() =>
     formatShortcut(DEFAULT_SHORTCUTS.desktopLyricsLock),
   );
@@ -107,7 +112,19 @@ export function DesktopLyricsApp() {
   const ignoreCursorEventsRef = useRef<boolean | null>(null);
   const isDraggingRef = useRef(false);
   const dragRef = useRef<DesktopLyricsDragState | null>(null);
+  const twoLinesRef = useRef<boolean | null>(null);
   const hasLyricContent = Boolean(snapshot.song && snapshot.lines.length > 0);
+
+  useEffect(() => {
+    const previous = twoLinesRef.current;
+    twoLinesRef.current = twoLines;
+    if (previous === null || previous === twoLines) return;
+    const delta = Math.round(LYRIC_FONT_SIZE * fontScaleRef.current * 0.78);
+    void nudgeDesktopLyricsHeight(
+      twoLines ? delta : -delta,
+      headingGroupRef.current,
+    );
+  }, [twoLines]);
 
   const finishDragging = (pointerId?: number) => {
     const drag = dragRef.current;
@@ -188,6 +205,8 @@ export function DesktopLyricsApp() {
                   applyFontStacks(event.payload.fontUi, event.payload.fontLyrics);
                 }
                 setCapsuleVisible(event.payload.capsuleVisible !== false);
+                setTwoLines(event.payload.twoLines === true);
+                setLyricColor(event.payload.lyricColor ?? null);
                 if (event.payload.lockShortcut) {
                   setLockShortcut(event.payload.lockShortcut);
                 }
@@ -550,13 +569,28 @@ export function DesktopLyricsApp() {
   const activeLyricIndex = findActiveLyricIndex(snapshot.lines, currentTime);
   const displayedLyricIndex = activeLyricIndex >= 0 ? activeLyricIndex : 0;
   const activeLine = snapshot.lines[displayedLyricIndex] ?? null;
+  const nextLine = snapshot.lines[displayedLyricIndex + 1];
+  const lineUntil =
+    nextLine && nextLine.time > (activeLine?.time ?? 0)
+      ? nextLine.time
+      : snapshot.duration > (activeLine?.time ?? 0)
+        ? snapshot.duration
+        : undefined;
+  const secondaryText = twoLines
+    ? desktopLyricSecondaryText(snapshot.lines, displayedLyricIndex)
+    : null;
   const lyricPaddingScale = fontScale / DEFAULT_FONT_SCALE;
+  const lyricColorStyle = lyricColor
+    ? ({ "--desktop-lyric": lyricColor } as CSSProperties)
+    : undefined;
 
   return (
     <div
       className="desktop-lyrics-window"
       data-capsule-visible={capsuleVisible ? "true" : "false"}
       data-interaction-mode={interactionMode}
+      data-two-lines={twoLines ? "true" : "false"}
+      style={lyricColorStyle}
     >
       <main className="desktop-lyrics-body" aria-live="polite">
         <section className="desktop-lyrics-stage">
@@ -636,17 +670,30 @@ export function DesktopLyricsApp() {
                 }}
               >
                 <LyricTransition
-                  transitionKey={`${displayedLyricIndex}:${activeLine.time}`}
+                  transitionKey={`${displayedLyricIndex}:${activeLine.time}:${secondaryText ?? ""}`}
                   className="w-max"
                   animateSize
                 >
-                  <KaraokeText
-                    line={activeLine}
-                    currentTime={currentTime}
-                    className="desktop-lyrics-heading"
-                    style={{ fontSize: `${LYRIC_FONT_SIZE * fontScale}px` }}
-                    onPointerEnter={() => setIsLyricsHovered(true)}
-                  />
+                  <div className="desktop-lyrics-lines">
+                    <KaraokeText
+                      line={activeLine}
+                      currentTime={currentTime}
+                      until={lineUntil}
+                      className="desktop-lyrics-heading"
+                      style={{ fontSize: `${LYRIC_FONT_SIZE * fontScale}px` }}
+                      onPointerEnter={() => setIsLyricsHovered(true)}
+                    />
+                    {twoLines ? (
+                      <span
+                        className="desktop-lyrics-sub"
+                        style={{
+                          fontSize: `${LYRIC_FONT_SIZE * fontScale * 0.62}px`,
+                        }}
+                      >
+                        {secondaryText || "\u00a0"}
+                      </span>
+                    ) : null}
+                  </div>
                 </LyricTransition>
               </div>
             </div>

@@ -17,6 +17,352 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.7.1": {
+    zh: {
+      sections: [
+        {
+          title: "⬇️ 下载",
+          bullets: [
+            "已完成的下载可一键导入本地音乐；悬停显示图标",
+            "进入下载页时后台检查文件是否还在，已删除的会标成「文件缺失」",
+          ],
+        },
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "进入本地页时后台检查文件是否还在，缺失或找回都会更新标记",
+          ],
+        },
+        {
+          title: "📋 歌单",
+          bullets: [
+            "打开过的收藏歌单会保存歌曲列表；远程被删后仍能打开和播放",
+            "这份快照会随配置同步到其他设备",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "⬇️ Downloads",
+          bullets: [
+            "Import a finished download into Local music from a hover icon",
+            "Opening Downloads checks files in the background and marks deleted ones as missing",
+          ],
+        },
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Opening Local checks files in the background and updates missing or restored tracks",
+          ],
+        },
+        {
+          title: "📋 Playlists",
+          bullets: [
+            "Opened favorite playlists keep a song snapshot, so they still open and play if the remote list is deleted",
+            "The snapshot syncs with your config to other devices",
+          ],
+        },
+      ],
+    },
+  },
+  "3.7.0": {
+    zh: {
+      sections: [
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "单曲「在线匹配」改为网易云候选列表，缺标签时可识曲；搜索中可取消",
+            "未匹配的文件点播放不再偷偷上网补封面、歌手和歌词",
+            "已匹配的歌曲按网易云目录搜歌词，其它平台也能出结果",
+            "本地有损音质按真实码率显示 128K / 192K / 256K / 320K",
+          ],
+        },
+        {
+          title: "🎤 歌词",
+          bullets: [
+            "没有歌词时，底部播放栏的桌面歌词按钮会禁用",
+            "桌面歌词的普通 LRC 会按整行用主题色填满",
+          ],
+        },
+        {
+          title: "📋 歌单",
+          bullets: [
+            "用链接打开的 QQ 个人歌单能正确列出歌曲",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Single-track Match online opens a NetEase picker, with fingerprint when tags are missing; you can cancel while it searches",
+            "Unmatched files no longer look up cover, artist, or lyrics when you press play",
+            "Matched tracks search lyrics as the bound NetEase song, so other platforms can appear too",
+            "Local lossy files show 128K / 192K / 256K / 320K from the real bitrate",
+          ],
+        },
+        {
+          title: "🎤 Lyrics",
+          bullets: [
+            "The desktop lyrics button in the player bar is disabled when there are no lyrics",
+            "Plain desktop LRC fills the whole line with the theme color",
+          ],
+        },
+        {
+          title: "📋 Playlists",
+          bullets: [
+            "QQ playlists opened from a personal or share link list their songs correctly",
+          ],
+        },
+      ],
+    },
+  },
+  "3.6.0": {
+    zh: {
+      sections: [
+        {
+          title: "🎤 歌词",
+          bullets: [
+            "卡拉 OK 只用平台原生逐字时间；普通歌词整行显示，不再估算逐字",
+            "歌词页可切换网易云、酷我、酷狗、QQ 音乐、咪咕；播放时优先选有逐字的源",
+            "去掉歌词时间轴微调，改从各平台里选一份更准的词",
+          ],
+        },
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "播放时补缺失封面和目录信息；勾选「显示原文件名」仍只锁定歌名",
+            "无歌词的 BGM、播客不再错配其他歌曲的词；歌名和时长对不上就留空",
+          ],
+        },
+        {
+          title: "🏷️ 分类",
+          bullets: [
+            "全部分类菜单里，自定义分类可直接改名或删除",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎤 Lyrics",
+          bullets: [
+            "Karaoke uses platform-native word timing only; plain lyrics stay whole-line",
+            "Switch NetEase, KuWo, KuGou, QQ Music, or Migu on the lyrics page; playback prefers a word-timed source",
+            "Timeline nudge is gone — pick another platform’s lyrics instead",
+          ],
+        },
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Playing fills missing cover and catalog info; Show original filename still only locks the title",
+            "Instrumental BGM and podcasts no longer get another song’s lyrics; weak title or duration matches stay empty",
+          ],
+        },
+        {
+          title: "🏷️ Categories",
+          bullets: [
+            "Rename or delete a custom category from the All Categories menu",
+          ],
+        },
+      ],
+    },
+  },
+  "3.5.3": {
+    zh: {
+      sections: [
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "导入立刻按文件名入列，封面和标签从文件后台补全，默认不上网",
+            "只有点「在线匹配」或打开「导入时匹配」才会上网补缺；勾选「显示原文件名」只锁定歌名",
+            "播放、勾选或取消「显示原文件名」都不会触发在线匹配",
+          ],
+        },
+        {
+          title: "⬇️ 下载",
+          bullets: [
+            "未设置下载目录时，「打开文件夹」会禁用，避免点了没反应",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Import lists filenames immediately; covers and tags fill from the file in the background with no network",
+            "Online fill only from Match online or Match on import; Show original filename only locks the title",
+            "Playing or toggling the filename checkbox never matches online",
+          ],
+        },
+        {
+          title: "⬇️ Downloads",
+          bullets: [
+            "Disable Open folder when no download directory is set",
+          ],
+        },
+      ],
+    },
+  },
+  "3.5.2": {
+    zh: {
+      sections: [
+        {
+          title: "🪟 Windows",
+          bullets: [
+            "修复打开数秒后闪退、拖窗口发滞：窗口显示改回界面线程",
+            "主窗口被藏住时，点任务栏图标可以重新打开（缩略图按钮本来就能用）",
+          ],
+        },
+        {
+          title: "🎵 酷狗",
+          bullets: [
+            "搜索页点收藏只会收进当前这一首，不再一次收进多首同名版本",
+          ],
+        },
+        {
+          title: "🎶 歌词",
+          bullets: [
+            "歌词页封面下方可拖动播放进度，盖住底栏时也能微调位置",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🪟 Windows",
+          bullets: [
+            "Fix a crash and drag hitch a few seconds after launch by showing the window on the UI thread",
+            "Clicking the taskbar icon restores a hidden main window (the thumbnail buttons already worked)",
+          ],
+        },
+        {
+          title: "🎵 KuGou",
+          bullets: [
+            "Favoriting a search result adds only that track, not every same-title version in the group",
+          ],
+        },
+        {
+          title: "🎶 Lyrics",
+          bullets: [
+            "Seek from a compact progress bar under the lyrics-page cover while the overlay hides the player bar",
+          ],
+        },
+      ],
+    },
+  },
+  "3.5.1": {
+    zh: {
+      sections: [
+        {
+          title: "⌨️ 快捷键",
+          bullets: [
+            "每项功能可同时设置应用内快捷键和全局热键，两套都能触发",
+            "应用内默认单键：空格播放、方向键微调进度、P/N 切歌、M 静音、L 歌词、D 桌面歌词",
+          ],
+        },
+        {
+          title: "🔌 音源",
+          bullets: [
+            "音源只从本地文件导入（选择文件或拖入），不再支持粘贴链接",
+          ],
+        },
+        {
+          title: "🎶 歌词与评论",
+          bullets: [
+            "修复酷狗评论因空图片字段导致面板报错",
+            "单行桌面歌词胶囊上下留白更均衡，评论标题不再被关闭按钮挡住",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "⌨️ Shortcuts",
+          bullets: [
+            "Each action can have an in-app shortcut and a global hotkey at the same time",
+            "Simple in-app defaults: Space to play, arrows to seek, P/N to skip, M mute, L lyrics, D desktop lyrics",
+          ],
+        },
+        {
+          title: "🔌 Sources",
+          bullets: [
+            "Import source scripts from local files only (picker or drag-drop); link import is gone",
+          ],
+        },
+        {
+          title: "🎶 Lyrics and comments",
+          bullets: [
+            "Fix KuGou comments crashing when the API returns an empty images field",
+            "Even padding on the single-line desktop lyric capsule, and the comments title no longer sits under the close button",
+          ],
+        },
+      ],
+    },
+  },
+  "3.5.0": {
+    zh: {
+      sections: [
+        {
+          title: "💬 评论",
+          bullets: [
+            "歌词页可查看网易云、酷我、酷狗、QQ 音乐、咪咕的歌曲评论，支持热评和最新",
+            "打开评论时收起封面；「歌词独享」与评论互斥，不会三列挤在一起",
+          ],
+        },
+        {
+          title: "🎶 歌词",
+          bullets: [
+            "桌面歌词可显示双行：有翻译时显示译文，否则显示下一句",
+            "桌面歌词颜色可跟随主题，也可自选",
+            "重启后会立即请求当前歌曲歌词，不必先点播放",
+          ],
+        },
+        {
+          title: "⌨️ 快捷键",
+          bullets: [
+            "录制快捷键时先注销全局热键，避免系统抢走按键",
+            "组合已被本软件占用时会明确提示",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "💬 Comments",
+          bullets: [
+            "Read song comments from NetEase, KuWo, KuGou, QQ Music, and Migu on the lyrics page, with Hot and Latest",
+            "Opening comments hides the cover; Lyrics only and comments are exclusive so the three columns never crowd",
+          ],
+        },
+        {
+          title: "🎶 Lyrics",
+          bullets: [
+            "Desktop lyrics can show two lines: the translation when present, otherwise the upcoming line",
+            "Desktop lyric color can follow the theme or a color you pick",
+            "Lyrics for the restored song load at launch — no need to press Play first",
+          ],
+        },
+        {
+          title: "⌨️ Shortcuts",
+          bullets: [
+            "Recording a shortcut unregisters global hotkeys so the OS does not swallow the keys",
+            "A clear prompt when the combo is already used by Museek",
+          ],
+        },
+      ],
+    },
+  },
   "3.4.0": {
     zh: {
       sections: [

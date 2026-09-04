@@ -200,6 +200,7 @@
 }
 
 .desktop-lyrics-window {
+  --desktop-lyric: hsl(var(--primary));
   position: relative;
   box-sizing: border-box;
   display: flex;
@@ -355,7 +356,7 @@
   justify-content: center;
   border-radius: 9999px;
   /* Inline styles scale this whitespace with the lyric font size. */
-  padding: 10px 14px 8px;
+  padding: 8px 14px;
   background: transparent;
   box-shadow: 0 0 0 transparent;
   transition:
@@ -378,7 +379,7 @@
   max-width: none;
   margin: 0;
   padding: 0;
-  color: hsl(var(--primary) / 0.48);
+  color: color-mix(in srgb, var(--desktop-lyric) 48%, transparent);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.025em;
@@ -389,7 +390,14 @@
   user-select: none;
   text-shadow:
     0 1px 2px hsl(0 0% 0% / 0.28),
-    0 0 18px hsl(var(--primary) / 0.14);
+    0 0 18px color-mix(in srgb, var(--desktop-lyric) 14%, transparent);
+}
+
+.desktop-lyrics-heading.lyric-plain {
+  color: var(--desktop-lyric);
+  text-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.3),
+    0 0 18px color-mix(in srgb, var(--desktop-lyric) 20%, transparent);
 }
 
 .lyric-karaoke-words {
@@ -400,12 +408,18 @@
 .lyric-karaoke-word {
   position: relative;
   display: inline-block;
+  overflow: visible;
   white-space: pre;
+  /* Extra box below the em-square so the sung overlay can cover descenders
+     (g, p, y) without shifting the glyph. Do not use padding-top — absolute
+     inset(0) is the padding box and would desync from in-flow text. */
+  padding-bottom: 0.3em;
 }
 
 .lyric-karaoke-word-text,
 .lyric-karaoke-word-sung {
   display: block;
+  overflow: visible;
   white-space: pre;
 }
 
@@ -426,6 +440,10 @@
 
 .top-bar-lyrics-text .lyric-karaoke-words {
   white-space: nowrap;
+}
+
+.lyrics-scroll [data-radix-scroll-area-viewport] {
+  overflow-anchor: none;
 }
 
 .lyrics-edge-blur {
@@ -464,8 +482,47 @@
   );
 }
 
+.desktop-lyrics-heading .lyric-karaoke-word {
+  /* Karaoke words elsewhere keep 0.3em padding so clip-path can cover
+     Latin descenders. That extra box made the single-line capsule look
+     bottom-heavy, as if a second line were reserved. */
+  padding-bottom: 0;
+}
+
 .desktop-lyrics-heading .lyric-karaoke-word-text {
   opacity: 1;
+}
+
+.desktop-lyrics-heading .lyric-karaoke-word-sung {
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: 1.3em;
+  color: var(--desktop-lyric);
+  text-shadow:
+    0 1px 2px hsl(0 0% 0% / 0.3),
+    0 0 18px color-mix(in srgb, var(--desktop-lyric) 20%, transparent);
+}
+
+.desktop-lyrics-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28em;
+}
+
+.desktop-lyrics-sub {
+  display: block;
+  width: max-content;
+  max-width: none;
+  color: color-mix(in srgb, var(--desktop-lyric) 42%, transparent);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  text-wrap: nowrap;
+  text-shadow: 0 1px 2px hsl(0 0% 0% / 0.22);
 }
 
 .lyric-transition {
@@ -1336,11 +1393,11 @@ html[data-mini-peek="true"] .app-shell > * {
   .icon-hover-font-decrease:hover svg {
     animation: iconFontDecrease 360ms ease;
   }
-  .icon-hover-offset-faster:hover svg {
-    animation: iconFontIncrease 360ms ease;
+  .icon-hover-comments:hover svg {
+    animation: iconCaptions 400ms ease;
   }
-  .icon-hover-offset-slower:hover svg {
-    animation: iconFontDecrease 360ms ease;
+  .icon-hover-lyric-source:hover svg {
+    animation: iconCaptions 400ms ease;
   }
 
   /* Nested icons (TrackRow / overlays) — animate the icon itself on parent hover */

@@ -1,11 +1,24 @@
 import type { Quality, MusicInfo, MusicQuality, MusicInfoMeta } from "@/types/music"
 
 // Quality from best to worst. Auto-downgrade walks down this ladder.
+// 192k/256k are local-file display tiers only — source scripts request 128k/320k/flac.
 export const QUALITY_LADDER: Quality[] = ["flac24bit", "flac", "320k", "128k"]
+
+/** Includes local-only lossy steps so badges can show 192K / 256K. */
+const QUALITY_RANK: Quality[] = [
+  "flac24bit",
+  "flac",
+  "320k",
+  "256k",
+  "192k",
+  "128k",
+]
 
 // Short labels for compact UI (e.g. the player bar badge).
 export const QUALITY_SHORT: Record<Quality, string> = {
   "128k": "128K",
+  "192k": "192K",
+  "256k": "256K",
   "320k": "320K",
   flac: "FLAC",
   flac24bit: "Hi-Res",
@@ -29,8 +42,8 @@ export function qualityCandidates(preferred: Quality): Quality[] {
 }
 
 function qualityIndex(q: Quality): number {
-  const i = QUALITY_LADDER.indexOf(q)
-  return i < 0 ? QUALITY_LADDER.length : i
+  const i = QUALITY_RANK.indexOf(q)
+  return i < 0 ? QUALITY_RANK.length : i
 }
 
 /** True when `have` is the preferred tier or better (FLAC satisfies 320k). */
@@ -51,7 +64,7 @@ export function qualityUpgradeCandidates(
  *  ceiling). Returns null if the song lists none. */
 export function bestQuality(song: MusicInfo): Quality | null {
   const available = new Set(song.meta.qualitys.map((q) => q.type))
-  return QUALITY_LADDER.find((q) => available.has(q)) ?? null
+  return QUALITY_RANK.find((q) => available.has(q)) ?? null
 }
 
 /** Build the `_qualitys` size map used by lx-music scripts and VIP size probes. */

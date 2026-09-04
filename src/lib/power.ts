@@ -55,6 +55,11 @@ export async function hideToTray(
   setTrayVisible(true);
   if (!win) return;
   try {
+    await invoke("note_hidden_to_tray");
+  } catch {
+    /* optional: older native builds */
+  }
+  try {
     // Drop from the taskbar while hidden so it feels like a real tray app.
     await win.setSkipTaskbar(true);
   } catch {

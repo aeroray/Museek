@@ -50,6 +50,25 @@ export function localFilenameTitle(path: string): string {
   return basenameNoExt(path).trim() || t("local.unknownTitle");
 }
 
+/** Display title: filename lock, else ID3, else Match-online catalog name. */
+export function localResolvedTitle(opts: {
+  filePath: string;
+  nameMode: LocalNameMode;
+  hasTitleTag: boolean;
+  parsedName: string;
+  catalogName?: string | null;
+}): string {
+  if (opts.nameMode === "filename") {
+    return localFilenameTitle(opts.filePath);
+  }
+  if (opts.hasTitleTag && opts.parsedName.trim()) {
+    return opts.parsedName.trim();
+  }
+  const catalog = opts.catalogName?.trim();
+  if (catalog) return catalog;
+  return opts.parsedName.trim() || localFilenameTitle(opts.filePath);
+}
+
 /** Guess "Artist - Title" from filename. */
 export function guessFromFilename(path: string): {
   name: string;
@@ -100,6 +119,15 @@ function isHiRes(bitsPerSample?: number, sampleRate?: number): boolean {
   return false;
 }
 
+/** Snap a measured bitrate (bits/sec) to a lossy display tier. */
+function lossyQualityFromBitrate(bps: number): Quality {
+  const kbps = bps / 1000;
+  if (kbps >= 288) return "320k";
+  if (kbps >= 224) return "256k";
+  if (kbps >= 160) return "192k";
+  return "128k";
+}
+
 /**
  * Map music-metadata `format` (+ file size) to Museek quality tiers.
  * Avoids the old ext-only guess (every MP3/M4A → 320k, every FLAC → flac).
@@ -130,17 +158,18 @@ function qualityFromFormat(
   // Lossy: music-metadata bitrate is bits/sec.
   const bps = format?.bitrate;
   if (typeof bps === "number" && bps > 0) {
-    const kbps = bps / 1000;
-    return [{ type: kbps >= 256 ? "320k" : "128k", size }];
+    return [{ type: lossyQualityFromBitrate(bps), size }];
   }
 
   return qualityForExt(ext, fileSize);
 }
 
-/** Re-read only container/bitrate/bit-depth for quality badge fixes (no cover I/O). */
-export async function peekLocalQuality(
-  filePath: string,
-): Promise<MusicQuality[] | null> {
+/** Re-read container/bitrate plus whether title/artist tags exist (no cover I/O). */
+export async function peekLocalQuality(filePath: string): Promise<{
+  qualitys: MusicQuality[];
+  hasTitleTag: boolean;
+  hasArtistTag: boolean;
+} | null> {
   if (!isTauri) return null;
   try {
     const ext = extOf(filePath);
@@ -150,7 +179,21 @@ export async function peekLocalQuality(
       mimeType: mimeForExt(ext),
       size: bytes.byteLength,
     });
-    return qualityFromFormat(ext, meta.format, bytes.byteLength);
+    const common = meta.common;
+    const artists = (
+      common.artists?.length
+        ? common.artists
+        : common.artist
+          ? [common.artist]
+          : []
+    )
+      .map((a) => a?.trim())
+      .filter(Boolean);
+    return {
+      qualitys: qualityFromFormat(ext, meta.format, bytes.byteLength),
+      hasTitleTag: Boolean(common.title?.trim()),
+      hasArtistTag: artists.length > 0,
+    };
   } catch {
     return null;
   }
@@ -295,6 +338,7 @@ export interface ParsedLocalTags {
 
 /**
  * Read tags from a local audio file. Falls back to filename / placeholders.
+ * Never networks — online fill lives in `enrichLocalSong`.
  */
 export async function parseLocalFile(
   filePath: string,
@@ -399,6 +443,23 @@ export async function parseLocalFile(
     hasArtistTag,
     hasAlbumTag,
     hasCover,
+  };
+}
+
+/** Import-time metadata: basename only, no file read and no network. */
+export function tagsFromFilename(filePath: string): ParsedLocalTags {
+  const filenameName = localFilenameTitle(filePath);
+  const guessed = guessFromFilename(filePath);
+  return {
+    name: filenameName,
+    singer: guessed.singer || t("local.unknownArtist"),
+    albumName: "",
+    interval: "0:00",
+    qualitys: qualityForExt(extOf(filePath)),
+    hasTitleTag: false,
+    hasArtistTag: false,
+    hasAlbumTag: false,
+    hasCover: false,
   };
 }
 

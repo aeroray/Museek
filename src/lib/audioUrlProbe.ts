@@ -20,6 +20,8 @@ import type { MusicInfo, Quality } from "@/types/music"
 
 const BITRATE_KBPS: Record<Quality, number> = {
   "128k": 128,
+  "192k": 192,
+  "256k": 256,
   "320k": 320,
   flac: 500,
   flac24bit: 900,

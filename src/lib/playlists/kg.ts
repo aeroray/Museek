@@ -1,6 +1,6 @@
-import * as md5Lib from "js-md5"
 import { httpFetch as tauriFetch } from "@/lib/http"
 import { getKgBoardSongs, kgBoards } from "@/lib/charts/kg"
+import { signatureParams } from "@/lib/platforms/kg/sign"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration } from "@/lib/utils"
@@ -15,19 +15,6 @@ import type { Playlist, PlaylistDetail, PlaylistDetailInfo, PlaylistTag } from "
 const LIMIT_LIST = 30
 // 推荐 sort id (sortList[0] in the reference).
 const SORT_RECOMMEND = 5
-
-// js-md5 CommonJS/ESM interop (same pattern as src/lib/search/mg.ts)
-const md5 = ((md5Lib as any).default ?? md5Lib) as (str: string) => string
-
-const KG_WEB_KEY = "NVPh5oo715z5DIWAeQlhMDsWXXQV4hwt"
-const KG_ANDROID_KEY = "OIlwieks28dk2k092lksi2UIkp"
-
-/** KuGou request signature (lx-music kg/util.js signatureParams). */
-function signatureParams(params: string, platform: "web" | "android" = "web", body = ""): string {
-  const key = platform === "web" ? KG_WEB_KEY : KG_ANDROID_KEY
-  const sorted = params.split("&").sort().join("")
-  return md5(`${key}${sorted}${body}${key}`)
-}
 
 // Mirrors src/lib/search/kg.ts sizeFormate
 function sizeFormate(size: number): string {

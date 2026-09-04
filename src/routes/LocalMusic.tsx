@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   HardDrive,
   FolderOpen,
@@ -17,6 +17,7 @@ import {
   ArrowDownUp,
   MoreHorizontal,
   TriangleAlert,
+  ScanSearch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,8 +45,8 @@ import { cn } from "@/lib/utils";
 import {
   categoryNameMap,
   filterByCategoryId,
-  findActiveCategory,
   labelForCategoryFilter,
+  sharedCategoryId,
   type CategoryFilter,
 } from "@/lib/songCategories";
 import { CategoryAssignItems } from "@/components/songCategories/CategoryAssignItems";
@@ -53,6 +54,7 @@ import { CategoryAssignMenu } from "@/components/songCategories/CategoryAssignMe
 import { CategoryFilterMenu } from "@/components/songCategories/CategoryFilterMenu";
 import { CategoryNameDialog } from "@/components/songCategories/CategoryNameDialog";
 import { useCategoryDialog } from "@/components/songCategories/useCategoryDialog";
+import { MatchOnlineDialog } from "@/components/localMusic/MatchOnlineDialog";
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -64,8 +66,11 @@ export function LocalMusic() {
   const categories = useLocalMusicStore((s) => s.categories);
   const importing = useLocalMusicStore((s) => s.importing);
   const importProgress = useLocalMusicStore((s) => s.importProgress);
+  const matching = useLocalMusicStore((s) => s.matching);
+  const matchProgress = useLocalMusicStore((s) => s.matchProgress);
   const importFiles = useLocalMusicStore((s) => s.importFiles);
   const importFolder = useLocalMusicStore((s) => s.importFolder);
+  const matchTracksOnline = useLocalMusicStore((s) => s.matchTracksOnline);
   const remove = useLocalMusicStore((s) => s.remove);
   const removeMany = useLocalMusicStore((s) => s.removeMany);
   const setTrackNameMode = useLocalMusicStore((s) => s.setTrackNameMode);
@@ -80,10 +85,15 @@ export function LocalMusic() {
   const setLocalSort = useSettingsStore((s) => s.setLocalSort);
   const notify = useUiStore((s) => s.notify);
 
+  useEffect(() => {
+    void useLocalMusicStore.getState().syncFilePresence();
+  }, []);
+
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [matchTrackId, setMatchTrackId] = useState<string | null>(null);
   const categoryDialog = useCategoryDialog({
     addCategory,
     renameCategory,
@@ -93,8 +103,6 @@ export function LocalMusic() {
       if (assignSelected && selected.size > 0) {
         setTracksCategory([...selected], cat.id);
         exitEdit();
-      } else {
-        setCategoryFilter(cat.id);
       }
     },
   });
@@ -155,6 +163,47 @@ export function LocalMusic() {
     exitEdit();
   };
 
+  const runMatch = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    try {
+      const { applied, miss, unchanged } = await matchTracksOnline(ids);
+      if (applied > 0) {
+        notify({
+          message: tr("local.matched", { n: applied }),
+          variant: "success",
+        });
+      } else if (miss > 0) {
+        notify({ message: tr("local.matchNone"), variant: "info" });
+      } else if (unchanged > 0) {
+        notify({ message: tr("local.matchUnchanged"), variant: "info" });
+      }
+    } catch (e) {
+      notify({
+        message: tr("local.matchFailed", { msg: String(e) }),
+        variant: "error",
+      });
+    }
+  };
+
+  const batchMatch = async () => {
+    await runMatch([...selected]);
+  };
+
+  const onMatchApplied = (
+    status: "applied" | "unchanged" | "miss" | "error",
+  ) => {
+    if (status === "applied") {
+      notify({ message: tr("local.matched", { n: 1 }), variant: "success" });
+    } else if (status === "unchanged") {
+      notify({ message: tr("local.matchUnchanged"), variant: "info" });
+    } else if (status === "error") {
+      notify({
+        message: tr("local.matchFailed", { msg: tr("local.fileUnreadable") }),
+        variant: "error",
+      });
+    }
+  };
+
   const deleteCategory = (id: string) => {
     removeCategory(id);
     if (categoryFilter === id) setCategoryFilter("all");
@@ -213,7 +262,9 @@ export function LocalMusic() {
       none: tr("local.categoryNone"),
     },
   );
-  const activeCategory = findActiveCategory(categories, categoryFilter);
+  const busy = importing || matching;
+  const progress = matchProgress ?? importProgress;
+  const progressIsMatch = Boolean(matchProgress);
 
   return (
     <div className="flex flex-col h-full">
@@ -224,27 +275,30 @@ export function LocalMusic() {
             {tr("local.title")}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {importing && importProgress && importProgress.total > 0
-              ? tr("local.importProgress", {
-                  done: importProgress.done,
-                  total: importProgress.total,
-                })
+            {progress && progress.total > 0 && busy
+              ? tr(
+                  progressIsMatch
+                    ? "local.matchProgress"
+                    : "local.importProgress",
+                  {
+                    done: progress.done,
+                    total: progress.total,
+                  },
+                )
               : tracks.length === 0
                 ? tr("local.summaryEmpty")
                 : tr("local.summary", { n: tracks.length })}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {importing && importProgress && importProgress.total > 0 && (
+          {busy && progress && progress.total > 0 && (
             <div className="hidden sm:flex items-center gap-2 min-w-0 max-w-[200px]">
               <Progress
-                value={Math.round(
-                  (importProgress.done / importProgress.total) * 100,
-                )}
+                value={Math.round((progress.done / progress.total) * 100)}
                 className="h-1.5 w-24 shrink-0"
               />
               <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                {importProgress.done}/{importProgress.total}
+                {progress.done}/{progress.total}
               </span>
             </div>
           )}
@@ -271,9 +325,9 @@ export function LocalMusic() {
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5"
-                disabled={importing}
+                disabled={busy}
               >
-                {importing ? (
+                {busy ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
                   <FilePlus2 size={14} />
@@ -284,14 +338,14 @@ export function LocalMusic() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                disabled={importing}
+                disabled={busy}
                 onClick={() => void onImportFiles()}
               >
                 <FilePlus2 size={14} className="mr-2" />
                 {tr("local.importFiles")}
               </DropdownMenuItem>
               <DropdownMenuItem
-                disabled={importing}
+                disabled={busy}
                 onClick={() => void onImportFolder()}
               >
                 <FolderPlus size={14} className="mr-2" />
@@ -321,16 +375,14 @@ export function LocalMusic() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   {SORTS.map((s) => (
-                    <DropdownMenuItem key={s} onClick={() => setLocalSort(s)}>
-                      <Check
-                        size={14}
-                        className={cn(
-                          "mr-2",
-                          localSort === s ? "opacity-100" : "opacity-0",
-                        )}
-                      />
+                    <DropdownMenuCheckboxItem
+                      key={s}
+                      checked={localSort === s}
+                      showUncheckedIndicator
+                      onCheckedChange={() => setLocalSort(s)}
+                    >
                       {tr(`favorites.sort.${s}`)}
-                    </DropdownMenuItem>
+                    </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -339,9 +391,8 @@ export function LocalMusic() {
                 categories={categories}
                 filter={categoryFilter}
                 filterLabel={categoryFilterLabel}
-                activeCategory={activeCategory}
                 onFilter={setCategoryFilter}
-                onCreate={categoryDialog.openCreate}
+                onCreate={() => categoryDialog.openCreate()}
                 onRename={categoryDialog.openRename}
                 onDelete={deleteCategory}
                 labels={{
@@ -395,6 +446,13 @@ export function LocalMusic() {
                 <CategoryAssignMenu
                   categories={categories}
                   disabled={selected.size === 0}
+                  selectedId={sharedCategoryId(
+                    [...selected].map(
+                      (id) =>
+                        tracks.find((track) => track.id === id)?.categoryId ??
+                        null,
+                    ),
+                  )}
                   onAssign={batchMove}
                   onCreate={() => categoryDialog.openCreate(true)}
                   labels={{
@@ -403,6 +461,20 @@ export function LocalMusic() {
                     add: tr("local.categoryAdd"),
                   }}
                 />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  disabled={selected.size === 0 || busy}
+                  onClick={() => void batchMatch()}
+                >
+                  {matching ? (
+                    <Loader2 size={14} className="mr-1.5 animate-spin" />
+                  ) : (
+                    <ScanSearch size={14} className="mr-1.5" />
+                  )}
+                  {tr("local.matchOnline")}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -448,29 +520,32 @@ export function LocalMusic() {
           <div className="mx-auto w-full max-w-5xl p-4">
             <div className="flex min-h-[18rem] flex-col items-center justify-center px-4 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
-                {importing ? (
+                {busy ? (
                   <Loader2 size={28} className="animate-spin" />
                 ) : (
                   <HardDrive size={28} strokeWidth={1.6} />
                 )}
               </div>
-              {importing && importProgress && importProgress.total > 0 ? (
+              {busy && progress && progress.total > 0 ? (
                 <>
                   <p className="mt-4 text-sm font-medium">
-                    {tr("local.importProgress", {
-                      done: importProgress.done,
-                      total: importProgress.total,
-                    })}
+                    {tr(
+                      progressIsMatch
+                        ? "local.matchProgress"
+                        : "local.importProgress",
+                      {
+                        done: progress.done,
+                        total: progress.total,
+                      },
+                    )}
                   </p>
                   <Progress
-                    value={Math.round(
-                      (importProgress.done / importProgress.total) * 100,
-                    )}
+                    value={Math.round((progress.done / progress.total) * 100)}
                     className="mt-3 h-1.5 w-48"
                   />
-                  {importProgress.current ? (
+                  {progress.current ? (
                     <p className="mt-2 max-w-sm truncate text-xs text-muted-foreground">
-                      {importProgress.current}
+                      {progress.current}
                     </p>
                   ) : null}
                 </>
@@ -639,10 +714,17 @@ export function LocalMusic() {
                             <DropdownMenuLabel>
                               {tr("local.trackNameMode")}
                             </DropdownMenuLabel>
+                            <DropdownMenuItem
+                              disabled={busy || missing}
+                              onClick={() => setMatchTrackId(track.id)}
+                            >
+                              <ScanSearch size={14} className="mr-2" />
+                              {tr("local.matchOnline")}
+                            </DropdownMenuItem>
                             <DropdownMenuCheckboxItem
                               checked={track.nameMode === "filename"}
                               showUncheckedIndicator
-                              disabled={importing}
+                              disabled={busy}
                               onCheckedChange={(checked) =>
                                 void setTrackNameMode(
                                   track.id,
@@ -658,6 +740,7 @@ export function LocalMusic() {
                             </DropdownMenuLabel>
                             <CategoryAssignItems
                               categories={categories}
+                              selectedId={track.categoryId ?? null}
                               onAssign={(categoryId) =>
                                 setTracksCategory([track.id], categoryId)
                               }
@@ -708,6 +791,14 @@ export function LocalMusic() {
         </ScrollArea>
       )}
 
+      <MatchOnlineDialog
+        trackId={matchTrackId}
+        open={!!matchTrackId}
+        onOpenChange={(next) => {
+          if (!next) setMatchTrackId(null);
+        }}
+        onApplied={onMatchApplied}
+      />
       <CategoryNameDialog
         dialog={categoryDialog.catDialog}
         name={categoryDialog.catName}

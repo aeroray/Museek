@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePlaybackTime } from "@/lib/playback/clock";
 import { usePlayerStore } from "@/stores/playerStore";
+import { useT } from "@/lib/i18n";
 import { formatDuration, cn } from "@/lib/utils";
 
 /**
@@ -8,14 +9,24 @@ import { formatDuration, cn } from "@/lib/utils";
  *
  * Custom track (not Radix): fill + thumb share the same %, so the range never
  * lags the thumb. Smooth time comes from the playback-clock seam.
+ *
+ * `compact` is for the lyrics-page cover column: same mechanics, no player-bar
+ * padding, width follows the parent (typically the album art).
  */
-export function ProgressSlider({ className }: { className?: string }) {
+export function ProgressSlider({
+  className,
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   const duration = usePlayerStore((s) => s.duration);
   const status = usePlayerStore((s) => s.status);
   const currentSong = usePlayerStore((s) => s.currentSong);
   const sourceReady = usePlayerStore((s) => s.sourceReady);
   const seek = usePlayerStore((s) => s.seek);
   const playbackTime = usePlaybackTime();
+  const t = useT();
 
   const trackRef = useRef<HTMLDivElement>(null);
   const scrubbingRef = useRef(false);
@@ -80,12 +91,13 @@ export function ProgressSlider({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 w-full px-4 pt-3 pb-1",
+        "flex w-full items-center",
+        compact ? "gap-2 px-0 py-0" : "gap-3 px-4 pb-1 pt-3",
         className,
         disabled && "opacity-50",
       )}
     >
-      <span className="text-[11px] text-muted-foreground/80 tabular-nums w-10 text-right shrink-0 font-medium tracking-wide">
+      <span className="w-10 shrink-0 text-right text-[11px] font-medium tabular-nums tracking-wide text-muted-foreground/80">
         {formatDuration(time)}
       </span>
 
@@ -97,7 +109,7 @@ export function ProgressSlider({ className }: { className?: string }) {
         aria-valuemax={Math.max(0, Math.floor(duration))}
         aria-valuenow={Math.floor(time)}
         aria-valuetext={formatDuration(time)}
-        aria-label="Seek"
+        aria-label={t("player.seek")}
         aria-disabled={disabled || undefined}
         className={cn(
           "group/slider relative flex h-5 w-full flex-1 touch-none select-none items-center",
@@ -131,7 +143,12 @@ export function ProgressSlider({ className }: { className?: string }) {
           }
         }}
       >
-        <div className="relative h-1.5 w-full grow overflow-visible rounded-full bg-secondary/80 transition-[height] duration-200 group-hover/slider:h-2">
+        <div
+          className={cn(
+            "relative w-full grow overflow-visible rounded-full bg-secondary/80 transition-[height] duration-200 group-hover/slider:h-2",
+            compact ? "h-1" : "h-1.5",
+          )}
+        >
           <div
             className="absolute inset-y-0 left-0 rounded-full bg-primary"
             style={{ width: `${pct}%` }}
@@ -139,16 +156,16 @@ export function ProgressSlider({ className }: { className?: string }) {
         </div>
         <div
           className={cn(
-            "pointer-events-none absolute top-1/2 z-10 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2",
-            "rounded-full border-2 border-primary bg-background shadow-sm",
+            "pointer-events-none absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background shadow-sm",
             "transition-transform duration-200 group-hover/slider:scale-110",
+            compact ? "h-3 w-3" : "h-3.5 w-3.5",
             scrubbing && "scale-110",
           )}
           style={{ left: `${pct}%` }}
         />
       </div>
 
-      <span className="text-[11px] text-muted-foreground/80 tabular-nums w-10 shrink-0 font-medium tracking-wide">
+      <span className="w-10 shrink-0 text-[11px] font-medium tabular-nums tracking-wide text-muted-foreground/80">
         {formatDuration(duration)}
       </span>
     </div>

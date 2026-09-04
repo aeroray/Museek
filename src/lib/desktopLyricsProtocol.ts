@@ -22,6 +22,8 @@ export interface DesktopLyricsAppearanceSnapshot {
   themeMode: ThemeMode;
   palette: Palette;
   capsuleVisible: boolean;
+  twoLines: boolean;
+  lyricColor: string | null;
   lockShortcut: string;
   hideShortcut: string;
   fontUi?: string;
@@ -37,6 +39,7 @@ export interface DesktopLyricsSnapshot {
   lines: LyricLine[];
   currentTime: number;
   currentLyricIndex: number;
+  duration: number;
   isPlaying: boolean;
   status: PlayerStatus;
   lyricsLoading: boolean;

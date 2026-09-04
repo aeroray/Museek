@@ -12,7 +12,9 @@ const PATTERNS: Record<
   { primary: RegExp; secondary?: RegExp; /** How to turn a captured group into store id */ format?: (id: string) => string }
 > = {
   // https://y.qq.com/n/yqq/playlist/7217720898.html
+  // https://y.qq.com/n/ryqq_v2/playlist/9681733702
   // https://i.y.qq.com/n2/m/share/details/taoge.html?id=7217720898
+  // https://i2.y.qq.com/n3/other/pages/details/playlist.html?id=9712417906&hosteuin=…
   tx: {
     primary: /\/playlist\/(\d+)/,
     secondary: /[?&]id=(\d+)/,
@@ -133,6 +135,25 @@ function matchId(input: string, source: OnlineSource): string | null {
   return format ? format(m[1]) : m[1]
 }
 
+function txHostEuin(input: string): string | null {
+  const raw = /[?&]hosteuin=([^&]+)/i.exec(input)?.[1]
+  if (!raw) return null
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
+/** Mobile QQ share links include hosteuin; Dissinfo needs it as enc_host_uin. */
+function withTxEuin(id: string, ...candidates: string[]): string {
+  for (const s of candidates) {
+    const euin = txHostEuin(s)
+    if (euin) return `${id}::euin::${euin}`
+  }
+  return id
+}
+
 /**
  * Resolve a pasted playlist link or raw ID for `source`.
  * Throws with a localized message when the input cannot be parsed.
@@ -159,9 +180,10 @@ export async function parsePlaylistLink(source: OnlineSource, raw: string): Prom
   }
 
   let id = matchId(input, source)
+  let resolved = input
   if (!id) {
     // Short links / share pages often need one redirect before the id appears.
-    const resolved = await resolveRedirect(input)
+    resolved = await resolveRedirect(input)
     id = matchId(resolved, source)
     // KuGou share pages may only expose the collection id after fetch — hand
     // the resolved URL to getKgPlaylistDetail.
@@ -169,5 +191,6 @@ export async function parsePlaylistLink(source: OnlineSource, raw: string): Prom
   }
 
   if (!id) throw new Error(t("playlists.openInvalid"))
+  if (source === "tx") id = withTxEuin(id, input, resolved)
   return id
 }

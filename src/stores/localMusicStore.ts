@@ -4,16 +4,26 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import {
   buildLocalSong,
   enrichLocalSong,
+  applyCatalogHit,
+  searchLocalCatalogCandidates,
+  localTrackUntagged,
   isLocalAudioPath,
+  isPlaceholderArtist,
   localFilenameTitle,
+  localResolvedTitle,
   localTrackId,
   parseLocalFile,
   peekLocalQuality,
   pickLocalAudioFiles,
   pickLocalAudioFolder,
   resolveLocalCoverUrl,
+  tagsFromFilename,
+  type LocalEnrichStatus,
+  type ParsedLocalTags,
 } from "@/lib/localMusic";
+import { fetchWySongDetail } from "@/lib/search/wy";
 import { indexQualitySizes } from "@/lib/quality";
+import { checkPathsExist } from "@/lib/fsPresence";
 import { normalizeCategoryName } from "@/lib/songCategories";
 import type {
   LocalCategory,
@@ -26,18 +36,26 @@ const STORE_FILE = "localMusic.json";
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+let presenceScan: Promise<void> | null = null;
+
 async function dropRemovedFromPlayback(ids: string[]) {
   const { usePlayerStore } = await import("@/stores/playerStore");
   usePlayerStore.getState().removeSongsFromPlayback(ids);
 }
 
-/** Parallel file reads + tag parse. Keep modest — each file is loaded fully into memory. */
+/** Parallel file reads for restore/refresh/quality probe. New imports skip this. */
 const IMPORT_CONCURRENCY = 4;
 const PERSIST_DEBOUNCE_MS = 400;
 /** Bump when local quality detection changes — triggers one-time re-probe on load. */
-const QUALITY_SCHEMA = 1;
+const QUALITY_SCHEMA = 3;
 /** Bump when local naming changes from a global setting to per-track overrides. */
 const NAME_MODE_SCHEMA = 1;
+
+export type LocalMatchSummary = {
+  applied: number;
+  miss: number;
+  unchanged: number;
+};
 
 export type LocalImportProgress = {
   done: number;
@@ -53,11 +71,23 @@ interface LocalMusicPersist {
   nameModeSchema?: number;
 }
 
+export type LocalMatchPreview = {
+  trackId: string;
+  song: MusicInfo;
+  nameMode: LocalNameMode;
+  query: string;
+  hits: MusicInfo[];
+  recommended: MusicInfo | null;
+  canRecognize: boolean;
+};
+
 interface LocalMusicState {
   tracks: LocalTrack[];
   categories: LocalCategory[];
   importing: boolean;
   importProgress: LocalImportProgress | null;
+  matching: boolean;
+  matchProgress: LocalImportProgress | null;
   loadFromDisk: () => Promise<void>;
   importFiles: () => Promise<number>;
   importFolder: () => Promise<number>;
@@ -69,11 +99,64 @@ interface LocalMusicState {
   removeMany: (ids: string[]) => Promise<void>;
   updateSong: (id: string, song: MusicInfo) => void;
   setTrackNameMode: (id: string, mode: LocalNameMode) => Promise<void>;
+  /** Read embedded tags if not yet parsed. Never networks. */
+  hydrateTrackOnPlay: (id: string) => Promise<MusicInfo | null>;
+  /** Fill missing metadata from NetEase. Explicit user action only. */
+  matchTracksOnline: (ids: string[]) => Promise<LocalMatchSummary>;
+  /** Single-track picker: ranked NetEase hits, no auto-apply. */
+  previewOnlineMatch: (id: string) => Promise<LocalMatchPreview | null>;
+  /** Apply a user-chosen NetEase hit from the picker. */
+  applyOnlineMatch: (
+    id: string,
+    hit: MusicInfo,
+  ) => Promise<LocalEnrichStatus | "error">;
   setTrackUnavailable: (id: string, unavailable: boolean) => void;
+  /** Background metadata check; marks tracks whose files were deleted. */
+  syncFilePresence: () => Promise<void>;
   addCategory: (name: string) => LocalCategory | null;
   renameCategory: (id: string, name: string) => void;
   removeCategory: (id: string) => void;
   setTracksCategory: (ids: string[], categoryId: string | null) => void;
+}
+
+function mergeCatalogFill(
+  prev: MusicInfo,
+  tags: ParsedLocalTags,
+  song: MusicInfo,
+  nameMode: LocalNameMode,
+): MusicInfo {
+  const keepSinger =
+    !tags.hasArtistTag && prev.singer && !isPlaceholderArtist(prev.singer);
+  const catalogName = prev.meta.catalogName ?? song.meta.catalogName;
+  const filePath = song.meta.filePath ?? "";
+  return {
+    ...song,
+    name: localResolvedTitle({
+      filePath,
+      nameMode,
+      hasTitleTag: tags.hasTitleTag,
+      parsedName: song.name,
+      catalogName,
+    }),
+    singer: tags.hasArtistTag
+      ? song.singer
+      : keepSinger
+        ? prev.singer
+        : song.singer,
+    albumName: tags.hasAlbumTag
+      ? song.albumName
+      : prev.albumName || song.albumName,
+    meta: {
+      ...song.meta,
+      picUrl: tags.hasCover
+        ? song.meta.picUrl
+        : (song.meta.picUrl ?? prev.meta.picUrl),
+      wySongId: prev.meta.wySongId ?? song.meta.wySongId,
+      catalogName,
+      catalogSinger: prev.meta.catalogSinger ?? song.meta.catalogSinger,
+      catalogInterval: prev.meta.catalogInterval ?? song.meta.catalogInterval,
+    },
+  };
 }
 
 function persist(
@@ -215,6 +298,23 @@ function migrateLegacyNameModes(
   });
 }
 
+/** Recent filename-first imports omitted `nameMode` while still showing the basename. */
+function stampFilenameModeIfShowingBasename(tracks: LocalTrack[]): {
+  tracks: LocalTrack[];
+  changed: boolean;
+} {
+  let changed = false;
+  const next = tracks.map((track) => {
+    if (track.nameMode) return track;
+    if (track.song.name.trim() !== localFilenameTitle(track.filePath)) {
+      return track;
+    }
+    changed = true;
+    return { ...track, nameMode: "filename" as const };
+  });
+  return { tracks: next, changed };
+}
+
 function pathKey(filePath: string): string {
   return filePath.replace(/\\/g, "/").toLowerCase();
 }
@@ -246,6 +346,8 @@ async function mapPool<T>(
 export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
   const refreshVersions = new Map<string, number>();
+  const tagReadTail = new Map<string, Promise<void>>();
+  const hydrateInFlight = new Map<string, Promise<MusicInfo | null>>();
 
   function schedulePersist() {
     if (persistTimer) clearTimeout(persistTimer);
@@ -263,12 +365,6 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     }
     const { tracks, categories } = get();
     persist(tracks, categories);
-  }
-
-  function prependTrack(track: LocalTrack) {
-    // Functional set avoids lost updates when several workers finish close together.
-    set((state) => ({ tracks: [track, ...state.tracks] }));
-    schedulePersist();
   }
 
   function upsertRestoredTrack(track: LocalTrack) {
@@ -299,42 +395,230 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     );
   }
 
-  async function refreshTrack(track: LocalTrack): Promise<boolean> {
-    const nameMode = localNameModeForTrack(track);
-    const version = beginTrackRefresh(track.id);
+  function tagsHintFromTrack(track: LocalTrack): ParsedLocalTags {
+    const song = track.song;
+    return {
+      name: song.name,
+      singer: song.singer,
+      albumName: song.albumName,
+      interval: song.interval,
+      qualitys: song.meta.qualitys,
+      localCoverRel: song.meta.localCoverRel,
+      picUrl: song.meta.picUrl,
+      embeddedLyric: song.meta.embeddedLyric,
+      hasTitleTag: track.hasTitleTag ?? false,
+      hasArtistTag:
+        track.hasArtistTag ?? !isPlaceholderArtist(song.singer),
+      hasAlbumTag: Boolean(song.albumName?.trim()),
+      hasCover: Boolean(
+        song.meta.picUrl?.trim() || song.meta.localCoverRel,
+      ),
+    };
+  }
+
+  /**
+   * Read embedded tags/cover/lyrics from disk. Never networks.
+   * `hydrated` here means tags were read, not that online match ran.
+   */
+  async function readLocalTags(track: LocalTrack): Promise<{
+    ok: boolean;
+    tags?: ParsedLocalTags;
+    song?: MusicInfo;
+    nameMode: LocalNameMode;
+    version: number;
+  }> {
+    const prev = tagReadTail.get(track.id) ?? Promise.resolve();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    tagReadTail.set(
+      track.id,
+      prev.then(
+        () => held,
+        () => held,
+      ),
+    );
     try {
-      const tags = await parseLocalFile(track.filePath, track.id, nameMode);
-      if (!canApplyTrackRefresh(track.id, track.filePath, nameMode, version)) {
-        return false;
-      }
-      const current = get().tracks.find((item) => item.id === track.id);
-      if (!current) return false;
-      const song = buildLocalSong(track.id, track.filePath, tags);
-      upsertRestoredTrack({
-        ...current,
-        unavailable: false,
-        song,
-      });
-      void enrichLocalSong(song, tags, nameMode, () =>
-        canApplyTrackRefresh(track.id, track.filePath, nameMode, version),
-      ).then((enriched) => {
-        if (
-          !canApplyTrackRefresh(track.id, track.filePath, nameMode, version)
-        ) {
-          return;
-        }
-        if (enriched !== song) get().updateSong(track.id, enriched);
-      });
-      return true;
+      await prev;
     } catch {
-      return false;
+      /* previous reader failed; still try */
     }
+    try {
+      const latest = get().tracks.find((item) => item.id === track.id);
+      if (!latest) {
+        return {
+          ok: false,
+          nameMode: localNameModeForTrack(track),
+          version: refreshVersions.get(track.id) ?? 0,
+        };
+      }
+      if (latest.hydrated !== false) {
+        const nameMode = localNameModeForTrack(latest);
+        return {
+          ok: true,
+          tags: tagsHintFromTrack(latest),
+          song: latest.song,
+          nameMode,
+          version: refreshVersions.get(track.id) ?? 0,
+        };
+      }
+
+      const nameMode = localNameModeForTrack(latest);
+      const version = beginTrackRefresh(latest.id);
+      try {
+        const tags = await parseLocalFile(latest.filePath, latest.id, nameMode);
+        if (!canApplyTrackRefresh(track.id, latest.filePath, nameMode, version)) {
+          return { ok: false, nameMode, version };
+        }
+        const current = get().tracks.find((item) => item.id === track.id);
+        if (!current) return { ok: false, nameMode, version };
+        let song = mergeCatalogFill(
+          current.song,
+          tags,
+          buildLocalSong(track.id, latest.filePath, tags),
+          nameMode,
+        );
+        if (
+          nameMode === "smart" &&
+          !tags.hasTitleTag &&
+          !song.meta.catalogName &&
+          song.meta.wySongId
+        ) {
+          const detailed = await fetchWySongDetail(song.meta.wySongId);
+          if (
+            !canApplyTrackRefresh(track.id, latest.filePath, nameMode, version)
+          ) {
+            return { ok: false, nameMode, version };
+          }
+          const catalogName = detailed?.name?.trim();
+          if (catalogName) {
+            song = {
+              ...song,
+              name: catalogName,
+              meta: { ...song.meta, catalogName },
+            };
+          }
+        }
+        upsertRestoredTrack({
+          ...current,
+          unavailable: false,
+          hydrated: true,
+          hasTitleTag: tags.hasTitleTag,
+          hasArtistTag: tags.hasArtistTag,
+          song,
+        });
+        return { ok: true, tags, song, nameMode, version };
+      } catch {
+        return { ok: false, nameMode, version };
+      }
+    } finally {
+      release();
+    }
+  }
+
+  /** Explicit online fill only (Match online / Match on import). */
+  async function matchOnline(track: LocalTrack): Promise<LocalEnrichStatus | "error"> {
+    const result = await readLocalTags(track);
+    if (!result.ok || !result.tags || !result.song) return "error";
+    const { tags, song, nameMode, version } = result;
+    const enriched = await enrichLocalSong(
+      song,
+      tags,
+      nameMode,
+      () => canApplyTrackRefresh(track.id, track.filePath, nameMode, version),
+    );
+    if (!canApplyTrackRefresh(track.id, track.filePath, nameMode, version)) {
+      return "error";
+    }
+    if (enriched.status === "applied") get().updateSong(track.id, enriched.song);
+    return enriched.status;
+  }
+
+  /** Read embedded tags/cover/lyrics from disk. Does not hit the network. */
+  function parseLocalTagsInBackground(ids: string[]) {
+    if (ids.length === 0) return;
+    void (async () => {
+      const tracks: LocalTrack[] = [];
+      const seen = new Set<string>();
+      for (const id of ids) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const track = get().tracks.find((item) => item.id === id);
+        if (track && track.hydrated === false) tracks.push(track);
+      }
+      if (tracks.length === 0) return;
+      await mapPool(tracks, IMPORT_CONCURRENCY, async (track) => {
+        const current = get().tracks.find((item) => item.id === track.id);
+        if (!current || current.hydrated !== false) return;
+        await readLocalTags(current);
+      });
+    })();
+  }
+
+  async function matchTracks(ids: string[]): Promise<LocalMatchSummary> {
+    const empty: LocalMatchSummary = { applied: 0, miss: 0, unchanged: 0 };
+    const seen = new Set<string>();
+    const tracks: LocalTrack[] = [];
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const track = get().tracks.find((item) => item.id === id);
+      if (track) tracks.push(track);
+    }
+    if (tracks.length === 0) return empty;
+    if (get().matching) return empty;
+
+    let done = 0;
+    const summary: LocalMatchSummary = { applied: 0, miss: 0, unchanged: 0 };
+    set({
+      matching: true,
+      matchProgress: { done: 0, total: tracks.length },
+    });
+    try {
+      await mapPool(tracks, IMPORT_CONCURRENCY, async (track) => {
+        const current =
+          get().tracks.find((item) => item.id === track.id) ?? track;
+        const status = await matchOnline(current);
+        if (status === "applied") summary.applied += 1;
+        else if (status === "miss") summary.miss += 1;
+        else if (status === "unchanged") summary.unchanged += 1;
+        else summary.miss += 1;
+        done += 1;
+        set({
+          matchProgress: {
+            done,
+            total: tracks.length,
+            current: fileBasename(current.filePath),
+          },
+        });
+      });
+      return summary;
+    } finally {
+      set({ matching: false, matchProgress: null });
+    }
+  }
+
+  async function ingestAndMaybeMatch(
+    paths: string[],
+    opts?: { refreshExisting?: boolean },
+  ): Promise<number> {
+    const { added, importedIds } = await ingestPaths(paths, opts);
+    // Release the import lock before matching so playback stays available.
+    set({ importing: false, importProgress: null });
+    if (importedIds.length === 0) return added;
+    if (useSettingsStore.getState().localMatchOnImport) {
+      await matchTracks(importedIds);
+    } else {
+      parseLocalTagsInBackground(importedIds);
+    }
+    return added;
   }
 
   async function ingestPaths(
     paths: string[],
     opts?: { refreshExisting?: boolean },
-  ): Promise<number> {
+  ): Promise<{ added: number; importedIds: string[] }> {
     const byPath = new Map(get().tracks.map((t) => [pathKey(t.filePath), t]));
     const toImport: string[] = [];
     const toRestore: LocalTrack[] = [];
@@ -358,7 +642,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     const total = toImport.length + toRestore.length + toRefresh.length;
     if (total === 0) {
       set({ importProgress: null });
-      return 0;
+      return { added: 0, importedIds: [] };
     }
 
     let done = 0;
@@ -375,7 +659,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       try {
         const currentTrack =
           get().tracks.find((track) => track.id === existing.id) ?? existing;
-        if ((await refreshTrack(currentTrack)) && countAsAdded) added += 1;
+        if ((await readLocalTags(currentTrack)).ok && countAsAdded) added += 1;
       } catch {
         /* still missing / unreadable — leave as-is */
       } finally {
@@ -391,40 +675,38 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       applyParsed(existing, false),
     );
 
-    await mapPool(toImport, IMPORT_CONCURRENCY, async (filePath) => {
-      const current = fileBasename(filePath);
-      try {
+    const importedIds: string[] = [];
+    if (toImport.length > 0) {
+      const now = Date.now();
+      const imported: LocalTrack[] = toImport.map((filePath, i) => {
         const id = localTrackId(filePath);
-        const nameMode: LocalNameMode = "smart";
-        const tags = await parseLocalFile(filePath, id, nameMode);
-        const song = buildLocalSong(id, filePath, tags);
-        const track: LocalTrack = {
+        const song = buildLocalSong(id, filePath, tagsFromFilename(filePath));
+        return {
           id,
           filePath,
-          addedAt: Date.now(),
+          addedAt: now + i,
           categoryId: null,
+          nameMode: "filename",
+          hydrated: false,
+          hasTitleTag: false,
+          hasArtistTag: false,
           song,
         };
-        prependTrack(track);
-        added += 1;
-
-        // Enrich (NetEase fill) off the critical path so the row appears immediately.
-        const version = beginTrackRefresh(id);
-        void enrichLocalSong(song, tags, nameMode, () =>
-          canApplyTrackRefresh(id, filePath, nameMode, version),
-        ).then((enriched) => {
-          if (!canApplyTrackRefresh(id, filePath, nameMode, version)) return;
-          if (enriched !== song) get().updateSong(id, enriched);
-        });
-      } catch {
-        /* skip unreadable files; still advance progress */
-      } finally {
-        bumpProgress(current);
-      }
-    });
+      });
+      set((state) => ({
+        tracks: [...imported.slice().reverse(), ...state.tracks],
+        importProgress: {
+          done: total,
+          total,
+          current: fileBasename(toImport[toImport.length - 1] ?? ""),
+        },
+      }));
+      added += imported.length;
+      importedIds.push(...imported.map((track) => track.id));
+    }
 
     flushPersist();
-    return added;
+    return { added, importedIds };
   }
 
   return {
@@ -432,34 +714,49 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     categories: [],
     importing: false,
     importProgress: null,
+    matching: false,
+    matchProgress: null,
 
     async loadFromDisk() {
       const raw = await readData<unknown>(STORE_FILE, []);
       const { tracks, categories, qualitySchema, nameModeSchema } =
         parseStore(raw);
       const migrated = migrateLegacyNameModes(tracks, nameModeSchema ?? 0);
-      const normalized = await hydrateCovers(migrated);
+      const stamped = stampFilenameModeIfShowingBasename(migrated);
+      const normalized = await hydrateCovers(stamped.tracks);
       set({ tracks: normalized, categories });
+      if (stamped.changed) persist(normalized, categories);
+
+      const pendingTagIds = normalized
+        .filter((track) => track.hydrated === false)
+        .map((track) => track.id);
+      if (pendingTagIds.length > 0) parseLocalTagsInBackground(pendingTagIds);
 
       // One-time fix: older imports guessed quality from extension only (e.g. all
       // MP3 → 320k, 24-bit FLAC → FLAC). Re-probe in the background.
       if ((qualitySchema ?? 0) < QUALITY_SCHEMA && normalized.length > 0) {
         void (async () => {
           await mapPool(normalized, IMPORT_CONCURRENCY, async (track) => {
-            const qualitys = await peekLocalQuality(track.filePath);
-            if (!qualitys?.length) return;
+            const peek = await peekLocalQuality(track.filePath);
+            if (!peek?.qualitys.length) return;
+            const qualitys = peek.qualitys;
             const next = qualitys[0]?.type;
             const prev = track.song.meta.qualitys[0]?.type;
             const sizeChanged =
               (qualitys[0]?.size ?? null) !==
               (track.song.meta.qualitys[0]?.size ?? null);
-            if (!next || (next === prev && !sizeChanged)) return;
+            const tagsChanged =
+              track.hasTitleTag !== peek.hasTitleTag ||
+              track.hasArtistTag !== peek.hasArtistTag;
+            if (!next || (next === prev && !sizeChanged && !tagsChanged)) return;
             const _qualitys = indexQualitySizes(qualitys);
             set((state) => ({
               tracks: state.tracks.map((t) =>
                 t.id === track.id
                   ? {
                       ...t,
+                      hasTitleTag: peek.hasTitleTag,
+                      hasArtistTag: peek.hasArtistTag,
                       song: {
                         ...t.song,
                         meta: { ...t.song.meta, qualitys, _qualitys },
@@ -484,7 +781,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       if (!paths.length) return 0;
       set({ importing: true, importProgress: null });
       try {
-        return await ingestPaths(paths);
+        return await ingestAndMaybeMatch(paths);
       } finally {
         set({ importing: false, importProgress: null });
       }
@@ -496,7 +793,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       if (!paths.length) return 0;
       set({ importing: true, importProgress: null });
       try {
-        return await ingestPaths(paths);
+        return await ingestAndMaybeMatch(paths);
       } finally {
         set({ importing: false, importProgress: null });
       }
@@ -509,7 +806,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       if (!filtered.length) return 0;
       set({ importing: true, importProgress: null });
       try {
-        return await ingestPaths(filtered, opts);
+        return await ingestAndMaybeMatch(filtered, opts);
       } finally {
         set({ importing: false, importProgress: null });
       }
@@ -563,6 +860,8 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
               p.isPlaying,
             );
           });
+          void p._loadLyric(song);
+          void p._loadPic(song);
         });
       });
     },
@@ -570,18 +869,82 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     async setTrackNameMode(id, mode) {
       const track = get().tracks.find((item) => item.id === id);
       if (!track || localNameModeForTrack(track) === mode) return;
-      const tracks = get().tracks.map((item) => {
-        if (item.id !== id) return item;
-        if (mode === "smart") {
-          const { nameMode: _nameMode, ...withoutMode } = item;
-          return withoutMode;
-        }
-        return { ...item, nameMode: mode };
-      });
+      const tracks = get().tracks.map((item) =>
+        item.id === id ? { ...item, nameMode: mode } : item,
+      );
       set({ tracks });
       persist(tracks, get().categories);
       const updated = tracks.find((item) => item.id === id);
-      if (updated) await refreshTrack(updated);
+      if (updated) await readLocalTags(updated);
+    },
+
+    async hydrateTrackOnPlay(id) {
+      const inflight = hydrateInFlight.get(id);
+      if (inflight) return inflight;
+
+      const work = (async () => {
+        const track = get().tracks.find((item) => item.id === id);
+        if (!track) return null;
+        if (track.hydrated !== false) return track.song;
+        const ok = (await readLocalTags(track)).ok;
+        if (!ok) return null;
+        return get().tracks.find((item) => item.id === id)?.song ?? null;
+      })();
+
+      hydrateInFlight.set(id, work);
+      try {
+        return await work;
+      } finally {
+        hydrateInFlight.delete(id);
+      }
+    },
+
+    matchTracksOnline(ids) {
+      return matchTracks(ids);
+    },
+
+    async previewOnlineMatch(id) {
+      const track = get().tracks.find((item) => item.id === id);
+      if (!track) return null;
+      const song = track.song;
+      const nameMode = localNameModeForTrack(track);
+      // Search with displayed tags — don't re-read the whole file first.
+      // Skip the batch queue so a picker isn't stuck behind Match-on-import.
+      const preview = await searchLocalCatalogCandidates(song, {
+        bypassQueue: true,
+      });
+      return {
+        trackId: id,
+        song,
+        nameMode,
+        query: preview.query,
+        hits: preview.hits,
+        recommended: preview.recommended,
+        canRecognize: localTrackUntagged({
+          ...track,
+          song,
+        }),
+      };
+    },
+
+    async applyOnlineMatch(id, hit) {
+      const track = get().tracks.find((item) => item.id === id);
+      if (!track) return "error";
+      const result = await readLocalTags(track);
+      if (!result.ok || !result.tags || !result.song) return "error";
+      const { tags, song, nameMode, version } = result;
+      const enriched = await applyCatalogHit(
+        song,
+        tags,
+        nameMode,
+        hit,
+        () => canApplyTrackRefresh(track.id, track.filePath, nameMode, version),
+      );
+      if (!canApplyTrackRefresh(track.id, track.filePath, nameMode, version)) {
+        return "error";
+      }
+      if (enriched.status === "applied") get().updateSong(track.id, enriched.song);
+      return enriched.status;
     },
 
     setTrackUnavailable(id, unavailable) {
@@ -592,6 +955,35 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       );
       set({ tracks });
       persist(tracks, get().categories);
+    },
+
+    async syncFilePresence() {
+      if (!isTauri) return;
+      if (presenceScan) return presenceScan;
+      presenceScan = (async () => {
+        const snapshot = get().tracks;
+        if (!snapshot.length) return;
+        const present = await checkPathsExist(snapshot.map((t) => t.filePath));
+        if (present.length !== snapshot.length) return;
+        const missingById = new Map(
+          snapshot.map((t, i) => [t.id, !present[i]]),
+        );
+        const current = get().tracks;
+        let changed = false;
+        const tracks = current.map((t) => {
+          if (!missingById.has(t.id)) return t;
+          const missing = missingById.get(t.id) === true;
+          if (!!t.unavailable === missing) return t;
+          changed = true;
+          return { ...t, unavailable: missing };
+        });
+        if (!changed) return;
+        set({ tracks });
+        persist(tracks, get().categories);
+      })().finally(() => {
+        presenceScan = null;
+      });
+      return presenceScan;
     },
 
     addCategory(name) {

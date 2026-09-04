@@ -1,6 +1,6 @@
 import {
   Music,
-  ListMusic,
+  List,
   MicVocal,
   Captions,
   CaptionsOff,
@@ -30,7 +30,7 @@ import {
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs";
 import { DownloadSongButton } from "@/components/common/DownloadSongButton";
 import { enterMiniPlayer } from "@/lib/miniPlayer";
-import { hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
+import { canToggleDesktopLyrics, hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { useT } from "@/lib/i18n";
@@ -45,6 +45,7 @@ export function PlayerBar() {
     queue,
     showQueue,
     showLyrics,
+    lyricLines,
     status,
     setShowQueue,
     setShowLyrics,
@@ -54,8 +55,12 @@ export function PlayerBar() {
   const desktopLyricsVisible = useDesktopLyricsStore(
     (state) => state.isVisible,
   );
-  const desktopLyricsControlsDisabled = !currentSong && !desktopLyricsVisible;
-
+  const hasLyrics = lyricLines.length > 0;
+  const desktopLyricsControlsDisabled = !canToggleDesktopLyrics({
+    hasSong: Boolean(currentSong),
+    hasLyrics,
+    visible: desktopLyricsVisible,
+  });
   const loading = status === "loading";
   // Prefer the resolved cover; while loading fall back to the song's own pic so
   // the art doesn't blank out — the spinner overlay still signals resolving.
@@ -87,8 +92,8 @@ export function PlayerBar() {
             <ShortcutTooltip label={t("player.lyrics")} action="lyrics">
             <button
               type="button"
-              onClick={() => !loading && setShowLyrics(true)}
-              disabled={loading}
+              onClick={() => !loading && hasLyrics && setShowLyrics(true)}
+              disabled={loading || !hasLyrics}
               // Outer owns shadow + scale; inner clips overlay so it never paints past rounded corners.
               className="group relative h-12 w-12 shrink-0 transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.96] disabled:pointer-events-none"
             >
@@ -198,7 +203,7 @@ export function PlayerBar() {
                 showLyrics && "text-primary",
               )}
               onClick={() => setShowLyrics(!showLyrics)}
-              disabled={!currentSong}
+              disabled={!currentSong || !hasLyrics}
             >
               <MicVocal size={16} />
             </Button>
@@ -243,7 +248,7 @@ export function PlayerBar() {
             disabled={queue.length === 0}
             title={t("player.queue")}
           >
-            <ListMusic size={16} />
+            <List size={16} />
           </Button>
           <ShortcutTooltip label={t("player.miniMode")} action="mini">
             <Button

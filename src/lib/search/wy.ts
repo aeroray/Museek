@@ -19,6 +19,7 @@ interface WyAlbumRaw {
   id?: number | string
   name?: string
   picUrl?: string
+  pic_str?: string
 }
 
 interface WyBrItemRaw {
@@ -116,7 +117,11 @@ function normalizeWySong(item: WySimpleSongRaw): MusicInfo {
     meta: {
       songId,
       albumId: item.al?.id != null ? String(item.al.id) : "",
-      picUrl: item.al?.picUrl ?? null,
+      picUrl:
+        item.al?.picUrl ||
+        (item.al?.pic_str
+          ? `https://p2.music.126.net/${item.al.pic_str}.jpg`
+          : null),
       qualitys: ordered,
       _qualitys,
     },
@@ -177,5 +182,39 @@ export async function searchWangyi(
     page,
     allPage: Math.ceil(total / limit),
     limit,
+  }
+}
+
+interface WySongDetailResponse {
+  code?: number
+  songs?: WySimpleSongRaw[]
+}
+
+/** Full song object (cover URL is often missing from search hits). */
+export async function fetchWySongDetail(
+  id: string
+): Promise<MusicInfo | null> {
+  if (!id) return null
+  try {
+    const apiPath = "/api/v3/song/detail"
+    const form = eapi(apiPath, { c: JSON.stringify([{ id }]) })
+    const body = new URLSearchParams(form).toString()
+    const res = await tauriFetch("http://interface.music.163.com/eapi/batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent":
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36",
+        origin: "https://music.163.com",
+      },
+      body,
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as WySongDetailResponse
+    const song = data.songs?.[0]
+    if (!song || data.code !== 200) return null
+    return normalizeWySong(song)
+  } catch {
+    return null
   }
 }

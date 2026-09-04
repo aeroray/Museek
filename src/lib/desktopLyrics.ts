@@ -10,7 +10,6 @@ import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { currentFontStacks, useFontStore } from "@/stores/fontStore";
 import { findActiveLyricIndex } from "@/lib/lyrics";
 import { getLyricTime } from "@/lib/playback/clock";
-import { subscribeLyricOffset } from "@/lib/lyrics/offset";
 import {
   loadDesktopLyricsInteractionMode,
   saveDesktopLyricsInteractionMode,
@@ -31,6 +30,16 @@ import {
 
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/** Same rule as the player-bar button: close if open; else need a song with lyrics. */
+export function canToggleDesktopLyrics(opts: {
+  hasSong: boolean;
+  hasLyrics: boolean;
+  visible: boolean;
+}): boolean {
+  if (opts.visible) return true;
+  return opts.hasSong && opts.hasLyrics;
+}
 
 type PlayerSnapshotState = ReturnType<typeof usePlayerStore.getState>;
 
@@ -63,6 +72,7 @@ function createSnapshot(state: PlayerSnapshotState): DesktopLyricsSnapshot {
     })),
     currentTime,
     currentLyricIndex: findActiveLyricIndex(state.lyricLines, currentTime),
+    duration: state.duration,
     isPlaying: state.isPlaying,
     status: state.status,
     lyricsLoading: state.lyricsLoading,
@@ -96,6 +106,8 @@ function createAppearanceSnapshot(): DesktopLyricsAppearanceSnapshot {
     themeMode: theme.mode,
     palette: theme.palette,
     capsuleVisible: useSettingsStore.getState().desktopLyricsCapsuleVisible,
+    twoLines: useSettingsStore.getState().desktopLyricsTwoLines,
+    lyricColor: useSettingsStore.getState().desktopLyricsColor,
     lockShortcut: formatShortcut(shortcuts.desktopLyricsLock),
     hideShortcut: formatShortcut(shortcuts.desktopLyrics),
     fontUi: fonts.ui,
@@ -104,7 +116,7 @@ function createAppearanceSnapshot(): DesktopLyricsAppearanceSnapshot {
 }
 
 function appearanceKey(snapshot: DesktopLyricsAppearanceSnapshot): string {
-  return `${snapshot.lang}|${snapshot.themeMode}|${snapshot.palette}|${snapshot.capsuleVisible}|${snapshot.lockShortcut}|${snapshot.hideShortcut}|${snapshot.fontUi ?? ""}|${snapshot.fontLyrics ?? ""}`;
+  return `${snapshot.lang}|${snapshot.themeMode}|${snapshot.palette}|${snapshot.capsuleVisible}|${snapshot.twoLines}|${snapshot.lyricColor ?? ""}|${snapshot.lockShortcut}|${snapshot.hideShortcut}|${snapshot.fontUi ?? ""}|${snapshot.fontLyrics ?? ""}`;
 }
 
 async function ensureInteractionModeLoaded(): Promise<void> {
@@ -249,6 +261,8 @@ export function startDesktopLyricsBridge(): () => void {
     if (
       state.desktopLyricsCapsuleVisible !==
         previous.desktopLyricsCapsuleVisible ||
+      state.desktopLyricsTwoLines !== previous.desktopLyricsTwoLines ||
+      state.desktopLyricsColor !== previous.desktopLyricsColor ||
       state.shortcuts.desktopLyricsLock !==
         previous.shortcuts.desktopLyricsLock ||
       state.shortcuts.desktopLyrics !== previous.shortcuts.desktopLyrics
@@ -304,17 +318,6 @@ export function startDesktopLyricsBridge(): () => void {
       pendingTime = getLyricTime();
       flushTime();
     });
-    const stopOffset = subscribeLyricOffset(() => {
-      if (!useDesktopLyricsStore.getState().isVisible) return;
-      pendingTime = getLyricTime();
-      flushTime();
-      void publishSnapshot(true);
-    });
-    const stopAudio = unsubscribeTime;
-    unsubscribeTime = () => {
-      stopAudio();
-      stopOffset();
-    };
   };
   const stopTimeBridge = () => {
     unsubscribeTime?.();

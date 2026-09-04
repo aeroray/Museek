@@ -1,4 +1,168 @@
-# Confirmed Decisions
+## 2026-08-30 - Presence scan on Downloads and Local
+
+Decision:
+Entering Downloads or Local runs one background native batch `exists` (metadata only, off the UI thread). Missing files get the existing missing badge; restored files clear it. Do not block the page or toast.
+
+Reason:
+Users delete files in the OS while Museek still lists them. Per-file frontend IPC would hitch large libraries; one Rust pass is cheap.
+
+## 2026-08-30 - Favorited playlist songs stay on disk
+
+Decision:
+Once a favorited platform playlist or album is opened or played, persist its song metadata on that favorite in `playlists.json` (already synced). Reopen shows the snapshot first, refreshes in the background, and keeps the snapshot if the remote fails or returns empty.
+
+Reason:
+Authors can delete a list after it was favorited; a stub-only favorite then opened with no tracks. The snapshot is metadata only, not audio.
+
+## 2026-08-30 - Downloads import to local is explicit
+
+Decision:
+Completed downloads stay a download list and are not playable there. Import to Local uses the existing file path (no copy) and does not auto-play or switch pages.
+
+Reason:
+Users expected a finished download to play; Local Music is the playable library, so one-click import is the bridge.
+
+## 2026-08-29 - Matched local lyrics use catalog identity
+
+Decision:
+A local file with `wySongId` searches other platforms as the bound NetEase song (catalog title, matched artist, catalog duration). Do not score those searches against the file clock or filename lock. Unmatched files stay on file identity.
+
+Reason:
+Lyric search on a matched local track showed only NetEase because pickBestMatch used the file duration and display name, while the same NetEase track played online used catalog fields.
+
+## 2026-08-29 - Local play does not search unless matched
+
+Decision:
+Playing a local file never searches cover, artist, or lyrics online unless that track already has a NetEase match (`wySongId` from Match on import or Match online). Unmatched play uses the file plus sidecar/embedded lyrics only.
+
+Reason:
+Implicit play-time matching was easy to get wrong and blocked playback on file reads. Catalog work stays an explicit import or picker action.
+
+## 2026-08-29 - Local lossy quality uses real bitrate
+
+Decision:
+Local lossy files map measured bitrate to 128k / 192k / 256k / 320k. Do not fold ≥256 kbps into 320k. Online playback still requests only 128k / 320k / flac / flac24bit.
+
+Reason:
+256 kbps AAC was shown as 320K because the local probe had only two lossy buckets.
+
+## 2026-08-29 - Match picker search must not restart
+
+Decision:
+The single-track match-picker search effect depends only on `open` and `trackId`. Do not list `useT()` there. Stop the spinner after 8s without cancelling the in-flight NetEase request so late hits can still appear.
+
+Reason:
+`useT()` was a new function every render, so background tag hydration re-rendered the parent, reset the search, and the 12s Promise.race never settled in the UI.
+
+## 2026-08-29 - Match picker stays dismissible
+
+Decision:
+The single-track online-match picker stays closeable (Cancel, X, overlay/Esc) while search, fingerprint, or apply is in flight.
+
+Reason:
+NetEase search and large-file work can stall; locking the modal made the app look frozen.
+
+## 2026-08-29 - Untagged picker keeps 识曲
+
+Decision:
+The single-track match picker shows 识曲 for files missing title or artist tags when search has no recommended hit or the filename match is weak. Hint with “找不到想要的结果？” or “匹配不准确？”. Do not offer 识曲 when both tags exist.
+
+Reason:
+Filename-only tracks used to hide 识曲 because the basename looked like a title, even when NetEase had no confident recommendation.
+
+## 2026-08-29 - Local match picker; file fingerprint fallback
+
+Decision:
+Batch Match online and Match on import stay automatic NetEase fills. A single-track Match online opens a NetEase picker with a recommended hit. Fingerprint the local file only as a fallback when title or artist tags are missing. Do not search other platforms.
+
+Reason:
+Filename guesses are weak, and silent first-hit fills were easy to get wrong. Confirming one song is cheap; batch dialogs and five-platform search are not.
+
+## 2026-08-29 - QQ external playlists via Dissinfo
+
+Decision:
+Plaza QQ lists keep `fcg_ucc_getcdinfo_byids_cp`. External/personal lists that return a non-zero subcode or songs without songmid fall back to `uniform_get_Dissinfo`, and mobile share `hosteuin` is passed as `enc_host_uin`. Remote play errors must stop audio and clear `isPlaying`.
+
+Reason:
+User-created QQ lists opened by link used the old endpoint’s incomplete tracks, so every song failed while the player bar stayed in a playing state.
+
+## 2026-08-28 - Desktop whole-line theme fill
+
+Decision:
+Desktop lyrics keep native per-word karaoke when timestamps exist. Plain LRC uses a whole-line theme-color fill across the line interval (next line or song duration). Do not invent per-word timings.
+
+Reason:
+After dropping estimated karaoke, plain desktop lines stayed at unsung opacity with no accent highlight.
+
+## 2026-08-28 - Reject weak local lyric matches
+
+Decision:
+Local lyric and catalog fills require a tight title, a known artist or a close duration, and reject duration gaps over 15s. Do not bind lyrics to a stored NetEase id or first search hit. Treat platform “instrumental / 纯音乐” notices as no lyrics.
+
+Reason:
+AI BGM and podcast files were matching unrelated songs via substring titles, unknown-artist passes, and play-time first-hit `wySongId`.
+
+## 2026-08-27 - Fill local cover on play (superseded)
+
+Superseded by 2026-08-29 local play does not search unless matched. Do not fill cover or catalog on play.
+
+## 2026-08-27 - Native karaoke only; prefer word-by-word sources
+
+Decision:
+Karaoke fill uses platform-native word timestamps only. Plain LRC keeps the default whole-line treatment. On play, local sidecar or embedded lyrics win; otherwise search wy/kw/kg/tx/mg and stop at the first word-by-word hit. Online songs try their own platform first, then the others for word-by-word, else keep that platform’s plain lyric.
+
+Reason:
+Estimated karaoke looked like word-by-word but was not. Users want real YRC/QRC/KRC or a normal line lyric, and a word-timed source when playing.
+
+## 2026-08-26 - Local import pipeline
+
+Superseded in part 2026-08-27: play may fill missing cover, NetEase id, and catalog title. Import still has no network; the filename checkbox is title lock only.
+
+Decision:
+Import enqueues by path with `nameMode: filename`. Background `readLocalTags` fills cover, duration, lyrics, artist, and album with no network. The filename checkbox only changes the displayed title. Match online / Match on import store the catalog title (`catalogName`) and fill gaps; unchecking shows ID3 or that catalog title.
+
+Reason:
+Mixing tags and NetEase in one refresh made a checkbox or play look like matching, and locking the title used to discard the catalog name.
+
+## 2026-08-24 - Windows window show on the UI thread
+
+Decision:
+Never call main-window show/hide/focus from a background thread on Windows. Marshal through `run_on_main_thread`, and restore the window on taskbar focus if it is hidden or minimized.
+
+Reason:
+Tao window APIs are event-loop-bound. A delayed worker-thread `show()` can hitch dragging and crash a few seconds after launch while the process and taskbar toolbar stay alive.
+
+## 2026-08-23 - Dual in-app and global shortcuts
+
+Decision:
+Each playback action has two optional bindings that both fire: a simple in-app key (main window) and an OS-global hotkey (Ctrl/⌘, Alt, or F1–F12). In-app defaults are single keys (Space, arrows, P/N, M, L, D, K, U) that do not collide with each other or with global combos. Empty unsets a slot. Do not register in-app keys with the OS.
+
+Reason:
+Users want a short key in the player and a separate system hotkey when minimized, without toggling a single binding’s scope.
+
+## 2026-08-22 - Source import is file-only
+
+Decision:
+Source management imports lx-music-compatible scripts from local `.js` files only (picker and drag-drop). URL import UI and `importScriptFromUrl` are removed. Origin badges still show historical link imports.
+
+Reason:
+Link import is no longer supported; files are the only inspectable import path.
+
+## 2026-08-21 - Song comments on the lyrics page
+
+Decision:
+Read-only song comments for wy/kw/kg/tx/mg via each platform's public comment API (not source scripts). Toggle from the lyrics-page right toolbar. Lyrics-only and comments are exclusive: solo shows only lyrics; opening comments turns solo off. Cover hides in either mode. Keep the comment dock at 22rem. Local files stay empty; disable the comments button.
+
+Reason:
+Users asked to read comments for the playing song without leaving the lyrics view or covering the spinning cover.
+
+## 2026-08-21 - Desktop lyrics two-line and custom color
+
+Decision:
+Optional two-line desktop lyrics: translation when present, otherwise the next sung line, smaller than the current line. Optional `#rrggbb` color in synced settings; null follows `--primary`. Use the OS color picker, not a bundled color-picker kit.
+
+Reason:
+Users want upcoming/translated context on the overlay, and a color that stays readable on their wallpaper independent of the app theme.
 
 ## macOS Dock tile playback progress
 
@@ -34,6 +198,8 @@ GSMTC consumers need EndTime and Position; a metadata-only card cannot sync lyri
 
 ## 2026-08-17 - Per-song lyric timeline offset in local cache
 
+Superseded 2026-08-27: delay/advance controls are gone. The lyrics page lists each platform’s lyrics (word-by-word badge vs plain) so the user can switch instead of nudging time.
+
 Decision:
 Store lyric delay/advance as a per-song cache file (0.5s steps, ±10s). Apply it on the lyric clock only. Do not sync it; clearing the media cache drops it.
 
@@ -59,7 +225,7 @@ After sleep AppKit can reset only some buttons; Tao/Wry then re-inset from an in
 ## 2026-08-16 - Register every playback shortcut as a global hotkey
 
 Decision:
-Store shortcuts in synced settings as `CommandOrControl` (Win Ctrl ↔ Mac ⌘). Allow only Ctrl/⌘, Alt/⌥, and Shift, plus F1–F12; reject Win/Super. Defaults use Ctrl/⌘+Shift only (no Ctrl+Alt letters, no bare Ctrl+arrows). Register via the Tauri plugin after hydrate. Wheel font-size stays window-local.
+Superseded 2026-08-23: each action has a separate in-app key and an OS-global hotkey. Store accelerators as `CommandOrControl` (Win Ctrl ↔ Mac ⌘). Global still allows only Ctrl/⌘, Alt/⌥, Shift, plus F1–F12; reject Win/Super. Defaults stay Ctrl/⌘+Shift globally, plus simple single-key in-app bindings. Wheel font-size stays window-local.
 
 Reason:
 Minimized Museek cannot see WebView keydown; global registration keeps transport available, and a platform-neutral accelerator avoids per-OS copies in sync.
@@ -183,7 +349,7 @@ Alignment is a presentation preference owned by the render-only lyrics window. K
 ## 2026-08-09 - Keep global shortcuts aligned with disabled controls
 
 Decision:
-Global playback shortcuts must use the same availability conditions as their UI controls: transport actions respect idle/loading state, seeking respects idle/loading/error and current-song state, desktop lyrics respects current-song or visible-window state, and mini-player respects a non-empty queue. The lock recovery shortcut remains available while the desktop lyrics window is visible, including locked mode.
+Global playback shortcuts must use the same availability conditions as their UI controls: transport actions respect idle/loading state, seeking respects idle/loading/error and current-song state, desktop lyrics respect a current song with lyrics (or an already-visible window so it can close), and mini-player respects a non-empty queue. The lock recovery shortcut remains available while the desktop lyrics window is visible, including locked mode.
 Reason:
 A disabled control establishes that the corresponding action is unavailable, so a global key path should not bypass that contract. The lock shortcut is intentionally different because locked mode hides the toolbar and needs a keyboard recovery path.
 
@@ -482,6 +648,8 @@ Pointer-up can race the last cursor sample and otherwise save a position outside
 
 ## 2026-08-09 - Preserve available word-timed lyric data
 
+Superseded 2026-08-27: no estimated fill from line LRC; plain lyrics use the default whole-line treatment.
+
 Decision:
 Parse inline word timings from LRC, KuWo, KRC, MRC, and external `lxlyric` data into optional `LyricLine.words`; use per-word theme-color fill when present and line-level interpolation otherwise.
 
@@ -489,6 +657,8 @@ Reason:
 Line-only LRC cannot provide perfect karaoke timing, while discarding available word timings made supported sources visibly lag the vocal timing.
 
 ## 2026-08-09 - Prefer validated native karaoke timing
+
+Superseded 2026-08-27: do not estimate word timings from line-timed lyrics.
 
 Decision:
 Use validated platform-native word timing first: NetEase YRC, QQ QRC, KuWo lyricx, KuGou KRC, Migu MRC, and inline `lxlyric` data. Estimate word timing only for line-timed lyrics when the next-line or song-duration interval is defensible; otherwise render stable themed text with karaoke disabled.
@@ -531,21 +701,18 @@ Window-scoped keys stopped working once Museek was minimized.
 ## 2026-08-10 - Make local naming a per-track override
 
 Decision:
-Use smart recognition for new local imports by default, and store an optional `filename` naming override on each `LocalTrack`. Expose the override as a checkbox in that track's local-library options menu; clearing it restores tag-first smart recognition and online enrichment. Migrate the previous global filename setting to per-track overrides once, preserving legacy filenames.
+Superseded 2026-08-26: the checkbox is a title lock only (no network). Keep the per-track filename checkbox; the previous global filename setting still migrates once.
 
 Reason:
-Most local songs benefit from automatic tag and online recognition, while fragments, covers, remixes, and other special files may have names that should remain untouched. A per-track override keeps the common path automatic without forcing a library-wide choice.
-
-Reason:
-The locked lyrics window ignores pointer and keyboard input by design, so an in-window shortcut cannot unlock it. A native global registration remains available while the lyrics window is click-through or the main window is unfocused, while limiting global scope avoids surprising conflicts for ordinary playback commands.
+Fragments and remixes still need a way to keep the original filename after catalog matching.
 
 ## 2026-08-09 - Make local song naming explicit and reversible
 
 Decision:
-Default local imports to preserve the file basename as the song title and expose a Local settings choice between filename-preserving and smart recognition modes. Filename mode still reads embedded local tags but skips online enrichment; smart mode keeps the existing tag-first and NetEase fallback behavior. Changing modes refreshes existing tracks, and the selected mode is persisted with regular settings.
+Superseded 2026-08-26: do not restore a global filename/smart setting. New imports lock the title to the basename; online fill is Match online or Match on import only.
 
 Reason:
-Local fragments, covers, remixes, and other non-mainstream versions often use intentionally meaningful names that online matching can erase. A conservative default protects that intent while keeping automatic recognition available for users who prefer it.
+A global mode fought the per-track lock and mixed tag reads with NetEase.
 
 ## 2026-08-10 - Deepen runtime boundaries without changing UX
 

@@ -178,13 +178,85 @@ export function parseAbsoluteWordTimedLyric(raw: string): LyricInfo {
   };
 }
 
-/** Extract the timed portion of a NetEase YRC JSON response. */
+interface YrcJsonWord {
+  tx?: string;
+  tr?: number[];
+}
+
+interface YrcJsonLine {
+  t?: number;
+  c?: YrcJsonWord[];
+}
+
+/** Newer NetEase YRC lines: `{"t":ms,"c":[{"tx":"字","tr":[offset,duration]}]}`. */
+function parseYrcJsonLine(
+  line: string,
+): { time: number; text: string; inline: string } | null {
+  if (!line.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(line) as YrcJsonLine;
+    const time = parsed.t;
+    if (typeof time !== "number" || !Number.isFinite(time) || !Array.isArray(parsed.c)) {
+      return null;
+    }
+
+    let text = "";
+    let inline = "";
+    let timed = false;
+    for (const word of parsed.c) {
+      const tx = word.tx ?? "";
+      if (!tx) continue;
+      text += tx;
+      if (Array.isArray(word.tr) && word.tr.length >= 2) {
+        timed = true;
+        inline += `<${Math.max(0, word.tr[0])},${Math.max(1, word.tr[1])}>${tx}`;
+      } else {
+        inline += tx;
+      }
+    }
+
+    const plain = text.trim();
+    if (!plain || !timed) return null;
+    return { time, text: plain, inline };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * NetEase YRC: classic `[startMs,dur](absMs,dur,0)字` lines, and JSON lines
+ * with per-word `tr` timings. Credit-only JSON (no `tr`) is skipped.
+ */
 export function parseYrc(yrc: string): LyricInfo {
-  const timedLines = yrc
-    .split(/\r?\n/)
-    .filter((line) => /^\s*\[\d+,\d+\]/.test(line))
-    .join("\n");
-  return parseAbsoluteWordTimedLyric(timedLines);
+  const lyricLines: string[] = [];
+  const timedLines: string[] = [];
+
+  for (const rawLine of yrc.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const json = parseYrcJsonLine(line);
+    if (json) {
+      const tag = formatLrcTimestamp(json.time);
+      lyricLines.push(`${tag}${json.text}`);
+      timedLines.push(`${tag}${json.inline}`);
+      continue;
+    }
+
+    const match = /^\[(\d+),\d+\](.*)$/.exec(line);
+    if (!match) continue;
+    const lineTime = Number(match[1]);
+    const parsed = parseAbsoluteWordTimedBody(match[2], lineTime);
+    if (!parsed) continue;
+    const tag = formatLrcTimestamp(lineTime);
+    lyricLines.push(`${tag}${parsed.text}`);
+    timedLines.push(`${tag}${parsed.inline}`);
+  }
+
+  return {
+    lyric: lyricLines.join("\n"),
+    lxlyric: timedLines.join("\n"),
+  };
 }
 
 export function parseLrc(

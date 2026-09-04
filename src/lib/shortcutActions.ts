@@ -2,6 +2,7 @@ import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { getPlaybackTime } from "@/lib/playback/clock";
 import { toggleMiniPlayer } from "@/lib/miniPlayer";
+import { canToggleDesktopLyrics } from "@/lib/desktopLyrics";
 import type { ShortcutAction } from "@/lib/shortcutKeys";
 
 const SEEK_STEP = 5;
@@ -73,10 +74,19 @@ export function runShortcutAction(action: ShortcutAction): boolean {
       return true;
     case "lyrics":
       if (!p.currentSong) return false;
+      if (!p.showLyrics && p.lyricLines.length === 0) return false;
       p.setShowLyrics(!p.showLyrics);
       return true;
     case "desktopLyrics":
-      if (!p.currentSong && !desktopLyricsVisible) return false;
+      if (
+        !canToggleDesktopLyrics({
+          hasSong: Boolean(p.currentSong),
+          hasLyrics: p.lyricLines.length > 0,
+          visible: desktopLyricsVisible,
+        })
+      ) {
+        return false;
+      }
       void import("@/lib/desktopLyrics").then((m) =>
         m.toggleDesktopLyricsVisibility(),
       );

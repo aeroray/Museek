@@ -1,6 +1,6 @@
 export type OnlineSource = "kw" | "kg" | "tx" | "wy" | "mg";
 export type Source = OnlineSource | "local";
-export type Quality = "128k" | "320k" | "flac" | "flac24bit";
+export type Quality = "128k" | "192k" | "256k" | "320k" | "flac" | "flac24bit";
 export type LocalNameMode = "filename" | "smart";
 
 export interface MusicQuality {
@@ -26,6 +26,14 @@ export interface MusicInfoMeta {
   localCoverRel?: string;
   /** Timed LRC text extracted from tags at import (local only). */
   embeddedLyric?: string;
+  /** NetEase id from Match online — used to fetch lyrics/cover without a second guess. */
+  wySongId?: string;
+  /** Catalog title from Match online. Shown when filename lock is off and there is no ID3 title. */
+  catalogName?: string;
+  /** Artist from the matched NetEase hit — lyric search, not the filename lock. */
+  catalogSinger?: string;
+  /** Duration from the matched NetEase hit — lyric scoring, not the file clock. */
+  catalogInterval?: string;
 }
 
 export interface MusicInfo {
@@ -45,8 +53,14 @@ export interface LocalTrack {
   addedAt: number;
   /** One category at most; null / omitted = uncategorized. */
   categoryId?: string | null;
-  /** Per-track naming override; omitted means smart recognition. */
+  /** Title lock: `filename` keeps the basename. New imports set this. Omitted = legacy smart. */
   nameMode?: LocalNameMode;
+  /** Whether local file tags (cover, duration, lyrics) have been read. Omitted = already read (legacy). */
+  hydrated?: boolean;
+  /** True when ID3/Vorbis title exists. Omitted on legacy rows. */
+  hasTitleTag?: boolean;
+  /** True when ID3/Vorbis artist exists. Omitted on legacy rows. */
+  hasArtistTag?: boolean;
   /** File missing/moved/unreadable — set after a failed play attempt. */
   unavailable?: boolean;
   song: MusicInfo;
@@ -80,7 +94,7 @@ export interface LyricWord {
   text: string;
 }
 
-export type LyricKaraokeMode = "native" | "estimated" | "none";
+export type LyricKaraokeMode = "native" | "none";
 
 export interface LyricLine {
   time: number;

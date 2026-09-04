@@ -5,6 +5,7 @@ import {
   eventMatchesShortcut,
   formatShortcut,
   isShortcutCaptureLocked,
+  isValidGlobalShortcut,
   type ShortcutMap,
 } from "@/lib/shortcutKeys";
 import { runShortcutAction } from "@/lib/shortcutActions";
@@ -17,7 +18,91 @@ const isTauri =
 
 let registerGeneration = 0;
 
-async function syncGlobalShortcuts(map: ShortcutMap): Promise<void> {
+export function describeShortcutError(err: unknown): string {
+  if (typeof err === "string" && err.trim()) return err.trim();
+  if (err instanceof Error && err.message.trim()) return err.message.trim();
+  if (err && typeof err === "object") {
+    const record = err as Record<string, unknown>;
+    for (const key of ["message", "error", "reason"]) {
+      const value = record[key];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    try {
+      const json = JSON.stringify(err);
+      if (json && json !== "{}") return json;
+    } catch {
+      /* ignore */
+    }
+  }
+  return String(err);
+}
+
+function isHotkeyTakenError(reason: string): boolean {
+  const lower = reason.toLowerCase();
+  return (
+    lower.includes("already registered") ||
+    lower.includes("already taken") ||
+    lower.includes("hotkey already") ||
+    lower.includes("error_hotkey_already_registered") ||
+    /\b1409\b/.test(reason)
+  );
+}
+
+export function formatShortcutOsFailure(combo: string, reason: string): string {
+  if (isHotkeyTakenError(reason)) {
+    return t("shortcuts.osBusy", { combo });
+  }
+  return t("shortcuts.osFailed", { combo });
+}
+
+export async function suspendGlobalShortcuts(): Promise<void> {
+  registerGeneration += 1;
+  if (!isTauri) return;
+  try {
+    const { unregisterAll } = await import(
+      "@tauri-apps/plugin-global-shortcut"
+    );
+    await unregisterAll();
+  } catch {
+    /* nothing registered yet */
+  }
+}
+
+export async function resumeGlobalShortcuts(): Promise<void> {
+  if (!isTauri) return;
+  const { hydrated, shortcuts } = useSettingsStore.getState();
+  if (!hydrated) return;
+  await syncGlobalShortcuts(shortcuts, { silent: true });
+}
+
+/** Try the OS hotkey table without keeping the binding. */
+export async function probeGlobalShortcut(
+  accel: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!isTauri) return { ok: true };
+  try {
+    const { register, unregister, isRegistered } = await import(
+      "@tauri-apps/plugin-global-shortcut"
+    );
+    if (await isRegistered(accel)) return { ok: true };
+    await register(accel, () => {});
+    try {
+      await unregister(accel);
+    } catch (err) {
+      console.warn(`[museek] probe unregister failed: ${accel}`, err);
+    }
+    return { ok: true };
+  } catch (err) {
+    const reason = describeShortcutError(err);
+    console.error(`[museek] global shortcut probe failed: ${accel}`, reason, err);
+    return { ok: false, reason };
+  }
+}
+
+async function syncGlobalShortcuts(
+  map: ShortcutMap,
+  options: { silent?: boolean } = {},
+): Promise<void> {
   const gen = ++registerGeneration;
   const { unregisterAll, register } = await import(
     "@tauri-apps/plugin-global-shortcut"
@@ -31,9 +116,10 @@ async function syncGlobalShortcuts(map: ShortcutMap): Promise<void> {
   if (gen !== registerGeneration) return;
   const reverse = new Map<string, (typeof SHORTCUT_ACTIONS)[number]>();
   for (const action of SHORTCUT_ACTIONS) {
+    if (!map[action] || !isValidGlobalShortcut(map[action])) continue;
     if (!reverse.has(map[action])) reverse.set(map[action], action);
   }
-  const failed: string[] = [];
+  const failed: { combo: string; reason: string }[] = [];
   for (const [accel, action] of reverse) {
     try {
       await register(accel, (event) => {
@@ -42,14 +128,17 @@ async function syncGlobalShortcuts(map: ShortcutMap): Promise<void> {
         runShortcutAction(action);
       });
     } catch (err) {
-      console.warn(`[museek] global shortcut failed: ${accel}`, err);
-      failed.push(formatShortcut(accel, isMacOs()));
+      const reason = describeShortcutError(err);
+      const combo = formatShortcut(accel, isMacOs());
+      console.error(`[museek] global shortcut failed: ${accel}`, reason, err);
+      failed.push({ combo, reason });
     }
     if (gen !== registerGeneration) return;
   }
+  if (options.silent) return;
   if (failed.length === 1) {
     notify({
-      message: t("shortcuts.registerFailed", { combo: failed[0] }),
+      message: formatShortcutOsFailure(failed[0].combo, failed[0].reason),
       variant: "error",
     });
   } else if (failed.length > 1) {
@@ -60,50 +149,67 @@ async function syncGlobalShortcuts(map: ShortcutMap): Promise<void> {
   }
 }
 
-function isTypingTarget(el: EventTarget | null): boolean {
+function isShortcutBlockedTarget(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
-  return (
-    el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable
+  if (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.tagName === "SELECT" ||
+    el.isContentEditable
+  ) {
+    return true;
+  }
+  return Boolean(
+    el.closest(
+      '[role="slider"], [role="combobox"], [role="listbox"], [role="menu"], [role="menuitem"], [role="dialog"], [role="tablist"]',
+    ),
   );
 }
 
 /**
- * Registers every playback shortcut as an OS global hotkey (minimized / background).
- * The same map also runs on window keydown while focused (deduped with the OS hook).
+ * Window-local keydown for in-app bindings (and global ones while focused),
+ * plus OS hotkeys for the global map.
  */
 export function useGlobalShortcuts(): void {
   const hydrated = useSettingsStore((s) => s.hydrated);
   const shortcuts = useSettingsStore((s) => s.shortcuts);
+  const localShortcuts = useSettingsStore((s) => s.localShortcuts);
 
   useEffect(() => {
     if (!hydrated) return;
 
     const onKey = (e: KeyboardEvent) => {
-      if (isShortcutCaptureLocked() || isTypingTarget(e.target)) return;
-      for (const action of SHORTCUT_ACTIONS) {
-        if (!eventMatchesShortcut(e, shortcuts[action])) continue;
-        if (!runShortcutAction(action)) return;
-        e.preventDefault();
-        const active = document.activeElement;
-        if (active instanceof HTMLElement && active !== document.body) {
-          active.blur();
-        }
+      if (e.repeat) return;
+      if (isShortcutCaptureLocked() || isShortcutBlockedTarget(e.target))
         return;
+      const maps = [localShortcuts, shortcuts];
+      for (const map of maps) {
+        for (const action of SHORTCUT_ACTIONS) {
+          if (!map[action] || !eventMatchesShortcut(e, map[action])) continue;
+          if (!runShortcutAction(action)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const active = document.activeElement;
+          if (active instanceof HTMLElement && active !== document.body) {
+            active.blur();
+          }
+          return;
+        }
       }
     };
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
 
     if (!isTauri) {
-      return () => window.removeEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey, true);
     }
 
     void syncGlobalShortcuts(shortcuts);
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
       registerGeneration += 1;
       void import("@tauri-apps/plugin-global-shortcut")
         .then((m) => m.unregisterAll())
         .catch(() => {});
     };
-  }, [hydrated, shortcuts]);
+  }, [hydrated, localShortcuts, shortcuts]);
 }

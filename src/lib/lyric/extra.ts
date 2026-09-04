@@ -289,6 +289,8 @@ async function getWyNativeLyric(songId: string): Promise<LyricInfo | null> {
         "User-Agent":
           "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36",
         Origin: "https://music.163.com",
+        Referer: "https://music.163.com/",
+        Cookie: "os=pc",
       },
       body: new URLSearchParams(eapi(apiPath, payload)).toString(),
     },
@@ -297,7 +299,13 @@ async function getWyNativeLyric(songId: string): Promise<LyricInfo | null> {
   const data = (await res.json()) as WyNativeLyricResponse;
   if (data.code !== 200 || !data.lrc?.lyric?.trim()) return null;
 
-  const native = data.yrc?.lyric ? parseYrc(data.yrc.lyric) : null;
+  const fromYrc = data.yrc?.lyric ? parseYrc(data.yrc.lyric) : null;
+  const fromLrcJson = data.lrc.lyric ? parseYrc(data.lrc.lyric) : null;
+  const native = fromYrc?.lxlyric?.trim()
+    ? fromYrc
+    : fromLrcJson?.lxlyric?.trim()
+      ? fromLrcJson
+      : null;
   const translation = data.ytlrc?.lyric
     ? parseYrc(data.ytlrc.lyric).lyric
     : data.tlyric?.lyric;

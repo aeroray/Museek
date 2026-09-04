@@ -136,5 +136,13 @@ export async function getKgBoardSongs(boardId: string, page = 1): Promise<MusicI
   const data = (await res.json()) as KgBangResponse
   if (!data || data.errcode !== 0) throw new Error("KuGou board failed: bad response")
 
-  return (data.data?.info ?? []).map(normalizeKgBangSong)
+  const seen = new Set<string>()
+  const list: MusicInfo[] = []
+  for (const raw of data.data?.info ?? []) {
+    const song = normalizeKgBangSong(raw)
+    if (!song.meta.songId || seen.has(song.id)) continue
+    seen.add(song.id)
+    list.push(song)
+  }
+  return list
 }

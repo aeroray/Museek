@@ -79,10 +79,14 @@ function TopBarLyrics() {
         type="button"
         className={cn(
           "inline-flex max-w-full min-w-0 items-center rounded-md px-2 py-0.5",
-          "cursor-pointer text-center",
-          "transition-[background-color,color] duration-200 ease-out hover:bg-accent/60",
+          "text-center",
+          lyricLines.length > 0
+            ? "cursor-pointer transition-[background-color,color] duration-200 ease-out hover:bg-accent/60"
+            : "cursor-default",
         )}
-        onClick={() => setShowLyrics(true)}
+        onClick={() => {
+          if (lyricLines.length > 0) setShowLyrics(true);
+        }}
         title={shortcutTitle(t("player.lyrics"), lyricsCombo)}
       >
         <LyricTransition

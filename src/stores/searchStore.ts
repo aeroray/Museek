@@ -34,6 +34,17 @@ const searchFns: Record<OnlineSource, SearchFn> = {
 // result instead of re-hitting the API (and de-dupes rapid identical calls).
 const searchCache = createAsyncCache<SearchResult>(3 * 60_000);
 
+function mergeSongsById(prev: MusicInfo[], next: MusicInfo[]): MusicInfo[] {
+  const seen = new Set(prev.map((s) => s.id));
+  const out = [...prev];
+  for (const song of next) {
+    if (seen.has(song.id)) continue;
+    seen.add(song.id);
+    out.push(song);
+  }
+  return out;
+}
+
 interface SearchState {
   searchGeneration: number;
   query: string;
@@ -140,7 +151,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       )
         return;
       set((s) => ({
-        results: page === 1 ? result.list : [...s.results, ...result.list],
+        results:
+          page === 1 ? result.list : mergeSongsById(s.results, result.list),
         total: result.total,
         page: result.page,
         allPage: result.allPage,

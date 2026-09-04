@@ -11,10 +11,19 @@
 // Failures are NOT cached: a rejected promise is evicted so a manual retry (or
 // the next visit) re-fetches. A simple LRU bound keeps memory in check.
 
-export function createAsyncCache<T>(ttlMs: number, max = 60) {
+export type AsyncCache<T> = {
+  (key: string, fn: () => Promise<T>): Promise<T>
+  prime(key: string, value: T): void
+}
+
+export function createAsyncCache<T>(
+  ttlMs: number,
+  max = 60,
+  keep?: (value: T) => boolean,
+): AsyncCache<T> {
   const map = new Map<string, { promise: Promise<T>; expires: number }>()
 
-  return function cached(key: string, fn: () => Promise<T>): Promise<T> {
+  const cached = ((key: string, fn: () => Promise<T>): Promise<T> => {
     const hit = map.get(key)
     if (hit && Date.now() < hit.expires) {
       // Refresh recency (Map keeps insertion order → re-insert = most recent).
@@ -23,11 +32,18 @@ export function createAsyncCache<T>(ttlMs: number, max = 60) {
       return hit.promise
     }
 
-    const promise = fn().catch((err) => {
-      // Don't keep a failed request cached — allow retry to re-fetch.
-      if (map.get(key)?.promise === promise) map.delete(key)
-      throw err
-    })
+    const promise = fn()
+      .then((value) => {
+        if (keep && !keep(value) && map.get(key)?.promise === promise) {
+          map.delete(key)
+        }
+        return value
+      })
+      .catch((err) => {
+        // Don't keep a failed request cached — allow retry to re-fetch.
+        if (map.get(key)?.promise === promise) map.delete(key)
+        throw err
+      })
 
     map.set(key, { promise, expires: Date.now() + ttlMs })
 
@@ -38,5 +54,11 @@ export function createAsyncCache<T>(ttlMs: number, max = 60) {
     }
 
     return promise
+  }) as AsyncCache<T>
+
+  cached.prime = (key, value) => {
+    map.set(key, { promise: Promise.resolve(value), expires: Date.now() + ttlMs })
   }
+
+  return cached
 }

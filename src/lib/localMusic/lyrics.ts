@@ -125,10 +125,5 @@ export async function fetchLocalFileLyric(opts: {
   const fromMeta = embeddedLyric?.trim()
   if (fromMeta && LRC_TIME_RX.test(fromMeta)) return { lyric: fromMeta }
 
-  if (filePath && !fromMeta) {
-    const embedded = await readEmbeddedLyric(filePath)
-    if (embedded) return { lyric: embedded }
-  }
-
   return null
 }
