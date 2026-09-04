@@ -950,3 +950,17 @@ The landing page should communicate Museek as a desktop music product before
 it communicates its visual style. Full-window captures make the actual app
 inspectable, while the SaaS structure keeps the page easy to scan and makes
 the source-script and no-content-distribution boundaries explicit.
+
+## 2026-08-21 - Separate app theme from macOS menu-bar wallpaper appearance
+
+Decision:
+Keep the app's light/dark theme controlled by the existing theme settings, but
+choose the macOS menu-bar tray logo from the status bar button's effective
+appearance. Reuse the existing black-background/white-glyph and
+white-background/black-glyph assets; do not use the main window theme for this
+choice.
+
+Reason:
+macOS can render the menu bar according to the desktop wallpaper independently
+of the app window. The tray icon must follow that status-bar surface while the
+app UI continues to follow its own theme mode.

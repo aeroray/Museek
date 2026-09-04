@@ -19,6 +19,8 @@ use tauri_plugin_fs::FsExt;
 
 #[cfg(target_os = "macos")]
 mod macos_traffic_lights;
+#[cfg(target_os = "macos")]
+mod macos_tray;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod system_fonts;
 
@@ -898,29 +900,30 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
             }
         });
 
-    // Prefer the theme-colored mark from the frontend (matches BrandMark /
-    // --primary). Fall back to graphite light/dark or the window icon.
-    if let Some(icon) = tray_mark_from_cache(app) {
-        builder = builder.icon(icon);
-    } else {
-        #[cfg(target_os = "macos")]
-        {
-            builder = builder.icon(macos_graphite_tray_icon(current_system_theme(app))?);
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            if let Some(icon) = app.default_window_icon() {
-                builder = builder.icon(icon.clone());
-            }
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.icon(macos_fallback_tray_icon()?);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(icon) = tray_mark_from_cache(app) {
+            builder = builder.icon(icon);
+        } else if let Some(icon) = app.default_window_icon() {
+            builder = builder.icon(icon.clone());
         }
     }
 
-    builder.build(app)
+    let tray = builder.build(app)?;
+    #[cfg(target_os = "macos")]
+    macos_tray::sync_after_build(app);
+    Ok(tray)
 }
 
 /// Last tray PNG painted by the frontend from the active theme palette.
+#[cfg(not(target_os = "macos"))]
 struct TrayMarkCache(Mutex<Option<Vec<u8>>>);
 
+#[cfg(not(target_os = "macos"))]
 fn tray_mark_from_cache(app: &tauri::AppHandle) -> Option<tauri::image::Image<'static>> {
     let state = app.try_state::<TrayMarkCache>()?;
     let guard = state.0.lock().ok()?;
@@ -930,33 +933,33 @@ fn tray_mark_from_cache(app: &tauri::AppHandle) -> Option<tauri::image::Image<'s
 
 #[tauri::command]
 fn set_tray_mark_icon(app: tauri::AppHandle, png: Vec<u8>) -> Result<(), String> {
-    if png.is_empty() {
-        return Err("empty tray mark".into());
+    // macOS uses the bundled light/dark logo selected from the native system
+    // appearance. Do not replace it with the frontend's accent-colored mark.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (app, png);
+        return Ok(());
     }
-    let icon = tauri::image::Image::from_bytes(&png).map_err(|e| e.to_string())?;
-    if let Ok(mut guard) = app.state::<TrayMarkCache>().0.lock() {
-        *guard = Some(png);
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        if png.is_empty() {
+            return Err("empty tray mark".into());
+        }
+        let icon = tauri::image::Image::from_bytes(&png).map_err(|e| e.to_string())?;
+        if let Ok(mut guard) = app.state::<TrayMarkCache>().0.lock() {
+            *guard = Some(png);
+        }
+        if let Some(tray) = app.tray_by_id("main-tray") {
+            tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
+        }
+        Ok(())
     }
-    if let Some(tray) = app.tray_by_id("main-tray") {
-        tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
-    }
-    Ok(())
 }
 
 #[cfg(target_os = "macos")]
-fn current_system_theme(app: &tauri::AppHandle) -> tauri::Theme {
-    app.get_webview_window("main")
-        .and_then(|w| w.theme().ok())
-        .unwrap_or(tauri::Theme::Light)
-}
-
-#[cfg(target_os = "macos")]
-fn macos_graphite_tray_icon(theme: tauri::Theme) -> tauri::Result<tauri::image::Image<'static>> {
-    // Fallback before the frontend has synced palette colors.
-    let bytes: &[u8] = match theme {
-        tauri::Theme::Dark => include_bytes!("../icons/tray-dark@2x.png"),
-        _ => include_bytes!("../icons/tray-light@2x.png"),
-    };
+fn macos_fallback_tray_icon() -> tauri::Result<tauri::image::Image<'static>> {
+    let bytes = include_bytes!("../icons/tray-light@2x.png");
     tauri::image::Image::from_bytes(bytes)
 }
 
@@ -1368,7 +1371,7 @@ pub fn run() {
         }));
     }
 
-    let app = builder
+    let builder = builder
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
@@ -1384,8 +1387,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(PendingLocalFiles(Mutex::new(Vec::new())))
         .manage(PendingUnsupportedOpens(Mutex::new(Vec::new())))
-        .manage(TrayMarkCache(Mutex::new(None)))
-        .manage(TrayHideAt(Mutex::new(None)))
+        .manage(TrayHideAt(Mutex::new(None)));
+
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.manage(TrayMarkCache(Mutex::new(None)));
+
+    let app = builder
         .setup(|app| {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
@@ -1535,6 +1542,9 @@ pub fn run() {
                     app.manage(MediaState(Mutex::new(controls)));
                 }
             }
+
+            #[cfg(target_os = "macos")]
+            macos_tray::observe_appearance(app.handle());
 
             if let Some(window) = app.get_webview_window("lyrics") {
                 let _ = window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
