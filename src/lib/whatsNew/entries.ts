@@ -17,6 +17,42 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.7.2": {
+    zh: {
+      sections: [
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "菜单栏托盘图标跟随系统浅色 / 深色，不再用应用内主题色绘制",
+          ],
+        },
+        {
+          title: "▶️ 播放队列",
+          bullets: [
+            "「播放全部」改为用当前列表重新开始队列，不再追加到旧队列后面",
+            "从队列里删掉一首时，正在播放的那首会保持正确",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🍎 macOS",
+          bullets: [
+            "The menu-bar tray icon follows system light / dark instead of the in-app accent mark",
+          ],
+        },
+        {
+          title: "▶️ Play queue",
+          bullets: [
+            "Play all starts a new queue from the list you picked, instead of appending to the old one",
+            "Removing a song from the queue keeps the now-playing track in place",
+          ],
+        },
+      ],
+    },
+  },
   "3.7.1": {
     zh: {
       sections: [
