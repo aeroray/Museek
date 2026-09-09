@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/shortcut-tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Controls } from "@/components/player/Controls";
-import { ProgressSlider } from "@/components/player/ProgressSlider";
 import { CoverImage } from "@/components/common/CoverImage";
+import { ProgressSlider } from "@/components/player/ProgressSlider";
 import { SpecularFrame } from "@/components/common/SpecularFrame";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
@@ -55,6 +55,8 @@ const FONT_MAX = 2.5;
 const FONT_STEP = 0.15;
 const SLIDE_MS = 320;
 const COVER_MS = 300;
+/** After the user scrolls lyrics, wait this long before snapping back to the sung line. */
+const FOLLOW_RESUME_MS = 2000;
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const FADE =
@@ -95,6 +97,10 @@ export function LyricsPanel() {
   const hideCover = lyricsOnly || commentsOpen;
   const pinningLayoutRef = useRef(false);
   const skipLayoutPinRef = useRef(true);
+  const browsingUntilRef = useRef(0);
+  const programmaticScrollRef = useRef(false);
+  const followResumeTimerRef = useRef<number>(0);
+  const progScrollTimerRef = useRef<number>(0);
   const [loadedHeroSrc, setLoadedHeroSrc] = useState<string | null>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -161,14 +167,59 @@ export function LyricsPanel() {
     const vp = viewport.getBoundingClientRect();
     const lr = line.getBoundingClientRect();
     const delta = lr.top + lr.height / 2 - (vp.top + vp.height / 2);
+    programmaticScrollRef.current = true;
     viewport.scrollTo({ top: viewport.scrollTop + delta, behavior });
+    window.clearTimeout(progScrollTimerRef.current);
+    progScrollTimerRef.current = window.setTimeout(
+      () => {
+        programmaticScrollRef.current = false;
+      },
+      behavior === "smooth" ? 480 : 40,
+    );
   }, []);
 
   useEffect(() => {
     if (currentLyricIndex >= 0 && entered) {
+      if (performance.now() < browsingUntilRef.current) return;
       centerActiveLine(pinningLayoutRef.current ? "auto" : "smooth");
     }
   }, [currentLyricIndex, centerActiveLine, entered]);
+
+  useEffect(() => {
+    if (!entered || lyricLines.length === 0) return;
+    const root = scrollRef.current;
+    const viewport = root?.querySelector<HTMLElement>(
+      "[data-radix-scroll-area-viewport]",
+    );
+    if (!viewport) return;
+
+    const linger = () => {
+      browsingUntilRef.current = performance.now() + FOLLOW_RESUME_MS;
+      window.clearTimeout(followResumeTimerRef.current);
+      followResumeTimerRef.current = window.setTimeout(() => {
+        browsingUntilRef.current = 0;
+        if (usePlayerStore.getState().showLyrics) centerActiveLine("smooth");
+      }, FOLLOW_RESUME_MS);
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      const zooming = isMacOs() ? event.metaKey : event.ctrlKey;
+      if (zooming) return;
+      linger();
+    };
+    const onScroll = () => {
+      if (programmaticScrollRef.current) return;
+      linger();
+    };
+
+    viewport.addEventListener("wheel", onWheel, { passive: true });
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      viewport.removeEventListener("wheel", onWheel);
+      viewport.removeEventListener("scroll", onScroll);
+      window.clearTimeout(followResumeTimerRef.current);
+    };
+  }, [entered, lyricLines.length, centerActiveLine]);
 
   useEffect(() => {
     if (
@@ -488,29 +539,26 @@ export function LyricsPanel() {
               </p>
             </div>
           )}
-          <div className="flex w-60 shrink-0 flex-col items-stretch gap-4">
-            <div
-              className="lyric-cover-float shrink-0"
-              style={{ animationPlayState: isPlaying ? "running" : "paused" }}
+          <div
+            className="lyric-cover-float w-60 shrink-0"
+            style={{ animationPlayState: isPlaying ? "running" : "paused" }}
+          >
+            <SpecularFrame
+              autoAnimate
+              paused={!isPlaying}
+              followMouse={false}
+              className="h-60 w-60"
+              radius={16}
+              lineColor="#ffffff"
+              baseColor="#9ca3af"
+              intensity={1.85}
+              shineSize={18}
+              shineFade={28}
+              thickness={0.8}
+              speed={-0.5}
             >
-              <SpecularFrame
-                autoAnimate
-                paused={!isPlaying}
-                followMouse={false}
-                className="h-60 w-60"
-                radius={16}
-                lineColor="#ffffff"
-                baseColor="#9ca3af"
-                intensity={1.85}
-                shineSize={18}
-                shineFade={28}
-                thickness={0.8}
-                speed={-0.5}
-              >
-                {coverArt}
-              </SpecularFrame>
-            </div>
-            <ProgressSlider compact />
+              {coverArt}
+            </SpecularFrame>
           </div>
           <Controls />
         </div>
@@ -604,6 +652,7 @@ export function LyricsPanel() {
         </div>
         <CommentsPanel song={currentSong} open={commentsOpen} />
       </div>
+      <ProgressSlider flush />
       <div
         data-tauri-drag-region
         className={cn(

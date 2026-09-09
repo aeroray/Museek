@@ -169,7 +169,7 @@ export function CommentsPanel({
           </div>
         ) : (
           <ScrollArea className="h-full">
-            <div className="flex flex-col gap-4 px-4 pb-8 pr-14">
+            <div className="flex flex-col gap-4 px-4 pb-16 pr-14">
               {comments.map((comment) => (
                 <CommentItem key={comment.id} comment={comment} />
               ))}

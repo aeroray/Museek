@@ -10,15 +10,18 @@ import { formatDuration, cn } from "@/lib/utils";
  * Custom track (not Radix): fill + thumb share the same %, so the range never
  * lags the thumb. Smooth time comes from the playback-clock seam.
  *
- * `compact` is for the lyrics-page cover column: same mechanics, no player-bar
- * padding, width follows the parent (typically the album art).
+ * `compact` is for a tight parent (no player-bar padding).
+ * `flush` pins the track to the window bottom (lyrics overlay).
+ * The thumb matches the track height so it is not clipped.
  */
 export function ProgressSlider({
   className,
   compact = false,
+  flush = false,
 }: {
   className?: string;
   compact?: boolean;
+  flush?: boolean;
 }) {
   const duration = usePlayerStore((s) => s.duration);
   const status = usePlayerStore((s) => s.status);
@@ -33,6 +36,8 @@ export function ProgressSlider({
   const scrubTimeRef = useRef<number | null>(null);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
   const [displayTime, setDisplayTime] = useState(playbackTime);
+  const [hover, setHover] = useState(false);
+  const [hoverX, setHoverX] = useState(0);
 
   const disabled =
     !currentSong ||
@@ -53,13 +58,17 @@ export function ProgressSlider({
   const pct =
     duration > 0 ? Math.min(100, Math.max(0, (time / duration) * 100)) : 0;
 
-  const timeFromClientX = (clientX: number) => {
+  const ratioFromClientX = (clientX: number) => {
     const el = trackRef.current;
-    if (!el || duration <= 0) return 0;
+    if (!el) return 0;
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0) return 0;
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    return ratio * duration;
+    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  };
+
+  const timeFromClientX = (clientX: number) => {
+    if (duration <= 0) return 0;
+    return ratioFromClientX(clientX) * duration;
   };
 
   const beginScrub = (clientX: number) => {
@@ -92,14 +101,20 @@ export function ProgressSlider({
     <div
       className={cn(
         "flex w-full items-center",
-        compact ? "gap-2 px-0 py-0" : "gap-3 px-4 pb-1 pt-3",
+        flush
+          ? "absolute inset-x-0 bottom-0 z-30 px-0 py-0"
+          : compact
+            ? "gap-2 px-0 py-0"
+            : "gap-3 px-4 pb-1 pt-3",
         className,
         disabled && "opacity-50",
       )}
     >
-      <span className="w-10 shrink-0 text-right text-[11px] font-medium tabular-nums tracking-wide text-muted-foreground/80">
-        {formatDuration(time)}
-      </span>
+      {!flush && (
+        <span className="w-10 shrink-0 text-right text-[11px] font-medium tabular-nums tracking-wide text-muted-foreground/80">
+          {formatDuration(time)}
+        </span>
+      )}
 
       <div
         ref={trackRef}
@@ -112,17 +127,29 @@ export function ProgressSlider({
         aria-label={t("player.seek")}
         aria-disabled={disabled || undefined}
         className={cn(
-          "group/slider relative flex h-5 w-full flex-1 touch-none select-none items-center",
+          "group/slider relative flex w-full flex-1 touch-none select-none",
+          flush ? "h-10 items-end" : "h-5 items-center",
           disabled
             ? "cursor-not-allowed pointer-events-none"
             : "cursor-pointer",
         )}
+        onPointerEnter={(e) => {
+          setHover(true);
+          setHoverX(ratioFromClientX(e.clientX));
+        }}
+        onPointerLeave={() => {
+          if (!scrubbingRef.current) setHover(false);
+        }}
         onPointerDown={(e) => {
           if (disabled) return;
           e.currentTarget.setPointerCapture(e.pointerId);
+          setHoverX(ratioFromClientX(e.clientX));
           beginScrub(e.clientX);
         }}
-        onPointerMove={(e) => moveScrub(e.clientX)}
+        onPointerMove={(e) => {
+          setHoverX(ratioFromClientX(e.clientX));
+          moveScrub(e.clientX);
+        }}
         onPointerUp={endScrub}
         onPointerCancel={endScrub}
         onKeyDown={(e) => {
@@ -143,31 +170,66 @@ export function ProgressSlider({
           }
         }}
       >
+        {flush && (hover || scrubbing) && !disabled && duration > 0 && (
+          <span
+            className="pointer-events-none absolute bottom-3.5 z-10 -translate-x-1/2 rounded-md bg-background/70 px-1.5 py-0.5 font-sans text-[11px] font-medium tabular-nums tracking-wide text-foreground/85 shadow-sm backdrop-blur-sm"
+            style={{ left: `${hoverX * 100}%` }}
+          >
+            {formatDuration(hoverX * duration)}
+          </span>
+        )}
         <div
           className={cn(
-            "relative w-full grow overflow-visible rounded-full bg-secondary/80 transition-[height] duration-200 group-hover/slider:h-2",
-            compact ? "h-1" : "h-1.5",
+            "relative w-full grow overflow-visible bg-secondary/80 transition-[height] duration-200",
+            flush ? "rounded-none" : "rounded-full",
+            flush
+              ? hover || scrubbing
+                ? "h-2"
+                : "h-1.5"
+              : compact
+                ? "h-1 group-hover/slider:h-2"
+                : "h-1.5 group-hover/slider:h-2",
           )}
         >
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-primary"
+            className={cn(
+              "absolute inset-y-0 left-0 bg-primary",
+              flush ? "rounded-none" : "rounded-full",
+            )}
             style={{ width: `${pct}%` }}
           />
+          <div
+            className={cn(
+              "pointer-events-none absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full",
+              flush
+                ? "h-full aspect-square bg-white"
+                : cn(
+                    "border-2 border-primary bg-background shadow-sm",
+                    "transition-transform duration-200 group-hover/slider:scale-110",
+                    compact ? "h-3 w-3" : "h-3.5 w-3.5",
+                    scrubbing && "scale-110",
+                  ),
+            )}
+            style={{
+              left: `${pct}%`,
+              ...(flush
+                ? {
+                    boxShadow:
+                      hover || scrubbing
+                        ? "0 0 0 1.5px hsl(var(--primary)), 0 0 10px 2px hsl(var(--primary) / 0.55), 0 1px 3px rgb(0 0 0 / 0.35)"
+                        : "0 0 0 1.5px hsl(var(--primary)), 0 0 6px 1px hsl(var(--primary) / 0.4), 0 1px 2px rgb(0 0 0 / 0.28)",
+                  }
+                : null),
+            }}
+          />
         </div>
-        <div
-          className={cn(
-            "pointer-events-none absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background shadow-sm",
-            "transition-transform duration-200 group-hover/slider:scale-110",
-            compact ? "h-3 w-3" : "h-3.5 w-3.5",
-            scrubbing && "scale-110",
-          )}
-          style={{ left: `${pct}%` }}
-        />
       </div>
 
-      <span className="w-10 shrink-0 text-[11px] font-medium tabular-nums tracking-wide text-muted-foreground/80">
-        {formatDuration(duration)}
-      </span>
+      {!flush && (
+        <span className="w-10 shrink-0 text-[11px] font-medium tabular-nums tracking-wide text-muted-foreground/80">
+          {formatDuration(duration)}
+        </span>
+      )}
     </div>
   );
 }

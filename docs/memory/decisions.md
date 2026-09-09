@@ -1,3 +1,19 @@
+## 2026-09-09 - Lyrics scroll linger before follow
+
+Decision:
+User wheel/scroll on the lyrics overlay pauses auto-centering for 2s, reset on each scroll. Programmatic snaps (open, line follow, layout pin) do not start the linger. After idle, follow resumes with a smooth snap.
+
+Reason:
+Immediate snap-back made it impossible to read earlier lines; a short linger keeps follow without fighting the user.
+
+## 2026-09-09 - Lyrics page edge progress
+
+Decision:
+On the lyrics overlay, seek is the same ProgressSlider as the player bar, full-width and flush to the window bottom. The thumb matches the track height, with a thin primary ring and a tight glow. Hover thickens the rail and shows the time under the cursor.
+
+Reason:
+A cover-column slider fought the immersive layout. A larger thumb sat on or clipped through the window edge; matching the track keeps the playhead on the rail.
+
 ## 2026-09-09 - Window the Local Music list
 
 Decision:
