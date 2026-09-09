@@ -1,3 +1,11 @@
+## 2026-09-09 - Window the Local Music list
+
+Decision:
+Local Music uses the same VirtualList as playlist detail. Background tag and quality writes batch into `tracks` about every 100ms instead of replacing the array per file.
+
+Reason:
+Mounting every local row (covers, menus) plus per-file store updates made the page hitch and delayed clicks.
+
 ## 2026-08-30 - Presence scan on Downloads and Local
 
 Decision:

@@ -46,6 +46,8 @@ async function dropRemovedFromPlayback(ids: string[]) {
 /** Parallel file reads for restore/refresh/quality probe. New imports skip this. */
 const IMPORT_CONCURRENCY = 4;
 const PERSIST_DEBOUNCE_MS = 400;
+/** Coalesce per-file tag/quality writes so Local Music isn't redrawn once per track. */
+const HYDRATE_FLUSH_MS = 100;
 /** Bump when local quality detection changes — triggers one-time re-probe on load. */
 const QUALITY_SCHEMA = 3;
 /** Bump when local naming changes from a global setting to per-track overrides. */
@@ -345,14 +347,34 @@ async function mapPool<T>(
 
 export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  let hydrateFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  const pendingHydrates = new Map<string, LocalTrack>();
   const refreshVersions = new Map<string, number>();
   const tagReadTail = new Map<string, Promise<void>>();
   const hydrateInFlight = new Map<string, Promise<MusicInfo | null>>();
+
+  function liveTrack(id: string): LocalTrack | undefined {
+    return pendingHydrates.get(id) ?? get().tracks.find((t) => t.id === id);
+  }
+
+  function commitPendingHydrates() {
+    if (hydrateFlushTimer) {
+      clearTimeout(hydrateFlushTimer);
+      hydrateFlushTimer = null;
+    }
+    if (pendingHydrates.size === 0) return;
+    const updates = new Map(pendingHydrates);
+    pendingHydrates.clear();
+    set((state) => ({
+      tracks: state.tracks.map((t) => updates.get(t.id) ?? t),
+    }));
+  }
 
   function schedulePersist() {
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       persistTimer = null;
+      commitPendingHydrates();
       const { tracks, categories } = get();
       persist(tracks, categories);
     }, PERSIST_DEBOUNCE_MS);
@@ -363,15 +385,23 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       clearTimeout(persistTimer);
       persistTimer = null;
     }
+    commitPendingHydrates();
     const { tracks, categories } = get();
     persist(tracks, categories);
   }
 
   function upsertRestoredTrack(track: LocalTrack) {
-    set((state) => ({
-      tracks: state.tracks.map((t) => (t.id === track.id ? track : t)),
-    }));
-    schedulePersist();
+    pendingHydrates.set(track.id, track);
+    queueHydrateFlush();
+  }
+
+  function queueHydrateFlush() {
+    if (hydrateFlushTimer) return;
+    hydrateFlushTimer = setTimeout(() => {
+      hydrateFlushTimer = null;
+      commitPendingHydrates();
+      schedulePersist();
+    }, HYDRATE_FLUSH_MS);
   }
 
   function beginTrackRefresh(id: string): number {
@@ -386,7 +416,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     nameMode: LocalNameMode,
     version: number,
   ): boolean {
-    const current = get().tracks.find((track) => track.id === id);
+    const current = liveTrack(id);
     return (
       refreshVersions.get(id) === version &&
       current?.filePath === filePath &&
@@ -445,7 +475,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       /* previous reader failed; still try */
     }
     try {
-      const latest = get().tracks.find((item) => item.id === track.id);
+      const latest = liveTrack(track.id);
       if (!latest) {
         return {
           ok: false,
@@ -471,7 +501,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
         if (!canApplyTrackRefresh(track.id, latest.filePath, nameMode, version)) {
           return { ok: false, nameMode, version };
         }
-        const current = get().tracks.find((item) => item.id === track.id);
+        const current = liveTrack(track.id);
         if (!current) return { ok: false, nameMode, version };
         let song = mergeCatalogFill(
           current.song,
@@ -544,12 +574,12 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       for (const id of ids) {
         if (seen.has(id)) continue;
         seen.add(id);
-        const track = get().tracks.find((item) => item.id === id);
+        const track = liveTrack(id);
         if (track && track.hydrated === false) tracks.push(track);
       }
       if (tracks.length === 0) return;
       await mapPool(tracks, IMPORT_CONCURRENCY, async (track) => {
-        const current = get().tracks.find((item) => item.id === track.id);
+        const current = liveTrack(track.id);
         if (!current || current.hydrated !== false) return;
         await readLocalTags(current);
       });
@@ -563,11 +593,11 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     for (const id of ids) {
       if (seen.has(id)) continue;
       seen.add(id);
-      const track = get().tracks.find((item) => item.id === id);
-      if (track) tracks.push(track);
-    }
-    if (tracks.length === 0) return empty;
-    if (get().matching) return empty;
+        const track = liveTrack(id);
+        if (track) tracks.push(track);
+      }
+      if (tracks.length === 0) return empty;
+      if (get().matching) return empty;
 
     let done = 0;
     const summary: LocalMatchSummary = { applied: 0, miss: 0, unchanged: 0 };
@@ -577,8 +607,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     });
     try {
       await mapPool(tracks, IMPORT_CONCURRENCY, async (track) => {
-        const current =
-          get().tracks.find((item) => item.id === track.id) ?? track;
+        const current = liveTrack(track.id) ?? track;
         const status = await matchOnline(current);
         if (status === "applied") summary.applied += 1;
         else if (status === "miss") summary.miss += 1;
@@ -657,8 +686,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     const applyParsed = async (existing: LocalTrack, countAsAdded: boolean) => {
       const current = fileBasename(existing.filePath);
       try {
-        const currentTrack =
-          get().tracks.find((track) => track.id === existing.id) ?? existing;
+        const currentTrack = liveTrack(existing.id) ?? existing;
         if ((await readLocalTags(currentTrack)).ok && countAsAdded) added += 1;
       } catch {
         /* still missing / unreadable — leave as-is */
@@ -677,6 +705,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
 
     const importedIds: string[] = [];
     if (toImport.length > 0) {
+      commitPendingHydrates();
       const now = Date.now();
       const imported: LocalTrack[] = toImport.map((filePath, i) => {
         const id = localTrackId(filePath);
@@ -737,35 +766,35 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       if ((qualitySchema ?? 0) < QUALITY_SCHEMA && normalized.length > 0) {
         void (async () => {
           await mapPool(normalized, IMPORT_CONCURRENCY, async (track) => {
-            const peek = await peekLocalQuality(track.filePath);
+            const current = liveTrack(track.id);
+            if (!current) return;
+            const peek = await peekLocalQuality(current.filePath);
             if (!peek?.qualitys.length) return;
             const qualitys = peek.qualitys;
             const next = qualitys[0]?.type;
-            const prev = track.song.meta.qualitys[0]?.type;
+            const prev = current.song.meta.qualitys[0]?.type;
             const sizeChanged =
               (qualitys[0]?.size ?? null) !==
-              (track.song.meta.qualitys[0]?.size ?? null);
+              (current.song.meta.qualitys[0]?.size ?? null);
             const tagsChanged =
-              track.hasTitleTag !== peek.hasTitleTag ||
-              track.hasArtistTag !== peek.hasArtistTag;
+              current.hasTitleTag !== peek.hasTitleTag ||
+              current.hasArtistTag !== peek.hasArtistTag;
             if (!next || (next === prev && !sizeChanged && !tagsChanged)) return;
             const _qualitys = indexQualitySizes(qualitys);
-            set((state) => ({
-              tracks: state.tracks.map((t) =>
-                t.id === track.id
-                  ? {
-                      ...t,
-                      hasTitleTag: peek.hasTitleTag,
-                      hasArtistTag: peek.hasArtistTag,
-                      song: {
-                        ...t.song,
-                        meta: { ...t.song.meta, qualitys, _qualitys },
-                      },
-                    }
-                  : t,
-              ),
-            }));
+            const latest = liveTrack(current.id);
+            if (!latest) return;
+            pendingHydrates.set(latest.id, {
+              ...latest,
+              hasTitleTag: peek.hasTitleTag,
+              hasArtistTag: peek.hasArtistTag,
+              song: {
+                ...latest.song,
+                meta: { ...latest.song.meta, qualitys, _qualitys },
+              },
+            });
+            queueHydrateFlush();
           });
+          commitPendingHydrates();
           persist(get().tracks, get().categories, QUALITY_SCHEMA);
         })();
       } else if (
@@ -813,6 +842,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     },
 
     async remove(id) {
+      commitPendingHydrates();
       const track = get().tracks.find((t) => t.id === id);
       const tracks = get().tracks.filter((t) => t.id !== id);
       set({ tracks });
@@ -822,6 +852,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     },
 
     async removeMany(ids) {
+      commitPendingHydrates();
       const idSet = new Set(ids);
       const removing = get().tracks.filter((t) => idSet.has(t.id));
       const tracks = get().tracks.filter((t) => !idSet.has(t.id));
@@ -832,6 +863,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     },
 
     updateSong(id, song) {
+      commitPendingHydrates();
       const tracks = get().tracks.map((t) =>
         t.id === id ? { ...t, song } : t,
       );
@@ -867,6 +899,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     },
 
     async setTrackNameMode(id, mode) {
+      commitPendingHydrates();
       const track = get().tracks.find((item) => item.id === id);
       if (!track || localNameModeForTrack(track) === mode) return;
       const tracks = get().tracks.map((item) =>
@@ -883,12 +916,12 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       if (inflight) return inflight;
 
       const work = (async () => {
-        const track = get().tracks.find((item) => item.id === id);
+        const track = liveTrack(id);
         if (!track) return null;
         if (track.hydrated !== false) return track.song;
-        const ok = (await readLocalTags(track)).ok;
-        if (!ok) return null;
-        return get().tracks.find((item) => item.id === id)?.song ?? null;
+        const result = await readLocalTags(track);
+        if (!result.ok) return null;
+        return result.song ?? liveTrack(id)?.song ?? null;
       })();
 
       hydrateInFlight.set(id, work);
@@ -904,7 +937,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     },
 
     async previewOnlineMatch(id) {
-      const track = get().tracks.find((item) => item.id === id);
+      const track = liveTrack(id);
       if (!track) return null;
       const song = track.song;
       const nameMode = localNameModeForTrack(track);
@@ -928,7 +961,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     },
 
     async applyOnlineMatch(id, hit) {
-      const track = get().tracks.find((item) => item.id === id);
+      const track = liveTrack(id);
       if (!track) return "error";
       const result = await readLocalTags(track);
       if (!result.ok || !result.tags || !result.song) return "error";
@@ -948,6 +981,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     },
 
     setTrackUnavailable(id, unavailable) {
+      commitPendingHydrates();
       const track = get().tracks.find((t) => t.id === id);
       if (!track || !!track.unavailable === unavailable) return;
       const tracks = get().tracks.map((t) =>
@@ -968,6 +1002,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
         const missingById = new Map(
           snapshot.map((t, i) => [t.id, !present[i]]),
         );
+        commitPendingHydrates();
         const current = get().tracks;
         let changed = false;
         const tracks = current.map((t) => {
@@ -1000,6 +1035,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       };
       const categories = [...get().categories, cat];
       set({ categories });
+      commitPendingHydrates();
       persist(get().tracks, categories);
       return cat;
     },
@@ -1017,10 +1053,12 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
         c.id === id ? { ...c, name: n } : c,
       );
       set({ categories });
+      commitPendingHydrates();
       persist(get().tracks, categories);
     },
 
     removeCategory(id) {
+      commitPendingHydrates();
       const categories = get().categories.filter((c) => c.id !== id);
       const tracks = get().tracks.map((t) =>
         t.categoryId === id ? { ...t, categoryId: null } : t,
@@ -1032,6 +1070,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     setTracksCategory(ids, categoryId) {
       if (categoryId && !get().categories.some((c) => c.id === categoryId))
         return;
+      commitPendingHydrates();
       const idSet = new Set(ids);
       const tracks = get().tracks.map((t) =>
         idSet.has(t.id) ? { ...t, categoryId } : t,

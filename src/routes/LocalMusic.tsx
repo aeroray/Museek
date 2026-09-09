@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   HardDrive,
   FolderOpen,
@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CoverImage } from "@/components/common/CoverImage";
+import { VirtualList } from "@/components/common/VirtualList";
 import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges";
 import { bestQuality } from "@/lib/quality";
 import { revealLocalFile } from "@/lib/localMusic";
@@ -85,9 +86,19 @@ export function LocalMusic() {
   const setLocalSort = useSettingsStore((s) => s.setLocalSort);
   const notify = useUiStore((s) => s.notify);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null);
+
   useEffect(() => {
     void useLocalMusicStore.getState().syncFilePresence();
   }, []);
+
+  useEffect(() => {
+    const vp = scrollRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    );
+    setViewportEl(vp instanceof HTMLElement ? vp : null);
+  }, [tracks.length]);
 
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -563,14 +574,19 @@ export function LocalMusic() {
           </div>
         </div>
       ) : (
-        <ScrollArea className="flex-1">
+        <ScrollArea ref={scrollRef} className="flex-1">
           <div className="px-3 py-2">
             {displayed.length === 0 ? (
               <p className="text-center text-sm text-muted-foreground py-12">
                 {tr("local.noMatch")}
               </p>
             ) : (
-              displayed.map((track) => {
+              <VirtualList
+                items={displayed}
+                scrollElement={viewportEl}
+                getKey={(track) => track.id}
+              >
+                {(track) => {
                 const sel = selected.has(track.id);
                 const best = bestQuality(track.song);
                 const catName = track.categoryId
@@ -579,9 +595,8 @@ export function LocalMusic() {
                 const missing = !!track.unavailable;
                 return (
                   <div
-                    key={track.id}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-xl group cursor-pointer transition-[background-color] duration-200 hover:bg-accent/55",
+                      "flex h-full items-center gap-3 px-3 py-2 rounded-xl group cursor-pointer transition-[background-color] duration-200 hover:bg-accent/55",
                       editing && sel && "bg-primary/10",
                       missing && "opacity-80",
                     )}
@@ -785,7 +800,8 @@ export function LocalMusic() {
                     )}
                   </div>
                 );
-              })
+                }}
+              </VirtualList>
             )}
           </div>
         </ScrollArea>
