@@ -538,9 +538,11 @@ export function LyricsPanel() {
                     hideCover ? "px-4" : "pl-4 pr-24",
                   )}
                 >
-                  <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
-                    {t("lyrics.fontHint", { shortcut: fontShortcut })}
-                  </p>
+                  {!lyricsOnly && (
+                    <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
+                      {t("lyrics.fontHint", { shortcut: fontShortcut })}
+                    </p>
+                  )}
                   {lyricLines.map((line, i) => {
                     const active = i === currentLyricIndex;
                     return (
@@ -582,9 +584,11 @@ export function LyricsPanel() {
                       </div>
                     );
                   })}
-                  <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
-                    {t("lyrics.fontHint", { shortcut: fontShortcut })}
-                  </p>
+                  {!lyricsOnly && (
+                    <p className="pointer-events-none select-none py-2 font-sans text-xs font-medium leading-5 text-muted-foreground/55">
+                      {t("lyrics.fontHint", { shortcut: fontShortcut })}
+                    </p>
+                  )}
                 </div>
               </ScrollArea>
               <div
