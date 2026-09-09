@@ -17,6 +17,44 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.7.3": {
+    zh: {
+      sections: [
+        {
+          title: "💬 歌词",
+          bullets: [
+            "进度条贴在窗口底边；悬停显示指针所在位置的时间",
+            "滚动歌词后会停两秒再跟回正在唱的那一行",
+            "纯歌词模式下不再显示字号提示",
+          ],
+        },
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "大曲库列表改为窗口化渲染，页面更跟手",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "💬 Lyrics",
+          bullets: [
+            "Seek lives on a flush bar at the window bottom; hover shows the time under the cursor",
+            "Scrolling lyrics waits two seconds before snapping back to the singing line",
+            "The font-size hint is hidden in lyrics-only mode",
+          ],
+        },
+        {
+          title: "📁 Local music",
+          bullets: [
+            "Large libraries stay responsive by windowing the track list",
+          ],
+        },
+      ],
+    },
+  },
   "3.7.2": {
     zh: {
       sections: [
