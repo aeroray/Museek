@@ -202,7 +202,7 @@ export function LyricsPanel() {
       }, FOLLOW_RESUME_MS);
     };
 
-    const onWheel = (event: WheelEvent) => {
+    const onWheel = (event: globalThis.WheelEvent) => {
       const zooming = isMacOs() ? event.metaKey : event.ctrlKey;
       if (zooming) return;
       linger();
