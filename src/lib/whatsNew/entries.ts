@@ -17,6 +17,54 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.7.4": {
+    zh: {
+      sections: [
+        {
+          title: "▶️ 播放",
+          bullets: [
+            "播完后会自动切到下一首",
+            "点播放时更少误报网络错误；过期的播放链接会自动再试一次",
+          ],
+        },
+        {
+          title: "🎧 识曲",
+          bullets: [
+            "去掉 Beta 标记",
+          ],
+        },
+        {
+          title: "🪟 界面",
+          bullets: [
+            "关闭确认里的「退出」按钮悬停时不再抖动、缩小",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "▶️ Playback",
+          bullets: [
+            "The next track starts when a song ends",
+            "Fewer false network errors on play; expired play URLs are retried once",
+          ],
+        },
+        {
+          title: "🎧 Recognize",
+          bullets: [
+            "The Beta badge is gone",
+          ],
+        },
+        {
+          title: "🪟 Interface",
+          bullets: [
+            "The Quit button on the close dialog no longer jumps or shrinks on hover",
+          ],
+        },
+      ],
+    },
+  },
   "3.7.3": {
     zh: {
       sections: [

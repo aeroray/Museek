@@ -43,6 +43,8 @@ class AudioPlayer {
   private webStatus: PlayerStatus = "idle";
   private webVolume = 1;
   private webMuted = false;
+  /** True after natural end (or pause-at-end) until the next setSource. */
+  private endedSent = false;
 
   constructor() {
     if (isWindowsTauri) {
@@ -85,7 +87,7 @@ class AudioPlayer {
     audio.addEventListener("ended", () => {
       this.stopSmoothClock();
       notify();
-      this.onEnded?.();
+      this.emitEnded();
     });
     audio.addEventListener("error", () => {
       this.stopSmoothClock();
@@ -114,19 +116,50 @@ class AudioPlayer {
 
   private emitTime() {
     const currentTime = this.readCurrentTime();
+    this.maybeFinishWebPlayback();
     for (const cb of this.timeListeners) cb(currentTime);
   }
 
-  private startSmoothClock() {
+  private emitEnded() {
+    if (this.endedSent) return;
+    this.endedSent = true;
+    this.onEnded?.();
+  }
+
+  private atEndOfTrack(duration: number, currentTime: number): boolean {
+    return duration > 0 && currentTime >= duration - 0.05;
+  }
+
+  /** BufferSource.onended is unreliable in WebView2; also treat pause-at-EOS as ended. */
+  private finishWebPlayback() {
+    if (this.audio || this.endedSent) return;
+    this.endedSent = true;
+    this.detachWebSource();
+    this.webPlaying = false;
+    this.webCurrentTime = this.webDuration;
+    this.webStatus = "ended";
+    this.stopSmoothClock();
+    this.notifyWebState();
+    this.onEnded?.();
+  }
+
+  private maybeFinishWebPlayback() {
     if (
-      this.timeRaf ||
-      this.timeFallbackTimer ||
-      this.timeListeners.size === 0
+      this.audio ||
+      !this.webPlaying ||
+      this.endedSent ||
+      !this.atEndOfTrack(this.webDuration, this.webCurrentTime)
     ) {
       return;
     }
+    this.finishWebPlayback();
+  }
+
+  private startSmoothClock() {
+    if (this.timeRaf || this.timeFallbackTimer) return;
+    if (this.timeListeners.size === 0 && this.audio) return;
     const tick = () => {
-      if (!this.isPlaying() || this.timeListeners.size === 0) {
+      if (!this.isPlaying() || (this.timeListeners.size === 0 && this.audio)) {
         this.stopSmoothClock();
         return;
       }
@@ -135,7 +168,7 @@ class AudioPlayer {
       this.timeRaf = requestAnimationFrame(tick);
     };
     const fallbackTick = () => {
-      if (!this.isPlaying() || this.timeListeners.size === 0) {
+      if (!this.isPlaying() || (this.timeListeners.size === 0 && this.audio)) {
         this.stopSmoothClock();
         return;
       }
@@ -287,15 +320,10 @@ class AudioPlayer {
     this.sourceNode = sourceNode;
     this.webPlaying = true;
     this.webStatus = "playing";
+    this.endedSent = false;
     sourceNode.onended = () => {
-      if (this.sourceNode !== sourceNode || !this.webPlaying) return;
-      this.sourceNode = null;
-      this.webPlaying = false;
-      this.webCurrentTime = this.webDuration;
-      this.webStatus = "ended";
-      this.stopSmoothClock();
-      this.notifyWebState();
-      this.onEnded?.();
+      if (this.sourceNode !== sourceNode) return;
+      this.finishWebPlayback();
     };
     sourceNode.start(0, offset);
     this.notifyWebState();
@@ -326,6 +354,7 @@ class AudioPlayer {
   }
 
   setSource(url: string) {
+    this.endedSent = false;
     if (!this.audio) {
       this.sourceVersion += 1;
       this.loadAbort?.abort();
@@ -352,7 +381,10 @@ class AudioPlayer {
   }
 
   whenReady(): Promise<void> {
-    if (!this.audio) return Promise.resolve();
+    if (!this.audio) {
+      if (!this.sourceUrl) return Promise.resolve();
+      return this.ensureWebBuffer().then(() => undefined);
+    }
     const audio = this.audio;
     if (
       audio.readyState >= 1 &&
@@ -390,7 +422,7 @@ class AudioPlayer {
     }
     await this.whenReady();
     this.seek(startTime);
-    this.audio.pause();
+    this.pause(false);
   }
 
   play(): Promise<void> {
@@ -404,10 +436,14 @@ class AudioPlayer {
     });
   }
 
-  pause() {
+  pause(emitEnd = true) {
     if (!this.audio) {
       if (!this.webPlaying) return;
       this.readCurrentTime();
+      if (emitEnd && this.atEndOfTrack(this.webDuration, this.webCurrentTime)) {
+        this.finishWebPlayback();
+        return;
+      }
       this.webPlaying = false;
       this.webStatus = this.sourceUrl ? "paused" : "idle";
       this.detachWebSource();
@@ -416,12 +452,17 @@ class AudioPlayer {
       this.emitTime();
       return;
     }
-    this.audio.pause();
+    const audio = this.audio;
+    const atEnd =
+      audio.ended || this.atEndOfTrack(audio.duration, audio.currentTime);
+    audio.pause();
+    if (emitEnd && atEnd) this.emitEnded();
   }
 
   // Fully stop: pause, drop the source, and reset the element to an idle state.
   // Used when the queue finishes so nothing is left loaded/paused.
   stop() {
+    this.endedSent = false;
     if (!this.audio) {
       this.sourceVersion += 1;
       this.loadAbort?.abort();

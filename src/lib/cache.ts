@@ -14,6 +14,7 @@
 export type AsyncCache<T> = {
   (key: string, fn: () => Promise<T>): Promise<T>
   prime(key: string, value: T): void
+  forget(key: string): void
 }
 
 export function createAsyncCache<T>(
@@ -58,6 +59,10 @@ export function createAsyncCache<T>(
 
   cached.prime = (key, value) => {
     map.set(key, { promise: Promise.resolve(value), expires: Date.now() + ttlMs })
+  }
+
+  cached.forget = (key) => {
+    map.delete(key)
   }
 
   return cached

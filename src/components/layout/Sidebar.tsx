@@ -17,7 +17,6 @@ import { useUiStore } from "@/stores/uiStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { SidebarUpdateCard } from "@/components/layout/SidebarUpdateCard";
 import { BrandMark } from "@/components/brand/BrandMark";
-import { Badge } from "@/components/ui/badge";
 
 // Settings is rendered separately at the bottom; these fill the main nav.
 const navItems = [
@@ -62,7 +61,6 @@ const navItems = [
     icon: Fingerprint,
     labelKey: "nav.recognize",
     iconHover: "icon-hover-search",
-    beta: true,
   },
   {
     to: "/downloads",
@@ -134,7 +132,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-1">
-        {navItems.map(({ to, icon: Icon, labelKey, iconHover, beta }) => (
+        {navItems.map(({ to, icon: Icon, labelKey, iconHover }) => (
           <NavLink
             key={to}
             to={to}
@@ -157,17 +155,7 @@ export function Sidebar() {
                   className="shrink-0"
                 />
                 {!collapsed && (
-                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="truncate">{t(labelKey)}</span>
-                    {beta && (
-                      <Badge
-                        variant="secondary"
-                        className="shrink-0 border-0 px-1.5 py-0 text-[10px] font-semibold leading-4"
-                      >
-                        {t("recognize.beta")}
-                      </Badge>
-                    )}
-                  </div>
+                  <span className="min-w-0 flex-1 truncate">{t(labelKey)}</span>
                 )}
               </>
             )}

@@ -248,7 +248,6 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Recognition
     "recognize.title": "识曲",
-    "recognize.beta": "BETA",
     "recognize.subtitle": "听见一段旋律，找到它的名字",
     "recognize.experimental":
       "实验功能：网易云识曲接口可能变化，结果仅供本地使用。",
@@ -958,7 +957,6 @@ const dict: Record<Lang, Record<string, string>> = {
 
     // Recognition
     "recognize.title": "Recognize",
-    "recognize.beta": "BETA",
     "recognize.subtitle": "Hear a melody and find the song behind it",
     "recognize.experimental":
       "Experimental: the NetEase recognition endpoint may change. Results are for local use.",

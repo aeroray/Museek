@@ -1,7 +1,6 @@
 import { AlertTriangle, Fingerprint, LoaderCircle } from "lucide-react";
 import { TrackRow } from "@/components/common/TrackRow";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { supportsSystemCapture } from "@/lib/recognition/capture";
@@ -74,14 +73,8 @@ export function Recognize() {
       <header className="p-4 border-b border-border flex items-center gap-3">
         <Fingerprint size={20} className="shrink-0" />
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-lg font-semibold leading-tight text-balance">
-            <span>{t("recognize.title")}</span>
-            <Badge
-              variant="secondary"
-              className="shrink-0 border-0 px-1.5 py-0 text-[10px] font-semibold leading-4"
-            >
-              {t("recognize.beta")}
-            </Badge>
+          <h2 className="text-lg font-semibold leading-tight text-balance">
+            {t("recognize.title")}
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground text-pretty">
             {t("recognize.subtitle")}

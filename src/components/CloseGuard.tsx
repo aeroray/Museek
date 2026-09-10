@@ -165,10 +165,12 @@ export function CloseGuard() {
             <span className="hidden sm:block" />
           )}
           <div className="flex w-full gap-2 sm:w-auto sm:justify-end">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" static onClick={() => setDialogOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button variant="destructive" onClick={onConfirmQuit}>{t("close.exitNow")}</Button>
+            <Button variant="destructive" static onClick={onConfirmQuit}>
+              {t("close.exitNow")}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

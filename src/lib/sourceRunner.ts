@@ -1,7 +1,7 @@
 import { createSourceRegistry } from "./sourceRegistry";
 import { SourceWorkerHost } from "./sources/sourceWorkerHost";
 import { t } from "@/lib/i18n";
-import { qualityCandidates, qualityUpgradeCandidates } from "@/lib/quality";
+import { qualityCandidates, qualityUpgradeCandidates, QUALITY_LADDER } from "@/lib/quality";
 import { toLxMusicInfo } from "@/lib/lxMusicInfo";
 import { looksLikeRealAudio } from "@/lib/audioUrlProbe";
 import { createAsyncCache } from "@/lib/cache";
@@ -245,10 +245,20 @@ export class SourceRunner {
     });
   }
 
-  /**
-   * Resolve a playback URL: wave-race enabled sources (cap concurrency), with a
-   * short TTL cache so replay / quality retries don't re-hit every script.
-   */
+  /** Drop cached play URLs so a stale CDN link is not reused after a fetch fail. */
+  invalidateMusicUrl(song: MusicInfo): void {
+    for (const quality of QUALITY_LADDER) {
+      musicUrlCache.forget(
+        this.musicUrlKey({
+          source: song.source,
+          action: "musicUrl",
+          info: song,
+          type: quality,
+        }),
+      );
+    }
+  }
+
   async getMusicUrl(payload: LxRequestPayload): Promise<string> {
     const ids = this.getOrderedIds();
     if (!ids.length) throw new Error(t("sources.err.noEnabled"));

@@ -46,6 +46,8 @@ let holdRestoredClock = false;
 let sessionResumeAt = 0;
 let sessionResumeSongId: string | null = null;
 let restoreSourcePromise: Promise<void> | null = null;
+/** Song id already retried after a stale cached play URL failed to fetch. */
+let urlRetryFor = "";
 
 type PlayerPrefs = {
   volume: number;
@@ -145,8 +147,24 @@ function playWithTimeout(): Promise<void> {
   });
 }
 
+function isIgnorablePlayError(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+  const raw = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  if (name === "AbortError") return true;
+  return (
+    raw.includes("the operation was aborted") ||
+    raw.includes("signal is aborted") ||
+    raw.includes("request canceled") ||
+    raw.includes("request cancelled") ||
+    raw.includes("audio source changed")
+  );
+}
+
 /** Map engine/DOM exceptions so the toast is readable, not a WebView string. */
 function formatRemotePlayError(raw: string): string {
+  if (isIgnorablePlayError(raw)) {
+    return raw;
+  }
   if (
     raw === t("player.err.playTimeout") ||
     raw === t("player.err.invalidAudio") ||
@@ -247,7 +265,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       play: () => {
         if (!get().isPlaying) get().togglePlay();
       },
-      pause: () => audioPlayer.pause(),
+      pause: () => {
+        if (get().status === "loading" || get().playPending) return;
+        audioPlayer.pause();
+      },
       toggle: () => get().togglePlay(),
       next: () => get().next(),
       previous: () => get().prev(),
@@ -301,7 +322,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
       // Immediately silence the previous track so switching feels instant — don't
       // let the old song keep playing while the new URL is being resolved.
-      audioPlayer.pause();
+      audioPlayer.pause(false);
       invalidateLyricLoad();
 
       // status:"loading" must survive audio pause/timeupdate sync (see _syncFromAudio).
@@ -331,6 +352,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       }
       persistPlaybackSession(true);
 
+      let attachedSource = false;
       try {
         if (isLocal) {
           const filePath = song.meta.filePath;
@@ -347,12 +369,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             return { currentQuality: best, queue: q };
           });
           applyAudioSource(src);
+          attachedSource = true;
           holdRestoredClock = false;
           const resumeAt = consumeResume(song.id);
-          if (resumeAt > 0) {
-            await audioPlayer.whenReady();
-            audioPlayer.seek(resumeAt);
-          }
+          await audioPlayer.whenReady();
+          if (!isPlayGenerationCurrent(gen)) return;
+          if (resumeAt > 0) audioPlayer.seek(resumeAt);
           set({ sourceReady: true });
           persistPlaybackSession(true);
           await playWithTimeout();
@@ -371,6 +393,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               isPlayGenerationCurrent(gen) && get().currentSong?.id === song.id
             );
           });
+          if (urlRetryFor === song.id) urlRetryFor = "";
           return;
         }
 
@@ -439,15 +462,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           });
         }
         applyAudioSource(src);
+        attachedSource = true;
         holdRestoredClock = false;
         if (fromCache) {
           const resumeAt = consumeResume(song.id);
-          if (resumeAt > 0) {
-            await audioPlayer.whenReady();
-            audioPlayer.seek(resumeAt);
-          }
+          await audioPlayer.whenReady();
+          if (!isPlayGenerationCurrent(gen)) return;
+          if (resumeAt > 0) audioPlayer.seek(resumeAt);
         } else {
           clearResume();
+          await audioPlayer.whenReady();
+          if (!isPlayGenerationCurrent(gen)) return;
         }
         set({ sourceReady: true });
         persistPlaybackSession(true);
@@ -462,8 +487,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           song.meta.picUrl ?? null,
           true,
         );
+        if (urlRetryFor === song.id) urlRetryFor = "";
       } catch (err) {
         if (!isPlayGenerationCurrent(gen)) return;
+        if (isIgnorablePlayError(err)) return;
         const raw = (err as Error).message || t("player.err.unknown");
         // Local missing/unreadable files: clear copy, not "播放失败：File not found".
         // Also reset the player bar — leaving the broken track as "current" looks paused.
@@ -505,6 +532,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           notify({ message, variant: "error" });
           return;
         }
+        if (attachedSource && urlRetryFor !== song.id) {
+          urlRetryFor = song.id;
+          sourceRunner.invalidateMusicUrl(song);
+          await get().play(song, preferred);
+          return;
+        }
+        urlRetryFor = "";
         const isTimeout = raw === t("player.err.playTimeout");
         const message = isTimeout ? raw : formatRemotePlayError(raw);
         audioPlayer.stop();
@@ -669,12 +703,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             return;
           }
           if (audioPlayer.hasSource()) {
-            await audioPlayer.play();
+            await audioPlayer.whenReady();
+            await playWithTimeout();
             return;
           }
           if (song) await get().play(song, preferred);
         } catch (err) {
           if (get().status === "loading") return;
+          if (isIgnorablePlayError(err)) return;
           get()._handleError(
             formatRemotePlayError(
               (err as Error).message || t("player.err.unknown"),
@@ -875,7 +911,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         state.status !== "playing" &&
         state.status !== "loading"
           ? "loading"
-          : storeStatus === "error"
+          : storeStatus === "error" && state.status !== "playing"
             ? "error"
             : state.status;
 
@@ -962,6 +998,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     _handleError(msg) {
+      if (isIgnorablePlayError(msg)) return;
       audioPlayer.stop();
       revokeCurrentObjectUrl();
       lastMediaPlaying = false;
