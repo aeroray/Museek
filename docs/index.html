@@ -1,2851 +1,2013 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Museek 拾音 | A calmer desktop music workspace.</title>
     <meta
       name="description"
-      content="Museek 拾音：把跨平台发现、播放、歌词、收藏和本地音乐收进一张桌面工作台。"
+      content="Museek 拾音 —— 一站式桌面音乐聚合应用。五大平台统一搜索、播放与下载，支持歌词、收藏、本地音乐与 CUE 分轨。"
     />
-    <meta name="theme-color" content="#f5f7f3" />
     <link rel="icon" type="image/svg+xml" href="./app-icon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <script>
+      (function () {
+        var mq = window.matchMedia
+          ? window.matchMedia("(prefers-color-scheme: dark)")
+          : null;
+        var stored = null;
+        try {
+          stored = localStorage.getItem("museek-theme");
+        } catch (e) {}
+        var theme = stored || (mq && mq.matches === false ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
     <style>
       :root {
-        --canvas: #f5f7f3;
-        --canvas-deep: #e9eee9;
-        --surface: #ffffff;
-        --surface-soft: #eef3ee;
-        --ink: #15211f;
-        --muted: #687571;
-        --line: #d8e0db;
-        --line-strong: #c2cec7;
-        --night: #111a20;
-        --night-soft: #18252b;
-        --night-line: rgba(245, 247, 243, 0.16);
-        --white: #f7faf7;
-        --accent: #c7f36b;
-        --accent-strong: #8bb842;
-        --teal: #1f8b76;
-        --coral: #f17e5e;
-        --display: "Fira Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
-        --sans: "Fira Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
-        --mono: "Fira Code", "SFMono-Regular", Consolas, monospace;
-        --shadow: 0 20px 54px rgba(21, 33, 31, 0.14);
-        --shadow-dark: 0 28px 70px rgba(6, 12, 14, 0.3);
-        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --bg: #0a0c0d;
+        --bg-soft: #0e1112;
+        --panel: #131718;
+        --card: #171c1d;
+        --card-2: #141819;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-mid: rgba(255, 255, 255, 0.14);
+        --t1: rgba(255, 255, 255, 0.94);
+        --t2: rgba(255, 255, 255, 0.56);
+        --t3: rgba(255, 255, 255, 0.36);
+        --acc: #2fd8a6;
+        --acc-deep: #12b98a;
+        --acc-ink: #04231b;
+        --acc-soft: rgba(47, 216, 166, 0.1);
+        --acc-line: rgba(47, 216, 166, 0.35);
+        --amber: #f3a04c;
+        --amber-soft: rgba(243, 160, 76, 0.07);
+        --glow: rgba(47, 216, 166, 0.16);
+        --glow-2: rgba(47, 216, 166, 0.03);
+        --shot-bg: #0c0f10;
+        --hover: rgba(255, 255, 255, 0.06);
+        --shadow: 0 40px 90px rgba(0, 0, 0, 0.55);
+        --shadow-soft: 0 20px 50px rgba(0, 0, 0, 0.4);
       }
-
+      html[data-theme="light"] {
+        --bg: #f7f8f8;
+        --bg-soft: #ffffff;
+        --panel: #f1f3f3;
+        --card: #ffffff;
+        --card-2: #f4f6f6;
+        --line: rgba(0, 0, 0, 0.08);
+        --line-mid: rgba(0, 0, 0, 0.14);
+        --t1: rgba(0, 0, 0, 0.88);
+        --t2: rgba(0, 0, 0, 0.56);
+        --t3: rgba(0, 0, 0, 0.4);
+        --acc: #0f9d76;
+        --acc-deep: #0a7d5e;
+        --acc-ink: #ffffff;
+        --acc-soft: rgba(15, 157, 118, 0.1);
+        --acc-line: rgba(15, 157, 118, 0.32);
+        --amber: #c9760f;
+        --amber-soft: rgba(201, 118, 15, 0.08);
+        --glow: rgba(15, 157, 118, 0.14);
+        --glow-2: rgba(15, 157, 118, 0.03);
+        --shot-bg: #eceeee;
+        --hover: rgba(0, 0, 0, 0.04);
+        --shadow: 0 30px 70px rgba(0, 0, 0, 0.13);
+        --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.1);
+      }
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
       }
-
       html {
         scroll-behavior: smooth;
-        -webkit-text-size-adjust: 100%;
       }
-
       body {
-        background: var(--canvas);
-        color: var(--ink);
-        font-family: var(--sans);
-        font-size: 16px;
-        line-height: 1.62;
-        overflow-x: hidden;
+        background: var(--bg);
+        color: var(--t1);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          sans-serif;
+        line-height: 1.6;
         -webkit-font-smoothing: antialiased;
-        text-rendering: optimizeLegibility;
+        transition:
+          background-color 0.25s ease,
+          color 0.25s ease;
       }
-
-      body::before {
-        background-image:
-          linear-gradient(rgba(21, 33, 31, 0.04) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(21, 33, 31, 0.04) 1px, transparent 1px);
-        background-size: 32px 32px;
-        content: "";
-        inset: 0;
-        opacity: 0.55;
-        pointer-events: none;
-        position: fixed;
-        z-index: -1;
-      }
-
-      ::selection {
-        background: var(--accent);
-        color: var(--ink);
-      }
-
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      button,
-      a {
-        -webkit-tap-highlight-color: transparent;
-      }
-
-      button {
-        color: inherit;
-        font: inherit;
-      }
-
       img {
-        display: block;
         max-width: 100%;
       }
-
-      h1,
-      h2,
-      h3 {
-        text-wrap: balance;
+      a {
+        cursor: pointer;
       }
-
-      p {
-        text-wrap: pretty;
+      button {
+        cursor: pointer;
+        font-family: inherit;
+        border: 0;
+        background: none;
+        color: inherit;
       }
-
-      :focus-visible {
-        outline: 3px solid var(--coral);
-        outline-offset: 4px;
-      }
-
       .wrap {
+        max-width: 1160px;
         margin: 0 auto;
-        max-width: 1280px;
         padding: 0 32px;
-        width: 100%;
+      }
+      .ico {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ico-fill {
+        fill: currentColor;
+        stroke: none;
       }
 
-      .mono {
-        font-family: var(--mono);
-        font-size: 0.68rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .skip-link {
-        background: var(--accent);
-        color: var(--ink);
-        left: 16px;
-        padding: 10px 16px;
-        position: fixed;
-        top: -80px;
-        z-index: 100;
-      }
-
-      .skip-link:focus {
-        top: 16px;
-      }
-
-      .site-header {
-        align-items: center;
-        background: rgba(245, 247, 243, 0.94);
-        border-bottom: 1px solid var(--line);
-        display: flex;
-        height: 72px;
+      /* ---------- NAV ---------- */
+      .nav {
         position: sticky;
         top: 0;
         z-index: 20;
-        backdrop-filter: blur(18px);
+        border-bottom: 1px solid var(--line);
+        background: var(--bg);
       }
-
-      .nav {
-        align-items: center;
+      .nav-in {
         display: flex;
-        gap: 28px;
-        justify-content: space-between;
+        align-items: center;
+        gap: 24px;
+        height: 72px;
       }
-
       .brand {
+        display: flex;
         align-items: center;
-        display: inline-flex;
-        flex-shrink: 0;
-        gap: 10px;
-      }
-
-      .brand-mark {
-        height: 32px;
-        width: 32px;
-      }
-
-      .brand-name {
-        font-size: 1.12rem;
-        font-weight: 800;
-        letter-spacing: 0;
-        line-height: 1;
-      }
-
-      .brand-name small {
-        color: var(--muted);
-        font-size: 0.75rem;
+        gap: 11px;
+        font-size: 15px;
         font-weight: 600;
-        letter-spacing: 0.03em;
-        margin-left: 5px;
+        color: var(--t1);
+        text-decoration: none;
       }
-
-      .nav-links {
+      .brand-mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        flex: none;
+        background: linear-gradient(
+          150deg,
+          var(--acc) 0%,
+          var(--acc-deep) 100%
+        );
+        display: flex;
         align-items: center;
+        justify-content: center;
+        color: var(--acc-ink);
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .nav-links {
         display: flex;
         gap: 24px;
         margin-left: auto;
       }
-
-      .nav-links a,
-      .language-button {
-        align-items: center;
-        color: var(--muted);
-        display: inline-flex;
-        font-size: 0.78rem;
-        font-weight: 600;
-        min-height: 44px;
-        transition: color 180ms ease;
+      .nav-links a {
+        font-size: 13px;
+        color: var(--t2);
+        text-decoration: none;
+        padding: 4px 0;
       }
-
-      .nav-links a:hover,
-      .language-button:hover {
-        color: var(--ink);
+      .nav-links a:hover {
+        color: var(--t1);
       }
-
-      .language-button {
-        background: none;
-        border: 0;
-        cursor: pointer;
-        padding: 8px 0;
-      }
-
-      .nav-github,
-      .button {
-        align-items: center;
-        border: 1px solid var(--ink);
-        border-radius: 5px;
-        display: inline-flex;
-        font-size: 0.78rem;
-        font-weight: 700;
-        gap: 9px;
-        justify-content: center;
-        min-height: 46px;
-        padding: 10px 16px;
-        transition:
-          background-color 180ms ease,
-          border-color 180ms ease,
-          color 180ms ease,
-          transform 180ms ease,
-          box-shadow 180ms ease;
-      }
-
-      .nav-github {
-        background: var(--ink);
-        color: var(--white);
-      }
-
-      .nav-github:hover,
-      .button-dark:hover {
-        background: var(--teal);
-        border-color: var(--teal);
-        color: var(--white);
-        transform: translateY(-2px);
-      }
-
-      .nav-github svg,
-      .button svg {
-        height: 16px;
-        width: 16px;
-      }
-
-      .menu-button {
-        align-items: center;
-        background: transparent;
-        border: 1px solid var(--line-strong);
-        border-radius: 5px;
-        cursor: pointer;
-        display: none;
-        height: 44px;
-        justify-content: center;
-        width: 44px;
-      }
-
-      .menu-button svg {
-        height: 20px;
-        width: 20px;
-      }
-
-      .mobile-menu {
-        background: var(--surface);
-        border-bottom: 1px solid var(--line);
-        display: none;
-        left: 0;
-        padding: 12px 32px 20px;
-        position: absolute;
-        right: 0;
-        top: 71px;
-      }
-
-      .mobile-menu.is-open {
-        display: grid;
-        gap: 3px;
-      }
-
-      .mobile-menu a,
-      .mobile-menu button {
-        align-items: center;
-        background: none;
-        border: 0;
+      .nav-actions {
         display: flex;
-        font-size: 0.94rem;
+        align-items: center;
+        gap: 8px;
+        margin-left: 24px;
+      }
+      .icon-btn,
+      .lang-btn {
+        height: 34px;
+        min-width: 34px;
+        padding: 0 10px;
+        border: 1px solid var(--line-mid);
+        border-radius: 9px;
+        background: var(--hover);
+        color: var(--t2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 500;
+        transition:
+          border-color 0.15s,
+          color 0.15s,
+          background 0.15s;
+      }
+      .icon-btn:hover,
+      .lang-btn:hover {
+        border-color: var(--acc-line);
+        color: var(--acc);
+      }
+      .lang-btn {
+        letter-spacing: 0.04em;
+      }
+      #themeBtn .sun {
+        display: none;
+      }
+      html[data-theme="light"] #themeBtn .sun {
+        display: block;
+      }
+      html[data-theme="light"] #themeBtn .moon {
+        display: none;
+      }
+      .nav-gh {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 34px;
+        padding: 0 14px;
+        border: 1px solid var(--line-mid);
+        border-radius: 9px;
+        font-size: 13px;
+        color: var(--t1);
+        text-decoration: none;
+      }
+      .nav-gh:hover {
+        border-color: var(--acc-line);
+        color: var(--acc);
+      }
+
+      /* ---------- HERO ---------- */
+      .hero {
+        position: relative;
+        padding: 104px 0 0;
+        text-align: center;
+        overflow: hidden;
+      }
+      .glow {
+        position: absolute;
+        left: 50%;
+        top: -220px;
+        width: 900px;
+        height: 520px;
+        transform: translateX(-50%);
+        pointer-events: none;
+        background: radial-gradient(
+          closest-side,
+          var(--glow),
+          var(--glow-2) 55%,
+          transparent 76%
+        );
+      }
+      .tag {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 28px;
+        padding: 0 14px;
+        border: 1px solid var(--line-mid);
+        border-radius: 999px;
+        background: var(--hover);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: var(--t2);
+      }
+      .pulse {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--acc);
+        box-shadow: 0 0 0 3px var(--acc-soft);
+      }
+      .hero h1 {
+        position: relative;
+        max-width: 20ch;
+        margin: 32px auto 0;
+        font-size: clamp(32px, 4.8vw, 52px);
+        line-height: 1.18;
+        letter-spacing: -0.02em;
         font-weight: 600;
-        min-height: 48px;
-        padding: 8px 0;
+      }
+      .hero h1 em {
+        font-style: normal;
+        color: var(--acc);
+        display: block;
+      }
+      .hero .sub {
+        position: relative;
+        max-width: 56ch;
+        margin: 28px auto 0;
+        font-size: 15px;
+        line-height: 1.85;
+        color: var(--t2);
+      }
+      .hero-cta {
+        position: relative;
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 42px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 48px;
+        padding: 0 24px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        transition:
+          transform 0.15s ease,
+          background 0.15s ease,
+          border-color 0.15s ease,
+          color 0.15s ease;
+      }
+      .btn-primary {
+        background: var(--acc);
+        color: var(--acc-ink);
+        font-weight: 600;
+      }
+      .btn-primary:hover {
+        background: var(--acc-deep);
+        color: #fff;
+        transform: translateY(-1px);
+      }
+      .btn-ghost {
+        border: 1px solid var(--line-mid);
+        background: var(--hover);
+        color: var(--t1);
+      }
+      .btn-ghost:hover {
+        border-color: var(--acc-line);
+        color: var(--acc);
+      }
+      .hero-meta {
+        position: relative;
+        display: flex;
+        gap: 10px 22px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 32px;
+        font-size: 11px;
+        letter-spacing: 0.09em;
+        color: var(--t3);
+      }
+      .hero-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .hero-meta span::before {
+        content: "";
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: var(--t3);
+      }
+      .stats {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-top: 68px;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+      .stat {
+        padding: 30px 24px;
+        border-right: 1px solid var(--line);
         text-align: left;
       }
-
-      .hero {
-        padding: 76px 0 44px;
+      .stat:last-child {
+        border-right: 0;
       }
-
-      .hero-grid {
-        align-items: center;
-        display: grid;
-        gap: 62px;
-        grid-template-columns: minmax(400px, 0.9fr) minmax(0, 1.1fr);
-      }
-
-      .hero-copy {
-        min-width: 0;
-      }
-
-      .kicker,
-      .section-kicker {
-        align-items: center;
-        color: var(--teal);
-        display: flex;
-        gap: 10px;
-      }
-
-      .kicker::before,
-      .section-kicker::before {
-        background: var(--coral);
-        border-radius: 50%;
-        content: "";
-        height: 8px;
-        width: 8px;
-      }
-
-      .hero h1 {
-        font-size: 4.5rem;
-        font-weight: 700;
-        letter-spacing: 0;
-        line-height: 1.06;
-        margin-top: 29px;
-        max-width: 590px;
-      }
-
-      .hero h1 span {
+      .stat b {
         display: block;
-      }
-
-      .hero h1 span:last-child {
-        color: var(--teal);
-      }
-
-      .hero-lede {
-        color: var(--ink);
-        font-size: 1.27rem;
+        font-size: 28px;
         font-weight: 600;
-        line-height: 1.48;
-        margin-top: 31px;
-        max-width: 420px;
+        letter-spacing: -0.01em;
       }
-
-      .hero-description {
-        color: var(--muted);
-        font-size: 0.96rem;
-        line-height: 1.68;
-        margin-top: 15px;
-        max-width: 470px;
+      .stat b small {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--t2);
+        margin-left: 2px;
       }
-
-      .hero-actions,
-      .download-actions {
-        align-items: center;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 34px;
-      }
-
-      .button-dark {
-        background: var(--ink);
-        border-color: var(--ink);
-        color: var(--white);
-      }
-
-      .button-light {
-        background: var(--surface);
-        border-color: var(--line-strong);
-        color: var(--ink);
-      }
-
-      .button-light:hover {
-        background: var(--surface-soft);
-        border-color: var(--ink);
-        transform: translateY(-2px);
-      }
-
-      .hero-meta {
-        align-items: center;
-        border-top: 1px solid var(--line);
-        color: var(--muted);
-        display: flex;
-        flex-wrap: wrap;
-        gap: 11px 20px;
-        margin-top: 31px;
-        padding-top: 19px;
-      }
-
-      .hero-meta span {
-        align-items: center;
-        display: inline-flex;
-        font-size: 0.68rem;
-        gap: 7px;
-      }
-
-      .hero-meta span::before {
-        background: var(--accent-strong);
-        border-radius: 50%;
-        content: "";
-        height: 6px;
-        width: 6px;
-      }
-
-      .product-shell {
-        background: var(--night);
-        border: 1px solid rgba(17, 26, 32, 0.86);
-        border-radius: 10px;
-        box-shadow: var(--shadow-dark);
-        color: var(--white);
-        min-width: 0;
-        padding: 12px;
-      }
-
-      .product-topbar {
-        align-items: center;
-        display: flex;
-        gap: 12px;
-        justify-content: space-between;
-        min-width: 0;
-        padding: 2px 5px 12px;
-      }
-
-      .window-dots {
-        display: flex;
-        flex-shrink: 0;
-        gap: 5px;
-      }
-
-      .window-dots i {
-        background: var(--coral);
-        border-radius: 50%;
+      .stat span {
         display: block;
-        height: 7px;
-        width: 7px;
+        margin-top: 6px;
+        font-size: 12.5px;
+        color: var(--t3);
       }
 
-      .window-dots i:nth-child(2) {
-        background: var(--accent);
-      }
-
-      .window-dots i:nth-child(3) {
-        background: #73a9d8;
-      }
-
-      .product-topbar strong,
-      .product-topbar span:last-child {
-        font-family: var(--mono);
-        font-size: 0.58rem;
-        font-weight: 400;
-        letter-spacing: 0.08em;
+      /* ---------- SHOTS ---------- */
+      .shot-frame {
+        position: relative;
+        background: var(--shot-bg);
+        border: 1px solid var(--line);
+        border-radius: 16px;
         overflow: hidden;
-        text-overflow: ellipsis;
-        text-transform: uppercase;
-        white-space: nowrap;
+        box-shadow: var(--shadow-soft);
       }
-
-      .product-topbar strong {
-        color: rgba(247, 250, 247, 0.66);
-        margin-left: auto;
-      }
-
-      .product-topbar span:last-child {
-        color: var(--accent);
-      }
-
-      .product-viewport {
-        background: #0d1519;
-        border: 1px solid rgba(247, 250, 247, 0.16);
-        border-radius: 5px;
-        overflow: hidden;
-      }
-
-      .product-viewport img,
-      .gallery-image-wrap img {
-        aspect-ratio: auto;
-        height: auto;
-        object-fit: contain;
+      .shot-frame img {
+        display: block;
         width: 100%;
+        height: auto;
+        object-fit: cover;
       }
-
-      .product-foot {
-        align-items: center;
-        color: rgba(247, 250, 247, 0.58);
+      .shot-frame.zoomable {
+        cursor: zoom-in;
+      }
+      .shot-frame.failed::after {
+        content: attr(data-ph);
+        position: absolute;
+        inset: 0;
         display: flex;
-        font-family: var(--mono);
-        font-size: 0.58rem;
-        justify-content: space-between;
-        letter-spacing: 0.04em;
-        padding: 11px 4px 1px;
-        text-transform: uppercase;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: var(--t3);
+        background: var(--shot-bg);
+      }
+      .shot-frame.failed img {
+        visibility: hidden;
+      }
+      .shot-frame.zoomable:not(.failed)::after {
+        content: "＋";
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: rgba(10, 12, 12, 0.55);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        border: 0.5px solid rgba(255, 255, 255, 0.28);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+      }
+      .shot-frame.zoomable:not(.failed):hover::after {
+        opacity: 1;
+      }
+      .shot-hero .shot-frame {
+        border-radius: 20px;
+        box-shadow: var(--shadow);
+      }
+      .shot-cap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 18px;
+        font-size: 13px;
+        color: var(--t3);
+      }
+      .shot-no {
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: var(--acc);
+        border: 1px solid var(--acc-line);
+        border-radius: 999px;
+        padding: 2px 10px;
+        flex: none;
+      }
+      .stage {
+        padding: 80px 0 0;
       }
 
-      .product-foot strong {
-        color: var(--accent);
+      /* ---------- SECTIONS ---------- */
+      section {
+        padding: 132px 0 0;
+      }
+      .sec-head {
+        max-width: 64ch;
+      }
+      .sec-tag {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        color: var(--acc);
+      }
+      .sec-tag::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: var(--line);
+      }
+      .sec-head h2 {
+        margin-top: 22px;
+        font-size: clamp(23px, 3vw, 33px);
+        line-height: 1.32;
+        letter-spacing: -0.015em;
+        font-weight: 600;
+      }
+      .sec-head p {
+        margin-top: 18px;
+        font-size: 14.5px;
+        line-height: 1.9;
+        color: var(--t2);
+      }
+
+      /* ---------- FEATURES ---------- */
+      .grid3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 22px;
+        margin-top: 60px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 32px;
+      }
+      .card-ico {
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--acc-soft);
+        color: var(--acc);
+      }
+      .card .en {
+        margin-top: 22px;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        color: var(--t3);
+      }
+      .card h3 {
+        margin-top: 8px;
+        font-size: 17.5px;
+        font-weight: 600;
+      }
+      .card p {
+        margin-top: 14px;
+        font-size: 13.5px;
+        line-height: 1.85;
+        color: var(--t2);
+      }
+      .card-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 24px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+      }
+      .card-tags span {
+        font-size: 11px;
+        color: var(--t3);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 10px;
+      }
+
+      /* ---------- GALLERY ---------- */
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 32px 32px;
+        margin-top: 64px;
+      }
+      .shot-item {
+        min-width: 0;
+      }
+      .shot-item .shot-frame {
+        aspect-ratio: 16/10;
+      }
+      .shot-item .shot-frame img {
+        height: 100%;
+        object-position: top center;
+        transition: transform 0.45s ease;
+      }
+      .shot-item:hover .shot-frame img {
+        transform: scale(1.02);
+      }
+      .shot-item figcaption {
+        margin-top: 18px;
+      }
+      .shot-item b {
+        display: block;
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--t1);
+      }
+      .shot-item span {
+        display: block;
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--t3);
+      }
+
+      /* ---------- FLOW ---------- */
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+        margin-top: 60px;
+      }
+      .step {
+        border-top: 1px solid var(--line);
+        padding-top: 28px;
+      }
+      .step-no {
+        font-size: 12px;
+        color: var(--acc);
+        letter-spacing: 0.1em;
+      }
+      .step h3 {
+        margin-top: 16px;
+        font-size: 16.5px;
+        font-weight: 600;
+      }
+      .step p {
+        margin-top: 12px;
+        font-size: 13.5px;
+        line-height: 1.85;
+        color: var(--t2);
+      }
+      .notice {
+        margin-top: 60px;
+        display: flex;
+        gap: 16px;
+        padding: 24px 28px;
+        border-radius: 14px;
+        border: 1px solid var(--line-mid);
+        border-left: 2px solid var(--amber);
+        background: var(--amber-soft);
+      }
+      .notice svg {
+        flex: none;
+        margin-top: 3px;
+        color: var(--amber);
+      }
+      .notice p {
+        font-size: 13.5px;
+        line-height: 1.9;
+        color: var(--t2);
+      }
+      .notice strong {
+        color: var(--t1);
         font-weight: 500;
       }
 
-      .proof-strip {
-        border-bottom: 1px solid var(--line);
-        border-top: 1px solid var(--line);
-        margin-top: 58px;
-      }
-
-      .proof-grid {
-        display: grid;
-        grid-template-columns: 1.35fr repeat(4, 1fr);
-        min-height: 104px;
-      }
-
-      .proof-intro,
-      .proof-stat {
-        align-items: center;
-        display: flex;
-      }
-
-      .proof-intro {
-        color: var(--muted);
-        font-size: 0.78rem;
-        font-weight: 600;
-        gap: 10px;
-        padding-right: 20px;
-      }
-
-      .proof-intro svg {
-        color: var(--teal);
-        flex-shrink: 0;
-        height: 21px;
-        width: 21px;
-      }
-
-      .proof-stat {
-        border-left: 1px solid var(--line);
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: center;
-        padding-left: 18px;
-      }
-
-      .proof-stat strong {
-        font-size: 1.35rem;
-        font-weight: 700;
-        letter-spacing: 0;
-        line-height: 1.1;
-      }
-
-      .proof-stat span {
-        color: var(--muted);
-        font-family: var(--mono);
-        font-size: 0.58rem;
-        letter-spacing: 0.03em;
-        line-height: 1.35;
-        margin-top: 8px;
-        text-transform: uppercase;
-      }
-
-      .section {
-        padding: 132px 0;
-      }
-
-      .section-heading {
-        font-size: 3.15rem;
-        font-weight: 700;
-        letter-spacing: 0;
-        line-height: 1.13;
-        margin-top: 20px;
-        max-width: 720px;
-      }
-
-      .section-intro {
-        color: var(--muted);
-        font-size: 0.98rem;
-        line-height: 1.72;
-        max-width: 525px;
-      }
-
-      .section-topline {
-        align-items: end;
-        display: flex;
-        gap: 48px;
-        justify-content: space-between;
-      }
-
-      .features-section {
-        background: var(--surface);
-        border-bottom: 1px solid var(--line);
-        border-top: 1px solid var(--line);
-      }
-
-      .feature-grid {
-        display: grid;
-        gap: 18px;
-        grid-template-columns: repeat(3, 1fr);
-        margin-top: 64px;
-      }
-
-      .feature-card {
-        background: var(--canvas);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        min-height: 352px;
-        padding: 26px;
-        transition:
-          border-color 180ms ease,
-          box-shadow 180ms ease,
-          transform 180ms var(--ease);
-      }
-
-      .feature-card:hover {
-        border-color: var(--line-strong);
-        box-shadow: 0 14px 28px rgba(21, 33, 31, 0.08);
-        transform: translateY(-4px);
-      }
-
-      .feature-card-head {
-        align-items: center;
-        display: flex;
-        gap: 11px;
-        justify-content: space-between;
-      }
-
-      .feature-index {
-        color: var(--teal);
-        font-family: var(--mono);
-        font-size: 0.65rem;
-      }
-
-      .feature-icon {
-        align-items: center;
-        background: var(--accent);
-        border-radius: 5px;
-        color: var(--ink);
-        display: inline-flex;
-        height: 38px;
-        justify-content: center;
-        width: 38px;
-      }
-
-      .feature-icon svg {
-        height: 19px;
-        width: 19px;
-      }
-
-      .feature-card h3 {
-        font-size: 1.35rem;
-        font-weight: 700;
-        letter-spacing: 0;
-        line-height: 1.18;
-        margin-top: 68px;
-      }
-
-      .feature-card p {
-        color: var(--muted);
-        font-size: 0.86rem;
-        line-height: 1.68;
-        margin-top: 14px;
-        max-width: 335px;
-      }
-
-      .feature-pills {
+      /* ---------- PLATFORMS ---------- */
+      .plats {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 25px;
-      }
-
-      .feature-pills span {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-radius: 3px;
-        color: var(--muted);
-        font-family: var(--mono);
-        font-size: 0.58rem;
-        padding: 5px 7px;
-      }
-
-      .showcase-section {
-        background: var(--night);
-        color: var(--white);
-        overflow: hidden;
-      }
-
-      .showcase-section::before {
-        background-image: linear-gradient(
-          rgba(247, 250, 247, 0.05) 1px,
-          transparent 1px
-        );
-        background-size: 100% 42px;
-        content: "";
-        inset: 0;
-        opacity: 0.42;
-        pointer-events: none;
-        position: absolute;
-      }
-
-      .showcase-section {
-        position: relative;
-      }
-
-      .showcase-section > .wrap {
-        position: relative;
-        z-index: 1;
-      }
-
-      .showcase-section .section-kicker,
-      .showcase-section .section-intro {
-        color: rgba(247, 250, 247, 0.62);
-      }
-
-      .showcase-section .section-heading {
-        color: var(--white);
-      }
-
-      .gallery-layout {
-        align-items: start;
-        display: grid;
-        gap: 32px;
-        grid-template-columns: minmax(0, 1fr) 280px;
-        margin-top: 64px;
-      }
-
-      .gallery-stage {
-        background: var(--night-soft);
-        border: 1px solid var(--night-line);
-        border-radius: 9px;
-        box-shadow: var(--shadow-dark);
-        min-width: 0;
-        padding: 16px;
-      }
-
-      .gallery-window-bar {
-        align-items: center;
-        display: flex;
-        gap: 16px;
-        justify-content: space-between;
-        padding: 1px 5px 14px;
-      }
-
-      .gallery-window-bar span {
-        color: rgba(247, 250, 247, 0.52);
-        font-family: var(--mono);
-        font-size: 0.59rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .gallery-window-bar span:last-child {
-        color: var(--accent);
-      }
-
-      .gallery-image-wrap {
-        background: #0d1519;
-        border: 1px solid rgba(247, 250, 247, 0.14);
-        border-radius: 5px;
-        overflow: hidden;
-      }
-
-      .gallery-caption {
-        align-items: end;
-        display: flex;
-        gap: 20px;
-        justify-content: space-between;
-        padding: 21px 5px 3px;
-      }
-
-      .gallery-caption strong {
-        font-size: 1.08rem;
-        font-weight: 700;
-        letter-spacing: 0;
-        line-height: 1.25;
-      }
-
-      .gallery-caption p {
-        color: rgba(247, 250, 247, 0.58);
-        font-size: 0.77rem;
-        line-height: 1.62;
-        max-width: 400px;
-        text-align: right;
-      }
-
-      .gallery-controls {
-        display: grid;
-        gap: 9px;
-      }
-
-      .shot-button {
-        align-items: center;
-        background: rgba(247, 250, 247, 0.045);
-        border: 1px solid transparent;
-        border-radius: 6px;
-        color: rgba(247, 250, 247, 0.58);
-        cursor: pointer;
-        display: grid;
-        gap: 10px;
-        grid-template-columns: 27px 1fr 15px;
-        min-height: 54px;
-        padding: 10px 12px;
-        text-align: left;
-        transition:
-          background-color 180ms ease,
-          border-color 180ms ease,
-          color 180ms ease,
-          transform 180ms ease;
-        width: 100%;
-      }
-
-      .shot-button:hover,
-      .shot-button.is-active {
-        background: rgba(199, 243, 107, 0.12);
-        border-color: rgba(199, 243, 107, 0.5);
-        color: var(--accent);
-      }
-
-      .shot-button:hover {
-        transform: translateX(3px);
-      }
-
-      .shot-number {
-        color: var(--coral);
-        font-family: var(--mono);
-        font-size: 0.6rem;
-      }
-
-      .shot-button strong {
-        font-size: 0.76rem;
-        font-weight: 600;
-        line-height: 1.3;
-      }
-
-      .shot-button svg {
-        height: 14px;
-        opacity: 0.65;
-        width: 14px;
-      }
-
-      .workflow-section {
-        background: var(--canvas-deep);
-        border-bottom: 1px solid var(--line);
-      }
-
-      .workflow-grid {
-        display: grid;
-        gap: 0;
-        grid-template-columns: repeat(3, 1fr);
-        margin-top: 70px;
-      }
-
-      .workflow-step {
-        border-left: 1px solid var(--line-strong);
-        min-height: 278px;
-        padding: 0 36px;
-      }
-
-      .workflow-step:first-child {
-        border-left: 0;
-        padding-left: 0;
-      }
-
-      .workflow-step:last-child {
-        padding-right: 0;
-      }
-
-      .step-number {
-        color: var(--teal);
-        font-family: var(--mono);
-        font-size: 0.65rem;
-      }
-
-      .workflow-step h3 {
-        font-size: 1.75rem;
-        font-weight: 700;
-        letter-spacing: 0;
-        line-height: 1.18;
-        margin: 70px 0 16px;
-      }
-
-      .workflow-step p {
-        color: var(--muted);
-        font-size: 0.87rem;
-        line-height: 1.68;
-        max-width: 275px;
-      }
-
-      .source-note {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        border-left: 4px solid var(--teal);
-        border-radius: 6px;
-        color: var(--muted);
-        font-size: 0.81rem;
-        line-height: 1.68;
-        margin-top: 58px;
-        max-width: 780px;
-        padding: 18px 22px;
-      }
-
-      .source-note strong {
-        color: var(--ink);
-      }
-
-      .platform-section {
-        background: var(--surface);
-      }
-
-      .platform-list {
-        display: grid;
-        gap: 14px;
-        grid-template-columns: repeat(6, 1fr);
-        margin-top: 58px;
-      }
-
-      .platform-item {
-        align-items: center;
-        background: var(--canvas);
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        display: flex;
         gap: 12px;
-        min-height: 88px;
-        padding: 16px;
-        transition:
-          border-color 180ms ease,
-          transform 180ms var(--ease);
+        margin-top: 44px;
       }
-
-      .platform-item:hover {
-        border-color: var(--teal);
-        transform: translateY(-3px);
-      }
-
-      .platform-mark {
-        align-items: center;
-        background: var(--night);
-        border-radius: 4px;
-        color: var(--accent);
+      .plat {
         display: inline-flex;
-        flex-shrink: 0;
-        font-family: var(--mono);
-        font-size: 0.64rem;
-        height: 31px;
-        justify-content: center;
-        width: 31px;
+        align-items: center;
+        gap: 10px;
+        height: 44px;
+        padding: 0 20px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: var(--card);
+        font-size: 13.5px;
+        color: var(--t2);
+      }
+      .plat b {
+        font-weight: 500;
+        color: var(--t1);
+      }
+      .plat i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--acc);
       }
 
-      .platform-item strong {
-        font-size: 0.8rem;
-        font-weight: 600;
-        line-height: 1.3;
-      }
-
-      .platform-item small {
-        color: var(--muted);
-        display: block;
-        font-size: 0.65rem;
-        line-height: 1.35;
-        margin-top: 5px;
-      }
-
-      .platform-note {
-        color: var(--muted);
-        font-size: 0.84rem;
-        line-height: 1.68;
-        margin-top: 26px;
-        max-width: 760px;
-      }
-
-      .download-section {
-        background: var(--night);
-        color: var(--white);
-        overflow: hidden;
-        padding: 132px 0 112px;
-        position: relative;
-      }
-
-      .download-section::after {
-        border: 1px solid rgba(199, 243, 107, 0.24);
-        content: "";
-        height: 360px;
-        position: absolute;
-        right: -130px;
-        top: 80px;
-        transform: rotate(20deg);
-        width: 360px;
-      }
-
-      .download-grid {
-        align-items: end;
+      /* ---------- DOWNLOAD ---------- */
+      .dl {
         display: grid;
-        gap: 76px;
-        grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
-        position: relative;
-        z-index: 1;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 22px;
+        margin-top: 60px;
       }
-
-      .download-section .section-kicker {
-        color: rgba(247, 250, 247, 0.63);
-      }
-
-      .download-section .section-heading {
-        color: var(--white);
-        font-size: 3.65rem;
-        max-width: 660px;
-      }
-
-      .download-section .section-heading span {
-        color: var(--accent);
-      }
-
-      .download-copy {
-        color: rgba(247, 250, 247, 0.65);
-        font-size: 0.94rem;
-        line-height: 1.72;
-        margin-top: 26px;
-        max-width: 535px;
-      }
-
-      .download-section .button-dark {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: var(--ink);
-      }
-
-      .download-section .button-dark:hover {
-        background: var(--white);
-        border-color: var(--white);
-        color: var(--ink);
-      }
-
-      .download-section .button-light {
-        background: transparent;
-        border-color: rgba(247, 250, 247, 0.35);
-        color: var(--white);
-      }
-
-      .download-section .button-light:hover {
-        background: rgba(247, 250, 247, 0.1);
-        border-color: rgba(247, 250, 247, 0.7);
-      }
-
-      .release-list {
-        border-top: 1px solid var(--night-line);
-      }
-
-      .release-row {
-        align-items: center;
-        border-bottom: 1px solid var(--night-line);
+      .dl-card {
         display: flex;
-        gap: 16px;
-        justify-content: space-between;
-        min-height: 72px;
+        flex-direction: column;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 30px;
       }
-
-      .release-row strong {
-        font-size: 0.82rem;
+      .dl-card.hl {
+        border-color: var(--acc-line);
+        background: var(--card-2);
+      }
+      .dl-os {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        color: var(--t3);
+      }
+      .dl-card h3 {
+        margin-top: 6px;
+        font-size: 17.5px;
         font-weight: 600;
       }
-
-      .release-row span {
-        color: rgba(247, 250, 247, 0.53);
-        font-family: var(--mono);
-        font-size: 0.59rem;
-        text-align: right;
+      .dl-card p {
+        margin-top: 10px;
+        font-size: 13px;
+        line-height: 1.8;
+        color: var(--t2);
       }
-
-      .release-note {
-        color: rgba(247, 250, 247, 0.5);
-        font-size: 0.72rem;
-        line-height: 1.6;
-        margin-top: 21px;
-      }
-
-      footer {
-        background: var(--night);
-        border-top: 1px solid var(--night-line);
-        color: var(--white);
-        padding: 30px 0 35px;
-      }
-
-      .footer-top {
+      .dl-card a {
+        margin-top: 26px;
+        display: inline-flex;
         align-items: center;
-        display: flex;
-        gap: 28px;
-        justify-content: space-between;
+        gap: 7px;
+        font-size: 13.5px;
+        color: var(--acc);
+        text-decoration: none;
+      }
+      .dl-card a:hover {
+        color: var(--acc-deep);
+      }
+      .dl-note {
+        margin-top: 28px;
+        font-size: 12.5px;
+        line-height: 1.8;
+        color: var(--t3);
       }
 
-      .footer-brand .brand-name {
-        font-size: 1.06rem;
-      }
-
-      .footer-brand .brand-name small {
-        color: rgba(247, 250, 247, 0.55);
-      }
-
-      .footer-links {
+      /* ---------- FOLLOW ---------- */
+      .follow-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 52px;
         align-items: center;
-        color: rgba(247, 250, 247, 0.61);
+        margin-top: 60px;
+        padding: 52px 56px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: var(--card);
+      }
+      .follow-qr {
+        width: 190px;
+        height: 190px;
+        border-radius: 18px;
+        overflow: hidden;
+        flex: none;
+        border: 1px solid var(--line-mid);
+        background: var(--shot-bg);
+        padding: 12px;
+      }
+      .follow-qr img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        border-radius: 8px;
+      }
+      .follow-text h2 {
+        margin-top: 20px;
+        font-size: clamp(21px, 2.4vw, 27px);
+        line-height: 1.35;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .follow-text p {
+        margin-top: 14px;
+        font-size: 14px;
+        line-height: 1.9;
+        color: var(--t2);
+        max-width: 52ch;
+      }
+      .follow-links {
         display: flex;
         flex-wrap: wrap;
-        font-size: 0.72rem;
-        gap: 20px;
-      }
-
-      .footer-links a:hover {
-        color: var(--accent);
-      }
-
-      .footer-bottom {
-        border-top: 1px solid var(--night-line);
-        color: rgba(247, 250, 247, 0.47);
-        display: flex;
-        font-size: 0.69rem;
-        gap: 30px;
-        justify-content: space-between;
+        gap: 12px;
         margin-top: 28px;
-        padding-top: 20px;
       }
-
-      .footer-bottom p {
-        max-width: 790px;
-      }
-
-      .reveal {
-        opacity: 0;
-        transform: translateY(16px);
+      .follow-links a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 18px;
+        border: 1px solid var(--line-mid);
+        border-radius: 10px;
+        background: var(--hover);
+        font-size: 13px;
+        color: var(--t1);
+        text-decoration: none;
         transition:
-          opacity 620ms var(--ease),
-          transform 620ms var(--ease);
+          border-color 0.15s,
+          color 0.15s;
+      }
+      .follow-links a:hover {
+        border-color: var(--acc-line);
+        color: var(--acc);
       }
 
-      .reveal.is-visible {
-        opacity: 1;
-        transform: none;
+      /* ---------- FOOTER ---------- */
+      footer {
+        margin-top: 132px;
+        border-top: 1px solid var(--line);
+        padding: 40px 0 64px;
+      }
+      .foot {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .foot-l {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--t2);
+      }
+      .foot-links {
+        margin-left: auto;
+        display: flex;
+        gap: 22px;
+        font-size: 12.5px;
+      }
+      .foot-links a {
+        color: var(--t3);
+        text-decoration: none;
+      }
+      .foot-links a:hover {
+        color: var(--acc);
       }
 
-      .hero-copy > * {
-        animation: enter 650ms var(--ease) both;
+      /* ---------- LIGHTBOX ---------- */
+      .lightbox {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 64px 40px 40px;
+        background: rgba(8, 10, 10, 0.9);
+      }
+      .lightbox.on {
+        display: flex;
+      }
+      .lb-inner {
+        margin: 0;
+        max-width: min(1320px, 94vw);
+        max-height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        align-items: center;
+      }
+      .lb-inner img {
+        width: auto;
+        max-width: 100%;
+        max-height: 76vh;
+        object-fit: contain;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: #0c0f10;
+      }
+      .lb-cap {
+        max-width: 80ch;
+        text-align: center;
+      }
+      .lb-cap b {
+        display: block;
+        font-size: 15px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.95);
+      }
+      .lb-cap span {
+        display: block;
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.55);
+      }
+      .lb-close {
+        position: absolute;
+        top: 22px;
+        right: 28px;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.07);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        line-height: 1;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+      .lb-close:hover {
+        background: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.4);
       }
 
-      .hero-copy > :nth-child(2) {
-        animation-delay: 70ms;
-      }
-
-      .hero-copy > :nth-child(3) {
-        animation-delay: 130ms;
-      }
-
-      .hero-copy > :nth-child(4) {
-        animation-delay: 190ms;
-      }
-
-      .hero-copy > :nth-child(5) {
-        animation-delay: 250ms;
-      }
-
-      @keyframes enter {
-        from {
-          opacity: 0;
-          transform: translateY(14px);
+      @media (max-width: 1000px) {
+        .stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        to {
-          opacity: 1;
-          transform: none;
+        .stat:nth-child(2) {
+          border-right: 0;
         }
-      }
-
-      @media (max-width: 1080px) {
-        .hero-grid {
-          gap: 40px;
-          grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+        .stat:nth-child(1),
+        .stat:nth-child(2) {
+          border-bottom: 1px solid var(--line);
         }
-
-        .hero h1 {
-          font-size: 4rem;
+        .grid3,
+        .flow,
+        .dl {
+          grid-template-columns: 1fr;
         }
-
-        .gallery-layout {
-          grid-template-columns: minmax(0, 1fr) 240px;
-        }
-
-        .platform-list {
-          grid-template-columns: repeat(3, 1fr);
-        }
-      }
-
-      @media (max-width: 860px) {
         .nav-links {
           display: none;
         }
-
-        .menu-button {
-          display: inline-flex;
-        }
-
-        .hero-grid,
-        .download-grid {
+        .follow-card {
           grid-template-columns: 1fr;
-        }
-
-        .hero-copy {
-          max-width: 640px;
-        }
-
-        .product-shell {
-          max-width: 800px;
-        }
-
-        .proof-grid {
-          grid-template-columns: repeat(4, 1fr);
-        }
-
-        .proof-intro {
-          grid-column: 1 / -1;
-          min-height: 58px;
-        }
-
-        .proof-stat {
-          border-top: 1px solid var(--line);
-          min-height: 78px;
-        }
-
-        .proof-stat:first-of-type {
-          border-left: 0;
-          padding-left: 0;
-        }
-
-        .feature-grid {
-          grid-template-columns: repeat(2, 1fr);
-        }
-
-        .feature-card:last-child {
-          grid-column: 1 / -1;
-        }
-
-        .gallery-layout {
-          grid-template-columns: 1fr;
-        }
-
-        .gallery-controls {
-          grid-template-columns: repeat(2, 1fr);
-        }
-
-        .workflow-grid {
-          grid-template-columns: 1fr;
-          gap: 0;
-        }
-
-        .workflow-step,
-        .workflow-step:first-child,
-        .workflow-step:last-child {
-          border-left: 0;
-          border-top: 1px solid var(--line-strong);
-          min-height: 0;
-          padding: 25px 0;
-        }
-
-        .workflow-step:first-child {
-          border-top: 0;
-          padding-top: 0;
-        }
-
-        .workflow-step h3 {
-          margin-top: 25px;
+          gap: 36px;
+          padding: 40px;
+          justify-items: flex-start;
         }
       }
-
-      @media (max-width: 620px) {
+      @media (max-width: 900px) {
+        .gallery {
+          grid-template-columns: 1fr;
+          gap: 44px;
+        }
+      }
+      @media (max-width: 640px) {
         .wrap {
-          padding-left: 20px;
-          padding-right: 20px;
+          padding: 0 20px;
         }
-
-        .site-header {
-          height: 66px;
+        section {
+          padding: 88px 0 0;
         }
-
-        .mobile-menu {
-          padding-left: 20px;
-          padding-right: 20px;
-          top: 65px;
-        }
-
-        .brand-mark {
-          height: 30px;
-          width: 30px;
-        }
-
-        .brand-name {
-          font-size: 1rem;
-        }
-
         .hero {
-          padding-top: 56px;
+          padding: 68px 0 0;
         }
-
-        .hero h1 {
-          font-size: 3rem;
-          line-height: 1.02;
-          margin-top: 20px;
-        }
-
-        .hero-lede {
-          font-size: 1.1rem;
-          margin-top: 23px;
-        }
-
-        .hero-description {
-          font-size: 0.9rem;
-        }
-
-        .hero-actions,
-        .download-actions {
-          align-items: stretch;
-          flex-direction: column;
-        }
-
-        .button {
-          width: 100%;
-        }
-
-        .product-shell {
-          padding: 8px;
-        }
-
-        .product-topbar {
-          padding-bottom: 9px;
-        }
-
-        .product-topbar strong {
-          display: none;
-        }
-
-        .product-foot {
-          font-size: 0.52rem;
-          gap: 8px;
-        }
-
-        .proof-strip {
-          margin-top: 44px;
-        }
-
-        .proof-grid {
-          grid-template-columns: repeat(2, 1fr);
-          padding-bottom: 10px;
-        }
-
-        .proof-intro {
-          grid-column: 1 / -1;
-          min-height: 64px;
-          padding-right: 0;
-        }
-
-        .proof-stat {
-          border-top: 1px solid var(--line);
-          min-height: 73px;
-          padding-left: 0;
-        }
-
-        .proof-stat:nth-child(odd) {
-          border-left: 0;
-        }
-
-        .section,
-        .download-section {
-          padding: 78px 0;
-        }
-
-        .section-topline {
-          align-items: start;
-          display: block;
-        }
-
-        .section-heading,
-        .download-section .section-heading {
-          font-size: 2.35rem;
-        }
-
-        .section-intro {
-          font-size: 0.9rem;
-          margin-top: 17px;
-        }
-
-        .feature-grid {
+        .stats {
           grid-template-columns: 1fr;
-          margin-top: 38px;
         }
-
-        .feature-card,
-        .feature-card:last-child {
-          grid-column: auto;
-          min-height: 275px;
+        .stat {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
         }
-
-        .feature-card h3 {
-          margin-top: 52px;
+        .nav-gh {
+          padding: 0 10px;
         }
-
-        .gallery-layout {
-          gap: 17px;
-          margin-top: 38px;
+        .lightbox {
+          padding: 56px 16px 24px;
         }
-
-        .gallery-stage {
-          padding: 8px;
+        .lb-close {
+          top: 14px;
+          right: 14px;
+          width: 38px;
+          height: 38px;
         }
-
-        .gallery-caption {
-          align-items: start;
-          display: block;
-          padding-top: 14px;
-        }
-
-        .gallery-caption p {
-          margin-top: 7px;
-          text-align: left;
-        }
-
-        .gallery-controls {
-          gap: 6px;
-        }
-
-        .shot-button {
-          gap: 7px;
-          grid-template-columns: 23px 1fr;
-          min-height: 52px;
-          padding: 8px;
-        }
-
-        .shot-button svg {
-          display: none;
-        }
-
-        .shot-button strong {
-          font-size: 0.7rem;
-        }
-
-        .platform-list {
-          grid-template-columns: repeat(2, 1fr);
-          margin-top: 35px;
-        }
-
-        .platform-item {
-          min-height: 68px;
-          padding: 10px;
-        }
-
-        .platform-item strong {
-          font-size: 0.7rem;
-        }
-
-        .platform-item small {
-          font-size: 0.58rem;
-        }
-
-        .download-grid {
-          gap: 43px;
-        }
-
-        .download-section::after {
-          opacity: 0.5;
-          right: -220px;
-        }
-
-        .footer-top,
-        .footer-bottom {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-
-        .footer-links {
-          gap: 12px 17px;
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        html {
-          scroll-behavior: auto;
-        }
-
-        *,
-        *::before,
-        *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          scroll-behavior: auto !important;
-          transition-duration: 0.01ms !important;
-        }
-
-        .reveal,
-        .hero-copy > * {
-          opacity: 1;
-          transform: none;
+        .follow-qr {
+          width: 160px;
+          height: 160px;
         }
       }
     </style>
   </head>
   <body>
-    <a class="skip-link" href="#main-content" data-i18n="controls.skip"
-      >跳到主要内容</a
-    >
-
-    <header class="site-header">
-      <div class="wrap nav">
-        <a class="brand" href="#top" aria-label="Museek 拾音">
-          <img
-            class="brand-mark"
-            src="./app-icon.svg"
-            alt=""
-            width="32"
-            height="32"
-          />
-          <span class="brand-name">Museek <small>拾音</small></span>
+    <div class="nav">
+      <div class="wrap nav-in">
+        <a class="brand" href="#top">
+          <span class="brand-mark">拾</span>
+          <span>Museek 拾音</span>
         </a>
-        <nav class="nav-links" aria-label="Primary navigation">
-          <a href="#features" data-i18n="nav.features">功能</a>
-          <a href="#gallery" data-i18n="nav.gallery">界面</a>
-          <a href="#workflow" data-i18n="nav.workflow">工作流</a>
-          <a href="#download" data-i18n="nav.download">下载</a>
+        <nav class="nav-links">
+          <a href="#features" data-en="Features" data-zh="功能">功能</a>
+          <a href="#gallery" data-en="Screens" data-zh="界面">界面</a>
+          <a href="#flow" data-en="Workflow" data-zh="工作流">工作流</a>
+          <a href="#download" data-en="Download" data-zh="下载">下载</a>
+        </nav>
+        <div class="nav-actions">
           <button
-            class="language-button"
-            id="languageButton"
+            class="icon-btn"
+            id="themeBtn"
             type="button"
-            aria-label="切换为 English"
+            aria-label="切换浅色 / 深色模式"
+          >
+            <svg class="ico sun" viewBox="0 0 16 16">
+              <circle cx="8" cy="8" r="3.1" />
+              <path
+                d="M8 1.4v1.6M8 13v1.6M1.4 8H3M13 8h1.6M3.3 3.3l1.1 1.1M11.6 11.6l1.1 1.1M12.7 3.3l-1.1 1.1M4.4 11.6l-1.1 1.1"
+              />
+            </svg>
+            <svg class="ico moon" viewBox="0 0 16 16">
+              <path
+                d="M13.2 10.3A5.8 5.8 0 0 1 5.7 2.8a5.8 5.8 0 1 0 7.5 7.5z"
+              />
+            </svg>
+          </button>
+          <button
+            class="lang-btn"
+            id="langBtn"
+            type="button"
+            aria-label="切换语言"
           >
             EN
           </button>
           <a
-            class="nav-github"
+            class="nav-gh"
             href="https://github.com/aeroray/Museek"
             target="_blank"
             rel="noopener"
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <svg
+              class="ico ico-fill"
+              viewBox="0 0 24 24"
+              style="width: 15px; height: 15px"
+            >
               <path
-                d="M12 .5C5.65.5.5 5.65.5 12c0 5.1 3.3 9.43 7.88 10.96.58.1.8-.25.8-.56v-2.16c-3.2.7-3.87-1.55-3.87-1.55-.53-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.04 1.77 2.73 1.26 3.4.96.1-.75.4-1.26.73-1.55-2.55-.3-5.23-1.27-5.23-5.68 0-1.25.45-2.27 1.2-3.07-.12-.3-.52-1.54.12-3.03 0 0 .98-.31 3.2 1.17a11.1 11.1 0 0 1 5.82 0c2.22-1.48 3.2-1.17 3.2-1.17.64 1.49.24 2.73.12 3.03.75.8 1.2 1.82 1.2 3.07 0 4.42-2.68 5.38-5.24 5.67.41.36.78 1.08.78 2.18v3.23c0 .31.21.67.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"
+                d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.53.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.62-2.81 5.64-5.49 5.94.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 24 12.5C24 5.87 18.63.5 12 .5z"
               />
             </svg>
             GitHub
           </a>
-        </nav>
-        <button
-          class="menu-button"
-          id="menuButton"
-          type="button"
-          aria-expanded="false"
-          aria-controls="mobileMenu"
-          aria-label="打开菜单"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            aria-hidden="true"
-          >
-            <path d="M4 7h16M4 12h16M4 17h16" />
-          </svg>
-        </button>
+        </div>
       </div>
-      <nav class="mobile-menu" id="mobileMenu" aria-label="Mobile navigation">
-        <a href="#features" data-i18n="nav.features">功能</a>
-        <a href="#gallery" data-i18n="nav.gallery">界面</a>
-        <a href="#workflow" data-i18n="nav.workflow">工作流</a>
-        <a href="#download" data-i18n="nav.download">下载</a>
-        <button id="mobileLanguageButton" type="button">
-          <span data-i18n="controls.switchLanguage">切换为 English</span>
-        </button>
-      </nav>
+    </div>
+
+    <header class="hero" id="top">
+      <div class="glow"></div>
+      <div class="wrap">
+        <span class="tag"
+          ><span class="pulse"></span
+          ><span data-en="Desktop Music Workspace" data-zh="桌面音乐工作台"
+            >桌面音乐工作台</span
+          ></span
+        >
+        <h1>
+          <span data-en="Find your next song," data-zh="把下一首歌，"
+            >把下一首歌，</span
+          >
+          <em data-en="faster." data-zh="找得更顺手。">找得更顺手。</em>
+        </h1>
+        <p
+          class="sub"
+          data-en="A cross-platform music workspace built for desktop listening. Discovery, playback, lyrics, favorites, local files, and downloads — all back in one clear workflow."
+          data-zh="一个为桌面听歌设计的跨平台音乐工作台。从发现、播放到歌词、收藏、本地音乐与下载，把散落的音乐线索放回同一条清晰的工作流。"
+        >
+          一个为桌面听歌设计的跨平台音乐工作台。从发现、播放到歌词、收藏、本地音乐与下载，把散落的音乐线索放回同一条清晰的工作流。
+        </p>
+        <div class="hero-cta">
+          <a
+            class="btn btn-primary"
+            href="https://github.com/aeroray/Museek/releases/latest"
+            target="_blank"
+            rel="noopener"
+          >
+            <span data-en="Download latest" data-zh="下载最新版本"
+              >下载最新版本</span
+            >
+            <svg class="ico" viewBox="0 0 16 16">
+              <path d="M8 2.5v7" />
+              <path d="M5 7l3 3 3-3" />
+              <path d="M3 12.5h10" />
+            </svg>
+          </a>
+          <a
+            class="btn btn-ghost"
+            href="https://github.com/aeroray/Museek"
+            target="_blank"
+            rel="noopener"
+          >
+            <span data-en="View source on GitHub" data-zh="查看 GitHub 源码"
+              >查看 GitHub 源码</span
+            >
+          </a>
+        </div>
+        <div class="hero-meta">
+          <span>OPEN SOURCE</span>
+          <span>WINDOWS + MACOS</span>
+          <span>TAURI 2 · REACT 19</span>
+          <span data-en="MIT LICENSED" data-zh="MIT 开源许可"
+            >MIT 开源许可</span
+          >
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <b>5<small data-en="" data-zh="个"></small></b
+            ><span
+              data-en="platforms, one search box"
+              data-zh="平台统一搜索入口"
+              >平台统一搜索入口</span
+            >
+          </div>
+          <div class="stat">
+            <b>1<small data-en="" data-zh="条"></small></b
+            ><span data-en="unified playback queue" data-zh="统一播放队列"
+              >统一播放队列</span
+            >
+          </div>
+          <div class="stat">
+            <b>3<small data-en="" data-zh="步"></small></b
+            ><span
+              data-en="discover · resolve · play"
+              data-zh="发现 · 解析 · 播放"
+              >发现 · 解析 · 播放</span
+            >
+          </div>
+          <div class="stat">
+            <b>100<small>%</small></b
+            ><span data-en="local-first settings" data-zh="设置与数据本地优先"
+              >设置与数据本地优先</span
+            >
+          </div>
+        </div>
+      </div>
     </header>
 
-    <main id="main-content">
-      <section class="hero" id="top">
-        <div class="wrap">
-          <div class="hero-grid">
-            <div class="hero-copy">
-              <p class="kicker mono" data-i18n="hero.kicker">
-                DESKTOP MUSIC WORKSPACE
-              </p>
-              <h1>
-                <span data-i18n="hero.titleLine1">把下一首歌，</span>
-                <span data-i18n="hero.titleLine2">找得更顺手。</span>
-              </h1>
-              <p class="hero-lede" data-i18n="hero.lede">
-                一个为桌面听歌设计的跨平台音乐工作台。
-              </p>
-              <p class="hero-description" data-i18n="hero.description">
-                从发现、播放到歌词、收藏、本地音乐与下载，把散落的音乐线索放回同一条清晰的工作流。
-              </p>
-              <div class="hero-actions">
-                <a
-                  class="button button-dark"
-                  href="https://github.com/aeroray/Museek/releases/latest"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
-                    />
-                  </svg>
-                  <span data-i18n="hero.download">下载最新版本</span>
-                </a>
-                <a
-                  class="button button-light"
-                  href="https://github.com/aeroray/Museek"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <span data-i18n="hero.github">查看 GitHub 源码</span>
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M5 12h13m-6-6 6 6-6 6" />
-                  </svg>
-                </a>
-              </div>
-              <div class="hero-meta mono">
-                <span data-i18n="hero.meta.one">Open source</span>
-                <span data-i18n="hero.meta.two">Windows + macOS</span>
-                <span data-i18n="hero.meta.three">Tauri 2 / React 19</span>
-              </div>
-            </div>
-
-            <div class="product-shell" aria-label="Museek app preview">
-              <div class="product-topbar">
-                <span class="window-dots" aria-hidden="true"
-                  ><i></i><i></i><i></i
-                ></span>
-                <strong>Museek / Search desk</strong>
-                <span data-i18n="hero.previewStatus">LIVE / 01</span>
-              </div>
-              <div class="product-viewport">
-                <img
-                  src="./screenshots/01-search.webp"
-                  alt="Museek 搜索界面，展示多个音乐平台的搜索结果"
-                  width="1600"
-                  height="1000"
-                  fetchpriority="high"
-                />
-              </div>
-              <div class="product-foot">
-                <span data-i18n="hero.previewLabel"
-                  >完整窗口截图，不裁切内容</span
-                >
-                <strong data-i18n="hero.previewSignal">SEARCH / READY</strong>
-              </div>
-            </div>
+    <section class="stage">
+      <div class="wrap">
+        <figure class="shot-hero">
+          <div class="shot-frame zoomable" data-ph="预览暂不可用">
+            <img
+              src="./screenshots/01-search.webp"
+              alt="Museek 跨平台搜索界面"
+              loading="lazy"
+            />
           </div>
+          <figcaption class="shot-cap">
+            <span class="shot-no">01</span>
+            <span
+              data-en="Cross-platform search — one input, five platforms."
+              data-zh="跨平台搜索 —— 一处输入，浏览五个平台的歌曲与歌单结果。"
+              >跨平台搜索 —— 一处输入，浏览五个平台的歌曲与歌单结果。</span
+            >
+          </figcaption>
+        </figure>
+      </div>
+    </section>
 
-          <div class="proof-strip" aria-label="Museek project facts">
-            <div class="proof-grid">
-              <div class="proof-intro">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M4 12h3l2.2-7L13 19l2.4-7H20" />
-                </svg>
-                <span data-i18n="stats.intro"
-                  >A focused desktop companion for everyday listening.</span
-                >
-              </div>
-              <div class="proof-stat">
-                <strong>05</strong>
-                <span data-i18n="stats.platforms">platforms</span>
-              </div>
-              <div class="proof-stat">
-                <strong>01</strong>
-                <span data-i18n="stats.queue">unified queue</span>
-              </div>
-              <div class="proof-stat">
-                <strong>02</strong>
-                <span data-i18n="stats.targets">desktop targets</span>
-              </div>
-              <div class="proof-stat">
-                <strong>100%</strong>
-                <span data-i18n="stats.local">local-first settings</span>
-              </div>
-            </div>
+    <section id="features">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="sec-tag">
+            <span data-en="01 / PRODUCT SURFACE" data-zh="01 / 产品界面"
+              >01 / 产品界面</span
+            >
           </div>
-        </div>
-      </section>
-
-      <section class="section features-section" id="features">
-        <div class="wrap">
-          <div class="section-topline reveal">
-            <div>
-              <p class="section-kicker mono" data-i18n="features.kicker">
-                01 / PRODUCT SURFACE
-              </p>
-              <h2 class="section-heading" data-i18n="features.heading">
-                少一点切换，多一点正在播放。
-              </h2>
-            </div>
-            <p class="section-intro" data-i18n="features.intro">
-              Museek
-              把搜索、播放器和个人音乐库放在同一个桌面上下文里，适合长时间使用，也适合快速找到一首歌。
-            </p>
-          </div>
-
-          <div class="feature-grid">
-            <article class="feature-card reveal">
-              <div class="feature-card-head">
-                <span class="feature-index">01 / DISCOVER</span>
-                <span class="feature-icon" aria-hidden="true">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="11" cy="11" r="6.5" />
-                    <path d="m16 16 4 4" />
-                  </svg>
-                </span>
-              </div>
-              <h3 data-i18n="feature.discovery.title">跨平台发现</h3>
-              <p data-i18n="feature.discovery.text">
-                在一个搜索入口里浏览歌曲、歌单、专辑和榜单，不必为每个平台重新建立习惯。
-              </p>
-              <div class="feature-pills" aria-hidden="true">
-                <span data-i18n="feature.discovery.pillOne">songs</span>
-                <span data-i18n="feature.discovery.pillTwo">playlists</span>
-                <span data-i18n="feature.discovery.pillThree">charts</span>
-              </div>
-            </article>
-
-            <article class="feature-card reveal">
-              <div class="feature-card-head">
-                <span class="feature-index">02 / PLAYBACK</span>
-                <span class="feature-icon" aria-hidden="true">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M7 4v16l13-8L7 4Z" />
-                  </svg>
-                </span>
-              </div>
-              <h3 data-i18n="feature.playback.title">播放与歌词同屏</h3>
-              <p data-i18n="feature.playback.text">
-                队列、同步歌词、全屏歌词、桌面歌词和迷你播放器围绕当前歌曲展开，不打断听歌节奏。
-              </p>
-              <div class="feature-pills" aria-hidden="true">
-                <span data-i18n="feature.playback.pillOne">queue</span>
-                <span data-i18n="feature.playback.pillTwo">lyrics</span>
-                <span data-i18n="feature.playback.pillThree">mini player</span>
-              </div>
-            </article>
-
-            <article class="feature-card reveal">
-              <div class="feature-card-head">
-                <span class="feature-index">03 / LIBRARY</span>
-                <span class="feature-icon" aria-hidden="true">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path
-                      d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21V5.5Z"
-                    />
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  </svg>
-                </span>
-              </div>
-              <h3 data-i18n="feature.library.title">收藏与本地音乐</h3>
-              <p data-i18n="feature.library.text">
-                收藏单曲、歌单和专辑；导入本地文件，也可以用 CUE 把一张整轨专辑变成可单独播放的曲目。
-              </p>
-              <div class="feature-pills" aria-hidden="true">
-                <span>mp3</span>
-                <span>flac</span>
-                <span>cue</span>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section showcase-section" id="gallery">
-        <div class="wrap">
-          <div class="section-topline reveal">
-            <div>
-              <p class="section-kicker mono" data-i18n="gallery.kicker">
-                02 / INSIDE THE APP
-              </p>
-              <h2 class="section-heading" data-i18n="gallery.heading">
-                这不是概念图，是正在工作的桌面界面。
-              </h2>
-            </div>
-            <p class="section-intro" data-i18n="gallery.intro">
-              选择一个工作区查看完整截图。所有窗口保留原始比例，内容不被裁掉。
-            </p>
-          </div>
-
-          <div class="gallery-layout reveal">
-            <div class="gallery-stage">
-              <div class="gallery-window-bar">
-                <span data-i18n="gallery.windowTitle"
-                  >museek.app / product preview</span
-                >
-                <span id="galleryCounter">01 / 10</span>
-              </div>
-              <div class="gallery-image-wrap">
-                <img
-                  id="galleryImage"
-                  src="./screenshots/01-search.webp"
-                  alt="Museek 搜索界面"
-                  width="1600"
-                  height="1000"
-                />
-              </div>
-              <div class="gallery-caption" aria-live="polite">
-                <strong id="galleryTitle">跨平台搜索</strong>
-                <p id="galleryDescription">
-                  一处输入，浏览五个平台的歌曲与歌单结果。
-                </p>
-              </div>
-            </div>
-            <div class="gallery-controls" aria-label="Screenshot selector">
-              <button
-                class="shot-button is-active"
-                type="button"
-                data-shot="search"
-                aria-pressed="true"
-              >
-                <span class="shot-number">01</span>
-                <strong data-shot-label="search">搜索</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="lyrics"
-                aria-pressed="false"
-              >
-                <span class="shot-number">02</span>
-                <strong data-shot-label="lyrics">歌词</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="playlists"
-                aria-pressed="false"
-              >
-                <span class="shot-number">03</span>
-                <strong data-shot-label="playlists">歌单</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="charts"
-                aria-pressed="false"
-              >
-                <span class="shot-number">04</span>
-                <strong data-shot-label="charts">榜单</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="albums"
-                aria-pressed="false"
-              >
-                <span class="shot-number">05</span>
-                <strong data-shot-label="albums">专辑</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="favorites"
-                aria-pressed="false"
-              >
-                <span class="shot-number">06</span>
-                <strong data-shot-label="favorites">收藏</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="library"
-                aria-pressed="false"
-              >
-                <span class="shot-number">07</span>
-                <strong data-shot-label="library">本地音乐</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="downloads"
-                aria-pressed="false"
-              >
-                <span class="shot-number">08</span>
-                <strong data-shot-label="downloads">下载</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="recognize"
-                aria-pressed="false"
-              >
-                <span class="shot-number">09</span>
-                <strong data-shot-label="recognize">识曲</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-              <button
-                class="shot-button"
-                type="button"
-                data-shot="desktopLyrics"
-                aria-pressed="false"
-              >
-                <span class="shot-number">10</span>
-                <strong data-shot-label="desktopLyrics">桌面歌词</strong>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h13m-6-6 6 6-6 6" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section workflow-section" id="workflow">
-        <div class="wrap">
-          <div class="section-topline reveal">
-            <div>
-              <p class="section-kicker mono" data-i18n="workflow.kicker">
-                03 / A CLEARER FLOW
-              </p>
-              <h2 class="section-heading" data-i18n="workflow.heading">
-                从线索到播放，只留下必要的步骤。
-              </h2>
-            </div>
-            <p class="section-intro" data-i18n="workflow.intro">
-              桌面软件应该让长时间使用变得安静。Museek
-              把复杂的来源、状态和设置收在该在的位置。
-            </p>
-          </div>
-
-          <div class="workflow-grid">
-            <article class="workflow-step reveal">
-              <span class="step-number">01 / DISCOVER</span>
-              <h3 data-i18n="workflow.discover.title">发现</h3>
-              <p data-i18n="workflow.discover.text">
-                从歌曲、歌单、专辑或榜单开始，在熟悉的搜索结果里继续探索。
-              </p>
-            </article>
-            <article class="workflow-step reveal">
-              <span class="step-number">02 / RESOLVE</span>
-              <h3 data-i18n="workflow.resolve.title">解析</h3>
-              <p data-i18n="workflow.resolve.text">
-                使用你自行导入的兼容音源解析播放链接，按优先级尝试可用来源。
-              </p>
-            </article>
-            <article class="workflow-step reveal">
-              <span class="step-number">03 / PLAY</span>
-              <h3 data-i18n="workflow.play.title">播放</h3>
-              <p data-i18n="workflow.play.text">
-                队列、歌词、收藏和桌面控制围绕当前播放内容展开，下一步随手可达。
-              </p>
-            </article>
-          </div>
-
-          <p class="source-note reveal" data-i18n="workflow.note">
-            <strong>音源边界：</strong>播放和下载地址来自用户自行导入的
-            lx-music-compatible source scripts。Museek
-            不随应用分发、托管或提供音乐内容。
-          </p>
-        </div>
-      </section>
-
-      <section class="section platform-section" id="platforms">
-        <div class="wrap">
-          <div class="section-topline reveal">
-            <div>
-              <p class="section-kicker mono" data-i18n="platforms.kicker">
-                04 / ONE DESKTOP CONTEXT
-              </p>
-              <h2 class="section-heading" data-i18n="platforms.heading">
-                你的平台，你的库，放在同一张桌面上。
-              </h2>
-            </div>
-            <p class="section-intro" data-i18n="platforms.intro">
-              用熟悉的平台寻找内容，用自己的设置决定播放方式，最后回到一个统一的播放器体验。
-            </p>
-          </div>
-
-          <div class="platform-list reveal">
-            <div class="platform-item">
-              <span class="platform-mark">WY</span>
-              <span
-                ><strong>NetEase</strong
-                ><small data-i18n="platforms.catalog">catalog</small></span
-              >
-            </div>
-            <div class="platform-item">
-              <span class="platform-mark">KW</span>
-              <span
-                ><strong>KuWo</strong
-                ><small data-i18n="platforms.catalog">catalog</small></span
-              >
-            </div>
-            <div class="platform-item">
-              <span class="platform-mark">KG</span>
-              <span
-                ><strong>KuGou</strong
-                ><small data-i18n="platforms.catalog">catalog</small></span
-              >
-            </div>
-            <div class="platform-item">
-              <span class="platform-mark">QQ</span>
-              <span
-                ><strong>QQ Music</strong
-                ><small data-i18n="platforms.catalog">catalog</small></span
-              >
-            </div>
-            <div class="platform-item">
-              <span class="platform-mark">MG</span>
-              <span
-                ><strong>Migu</strong
-                ><small data-i18n="platforms.catalog">catalog</small></span
-              >
-            </div>
-            <div class="platform-item">
-              <span class="platform-mark">LIB</span>
-              <span
-                ><strong data-i18n="platforms.local">Local library</strong
-                ><small data-i18n="platforms.files">your files</small></span
-              >
-            </div>
-          </div>
-          <p class="platform-note reveal" data-i18n="platforms.note">
+          <h2
+            data-en="Fewer switches, more now playing."
+            data-zh="少一点切换，多一点正在播放。"
+          >
+            少一点切换，多一点正在播放。
+          </h2>
+          <p
+            data-en="Museek puts search, player, and your personal library into the same desktop context — comfortable for long sessions, fast when you just need one song."
+            data-zh="Museek 把搜索、播放器和个人音乐库放在同一个桌面上下文里，适合长时间使用，也适合快速找到一首歌。"
+          >
             Museek
-            是一个桌面音乐聚合工具：它连接发现入口和本地体验，但不代表任何音乐平台，也不替代平台服务。
+            把搜索、播放器和个人音乐库放在同一个桌面上下文里，适合长时间使用，也适合快速找到一首歌。
           </p>
         </div>
-      </section>
 
-      <section class="download-section" id="download">
-        <div class="wrap">
-          <div class="download-grid">
-            <div class="reveal">
-              <p class="section-kicker mono" data-i18n="download.kicker">
-                05 / GET THE DESKTOP APP
-              </p>
-              <h2 class="section-heading" data-i18n="download.heading">
-                把你的下一首歌，带回桌面。
-              </h2>
-              <p class="download-copy" data-i18n="download.text">
-                从 GitHub Releases 获取最新版本。Museek 以 Tauri 2 构建，面向
-                Windows 与 macOS，开源且由你掌握配置。
-              </p>
-              <div class="download-actions">
-                <a
-                  class="button button-dark"
-                  href="https://github.com/aeroray/Museek/releases/latest"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
-                    />
-                  </svg>
-                  <span data-i18n="download.release">打开 Releases</span>
-                </a>
-                <a
-                  class="button button-light"
-                  href="https://github.com/aeroray/Museek"
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <span data-i18n="download.repository">阅读仓库</span>
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M5 12h13m-6-6 6 6-6 6" />
-                  </svg>
-                </a>
-              </div>
+        <div class="grid3">
+          <div class="card">
+            <div class="card-ico">
+              <svg
+                class="ico"
+                viewBox="0 0 16 16"
+                style="width: 19px; height: 19px"
+              >
+                <circle cx="7" cy="7" r="4.6" />
+                <path d="M10.5 10.5 14 14" />
+              </svg>
             </div>
-            <div class="reveal">
-              <div class="release-list">
-                <div class="release-row">
-                  <strong data-i18n="download.windows">Windows</strong>
-                  <span data-i18n="download.windowsNote"
-                    >installer / portable</span
-                  >
-                </div>
-                <div class="release-row">
-                  <strong data-i18n="download.macos">macOS</strong>
-                  <span data-i18n="download.macosNote"
-                    >Apple Silicon / Intel</span
-                  >
-                </div>
-                <div class="release-row">
-                  <strong data-i18n="download.source">Source</strong>
-                  <span data-i18n="download.sourceNote">MIT licensed repo</span>
-                </div>
-              </div>
-              <p class="release-note" data-i18n="download.note">
-                版本、安装包和变更记录以 GitHub Releases 页面为准。
-              </p>
+            <div class="en">DISCOVER</div>
+            <h3 data-en="Cross-platform discovery" data-zh="跨平台发现">
+              跨平台发现
+            </h3>
+            <p
+              data-en="Browse songs, playlists, albums, and charts from one search entry. History, hot keywords, and trending content all live in the same place."
+              data-zh="在一个搜索入口里浏览歌曲、歌单、专辑和榜单，不必为每个平台重新建立习惯。搜索历史、热搜词与热门内容都在同一处。"
+            >
+              在一个搜索入口里浏览歌曲、歌单、专辑和榜单，不必为每个平台重新建立习惯。搜索历史、热搜词与热门内容都在同一处。
+            </p>
+            <div class="card-tags">
+              <span>songs</span><span>playlists</span><span>albums</span
+              ><span>charts</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-ico">
+              <svg
+                class="ico"
+                viewBox="0 0 16 16"
+                style="width: 19px; height: 19px"
+              >
+                <path d="M3 5h10M3 9h7M3 13h5" />
+                <circle cx="12.5" cy="11.5" r="2.5" />
+              </svg>
+            </div>
+            <div class="en">PLAYBACK</div>
+            <h3
+              data-en="Playback and lyrics, side by side"
+              data-zh="播放与歌词同屏"
+            >
+              播放与歌词同屏
+            </h3>
+            <p
+              data-en="Queue, synced lyrics, fullscreen lyrics, desktop lyrics overlay, and a mini player all orbit the current track. Quality adapts downward to keep playback smooth."
+              data-zh="队列、同步歌词、全屏歌词、桌面歌词和迷你播放器围绕当前歌曲展开，不打断听歌节奏。音质可自动降级以保证连续播放。"
+            >
+              队列、同步歌词、全屏歌词、桌面歌词和迷你播放器围绕当前歌曲展开，不打断听歌节奏。音质可自动降级以保证连续播放。
+            </p>
+            <div class="card-tags">
+              <span>queue</span><span>lyrics</span><span>mini player</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-ico">
+              <svg
+                class="ico"
+                viewBox="0 0 16 16"
+                style="width: 19px; height: 19px"
+              >
+                <path d="M8 2.5v6.5" />
+                <path d="M5.2 6.5 8 9.3l2.8-2.8" />
+                <path d="M3 12.5h10" />
+              </svg>
+            </div>
+            <div class="en">LIBRARY</div>
+            <h3 data-en="Favorites and local music" data-zh="收藏与本地音乐">
+              收藏与本地音乐
+            </h3>
+            <p
+              data-en="Favorite songs, playlists, and albums. Import local files and folders, or use a CUE sheet to turn a single album image into individually playable tracks."
+              data-zh="收藏单曲、歌单和专辑；导入本地文件与文件夹，也可以用 CUE 表把一张整轨专辑变成可单独播放的曲目。"
+            >
+              收藏单曲、歌单和专辑；导入本地文件与文件夹，也可以用 CUE
+              表把一张整轨专辑变成可单独播放的曲目。
+            </p>
+            <div class="card-tags">
+              <span>mp3</span><span>flac</span><span>m4a</span><span>cue</span>
             </div>
           </div>
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
+
+    <section id="gallery">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="sec-tag">
+            <span data-en="02 / INSIDE THE APP" data-zh="02 / 应用内部"
+              >02 / 应用内部</span
+            >
+          </div>
+          <h2
+            data-en="These are not concept shots — this is the working desktop UI."
+            data-zh="这不是概念图，是正在工作的桌面界面。"
+          >
+            这不是概念图，是正在工作的桌面界面。
+          </h2>
+          <p
+            data-en="Screenshots are taken from the macOS build and keep their original proportions without cropping. Click any preview to view it larger."
+            data-zh="以下界面截图来自 macOS 版本，保留原始比例，内容不被裁切。点击任意预览图可放大查看。"
+          >
+            以下界面截图来自 macOS
+            版本，保留原始比例，内容不被裁切。点击任意预览图可放大查看。
+          </p>
+        </div>
+
+        <div class="gallery">
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/02-lyrics.webp"
+                alt="全屏同步歌词"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Fullscreen synchronized lyrics" data-zh="全屏同步歌词"
+                >全屏同步歌词</b
+              ><span
+                data-en="Lyrics fill the window and follow the track line by line."
+                data-zh="歌词全屏铺开，跟随当前曲目逐句推进。"
+                >歌词全屏铺开，跟随当前曲目逐句推进。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/03-playlists.webp"
+                alt="热门歌单"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Hot playlists" data-zh="热门歌单">热门歌单</b
+              ><span
+                data-en="Browse curated playlists without leaving the app."
+                data-zh="在应用内直接浏览各平台热门歌单。"
+                >在应用内直接浏览各平台热门歌单。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/04-charts.webp"
+                alt="多平台排行榜"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Charts across platforms" data-zh="多平台排行榜"
+                >多平台排行榜</b
+              ><span
+                data-en="Compare charts from five platforms in one view."
+                data-zh="并排查看五个平台的榜单，快速判断热度。"
+                >并排查看五个平台的榜单，快速判断热度。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/05-albums.webp"
+                alt="多平台专辑"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Albums across platforms" data-zh="多平台专辑"
+                >多平台专辑</b
+              ><span
+                data-en="Album view keeps cover, track order, and metadata intact."
+                data-zh="专辑视图保留封面信息与曲序。"
+                >专辑视图保留封面信息与曲序。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/06-favorites.webp"
+                alt="收藏库"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Favorites library" data-zh="收藏库">收藏库</b
+              ><span
+                data-en="Songs, playlists, and albums in one library, sorted by category."
+                data-zh="单曲、歌单与专辑集中收藏，可按分类整理。"
+                >单曲、歌单与专辑集中收藏，可按分类整理。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/07-local-library.webp"
+                alt="本地音乐库"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Local music library" data-zh="本地音乐库"
+                >本地音乐库</b
+              ><span
+                data-en="Import files or folders, and split CUE album images into tracks."
+                data-zh="导入文件或文件夹，用 CUE 把整轨专辑拆成曲目。"
+                >导入文件或文件夹，用 CUE 把整轨专辑拆成曲目。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/08-downloads.webp"
+                alt="下载管理"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Download manager" data-zh="下载管理">下载管理</b
+              ><span
+                data-en="Batch downloads with quality, concurrency, and filename rules."
+                data-zh="批量下载，可设置音质、并发数与文件命名规则。"
+                >批量下载，可设置音质、并发数与文件命名规则。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/09-recognize.webp"
+                alt="听歌识曲 Beta"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Song recognition (Beta)" data-zh="听歌识曲（Beta）"
+                >听歌识曲（Beta）</b
+              ><span
+                data-en="Capture microphone or system audio to identify a track."
+                data-zh="采集麦克风或系统声音，识别正在播放的歌曲。"
+                >采集麦克风或系统声音，识别正在播放的歌曲。</span
+              >
+            </figcaption>
+          </figure>
+          <figure class="shot-item">
+            <div class="shot-frame zoomable" data-ph="预览暂不可用">
+              <img
+                src="./screenshots/10-desktop-lyrics.webp"
+                alt="桌面歌词窗口"
+                loading="lazy"
+              />
+            </div>
+            <figcaption>
+              <b data-en="Desktop lyrics overlay" data-zh="桌面歌词窗口"
+                >桌面歌词窗口</b
+              ><span
+                data-en="A floating lyric window that stays above other apps."
+                data-zh="桌面歌词窗口浮在其它应用之上。"
+                >桌面歌词窗口浮在其它应用之上。</span
+              >
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="sec-tag">
+            <span data-en="03 / A CLEARER FLOW" data-zh="03 / 清晰的工作流"
+              >03 / 清晰的工作流</span
+            >
+          </div>
+          <h2
+            data-en="From clue to playback, nothing unnecessary in between."
+            data-zh="从线索到播放，只留下必要的步骤。"
+          >
+            从线索到播放，只留下必要的步骤。
+          </h2>
+          <p
+            data-en="Desktop software should feel quiet over long sessions. Museek tucks complex sources, states, and settings exactly where they belong."
+            data-zh="桌面软件应该让长时间使用变得安静。Museek 把复杂的来源、状态和设置收在该在的位置。"
+          >
+            桌面软件应该让长时间使用变得安静。Museek
+            把复杂的来源、状态和设置收在该在的位置。
+          </p>
+        </div>
+
+        <div class="flow">
+          <div class="step">
+            <div class="step-no">01 / DISCOVER</div>
+            <h3 data-en="Discover" data-zh="发现">发现</h3>
+            <p
+              data-en="Start from a song, playlist, album, or chart and keep exploring inside familiar search results."
+              data-zh="从歌曲、歌单、专辑或榜单开始，在熟悉的搜索结果里继续探索。"
+            >
+              从歌曲、歌单、专辑或榜单开始，在熟悉的搜索结果里继续探索。
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-no">02 / RESOLVE</div>
+            <h3 data-en="Resolve" data-zh="解析">解析</h3>
+            <p
+              data-en="Your imported compatible sources resolve playable links, trying available sources in priority order."
+              data-zh="使用你自行导入的兼容音源解析播放链接，按优先级尝试可用来源。"
+            >
+              使用你自行导入的兼容音源解析播放链接，按优先级尝试可用来源。
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-no">03 / PLAY</div>
+            <h3 data-en="Play" data-zh="播放">播放</h3>
+            <p
+              data-en="Queue, lyrics, favorites, and desktop controls orbit what is playing now, so the next step is always within reach."
+              data-zh="队列、歌词、收藏和桌面控制围绕当前播放内容展开，下一步随手可达。"
+            >
+              队列、歌词、收藏和桌面控制围绕当前播放内容展开，下一步随手可达。
+            </p>
+          </div>
+        </div>
+
+        <div class="notice">
+          <svg
+            class="ico"
+            viewBox="0 0 16 16"
+            style="width: 19px; height: 19px"
+          >
+            <path d="M8 5.5v4" />
+            <circle
+              cx="8"
+              cy="11.8"
+              r="0.7"
+              fill="currentColor"
+              stroke="none"
+            />
+            <path d="M8 1.8 14.5 13H1.5z" />
+          </svg>
+          <p>
+            <strong data-en="Source boundary: " data-zh="音源边界："
+              >音源边界：</strong
+            ><span
+              data-en="playback and download URLs come from lx-music-compatible source scripts that you import yourself. Museek does not bundle, host, or distribute music content — only import scripts you trust."
+              data-zh="播放和下载地址来自用户自行导入的 lx-music-compatible source scripts。Museek 不随应用分发、托管或提供音乐内容，请只导入你信任的音源脚本。"
+              >播放和下载地址来自用户自行导入的 lx-music-compatible source
+              scripts。Museek
+              不随应用分发、托管或提供音乐内容，请只导入你信任的音源脚本。</span
+            >
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="platforms">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="sec-tag">
+            <span
+              data-en="04 / ONE DESKTOP CONTEXT"
+              data-zh="04 / 统一的桌面上下文"
+              >04 / 统一的桌面上下文</span
+            >
+          </div>
+          <h2
+            data-en="Your platforms, your library, on one desktop."
+            data-zh="你的平台，你的库，放在同一张桌面上。"
+          >
+            你的平台，你的库，放在同一张桌面上。
+          </h2>
+          <p
+            data-en="Find content on the platforms you already know, decide how it plays with your own settings, and return to one unified player."
+            data-zh="用熟悉的平台寻找内容，用自己的设置决定播放方式，最后回到一个统一的播放器体验。"
+          >
+            用熟悉的平台寻找内容，用自己的设置决定播放方式，最后回到一个统一的播放器体验。
+          </p>
+        </div>
+        <div class="plats">
+          <span class="plat"
+            ><i></i
+            ><span data-en="NetEase Cloud Music" data-zh="网易云音乐"
+              >网易云音乐</span
+            ></span
+          >
+          <span class="plat"
+            ><i></i
+            ><span data-en="KuWo Music" data-zh="酷我音乐">酷我音乐</span></span
+          >
+          <span class="plat"
+            ><i></i
+            ><span data-en="KuGou Music" data-zh="酷狗音乐"
+              >酷狗音乐</span
+            ></span
+          >
+          <span class="plat"
+            ><i></i
+            ><span data-en="QQ Music" data-zh="QQ 音乐">QQ 音乐</span></span
+          >
+          <span class="plat"
+            ><i></i
+            ><span data-en="Migu Music" data-zh="咪咕音乐">咪咕音乐</span></span
+          >
+          <span class="plat" style="border-style: dashed"
+            ><b data-en="Local library" data-zh="本地音乐">本地音乐</b
+            ><span data-en="your files" data-zh="你的文件">你的文件</span></span
+          >
+        </div>
+      </div>
+    </section>
+
+    <section id="download">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="sec-tag">
+            <span data-en="05 / GET THE DESKTOP APP" data-zh="05 / 获取桌面应用"
+              >05 / 获取桌面应用</span
+            >
+          </div>
+          <h2
+            data-en="Bring your next song back to the desktop."
+            data-zh="把你的下一首歌，带回桌面。"
+          >
+            把你的下一首歌，带回桌面。
+          </h2>
+          <p
+            data-en="Get the latest build from GitHub Releases. Museek is built with Tauri 2 for Windows and macOS, open source, with settings you control."
+            data-zh="从 GitHub Releases 获取最新版本。Museek 以 Tauri 2 构建，面向 Windows 与 macOS，开源且由你掌握配置。"
+          >
+            从 GitHub Releases 获取最新版本。Museek 以 Tauri 2 构建，面向
+            Windows 与 macOS，开源且由你掌握配置。
+          </p>
+        </div>
+
+        <div class="dl">
+          <div class="dl-card hl">
+            <div class="dl-os">WINDOWS X64</div>
+            <h3>Windows</h3>
+            <p
+              data-en="NSIS installer. The setup interface follows the system language between English and Simplified Chinese."
+              data-zh="NSIS 安装包，安装界面跟随系统语言在英文与简体中文之间切换。"
+            >
+              NSIS 安装包，安装界面跟随系统语言在英文与简体中文之间切换。
+            </p>
+            <a
+              href="https://github.com/aeroray/Museek/releases/latest"
+              target="_blank"
+              rel="noopener"
+              ><span data-en="Go to Releases" data-zh="前往 Releases"
+                >前往 Releases</span
+              ><svg
+                class="ico"
+                viewBox="0 0 16 16"
+                style="width: 14px; height: 14px"
+              >
+                <path d="M5 11 11 5" />
+                <path d="M6 5h5v5" /></svg
+            ></a>
+          </div>
+          <div class="dl-card">
+            <div class="dl-os">MACOS</div>
+            <h3>macOS</h3>
+            <p
+              data-en="DMG builds for Apple Silicon and Intel. Requires macOS 13 or later."
+              data-zh="Apple Silicon 与 Intel 的 DMG 安装包，需要 macOS 13 或更高版本。"
+            >
+              Apple Silicon 与 Intel 的 DMG 安装包，需要 macOS 13 或更高版本。
+            </p>
+            <a
+              href="https://github.com/aeroray/Museek/releases/latest"
+              target="_blank"
+              rel="noopener"
+              ><span data-en="Go to Releases" data-zh="前往 Releases"
+                >前往 Releases</span
+              ><svg
+                class="ico"
+                viewBox="0 0 16 16"
+                style="width: 14px; height: 14px"
+              >
+                <path d="M5 11 11 5" />
+                <path d="M6 5h5v5" /></svg
+            ></a>
+          </div>
+          <div class="dl-card">
+            <div class="dl-os">SOURCE</div>
+            <h3 data-en="Source code" data-zh="源代码">源代码</h3>
+            <p
+              data-en="An MIT licensed repository. Read the code, open issues, or contribute."
+              data-zh="MIT 许可的开源仓库，欢迎阅读代码、提交 issue 或参与开发。"
+            >
+              MIT 许可的开源仓库，欢迎阅读代码、提交 issue 或参与开发。
+            </p>
+            <a
+              href="https://github.com/aeroray/Museek"
+              target="_blank"
+              rel="noopener"
+              ><span data-en="Open the repository" data-zh="阅读仓库"
+                >阅读仓库</span
+              ><svg
+                class="ico"
+                viewBox="0 0 16 16"
+                style="width: 14px; height: 14px"
+              >
+                <path d="M5 11 11 5" />
+                <path d="M6 5h5v5" /></svg
+            ></a>
+          </div>
+        </div>
+        <div
+          class="dl-note"
+          data-en="Versions, installers, and changelogs are authoritative on the GitHub Releases page. The project is intended for personal study and research — respect each platform terms and copyright rules."
+          data-zh="版本、安装包和变更记录以 GitHub Releases 页面为准。项目仅供个人学习与研究，请遵守各平台条款与版权规则。"
+        >
+          版本、安装包和变更记录以 GitHub Releases
+          页面为准。项目仅供个人学习与研究，请遵守各平台条款与版权规则。
+        </div>
+      </div>
+    </section>
+
+    <section id="follow">
+      <div class="wrap">
+        <div class="follow-card">
+          <div class="follow-qr">
+            <img
+              src="../public/gzh/qrcode.webp"
+              alt="Museek 公众号二维码"
+              loading="lazy"
+            />
+          </div>
+          <div class="follow-text">
+            <div class="sec-tag">
+              <span
+                data-en="06 / UPDATES &amp; COMMUNITY"
+                data-zh="06 / 更新与交流"
+                >06 / 更新与交流</span
+              >
+            </div>
+            <h2
+              data-en="Follow the project channel."
+              data-zh="扫码关注公众号，跟上项目更新。"
+            >
+              扫码关注公众号，跟上项目更新。
+            </h2>
+            <p
+              data-en="Scan the QR code to get source links, release notes, and project updates. The website, repository, and release list are always open for you to check."
+              data-zh="扫码即可获取音源链接、版本发布与使用说明。项目主页、开源仓库和发布记录同样长期开放，可随时查阅。"
+            >
+              扫码即可获取音源链接、版本发布与使用说明。项目主页、开源仓库和发布记录同样长期开放，可随时查阅。
+            </p>
+            <div class="follow-links">
+              <a
+                href="https://aeroray.github.io/Museek/"
+                target="_blank"
+                rel="noopener"
+                ><span data-en="Homepage" data-zh="项目主页">项目主页</span
+                ><svg
+                  class="ico"
+                  viewBox="0 0 16 16"
+                  style="width: 13px; height: 13px"
+                >
+                  <path d="M5 11 11 5" />
+                  <path d="M6 5h5v5" /></svg
+              ></a>
+              <a
+                href="https://github.com/aeroray/Museek"
+                target="_blank"
+                rel="noopener"
+                ><span data-en="Repository" data-zh="开源仓库">开源仓库</span
+                ><svg
+                  class="ico"
+                  viewBox="0 0 16 16"
+                  style="width: 13px; height: 13px"
+                >
+                  <path d="M5 11 11 5" />
+                  <path d="M6 5h5v5" /></svg
+              ></a>
+              <a
+                href="https://github.com/aeroray/Museek/releases"
+                target="_blank"
+                rel="noopener"
+                ><span data-en="All releases" data-zh="发布记录">发布记录</span
+                ><svg
+                  class="ico"
+                  viewBox="0 0 16 16"
+                  style="width: 13px; height: 13px"
+                >
+                  <path d="M5 11 11 5" />
+                  <path d="M6 5h5v5" /></svg
+              ></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <footer>
       <div class="wrap">
-        <div class="footer-top">
-          <a class="brand footer-brand" href="#top" aria-label="Museek 拾音">
-            <img
+        <div class="foot">
+          <div class="foot-l">
+            <span
               class="brand-mark"
-              src="./app-icon.svg"
-              alt=""
-              width="32"
-              height="32"
-            />
-            <span class="brand-name">Museek <small>拾音</small></span>
-          </a>
-          <nav class="footer-links" aria-label="Footer navigation">
-            <a href="#features" data-i18n="nav.features">功能</a>
-            <a href="#gallery" data-i18n="nav.gallery">界面</a>
-            <a href="#workflow" data-i18n="nav.workflow">工作流</a>
+              style="
+                width: 24px;
+                height: 24px;
+                border-radius: 7px;
+                font-size: 11px;
+              "
+              >拾</span
+            >
+            <span>Museek 拾音 · Every melody, one search.</span>
+          </div>
+          <div class="foot-links">
+            <a
+              href="https://aeroray.github.io/Museek/"
+              target="_blank"
+              rel="noopener"
+              data-en="Homepage"
+              data-zh="项目主页"
+              >项目主页</a
+            >
             <a
               href="https://github.com/aeroray/Museek"
               target="_blank"
               rel="noopener"
               >GitHub</a
             >
-          </nav>
-        </div>
-        <div class="footer-bottom">
-          <p data-i18n="footer.boundary">
-            Museek
-            不分发音乐内容。播放与下载依赖用户自行配置的兼容音源及其使用权限。
-          </p>
-          <span data-i18n="footer.made">Built for the desktop listener.</span>
+            <a
+              href="https://github.com/aeroray/Museek/releases"
+              target="_blank"
+              rel="noopener"
+              >Releases</a
+            >
+          </div>
         </div>
       </div>
     </footer>
 
+    <div
+      class="lightbox"
+      id="lightbox"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button class="lb-close" id="lbClose" type="button" aria-label="关闭">
+        ×
+      </button>
+      <figure class="lb-inner">
+        <img id="lbImg" src="" alt="" />
+        <figcaption class="lb-cap">
+          <b id="lbTitle"></b>
+          <span id="lbDesc"></span>
+        </figcaption>
+      </figure>
+    </div>
+
     <script>
-      const translations = {
-        zh: {
-          meta: {
-            title: "Museek 拾音 | 一个更顺手的桌面音乐工作台。",
-            description:
-              "Museek 拾音：把跨平台发现、播放、歌词、收藏和本地音乐收进一张桌面工作台。",
-          },
-          controls: {
-            skip: "跳到主要内容",
-            openMenu: "打开菜单",
-            closeMenu: "关闭菜单",
-            switchLanguage: "切换为 English",
-          },
-          nav: {
-            features: "功能",
-            gallery: "界面",
-            workflow: "工作流",
-            download: "下载",
-          },
-          hero: {
-            kicker: "DESKTOP MUSIC WORKSPACE",
-            titleLine1: "把下一首歌，",
-            titleLine2: "找得更顺手。",
-            lede: "一个为桌面听歌设计的跨平台音乐工作台。",
-            description:
-              "从发现、播放到歌词、收藏、本地音乐与下载，把散落的音乐线索放回同一条清晰的工作流。",
-            download: "下载最新版本",
-            github: "查看 GitHub 源码",
-            meta: {
-              one: "Open source",
-              two: "Windows + macOS",
-              three: "Tauri 2 / React 19",
-            },
-            previewStatus: "LIVE / 01",
-            previewLabel: "完整窗口截图，不裁切内容",
-            previewSignal: "SEARCH / READY",
-          },
-          stats: {
-            intro: "A focused desktop companion for everyday listening.",
-            platforms: "platforms",
-            queue: "unified queue",
-            targets: "desktop targets",
-            local: "local-first settings",
-          },
-          features: {
-            kicker: "01 / PRODUCT SURFACE",
-            heading: "少一点切换，多一点正在播放。",
-            intro:
-              "Museek 把搜索、播放器和个人音乐库放在同一个桌面上下文里，适合长时间使用，也适合快速找到一首歌。",
-          },
-          feature: {
-            discovery: {
-              title: "跨平台发现",
-              text: "在一个搜索入口里浏览歌曲、歌单、专辑和榜单，不必为每个平台重新建立习惯。",
-              pillOne: "songs",
-              pillTwo: "playlists",
-              pillThree: "charts",
-            },
-            playback: {
-              title: "播放与歌词同屏",
-              text: "队列、同步歌词、全屏歌词、桌面歌词和迷你播放器围绕当前歌曲展开，不打断听歌节奏。",
-              pillOne: "queue",
-              pillTwo: "lyrics",
-              pillThree: "mini player",
-            },
-            library: {
-              title: "收藏与本地音乐",
-              text: "收藏单曲、歌单和专辑；导入本地文件，也可以用 CUE 把一张整轨专辑变成可单独播放的曲目。",
-            },
-          },
-          gallery: {
-            kicker: "02 / INSIDE THE APP",
-            heading: "这不是概念图，是正在工作的桌面界面。",
-            intro:
-              "选择一个工作区查看完整截图。所有窗口保留原始比例，内容不被裁掉。",
-            windowTitle: "museek.app / product preview",
-          },
-          shots: {
-            search: {
-              label: "搜索",
-              title: "跨平台搜索",
-              description: "一处输入，浏览五个平台的歌曲与歌单结果。",
-              alt: "Museek 搜索界面，展示多个音乐平台的搜索结果",
-            },
-            lyrics: {
-              label: "歌词",
-              title: "歌词工作区",
-              description: "让同步歌词与当前播放内容保持在同一个视线范围内。",
-              alt: "Museek 歌词界面，展示当前歌曲的歌词内容",
-            },
-            playlists: {
-              label: "歌单",
-              title: "歌单浏览",
-              description:
-                "从平台歌单进入更长的发现路径，也可以随时加入播放队列。",
-              alt: "Museek 歌单界面，展示音乐歌单列表",
-            },
-            charts: {
-              label: "榜单",
-              title: "热门榜单",
-              description: "把正在发生的热门内容放进桌面发现流。",
-              alt: "Museek 榜单界面，展示音乐排行榜",
-            },
-            albums: {
-              label: "专辑",
-              title: "专辑详情",
-              description: "查看专辑信息、曲目和封面，再决定下一步怎么听。",
-              alt: "Museek 专辑界面，展示专辑详情与曲目",
-            },
-            favorites: {
-              label: "收藏",
-              title: "收藏库",
-              description: "把反复想听的单曲、专辑和歌单留在自己的工作区。",
-              alt: "Museek 收藏界面，展示收藏的音乐内容",
-            },
-            library: {
-              label: "本地音乐",
-              title: "本地音乐库",
-              description: "把本地文件和 CUE 整轨专辑纳入统一的播放和整理体验。",
-              alt: "Museek 本地音乐界面，展示本地文件列表",
-            },
-            downloads: {
-              label: "下载",
-              title: "下载队列",
-              description: "查看进度、任务状态和已完成的文件，保持下载有秩序。",
-              alt: "Museek 下载界面，展示下载任务列表",
-            },
-            recognize: {
-              label: "识曲",
-              title: "识曲工具",
-              description: "从一段正在播放的声音开始，回到可继续探索的结果。",
-              alt: "Museek 识曲界面，展示音频识别功能",
-            },
-            desktopLyrics: {
-              label: "桌面歌词",
-              title: "桌面歌词",
-              description: "把歌词放在桌面上，播放控制仍然保持轻量。",
-              alt: "Museek 桌面歌词界面，展示悬浮歌词窗口",
-            },
-          },
-          workflow: {
-            kicker: "03 / A CLEARER FLOW",
-            heading: "从线索到播放，只留下必要的步骤。",
-            intro:
-              "桌面软件应该让长时间使用变得安静。Museek 把复杂的来源、状态和设置收在该在的位置。",
-            discover: {
-              title: "发现",
-              text: "从歌曲、歌单、专辑或榜单开始，在熟悉的搜索结果里继续探索。",
-            },
-            resolve: {
-              title: "解析",
-              text: "使用你自行导入的兼容音源解析播放链接，按优先级尝试可用来源。",
-            },
-            play: {
-              title: "播放",
-              text: "队列、歌词、收藏和桌面控制围绕当前播放内容展开，下一步随手可达。",
-            },
-            note: "音源边界：播放和下载地址来自用户自行导入的 lx-music-compatible source scripts。Museek 不随应用分发、托管或提供音乐内容。",
-          },
-          platforms: {
-            kicker: "04 / ONE DESKTOP CONTEXT",
-            heading: "你的平台，你的库，放在同一张桌面上。",
-            intro:
-              "用熟悉的平台寻找内容，用自己的设置决定播放方式，最后回到一个统一的播放器体验。",
-            catalog: "catalog",
-            local: "Local library",
-            files: "your files",
-            note: "Museek 是一个桌面音乐聚合工具：它连接发现入口和本地体验，但不代表任何音乐平台，也不替代平台服务。",
-          },
-          download: {
-            kicker: "05 / GET THE DESKTOP APP",
-            heading: "把你的下一首歌，带回桌面。",
-            text: "从 GitHub Releases 获取最新版本。Museek 以 Tauri 2 构建，面向 Windows 与 macOS，开源且由你掌握配置。",
-            release: "打开 Releases",
-            repository: "阅读仓库",
-            windows: "Windows",
-            windowsNote: "installer / portable",
-            macos: "macOS",
-            macosNote: "Apple Silicon / Intel",
-            source: "Source",
-            sourceNote: "MIT licensed repo",
-            note: "版本、安装包和变更记录以 GitHub Releases 页面为准。",
-          },
-          footer: {
-            boundary:
-              "Museek 不分发音乐内容。播放与下载依赖用户自行配置的兼容音源及其使用权限。",
-            made: "Built for the desktop listener.",
-          },
-        },
-        en: {
-          meta: {
-            title: "Museek | A calmer desktop music workspace.",
-            description:
-              "Museek is a cross-platform desktop music workspace for discovery, playback, lyrics, favorites, local files, and downloads.",
-          },
-          controls: {
-            skip: "Skip to main content",
-            openMenu: "Open menu",
-            closeMenu: "Close menu",
-            switchLanguage: "切换为中文",
-          },
-          nav: {
-            features: "Features",
-            gallery: "Product UI",
-            workflow: "Workflow",
-            download: "Download",
-          },
-          hero: {
-            kicker: "DESKTOP MUSIC WORKSPACE",
-            titleLine1: "A calmer way to",
-            titleLine2: "find your next track.",
-            lede: "A cross-platform music workspace made for the desktop listener.",
-            description:
-              "Bring discovery, playback, lyrics, favorites, local music, and downloads into one clear flow.",
-            download: "Download latest",
-            github: "View on GitHub",
-            meta: {
-              one: "Open source",
-              two: "Windows + macOS",
-              three: "Tauri 2 / React 19",
-            },
-            previewStatus: "LIVE / 01",
-            previewLabel: "Full-window capture, nothing cropped",
-            previewSignal: "SEARCH / READY",
-          },
-          stats: {
-            intro: "A focused desktop companion for everyday listening.",
-            platforms: "platforms",
-            queue: "unified queue",
-            targets: "desktop targets",
-            local: "local-first settings",
-          },
-          features: {
-            kicker: "01 / PRODUCT SURFACE",
-            heading: "Less switching. More of what is playing.",
-            intro:
-              "Museek keeps search, the player, and your personal library in one desktop context for long sessions and quick finds alike.",
-          },
-          feature: {
-            discovery: {
-              title: "Cross-platform discovery",
-              text: "Browse songs, playlists, albums, and charts from one search entry without relearning every platform.",
-              pillOne: "songs",
-              pillTwo: "playlists",
-              pillThree: "charts",
-            },
-            playback: {
-              title: "Playback with lyrics",
-              text: "Queue, synced lyrics, full-screen lyrics, desktop lyrics, and the mini player stay close to the current track.",
-              pillOne: "queue",
-              pillTwo: "lyrics",
-              pillThree: "mini player",
-            },
-            library: {
-              title: "Favorites and local files",
-              text: "Keep songs, playlists, and albums close, and import local files — including CUE sheets that map one album image into playable tracks.",
-            },
-          },
-          gallery: {
-            kicker: "02 / INSIDE THE APP",
-            heading: "Not a concept image. A working desktop interface.",
-            intro:
-              "Choose a workspace to see the complete capture. Every window keeps its native proportion, with no cropped content.",
-            windowTitle: "museek.app / product preview",
-          },
-          shots: {
-            search: {
-              label: "Search",
-              title: "Cross-platform search",
-              description:
-                "One query, five platform result sets for songs and playlists.",
-              alt: "Museek search interface showing results from multiple music platforms",
-            },
-            lyrics: {
-              label: "Lyrics",
-              title: "Lyrics workspace",
-              description:
-                "Keep synced lyrics and the current track within the same visual context.",
-              alt: "Museek lyrics interface showing lyrics for the current track",
-            },
-            playlists: {
-              label: "Playlists",
-              title: "Playlist browsing",
-              description:
-                "Follow a longer discovery path from platform playlists and send tracks to the queue.",
-              alt: "Museek playlist interface showing a list of music playlists",
-            },
-            charts: {
-              label: "Charts",
-              title: "Popular charts",
-              description:
-                "Bring what is trending into a desktop discovery flow.",
-              alt: "Museek charts interface showing music rankings",
-            },
-            albums: {
-              label: "Albums",
-              title: "Album details",
-              description:
-                "Review album context, track list, and artwork before choosing what to play.",
-              alt: "Museek album interface showing album details and tracks",
-            },
-            favorites: {
-              label: "Favorites",
-              title: "Favorites library",
-              description:
-                "Keep the songs, albums, and playlists you return to in your own workspace.",
-              alt: "Museek favorites interface showing saved music content",
-            },
-            library: {
-              label: "Local music",
-              title: "Local music library",
-              description:
-                "Bring local files and CUE album sheets into one consistent playback and organization experience.",
-              alt: "Museek local music interface showing a list of local files",
-            },
-            downloads: {
-              label: "Downloads",
-              title: "Download queue",
-              description:
-                "Track progress, task state, and completed files without losing the thread.",
-              alt: "Museek downloads interface showing a list of download tasks",
-            },
-            recognize: {
-              label: "Recognize",
-              title: "Song recognition",
-              description:
-                "Start with a sound that is playing and return to a result you can keep exploring.",
-              alt: "Museek recognition interface showing audio recognition controls",
-            },
-            desktopLyrics: {
-              label: "Desktop lyrics",
-              title: "Desktop lyrics",
-              description:
-                "Keep lyrics on the desktop while playback controls stay lightweight.",
-              alt: "Museek desktop lyrics interface showing a floating lyrics window",
-            },
-          },
-          workflow: {
-            kicker: "03 / A CLEARER FLOW",
-            heading: "From clue to playback, keep only the necessary steps.",
-            intro:
-              "Desktop software should feel quiet over long sessions. Museek puts sources, state, and settings where they belong.",
-            discover: {
-              title: "Discover",
-              text: "Start with a song, playlist, album, or chart and keep exploring from familiar results.",
-            },
-            resolve: {
-              title: "Resolve",
-              text: "Resolve playback URLs through compatible source scripts you import yourself, trying available sources by priority.",
-            },
-            play: {
-              title: "Play",
-              text: "Queue, lyrics, favorites, and desktop controls orbit the current track so the next action stays close.",
-            },
-            note: "Source boundary: playback and download URLs come from lx-music-compatible source scripts imported by the user. Museek does not ship, host, or provide music content.",
-          },
-          platforms: {
-            kicker: "04 / ONE DESKTOP CONTEXT",
-            heading: "Your platforms, your library, one desktop context.",
-            intro:
-              "Discover through familiar platforms, choose your own playback configuration, and return to one unified player experience.",
-            catalog: "catalog",
-            local: "Local library",
-            files: "your files",
-            note: "Museek is a desktop music aggregation tool: it connects discovery surfaces with a local experience, without representing or replacing any music platform.",
-          },
-          download: {
-            kicker: "05 / GET THE DESKTOP APP",
-            heading: "Bring your next track back to the desktop.",
-            text: "Get the latest build from GitHub Releases. Museek is built with Tauri 2 for Windows and macOS, open source and configured by you.",
-            release: "Open Releases",
-            repository: "Read the repository",
-            windows: "Windows",
-            windowsNote: "installer / portable",
-            macos: "macOS",
-            macosNote: "Apple Silicon / Intel",
-            source: "Source",
-            sourceNote: "MIT licensed repo",
-            note: "Versions, installers, and release notes live on GitHub Releases.",
-          },
-          footer: {
-            boundary:
-              "Museek does not distribute music content. Playback and downloads depend on compatible sources configured by the user and their permissions.",
-            made: "Built for the desktop listener.",
-          },
-        },
-      };
+      (function () {
+        var root = document.documentElement;
 
-      const screenshotPaths = {
-        search: "./screenshots/01-search.webp",
-        lyrics: "./screenshots/02-lyrics.webp",
-        playlists: "./screenshots/03-playlists.webp",
-        charts: "./screenshots/04-charts.webp",
-        albums: "./screenshots/05-albums.webp",
-        favorites: "./screenshots/06-favorites.webp",
-        library: "./screenshots/07-local-library.webp",
-        downloads: "./screenshots/08-downloads.webp",
-        recognize: "./screenshots/09-recognize.webp",
-        desktopLyrics: "./screenshots/10-desktop-lyrics.webp",
-      };
+        var mq = window.matchMedia
+          ? window.matchMedia("(prefers-color-scheme: dark)")
+          : null;
+        var langPrefs = null;
+        var themePrefs = null;
+        try {
+          langPrefs = localStorage.getItem("museek-lang");
+          themePrefs = localStorage.getItem("museek-theme");
+        } catch (e) {}
 
-      let language = "zh";
-      let activeShot = "search";
-      let menuOpen = false;
+        var lang =
+          langPrefs ||
+          ((navigator.language || "en").toLowerCase().indexOf("zh") === 0
+            ? "zh"
+            : "en");
+        var theme = themePrefs || root.getAttribute("data-theme") || "dark";
 
-      const languageButton = document.querySelector("#languageButton");
-      const mobileLanguageButton = document.querySelector(
-        "#mobileLanguageButton",
-      );
-      const menuButton = document.querySelector("#menuButton");
-      const mobileMenu = document.querySelector("#mobileMenu");
-      const galleryImage = document.querySelector("#galleryImage");
-      const galleryTitle = document.querySelector("#galleryTitle");
-      const galleryDescription = document.querySelector("#galleryDescription");
-      const galleryCounter = document.querySelector("#galleryCounter");
-      const descriptionMeta = document.querySelector(
-        'meta[name="description"]',
-      );
-      const shotButtons = [...document.querySelectorAll("[data-shot]")];
+        var langBtn = document.getElementById("langBtn");
+        var themeBtn = document.getElementById("themeBtn");
 
-      function getTranslation(path) {
-        return path
-          .split(".")
-          .reduce((value, key) => value && value[key], translations[language]);
-      }
+        var COPY = {
+          theme: { zh: "切换浅色 / 深色模式", en: "Toggle light / dark mode" },
+          lang: { zh: "切换语言", en: "Switch language" },
+          close: { zh: "关闭", en: "Close" },
+          ph: { zh: "预览暂不可用", en: "Preview unavailable" },
+        };
 
-      function syncMenu() {
-        menuOpen = menuOpen && window.matchMedia("(max-width: 860px)").matches;
-        mobileMenu.classList.toggle("is-open", menuOpen);
-        menuButton.setAttribute("aria-expanded", String(menuOpen));
-        menuButton.setAttribute(
-          "aria-label",
-          getTranslation(menuOpen ? "controls.closeMenu" : "controls.openMenu"),
-        );
-      }
-
-      function updateGallery(key, moveFocus) {
-        const shot = translations[language].shots[key];
-        const shotIndex = Object.keys(screenshotPaths).indexOf(key) + 1;
-        activeShot = key;
-        galleryImage.src = screenshotPaths[key];
-        galleryImage.alt = shot.alt;
-        galleryTitle.textContent = shot.title;
-        galleryDescription.textContent = shot.description;
-        galleryCounter.textContent = `${String(shotIndex).padStart(2, "0")} / 10`;
-
-        shotButtons.forEach((button) => {
-          const isActive = button.dataset.shot === key;
-          button.classList.toggle("is-active", isActive);
-          button.setAttribute("aria-pressed", String(isActive));
-          button.querySelector("[data-shot-label]").textContent =
-            translations[language].shots[button.dataset.shot].label;
-        });
-
-        if (moveFocus) {
-          galleryImage.focus({ preventScroll: true });
+        function applyLang(next) {
+          lang = next;
+          root.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
+          document.querySelectorAll("[data-en]").forEach(function (el) {
+            var v = el.getAttribute("data-" + lang);
+            if (v !== null) el.textContent = v;
+          });
+          document.querySelectorAll(".shot-frame").forEach(function (f) {
+            f.setAttribute("data-ph", COPY.ph[lang]);
+          });
+          if (langBtn) {
+            langBtn.textContent = lang === "zh" ? "EN" : "中文";
+            langBtn.setAttribute("aria-label", COPY.lang[lang]);
+          }
+          if (themeBtn) {
+            themeBtn.setAttribute("aria-label", COPY.theme[lang]);
+            themeBtn.setAttribute("title", COPY.theme[lang]);
+          }
+          if (lbClose) lbClose.setAttribute("aria-label", COPY.close[lang]);
+          try {
+            localStorage.setItem("museek-lang", lang);
+          } catch (e) {}
         }
-      }
 
-      function applyLanguage(nextLanguage) {
-        language = nextLanguage;
-        document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
-        document.title = translations[language].meta.title;
-        descriptionMeta.setAttribute(
-          "content",
-          translations[language].meta.description,
-        );
+        function applyTheme(next) {
+          theme = next;
+          root.setAttribute("data-theme", theme);
+          try {
+            localStorage.setItem("museek-theme", theme);
+          } catch (e) {}
+        }
 
-        document.querySelectorAll("[data-i18n]").forEach((element) => {
-          element.textContent = getTranslation(element.dataset.i18n);
-        });
+        applyLang(lang);
+        applyTheme(theme);
 
-        languageButton.textContent = language === "zh" ? "EN" : "中文";
-        languageButton.setAttribute(
-          "aria-label",
-          getTranslation("controls.switchLanguage"),
-        );
-        updateGallery(activeShot, false);
-        syncMenu();
-      }
+        if (langBtn) {
+          langBtn.addEventListener("click", function () {
+            applyLang(lang === "zh" ? "en" : "zh");
+          });
+        }
 
-      function toggleLanguage() {
-        applyLanguage(language === "zh" ? "en" : "zh");
-      }
+        if (themeBtn) {
+          themeBtn.addEventListener("click", function () {
+            var next = theme === "dark" ? "light" : "dark";
+            themePrefs = next;
+            applyTheme(next);
+          });
+        }
 
-      languageButton.addEventListener("click", toggleLanguage);
-      mobileLanguageButton.addEventListener("click", () => {
-        toggleLanguage();
-        menuOpen = false;
-        syncMenu();
-      });
+        if (mq && mq.addEventListener) {
+          mq.addEventListener("change", function (e) {
+            if (!themePrefs) applyTheme(e.matches ? "dark" : "light");
+          });
+        }
 
-      menuButton.addEventListener("click", () => {
-        menuOpen = !menuOpen;
-        syncMenu();
-      });
+        var lightbox = document.getElementById("lightbox");
+        var lbImg = document.getElementById("lbImg");
+        var lbTitle = document.getElementById("lbTitle");
+        var lbDesc = document.getElementById("lbDesc");
+        var lbClose = document.getElementById("lbClose");
+        var lastFocus = null;
 
-      mobileMenu.querySelectorAll("a").forEach((link) => {
-        link.addEventListener("click", () => {
-          menuOpen = false;
-          syncMenu();
-        });
-      });
+        function openLightbox(frame) {
+          var img = frame.querySelector("img");
+          if (!img || frame.classList.contains("failed")) return;
 
-      window.addEventListener("resize", syncMenu);
+          var holder =
+            frame.closest(".shot-item") || frame.closest(".shot-hero");
+          var title = "";
+          var desc = "";
+          if (holder) {
+            var b = holder.querySelector("figcaption b");
+            var d = holder.querySelector("figcaption span:not(.shot-no)");
+            title = b ? b.textContent : "";
+            desc = d ? d.textContent : "";
+          }
 
-      shotButtons.forEach((button) => {
-        button.addEventListener("click", () =>
-          updateGallery(button.dataset.shot, true),
-        );
-      });
+          lbImg.src = img.currentSrc || img.src;
+          lbImg.alt = img.alt || title;
+          lbTitle.textContent = title;
+          lbTitle.style.display = title ? "" : "none";
+          lbDesc.textContent = desc;
+          lbDesc.style.display = desc ? "" : "none";
 
-      const revealElements = document.querySelectorAll(".reveal");
-      if ("IntersectionObserver" in window) {
-        const revealObserver = new IntersectionObserver(
-          (entries, observer) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                entry.target.classList.add("is-visible");
-                observer.unobserve(entry.target);
-              }
+          lastFocus = document.activeElement;
+          lightbox.classList.add("on");
+          lightbox.setAttribute("aria-hidden", "false");
+          document.body.style.overflow = "hidden";
+          if (lbClose) lbClose.focus();
+        }
+
+        function closeLightbox() {
+          lightbox.classList.remove("on");
+          lightbox.setAttribute("aria-hidden", "true");
+          document.body.style.overflow = "";
+          lbImg.src = "";
+          if (lastFocus && lastFocus.focus) lastFocus.focus();
+        }
+
+        document
+          .querySelectorAll(".shot-frame.zoomable")
+          .forEach(function (frame) {
+            frame.addEventListener("click", function () {
+              openLightbox(frame);
             });
-          },
-          { threshold: 0.12 },
-        );
-        revealElements.forEach((element) => revealObserver.observe(element));
-      } else {
-        revealElements.forEach((element) =>
-          element.classList.add("is-visible"),
-        );
-      }
+          });
 
-      applyLanguage(language);
+        if (lbClose) lbClose.addEventListener("click", closeLightbox);
+        if (lightbox) {
+          lightbox.addEventListener("click", function (e) {
+            if (e.target === lightbox) closeLightbox();
+          });
+        }
+        document.addEventListener("keydown", function (e) {
+          if (
+            e.key === "Escape" &&
+            lightbox &&
+            lightbox.classList.contains("on")
+          )
+            closeLightbox();
+        });
+      })();
     </script>
   </body>
 </html>
