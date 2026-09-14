@@ -17,6 +17,58 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.8.0": {
+    zh: {
+      sections: [
+        {
+          title: "📁 本地音乐",
+          bullets: [
+            "导入 CUE 表时，一张整轨专辑会按曲目拆成可单独播放的片段，不用再切文件",
+            "导入大专辑时不再卡住窗口；标签和时长在后台读取",
+          ],
+        },
+        {
+          title: "▶️ 播放",
+          bullets: [
+            "Windows 上播放本地文件和 CUE 分轨时直接从磁盘读，不再把整张专辑解码进内存",
+          ],
+        },
+        {
+          title: "💬 歌词",
+          bullets: [
+            "全屏沉浸时，右侧按钮和关闭会在鼠标停下后隐藏，移动再出现",
+            "悬停封面可以把它保存到你选择的位置",
+            "暂停时封面浮动也会停住",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📁 Local music",
+          bullets: [
+            "A CUE sheet maps one album file into playable per-track clips — no splitting",
+            "Importing a large album no longer freezes the window; tags and duration load in the background",
+          ],
+        },
+        {
+          title: "▶️ Playback",
+          bullets: [
+            "On Windows, local files and CUE clips stream from disk instead of decoding the whole album into memory",
+          ],
+        },
+        {
+          title: "💬 Lyrics",
+          bullets: [
+            "In immersive fullscreen, the side controls and close button hide after the pointer goes still",
+            "Hover the cover to save it to a folder you choose",
+            "The cover float pauses when playback is paused",
+          ],
+        },
+      ],
+    },
+  },
   "3.7.4": {
     zh: {
       sections: [
