@@ -158,17 +158,13 @@
         height: 30px;
         border-radius: 9px;
         flex: none;
-        background: linear-gradient(
-          150deg,
-          var(--acc) 0%,
-          var(--acc-deep) 100%
-        );
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--acc-ink);
-        font-size: 14px;
-        font-weight: 700;
+        display: block;
+        object-fit: cover;
+      }
+      .foot-l .brand-mark {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
       }
       .nav-links {
         display: flex;
@@ -1001,8 +997,14 @@
   <body>
     <div class="nav">
       <div class="wrap nav-in">
-        <a class="brand" href="#top">
-          <span class="brand-mark">拾</span>
+        <a class="brand" href="#top" aria-label="Museek 拾音">
+          <img
+            class="brand-mark"
+            src="./app-icon.svg"
+            alt=""
+            width="30"
+            height="30"
+          />
           <span>Museek 拾音</span>
         </a>
         <nav class="nav-links">
@@ -1723,8 +1725,10 @@
         <div class="follow-card">
           <div class="follow-qr">
             <img
-              src="../public/gzh/qrcode.webp"
+              src="./gzh/qrcode.webp"
               alt="Museek 公众号二维码"
+              width="166"
+              height="166"
               loading="lazy"
             />
           </div>
@@ -1798,16 +1802,13 @@
       <div class="wrap">
         <div class="foot">
           <div class="foot-l">
-            <span
+            <img
               class="brand-mark"
-              style="
-                width: 24px;
-                height: 24px;
-                border-radius: 7px;
-                font-size: 11px;
-              "
-              >拾</span
-            >
+              src="./app-icon.svg"
+              alt=""
+              width="24"
+              height="24"
+            />
             <span>Museek 拾音 · Every melody, one search.</span>
           </div>
           <div class="foot-links">
