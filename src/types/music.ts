@@ -34,6 +34,10 @@ export interface MusicInfoMeta {
   catalogSinger?: string;
   /** Duration from the matched NetEase hit — lyric scoring, not the file clock. */
   catalogInterval?: string;
+  /** CUE virtual-track window on the shared local file (seconds). */
+  clipStart?: number;
+  clipEnd?: number;
+  cueIndex?: number;
 }
 
 export interface MusicInfo {
@@ -63,6 +67,8 @@ export interface LocalTrack {
   hasArtistTag?: boolean;
   /** File missing/moved/unreadable — set after a failed play attempt. */
   unavailable?: boolean;
+  /** Absolute path of the CUE sheet that created this virtual track. */
+  cueSheetPath?: string;
   song: MusicInfo;
 }
 

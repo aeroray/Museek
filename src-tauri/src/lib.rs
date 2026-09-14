@@ -1,5 +1,5 @@
-use lofty::config::WriteOptions;
-use lofty::file::{AudioFile, TaggedFileExt};
+use lofty::config::{ParseOptions, WriteOptions};
+use lofty::file::{AudioFile, FileType, TaggedFileExt};
 use lofty::picture::{MimeType, Picture, PictureType};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, ItemKey, Tag, TagType};
@@ -738,7 +738,7 @@ fn is_local_audio_path(path: &std::path::Path) -> bool {
             .and_then(|e| e.to_str())
             .map(|e| e.to_ascii_lowercase())
             .as_deref(),
-        Some("mp3" | "flac" | "m4a" | "ogg" | "wav" | "aac")
+        Some("mp3" | "flac" | "m4a" | "ogg" | "wav" | "aac" | "cue")
     )
 }
 
@@ -827,6 +827,17 @@ fn queue_unsupported_opens(app: &tauri::AppHandle, paths: Vec<String>) {
 fn handle_os_open_args(app: &tauri::AppHandle, args: &[String]) {
     queue_open_local_files(app, audio_paths_from_args(args));
     queue_unsupported_opens(app, unsupported_open_paths_from_args(args));
+}
+
+/// Expand plugin-fs runtime ACL so CUE-referenced audio (and similar) can be read.
+#[tauri::command]
+fn allow_local_file_paths(app: tauri::AppHandle, paths: Vec<String>) {
+    for p in &paths {
+        if p.is_empty() {
+            continue;
+        }
+        let _ = app.fs_scope().allow_file(std::path::Path::new(p));
+    }
 }
 
 /// Drain paths queued before the frontend subscribed to `open-local-files`.
@@ -1333,6 +1344,147 @@ async fn race_download_and_install(
     }
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalAudioProbe {
+    duration_sec: f64,
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+    lossless: bool,
+    sample_rate: Option<u32>,
+    bits_per_sample: Option<u8>,
+    channels: Option<u8>,
+    bitrate_kbps: Option<u32>,
+    file_size: u64,
+    lyric: Option<String>,
+    cover_base64: Option<String>,
+    cover_mime: Option<String>,
+}
+
+fn probe_cover(
+    tagged: &lofty::file::TaggedFile,
+) -> (Option<String>, Option<String>) {
+    let mut best: Option<&lofty::picture::Picture> = None;
+    let mut best_rank = -1i32;
+    for tag in tagged.tags() {
+        for pic in tag.pictures() {
+            let len = pic.data().len();
+            if len < 64 || len > MAX_EMBEDDED_COVER_BYTES {
+                continue;
+            }
+            let rank = match pic.pic_type() {
+                PictureType::CoverFront => 3,
+                PictureType::Other => 1,
+                _ => 0,
+            };
+            if rank > best_rank {
+                best_rank = rank;
+                best = Some(pic);
+            }
+        }
+    }
+    let Some(pic) = best else {
+        return (None, None);
+    };
+    let mime = pic
+        .mime_type()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_else(|| "image/jpeg".to_string());
+    (
+        Some(base64::engine::general_purpose::STANDARD.encode(pic.data())),
+        Some(mime),
+    )
+}
+
+fn probe_lyric(tag: &Tag) -> Option<String> {
+    for key in [ItemKey::UnsyncLyrics, ItemKey::Lyrics] {
+        if let Some(text) = tag.get_string(key) {
+            let trimmed = text.trim();
+            if trimmed.contains('[') && trimmed.contains(':') {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn probe_local_audio_sync(path: &str, include_cover: bool) -> Result<LocalAudioProbe, String> {
+    if path.is_empty() {
+        return Err("Empty path".to_string());
+    }
+    let file_size = std::fs::metadata(path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    let options = ParseOptions::new().read_cover_art(include_cover);
+    let tagged = Probe::open(path)
+        .map_err(|error| error.to_string())?
+        .options(options)
+        .read()
+        .map_err(|error| error.to_string())?;
+    let props = tagged.properties();
+    let duration_sec = props.duration().as_secs_f64();
+    let lossless = matches!(
+        tagged.file_type(),
+        FileType::Flac | FileType::Wav | FileType::Aiff
+    ) || props.bit_depth().is_some_and(|bits| bits >= 16);
+    let tag = tagged.primary_tag().or_else(|| tagged.first_tag());
+    let title = tag
+        .and_then(|t| t.title())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let album = tag
+        .and_then(|t| t.album())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let artist = tag.and_then(|t| {
+        let named: Vec<String> = t
+            .get_strings(ItemKey::TrackArtist)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !named.is_empty() {
+            return Some(named.join("、"));
+        }
+        t.artist()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    });
+    let lyric = tag.and_then(probe_lyric);
+    let (cover_base64, cover_mime) = if include_cover {
+        probe_cover(&tagged)
+    } else {
+        (None, None)
+    };
+    Ok(LocalAudioProbe {
+        duration_sec,
+        title,
+        artist,
+        album,
+        lossless,
+        sample_rate: props.sample_rate(),
+        bits_per_sample: props.bit_depth(),
+        channels: props.channels(),
+        bitrate_kbps: props.audio_bitrate().or(props.overall_bitrate()),
+        file_size,
+        lyric,
+        cover_base64,
+        cover_mime,
+    })
+}
+
+/// Read duration/tags/cover from disk in a worker thread.
+/// Never copies the audio bitstream into the WebView (CUE images are hundreds of MB).
+#[tauri::command]
+async fn probe_local_audio(
+    path: String,
+    include_cover: bool,
+) -> Result<LocalAudioProbe, String> {
+    tauri::async_runtime::spawn_blocking(move || probe_local_audio_sync(&path, include_cover))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 /// Metadata-only presence check for many absolute paths in one IPC round-trip.
 /// Permission / IO errors count as present so a locked file is never marked missing.
 #[tauri::command]
@@ -1574,6 +1726,8 @@ pub fn run() {
             race_download_and_install,
             take_opened_local_files,
             take_opened_unsupported_files,
+            allow_local_file_paths,
+            probe_local_audio,
             is_autostart_launch,
             should_start_hidden,
             reapply_macos_traffic_lights,

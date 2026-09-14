@@ -112,11 +112,21 @@ export async function readEmbeddedLyric(filePath: string): Promise<string | null
  * Local lyric sources in priority order: sidecar .lrc → stored/embedded tags.
  * Untimed plain text is ignored so NetEase can still supply synced lines.
  */
-export async function fetchLocalFileLyric(opts: {
+export function fetchLocalFileLyric(opts: {
   filePath?: string
   embeddedLyric?: string | null
+  /** CUE virtual tracks must not use the album sidecar / embedded lyrics. */
+  skipFileLyrics?: boolean
 }): Promise<LyricInfo | null> {
-  const { filePath, embeddedLyric } = opts
+  const { filePath, embeddedLyric, skipFileLyrics } = opts
+  if (skipFileLyrics) return Promise.resolve(null)
+  return fetchLocalFileLyricFromDisk(filePath, embeddedLyric)
+}
+
+async function fetchLocalFileLyricFromDisk(
+  filePath: string | undefined,
+  embeddedLyric: string | null | undefined,
+): Promise<LyricInfo | null> {
   if (filePath) {
     const sidecar = await readSiblingLrc(filePath)
     if (sidecar) return { lyric: sidecar }

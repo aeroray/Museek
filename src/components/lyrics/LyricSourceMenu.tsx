@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ListMusic, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,21 +22,25 @@ import type { MusicInfo, OnlineSource } from "@/types/music"
 
 type Props = {
   song: MusicInfo | null
+  onOpenChange?: (open: boolean) => void
 }
 
-export function LyricSourceMenu({ song }: Props) {
+export function LyricSourceMenu({ song, onOpenChange }: Props) {
   const t = useT()
   const [open, setOpen] = useState(false)
   const [applying, setApplying] = useState<OnlineSource | null>(null)
   const [options, setOptions] = useState<PlatformLyricOption[]>([])
   const songKey = song ? `${song.source}:${song.meta.songId}` : ""
   const selected = song ? selectedLyricSource(song) : null
+  const openRef = useRef(open)
+  openRef.current = open
 
   useEffect(() => {
     setOptions([])
     setApplying(null)
+    if (openRef.current) onOpenChange?.(false)
     setOpen(false)
-  }, [songKey])
+  }, [songKey, onOpenChange])
 
   useEffect(() => {
     if (!open || !song) return
@@ -78,7 +82,13 @@ export function LyricSourceMenu({ song }: Props) {
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        onOpenChange?.(next)
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"

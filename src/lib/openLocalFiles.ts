@@ -34,13 +34,25 @@ async function bringAppToFront() {
 
 /** Resolve opened paths to library songs, preserving open order. */
 function songsForPaths(paths: string[]): MusicInfo[] {
-  const byPath = new Map(
-    useLocalMusicStore.getState().tracks.map((t) => [pathKey(t.filePath), t])
-  )
+  const tracks = useLocalMusicStore.getState().tracks
   const songs: MusicInfo[] = []
+  const seen = new Set<string>()
   for (const p of paths) {
-    const track = byPath.get(pathKey(p))
-    if (track?.song && !track.unavailable) songs.push(track.song)
+    const key = pathKey(p)
+    const matched = tracks
+      .filter(
+        (t) =>
+          pathKey(t.filePath) === key ||
+          (t.cueSheetPath ? pathKey(t.cueSheetPath) === key : false),
+      )
+      .sort(
+        (a, b) => (a.song.meta.cueIndex ?? 0) - (b.song.meta.cueIndex ?? 0),
+      )
+    for (const track of matched) {
+      if (seen.has(track.id) || track.unavailable || !track.song) continue
+      seen.add(track.id)
+      songs.push(track.song)
+    }
   }
   return songs
 }

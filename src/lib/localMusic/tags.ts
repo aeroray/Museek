@@ -1,5 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
 import * as md5Lib from "js-md5";
-import { parseBuffer } from "music-metadata";
 import { formatDuration } from "@/lib/utils";
 import { indexQualitySizes } from "@/lib/quality";
 import { t } from "@/lib/i18n";
@@ -9,7 +9,7 @@ import type {
   MusicQuality,
   Quality,
 } from "@/types/music";
-import { lyricTextFromTags } from "./lyrics";
+import { allowLocalFilePaths } from "./fsScope";
 
 // js-md5 CommonJS/ESM interop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,6 +39,21 @@ export function extOf(path: string): string {
 
 export function isLocalAudioPath(path: string): boolean {
   return LOCAL_AUDIO_EXTS.has(extOf(path));
+}
+
+export function isCuePath(path: string): boolean {
+  return extOf(path) === "cue";
+}
+
+export function isLocalImportPath(path: string): boolean {
+  return isLocalAudioPath(path) || isCuePath(path);
+}
+
+export function localCueTrackId(filePath: string, trackNo: number): string {
+  const n = Number.isFinite(trackNo) ? Math.max(1, Math.trunc(trackNo)) : 1;
+  return localTrackId(
+    `${filePath.replace(/\\/g, "/")}#${String(n).padStart(2, "0")}`,
+  );
 }
 
 function basenameNoExt(path: string): string {
@@ -164,6 +179,59 @@ function qualityFromFormat(
   return qualityForExt(ext, fileSize);
 }
 
+type NativeAudioProbe = {
+  durationSec: number;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  lossless: boolean;
+  sampleRate: number | null;
+  bitsPerSample: number | null;
+  channels: number | null;
+  bitrateKbps: number | null;
+  fileSize: number;
+  lyric: string | null;
+  coverBase64: string | null;
+  coverMime: string | null;
+};
+
+function bytesFromBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function probeLocalAudioNative(
+  filePath: string,
+  includeCover: boolean,
+): Promise<NativeAudioProbe | null> {
+  try {
+    return await invoke<NativeAudioProbe>("probe_local_audio", {
+      path: filePath,
+      includeCover,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function qualityFromProbe(ext: string, probe: NativeAudioProbe): MusicQuality[] {
+  return qualityFromFormat(
+    ext,
+    {
+      lossless: probe.lossless,
+      bitsPerSample: probe.bitsPerSample ?? undefined,
+      sampleRate: probe.sampleRate ?? undefined,
+      bitrate:
+        typeof probe.bitrateKbps === "number" && probe.bitrateKbps > 0
+          ? probe.bitrateKbps * 1000
+          : undefined,
+    },
+    probe.fileSize,
+  );
+}
+
 /** Re-read container/bitrate plus whether title/artist tags exist (no cover I/O). */
 export async function peekLocalQuality(filePath: string): Promise<{
   qualitys: MusicQuality[];
@@ -172,46 +240,15 @@ export async function peekLocalQuality(filePath: string): Promise<{
 } | null> {
   if (!isTauri) return null;
   try {
-    const ext = extOf(filePath);
-    const { readFile } = await import("@tauri-apps/plugin-fs");
-    const bytes = await readFile(filePath);
-    const meta = await parseBuffer(bytes, {
-      mimeType: mimeForExt(ext),
-      size: bytes.byteLength,
-    });
-    const common = meta.common;
-    const artists = (
-      common.artists?.length
-        ? common.artists
-        : common.artist
-          ? [common.artist]
-          : []
-    )
-      .map((a) => a?.trim())
-      .filter(Boolean);
+    const probe = await probeLocalAudioNative(filePath, false);
+    if (!probe) return null;
     return {
-      qualitys: qualityFromFormat(ext, meta.format, bytes.byteLength),
-      hasTitleTag: Boolean(common.title?.trim()),
-      hasArtistTag: artists.length > 0,
+      qualitys: qualityFromProbe(extOf(filePath), probe),
+      hasTitleTag: Boolean(probe.title?.trim()),
+      hasArtistTag: Boolean(probe.artist?.trim()),
     };
   } catch {
     return null;
-  }
-}
-
-function mimeForExt(ext: string): string {
-  switch (ext) {
-    case "flac":
-      return "audio/flac";
-    case "m4a":
-    case "aac":
-      return "audio/mp4";
-    case "ogg":
-      return "audio/ogg";
-    case "wav":
-      return "audio/wav";
-    default:
-      return "audio/mpeg";
   }
 }
 
@@ -250,59 +287,6 @@ async function saveEmbeddedCover(
   }
 }
 
-type PictureLike = {
-  format?: string;
-  type?: string;
-  name?: string;
-  description?: string;
-  data?: Uint8Array;
-};
-
-/**
- * Prefer a real album cover over file icons / artist photos.
- * music-metadata's own `selectCover` is unreliable (broken `in` check on an array),
- * and using `picture[0]` alone misses files where the front cover isn't first.
- */
-function pickCoverPicture(
-  pictures: PictureLike[] | undefined,
-): PictureLike | null {
-  if (!pictures?.length) return null;
-
-  const rank = (p: PictureLike): number => {
-    const len = p.data?.byteLength ?? p.data?.length ?? 0;
-    if (len < 64) return -1; // empty / tiny stub
-    const type =
-      `${p.type ?? ""} ${p.name ?? ""} ${p.description ?? ""}`.toLowerCase();
-    const mime = (p.format ?? "").toLowerCase();
-    let score = Math.min(len, 5_000_000); // size as weak signal
-    if (/cover\s*\(front\)|front\s*cover|^3$|\bfront\b/.test(type))
-      score += 1e12;
-    else if (/\bcover\b|\balbum\b|^4$/.test(type)) score += 1e11;
-    else if (!type.trim() || /\bother\b|^0$/.test(type)) score += 1e9;
-    if (
-      /icon|leaflet|media|conductor|composer|lyricist|artist|band|publisher|video/.test(
-        type,
-      )
-    ) {
-      score -= 1e11;
-    }
-    if (/jpeg|jpg|png|webp/.test(mime)) score += 1e8;
-    else if (/gif|bmp/.test(mime)) score += 1e7;
-    return score;
-  };
-
-  let best: PictureLike | null = null;
-  let bestScore = -1;
-  for (const p of pictures) {
-    const score = rank(p);
-    if (score > bestScore) {
-      best = p;
-      bestScore = score;
-    }
-  }
-  return bestScore >= 0 ? best : null;
-}
-
 /** Rebuild convertFileSrc URL for a stored relative cover path. */
 export async function resolveLocalCoverUrl(
   rel: string | undefined,
@@ -324,6 +308,8 @@ export interface ParsedLocalTags {
   singer: string;
   albumName: string;
   interval: string;
+  /** File clock in seconds; 0 when unknown. */
+  durationSec: number;
   qualitys: MusicQuality[];
   localCoverRel?: string;
   picUrl?: string | null;
@@ -344,6 +330,7 @@ export async function parseLocalFile(
   filePath: string,
   id: string,
   nameMode: LocalNameMode = "smart",
+  includeCover = true,
 ): Promise<ParsedLocalTags> {
   const ext = extOf(filePath);
   const filenameName = localFilenameTitle(filePath);
@@ -355,6 +342,7 @@ export async function parseLocalFile(
   let singer = "";
   let albumName = "";
   let interval = "0:00";
+  let durationSec = 0;
   let qualitys = qualityForExt(ext);
   let localCoverRel: string | undefined;
   let picUrl: string | null = null;
@@ -366,54 +354,38 @@ export async function parseLocalFile(
 
   if (isTauri) {
     try {
-      const { readFile } = await import("@tauri-apps/plugin-fs");
-      const bytes = await readFile(filePath);
-      const meta = await parseBuffer(bytes, {
-        mimeType: mimeForExt(ext),
-        size: bytes.byteLength,
-      });
-      const common = meta.common;
-      if (common.title?.trim()) {
-        if (nameMode === "smart") name = common.title.trim();
-        hasTitleTag = true;
-      }
-      const artists = (
-        common.artists?.length
-          ? common.artists
-          : common.artist
-            ? [common.artist]
-            : []
-      )
-        .map((a) => a?.trim())
-        .filter(Boolean) as string[];
-      if (artists.length) {
-        singer = artists.join("、");
-        hasArtistTag = true;
-      }
-      if (common.album?.trim()) {
-        albumName = common.album.trim();
-        hasAlbumTag = true;
-      }
-      const dur = meta.format.duration;
-      if (typeof dur === "number" && dur > 0) interval = formatDuration(dur);
-
-      qualitys = qualityFromFormat(ext, meta.format, bytes.byteLength);
-
-      const fromTags = lyricTextFromTags(common.lyrics);
-      if (fromTags) embeddedLyric = fromTags;
-
-      const pic = pickCoverPicture(common.picture);
-      const raw = pic?.data;
-      if (raw && raw.length > 0) {
-        const data =
-          raw instanceof Uint8Array
-            ? raw
-            : new Uint8Array(raw as ArrayLike<number>);
-        const saved = await saveEmbeddedCover(id, data, pic?.format);
-        if (saved) {
-          localCoverRel = saved.rel;
-          picUrl = saved.picUrl;
-          hasCover = true;
+      await allowLocalFilePaths([filePath]);
+      const probe = await probeLocalAudioNative(filePath, includeCover);
+      if (probe) {
+        if (probe.title?.trim()) {
+          if (nameMode === "smart") name = probe.title.trim();
+          hasTitleTag = true;
+        }
+        if (probe.artist?.trim()) {
+          singer = probe.artist.trim();
+          hasArtistTag = true;
+        }
+        if (probe.album?.trim()) {
+          albumName = probe.album.trim();
+          hasAlbumTag = true;
+        }
+        if (probe.durationSec > 0) {
+          durationSec = probe.durationSec;
+          interval = formatDuration(probe.durationSec);
+        }
+        qualitys = qualityFromProbe(ext, probe);
+        if (probe.lyric?.trim()) embeddedLyric = probe.lyric.trim();
+        if (probe.coverBase64) {
+          const saved = await saveEmbeddedCover(
+            id,
+            bytesFromBase64(probe.coverBase64),
+            probe.coverMime ?? undefined,
+          );
+          if (saved) {
+            localCoverRel = saved.rel;
+            picUrl = saved.picUrl;
+            hasCover = true;
+          }
         }
       }
     } catch {
@@ -435,6 +407,7 @@ export async function parseLocalFile(
     singer,
     albumName,
     interval,
+    durationSec,
     qualitys,
     localCoverRel,
     picUrl,
@@ -455,6 +428,7 @@ export function tagsFromFilename(filePath: string): ParsedLocalTags {
     singer: guessed.singer || t("local.unknownArtist"),
     albumName: "",
     interval: "0:00",
+    durationSec: 0,
     qualitys: qualityForExt(extOf(filePath)),
     hasTitleTag: false,
     hasArtistTag: false,
@@ -467,14 +441,20 @@ export function buildLocalSong(
   id: string,
   filePath: string,
   tags: ParsedLocalTags,
+  clip?: { start: number; end: number; index: number },
 ): MusicInfo {
   const _qualitys = indexQualitySizes(tags.qualitys);
+  const useClip =
+    clip &&
+    Number.isFinite(clip.start) &&
+    Number.isFinite(clip.end) &&
+    clip.end > clip.start;
   return {
     id,
     name: tags.name,
     singer: tags.singer,
     source: "local",
-    interval: tags.interval,
+    interval: useClip ? formatDuration(clip.end - clip.start) : tags.interval,
     albumName: tags.albumName,
     meta: {
       songId: id,
@@ -484,7 +464,10 @@ export function buildLocalSong(
       _qualitys,
       filePath,
       localCoverRel: tags.localCoverRel,
-      embeddedLyric: tags.embeddedLyric,
+      embeddedLyric: useClip ? undefined : tags.embeddedLyric,
+      clipStart: useClip ? clip.start : undefined,
+      clipEnd: useClip ? clip.end : undefined,
+      cueIndex: useClip ? clip.index : undefined,
     },
   };
 }

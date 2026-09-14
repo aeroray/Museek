@@ -94,8 +94,8 @@ export function PlayerBar() {
               type="button"
               onClick={() => !loading && hasLyrics && setShowLyrics(true)}
               disabled={loading || !hasLyrics}
-              // Outer owns shadow + scale; inner clips overlay so it never paints past rounded corners.
-              className="group relative h-12 w-12 shrink-0 transition-transform duration-200 ease-out hover:scale-[1.03] active:scale-[0.96] disabled:pointer-events-none"
+              // Inner clips overlay so it never paints past rounded corners.
+              className="group relative h-12 w-12 shrink-0 transition-transform duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none"
             >
               <span className="absolute inset-0 overflow-hidden rounded-xl shadow-[var(--shadow-border)]">
                 <img
@@ -112,7 +112,7 @@ export function PlayerBar() {
                   </span>
                 ) : (
                   <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 icon-hover-maximize">
-                    <Maximize2 size={15} className="text-white icon-play-pop" />
+                    <Maximize2 size={15} className="text-white" />
                   </span>
                 )}
               </span>

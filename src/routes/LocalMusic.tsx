@@ -37,6 +37,7 @@ import { VirtualList } from "@/components/common/VirtualList";
 import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges";
 import { bestQuality } from "@/lib/quality";
 import { revealLocalFile } from "@/lib/localMusic";
+import { isCueClipMeta } from "@/lib/localMusic/cue";
 import { useLocalMusicStore } from "@/stores/localMusicStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useSettingsStore, type LocalSort } from "@/stores/settingsStore";
@@ -736,19 +737,21 @@ export function LocalMusic() {
                               <ScanSearch size={14} className="mr-2" />
                               {tr("local.matchOnline")}
                             </DropdownMenuItem>
-                            <DropdownMenuCheckboxItem
-                              checked={track.nameMode === "filename"}
-                              showUncheckedIndicator
-                              disabled={busy}
-                              onCheckedChange={(checked) =>
-                                void setTrackNameMode(
-                                  track.id,
-                                  checked ? "filename" : "smart",
-                                )
-                              }
-                            >
-                              {tr("local.keepFilename")}
-                            </DropdownMenuCheckboxItem>
+                            {!isCueClipMeta(track.song.meta) && (
+                              <DropdownMenuCheckboxItem
+                                checked={track.nameMode === "filename"}
+                                showUncheckedIndicator
+                                disabled={busy}
+                                onCheckedChange={(checked) =>
+                                  void setTrackNameMode(
+                                    track.id,
+                                    checked ? "filename" : "smart",
+                                  )
+                                }
+                              >
+                                {tr("local.keepFilename")}
+                              </DropdownMenuCheckboxItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>
                               {tr("local.categoryLabel")}

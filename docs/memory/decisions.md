@@ -1,3 +1,27 @@
+## 2026-09-14 - Local tags probe on a Rust worker
+
+Decision:
+Do not `readFile` a whole audio file into the WebView. Duration, tags, and cover come from a lofty probe on a background thread. CUE import skips cover on that first pass.
+
+Reason:
+A CD-image FLAC copied through plugin-fs froze import and window close.
+
+## 2026-09-14 - Windows local files stream in HTML audio
+
+Decision:
+Supersedes 2026-08-11 for local/asset URLs only. Windows still decodes remote HTTP(S) with Web Audio so WebView2 does not publish a second SMTC card. `convertFileSrc`, blob, and data URLs use HTML `<audio>` so CUE albums seek on disk instead of `decodeAudioData` of the whole FLAC.
+
+Reason:
+A CD image decoded into an AudioBuffer can stall play for minutes; the media element can start after a seek.
+
+## 2026-09-14 - CUE albums are virtual clips
+
+Decision:
+Import a CUE as N LocalTracks sharing one audio `filePath`, with `clipStart`/`clipEnd` on `MusicInfo.meta`. AudioPlayer remaps seek/duration/ended. No ffmpeg split. Whole-file tags must not overwrite CUE title or clip duration. Skip album sidecar lyrics on clip tracks.
+
+Reason:
+CD rips are one FLAC plus a sheet. Treating the file as one song breaks auto-next, match scoring, and delete-from-disk.
+
 ## 2026-09-09 - Lyrics scroll linger before follow
 
 Decision:
@@ -912,10 +936,9 @@ AppMediaId must be initialized before playback metadata is published.
 ## 2026-08-11 - Keep WebView2 out of Windows desktop media ownership
 
 Decision:
-On Windows Tauri, do not create an HTML audio element. Fetch and decode the
-resolved audio source through Web Audio, while keeping the existing HTML audio
-and `navigator.mediaSession` path for browser preview and non-Windows platforms.
-Native souvlaki SMTC remains the only Windows desktop media-card owner.
+Superseded 2026-09-14 for local/asset URLs. Remote HTTP(S) on Windows Tauri still
+must not use HTML audio: fetch and decode through Web Audio. Browser preview and
+non-Windows keep HTML audio. Native souvlaki SMTC remains the desktop media-card owner.
 
 Reason:
 WebView2 automatically publishes a media card for an HTML audio element even

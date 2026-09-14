@@ -17,13 +17,21 @@ function audioContext(): AudioContext {
   return new Ctor();
 }
 
-function sliceBuffer(buffer: AudioBuffer): AudioClip {
+function sliceBuffer(
+  buffer: AudioBuffer,
+  clip?: { start: number; end: number },
+): AudioClip {
   const wantSec = RECOGNITION_DURATION_MS / 1000;
+  const windowStart = clip && clip.end > clip.start ? clip.start : 0;
+  const windowEnd =
+    clip && clip.end > clip.start ? clip.end : buffer.duration;
+  const windowDur = Math.max(0, windowEnd - windowStart);
   const startSec =
-    buffer.duration > wantSec + 4
-      ? Math.min(buffer.duration * 0.35, Math.max(0, buffer.duration - wantSec))
-      : 0;
-  const durationSec = Math.min(wantSec, Math.max(0, buffer.duration - startSec));
+    windowDur > wantSec + 4
+      ? windowStart +
+        Math.min(windowDur * 0.35, Math.max(0, windowDur - wantSec))
+      : windowStart;
+  const durationSec = Math.min(wantSec, Math.max(0, windowEnd - startSec));
   const rate = buffer.sampleRate;
   const start = Math.floor(startSec * rate);
   const length = Math.max(1, Math.floor(durationSec * rate));
@@ -44,8 +52,13 @@ function sliceBuffer(buffer: AudioBuffer): AudioClip {
   };
 }
 
-async function clipFromLocalFile(filePath: string): Promise<AudioClip> {
+async function clipFromLocalFile(
+  filePath: string,
+  clip?: { start: number; end: number },
+): Promise<AudioClip> {
   if (!isTauri) throw new Error(t("local.desktopOnly"));
+  const { allowLocalFilePaths } = await import("./fsScope");
+  await allowLocalFilePaths([filePath]);
   const { readFile } = await import("@tauri-apps/plugin-fs");
   const bytes = await readFile(filePath);
   if (!bytes.byteLength) throw new Error(t("local.matchRecognizeFailed"));
@@ -55,7 +68,7 @@ async function clipFromLocalFile(filePath: string): Promise<AudioClip> {
   try {
     const buffer = await ctx.decodeAudioData(copy.buffer);
     if (!buffer.length) throw new Error(t("local.matchRecognizeFailed"));
-    return sliceBuffer(buffer);
+    return sliceBuffer(buffer, clip);
   } catch (err) {
     if (err instanceof Error && err.message === t("local.desktopOnly")) {
       throw err;
@@ -88,9 +101,10 @@ async function musicInfoFromCandidateId(
 /** Fingerprint a slice of the local file (NetEase AFP). Fallback when tags are missing. */
 export async function recognizeLocalFile(
   filePath: string,
+  clip?: { start: number; end: number },
 ): Promise<MusicInfo[]> {
-  const clip = await clipFromLocalFile(filePath);
-  const result = await recognitionProviders.netease.recognize(clip);
+  const audioClip = await clipFromLocalFile(filePath, clip);
+  const result = await recognitionProviders.netease.recognize(audioClip);
   const songs: MusicInfo[] = [];
   const seen = new Set<string>();
   for (const candidate of result.candidates) {

@@ -7,6 +7,9 @@
   .duration-drawer-swipe {
     transition-duration: calc(var(--drawer-swipe-strength, 1) * 400ms);
   }
+  .ease-emphasized {
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
 }
 
 @layer base {
@@ -893,6 +896,10 @@ html[data-mini-peek="true"] .app-shell > * {
 .lyric-cover-float {
   animation: lyricCoverFloat 6s ease-in-out infinite;
 }
+.lyric-cover-float.is-paused,
+.lyric-cover-float:hover {
+  animation-play-state: paused;
+}
 
 /* Nav active indicator: expand from center */
 @keyframes navIn {
@@ -926,7 +933,7 @@ html[data-mini-peek="true"] .app-shell > * {
 }
 
 /* ── Icon micro-animations ─────────────────────────────────────────
-   Hover: one-shot fun on the SVG. State change: pop-in / heart burst.
+   Hover: interruptible pose on the SVG. State change: pop-in / heart burst.
    Respect reduced-motion; keep transforms interruptible where possible. */
 
 .icon-swap {
@@ -976,255 +983,16 @@ html[data-mini-peek="true"] .app-shell > * {
   animation: iconHeartBurst 420ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-@keyframes iconSearch {
-  0%,
-  100% {
-    transform: rotate(0deg) translate(0, 0);
-  }
-  30% {
-    transform: rotate(-14deg) translate(1px, -1px);
-  }
-  55% {
-    transform: rotate(8deg) translate(-0.5px, 0.5px);
-  }
-  75% {
-    transform: rotate(-4deg);
-  }
-}
-@keyframes iconList {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-2px);
-  }
-  70% {
-    transform: translateY(1px);
-  }
-}
-@keyframes iconTrend {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  45% {
-    transform: translate(1.5px, -2.5px);
-  }
-}
-@keyframes iconHeartBeat {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  25% {
-    transform: scale(1.22);
-  }
-  45% {
-    transform: scale(0.94);
-  }
-  65% {
-    transform: scale(1.1);
-  }
-}
-@keyframes iconDownload {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  35% {
-    transform: translateY(2.5px);
-  }
-  55% {
-    transform: translateY(-1px);
-  }
-}
-@keyframes iconSpinNudge {
-  0% {
-    transform: rotate(0deg);
-  }
-  60% {
-    transform: rotate(90deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-@keyframes iconSkipPrev {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  40% {
-    transform: translateX(-3px);
-  }
-}
-@keyframes iconSkipNext {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  40% {
-    transform: translateX(3px);
-  }
-}
-@keyframes iconShuffle {
-  0%,
-  100% {
-    transform: rotate(0deg) translateX(0);
-  }
-  25% {
-    transform: rotate(-8deg) translateX(-1px);
-  }
-  50% {
-    transform: rotate(8deg) translateX(1px);
-  }
-  75% {
-    transform: rotate(-4deg);
-  }
-}
-@keyframes iconRepeat {
-  0% {
-    transform: rotate(0deg);
-  }
-  65% {
-    transform: rotate(180deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-@keyframes iconMic {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  40% {
-    transform: translateY(-2px) scale(1.08);
-  }
-}
-@keyframes iconPlus {
-  0%,
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-  45% {
-    transform: rotate(90deg) scale(1.12);
-  }
-}
 @keyframes iconPlayPop {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.5;
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+    filter: blur(4px);
   }
-  100% {
-    transform: scale(1);
+  to {
     opacity: 1;
-  }
-}
-@keyframes iconSun {
-  0%,
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-  50% {
-    transform: rotate(45deg) scale(1.1);
-  }
-}
-@keyframes iconMoon {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(-18deg);
-  }
-}
-@keyframes iconPanel {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  40% {
-    transform: translateX(-2px);
-  }
-  70% {
-    transform: translateX(1px);
-  }
-}
-@keyframes iconArrowLeft {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  45% {
-    transform: translateX(-3px);
-  }
-}
-@keyframes iconArrowRight {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  45% {
-    transform: translateX(3px);
-  }
-}
-@keyframes iconMaximize {
-  0%,
-  100% {
     transform: scale(1);
-  }
-  45% {
-    transform: scale(1.15);
-  }
-}
-@keyframes iconPip {
-  0%,
-  100% {
-    transform: scale(1) translate(0, 0);
-  }
-  35% {
-    transform: scale(0.88) translate(1.5px, 1.5px);
-  }
-  65% {
-    transform: scale(1.08) translate(-0.5px, -0.5px);
-  }
-}
-@keyframes iconCaptions {
-  0%,
-  100% {
-    transform: scale(1) translateY(0);
-  }
-  35% {
-    transform: scale(1.1) translateY(-1px);
-  }
-  65% {
-    transform: scale(0.96) translateY(0);
-  }
-}
-@keyframes iconFontIncrease {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  45% {
-    transform: translateY(-2px) scale(1.08);
-  }
-  70% {
-    transform: translateY(0) scale(0.98);
-  }
-}
-@keyframes iconFontDecrease {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  45% {
-    transform: translateY(2px) scale(1.08);
-  }
-  70% {
-    transform: translateY(0) scale(0.98);
+    filter: blur(0);
   }
 }
 @keyframes queueEqualizerBar {
@@ -1324,86 +1092,111 @@ html[data-mini-peek="true"] .app-shell > * {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .icon-hover-search svg,
+  .icon-hover-list svg,
+  .icon-hover-trend svg,
+  .icon-hover-heart svg,
+  .icon-hover-download svg,
+  .icon-hover-settings svg,
+  .icon-hover-skip-prev svg,
+  .icon-hover-skip-next svg,
+  .icon-hover-shuffle svg,
+  .icon-hover-repeat svg,
+  .icon-hover-mic svg,
+  .icon-hover-plus svg,
+  .icon-hover-sun svg,
+  .icon-hover-moon svg,
+  .icon-hover-panel svg,
+  .icon-hover-arrow-left svg,
+  .icon-hover-arrow-right svg,
+  .icon-hover-maximize svg,
+  .icon-hover-pip svg,
+  .icon-hover-captions svg,
+  .icon-hover-font-increase svg,
+  .icon-hover-font-decrease svg,
+  .icon-hover-comments svg,
+  .icon-hover-lyric-source svg,
+  .icon-hover-play-pause svg {
+    transform-origin: center;
+    transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
+  }
+
   .icon-hover-search:hover svg {
-    animation: iconSearch 480ms ease;
+    transform: rotate(-12deg);
   }
   .icon-hover-list:hover svg {
-    animation: iconList 420ms ease;
+    transform: translateY(-1.5px);
   }
   .icon-hover-trend:hover svg {
-    animation: iconTrend 420ms ease;
+    transform: translate(1px, -1.5px);
   }
   .icon-hover-heart:hover svg {
-    animation: iconHeartBeat 480ms ease;
+    transform: scale(1.12);
   }
   .icon-hover-download:hover svg {
-    animation: iconDownload 420ms ease;
+    transform: translateY(2px);
   }
   .icon-hover-settings:hover svg {
-    animation: iconSpinNudge 480ms ease;
-    transform-origin: center;
+    transform: rotate(30deg);
   }
   .icon-hover-skip-prev:hover svg {
-    animation: iconSkipPrev 320ms ease;
+    transform: translateX(-2px);
   }
   .icon-hover-skip-next:hover svg {
-    animation: iconSkipNext 320ms ease;
+    transform: translateX(2px);
   }
   .icon-hover-shuffle:hover svg {
-    animation: iconShuffle 450ms ease;
+    transform: rotate(-8deg);
   }
   .icon-hover-repeat:hover svg {
-    animation: iconRepeat 420ms ease;
+    transform: rotate(45deg);
   }
   .icon-hover-mic:hover svg {
-    animation: iconMic 400ms ease;
+    transform: translateY(-1.5px);
   }
   .icon-hover-plus:hover svg {
-    animation: iconPlus 400ms ease;
+    transform: rotate(90deg);
   }
   .icon-hover-sun:hover svg {
-    animation: iconSun 500ms ease;
-    transform-origin: center;
+    transform: rotate(30deg);
   }
   .icon-hover-moon:hover svg {
-    animation: iconMoon 500ms ease;
-    transform-origin: 60% 40%;
+    transform: rotate(-12deg);
   }
   .icon-hover-panel:hover svg {
-    animation: iconPanel 380ms ease;
+    transform: translateX(-2px);
   }
   .icon-hover-arrow-left:hover svg {
-    animation: iconArrowLeft 320ms ease;
+    transform: translateX(-2px);
   }
   .icon-hover-arrow-right:hover svg {
-    animation: iconArrowRight 320ms ease;
+    transform: translateX(2px);
   }
   .icon-hover-maximize:hover svg {
-    animation: iconMaximize 360ms ease;
+    transform: scale(1.08);
   }
   .icon-hover-pip:hover svg {
-    animation: iconPip 420ms ease;
+    transform: scale(0.92) translate(1px, 1px);
   }
-  .icon-hover-captions:hover svg {
-    animation: iconCaptions 400ms ease;
+  .icon-hover-captions:hover svg,
+  .icon-hover-comments:hover svg,
+  .icon-hover-lyric-source:hover svg {
+    transform: translateY(-1.5px);
   }
   .icon-hover-font-increase:hover svg {
-    animation: iconFontIncrease 360ms ease;
+    transform: translateY(-2px) scale(1.08);
   }
   .icon-hover-font-decrease:hover svg {
-    animation: iconFontDecrease 360ms ease;
+    transform: translateY(2px) scale(1.08);
   }
-  .icon-hover-comments:hover svg {
-    animation: iconCaptions 400ms ease;
-  }
-  .icon-hover-lyric-source:hover svg {
-    animation: iconCaptions 400ms ease;
+  .icon-hover-play-pause:hover svg {
+    transform: scale(1.08);
   }
 
   /* Nested icons (TrackRow / overlays) — animate the icon itself on parent hover */
   .group\/row:hover .icon-play-pop,
   .group:hover .icon-play-pop {
-    animation: iconPlayPop 280ms cubic-bezier(0.2, 0, 0, 1) both;
+    animation: iconPlayPop 300ms cubic-bezier(0.2, 0, 0, 1) both;
   }
 
   .queue-equalizer__bar {
@@ -1429,5 +1222,8 @@ html[data-mini-peek="true"] .app-shell > * {
   .hot-cloud-word,
   .lyric-cover-float {
     animation: none !important;
+  }
+  .icon-swap {
+    transition: none;
   }
 }

@@ -1,5 +1,6 @@
 import { createAsyncCache } from "@/lib/cache";
 import { fetchLocalFileLyric } from "@/lib/localMusic";
+import { isCueClipMeta } from "@/lib/localMusic/cue";
 import {
   lyricSearchIdentity,
   localSongMatched,
@@ -51,6 +52,7 @@ async function fetchLyricInfo(
     const fromFile = await fetchLocalFileLyric({
       filePath: song.meta.filePath,
       embeddedLyric: song.meta.embeddedLyric,
+      skipFileLyrics: isCueClipMeta(song.meta),
     });
     if (hasLyricPayload(fromFile)) {
       await putCachedLyric(song.source, cacheSongId, fromFile);

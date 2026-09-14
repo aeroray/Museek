@@ -7,7 +7,7 @@ import {
   applyCatalogHit,
   searchLocalCatalogCandidates,
   localTrackUntagged,
-  isLocalAudioPath,
+  isLocalImportPath,
   isPlaceholderArtist,
   localFilenameTitle,
   localResolvedTitle,
@@ -21,6 +21,10 @@ import {
   type LocalEnrichStatus,
   type ParsedLocalTags,
 } from "@/lib/localMusic";
+import { collectCueImport, isCueClipMeta, type CueImportTrack } from "@/lib/localMusic/cue";
+import { notify } from "@/lib/notify";
+import { t } from "@/lib/i18n";
+import { formatDuration } from "@/lib/utils";
 import { fetchWySongDetail } from "@/lib/search/wy";
 import { indexQualitySizes } from "@/lib/quality";
 import { checkPathsExist } from "@/lib/fsPresence";
@@ -157,6 +161,104 @@ function mergeCatalogFill(
       catalogName,
       catalogSinger: prev.meta.catalogSinger ?? song.meta.catalogSinger,
       catalogInterval: prev.meta.catalogInterval ?? song.meta.catalogInterval,
+      clipStart: prev.meta.clipStart ?? song.meta.clipStart,
+      clipEnd: prev.meta.clipEnd ?? song.meta.clipEnd,
+      cueIndex: prev.meta.cueIndex ?? song.meta.cueIndex,
+    },
+  };
+}
+
+function cueImportToLocalTrack(
+  spec: CueImportTrack,
+  fileTags: ParsedLocalTags | undefined,
+  existing: LocalTrack | undefined,
+  addedAt: number,
+): LocalTrack {
+  const hasClip =
+    typeof spec.clipStart === "number" &&
+    typeof spec.clipEnd === "number" &&
+    spec.clipEnd > spec.clipStart;
+  const fallback = fileTags ?? tagsFromFilename(spec.filePath);
+  const tags: ParsedLocalTags = {
+    name: spec.title || fallback.name,
+    singer: spec.performer || fallback.singer,
+    albumName: spec.albumTitle || fallback.albumName,
+    interval: hasClip
+      ? formatDuration(spec.clipEnd! - spec.clipStart!)
+      : fallback.interval,
+    durationSec: hasClip
+      ? spec.clipEnd! - spec.clipStart!
+      : fallback.durationSec,
+    qualitys: fallback.qualitys,
+    localCoverRel: fallback.localCoverRel,
+    picUrl: fallback.picUrl,
+    hasTitleTag: Boolean(spec.title),
+    hasArtistTag: Boolean(spec.performer),
+    hasAlbumTag: Boolean(spec.albumTitle || fallback.hasAlbumTag),
+    hasCover: Boolean(fallback.hasCover),
+  };
+  let song = buildLocalSong(
+    spec.id,
+    spec.filePath,
+    tags,
+    hasClip
+      ? {
+          start: spec.clipStart as number,
+          end: spec.clipEnd as number,
+          index: spec.trackNo,
+        }
+      : undefined,
+  );
+  if (existing?.song.meta.wySongId) {
+    song = {
+      ...song,
+      meta: {
+        ...song.meta,
+        wySongId: existing.song.meta.wySongId,
+        catalogName: existing.song.meta.catalogName,
+        catalogSinger: existing.song.meta.catalogSinger,
+        catalogInterval: existing.song.meta.catalogInterval,
+        picUrl: song.meta.picUrl ?? existing.song.meta.picUrl,
+      },
+    };
+  }
+  return {
+    id: spec.id,
+    filePath: spec.filePath,
+    cueSheetPath: spec.cueSheetPath,
+    addedAt: existing?.addedAt ?? addedAt,
+    categoryId: existing?.categoryId ?? null,
+    nameMode: "smart",
+    hydrated: false,
+    hasTitleTag: tags.hasTitleTag,
+    hasArtistTag: tags.hasArtistTag,
+    unavailable: false,
+    song,
+  };
+}
+
+function applyFileTagsToCueTrack(
+  track: LocalTrack,
+  tags: ParsedLocalTags,
+): MusicInfo {
+  const song = track.song;
+  return {
+    ...song,
+    albumName: song.albumName.trim() ? song.albumName : tags.albumName,
+    meta: {
+      ...song.meta,
+      picUrl: tags.hasCover ? (tags.picUrl ?? song.meta.picUrl) : song.meta.picUrl,
+      localCoverRel: tags.hasCover
+        ? tags.localCoverRel ?? song.meta.localCoverRel
+        : song.meta.localCoverRel,
+      qualitys: tags.qualitys.length ? tags.qualitys : song.meta.qualitys,
+      _qualitys: tags.qualitys.length
+        ? indexQualitySizes(tags.qualitys)
+        : song.meta._qualitys,
+      clipStart: song.meta.clipStart,
+      clipEnd: song.meta.clipEnd,
+      cueIndex: song.meta.cueIndex,
+      embeddedLyric: undefined,
     },
   };
 }
@@ -176,9 +278,11 @@ function persist(
   } satisfies LocalMusicPersist);
 }
 
-async function deleteFileIfNeeded(filePath: string) {
+async function deleteFileIfNeeded(filePath: string, remaining: LocalTrack[]) {
   if (!isTauri) return;
   if (!useSettingsStore.getState().deleteLocalFiles) return;
+  const key = pathKey(filePath);
+  if (remaining.some((track) => pathKey(track.filePath) === key)) return;
   try {
     const { remove, exists } = await import("@tauri-apps/plugin-fs");
     if (await exists(filePath)) await remove(filePath);
@@ -321,6 +425,23 @@ function pathKey(filePath: string): string {
   return filePath.replace(/\\/g, "/").toLowerCase();
 }
 
+const fileTagCache = new Map<string, Promise<ParsedLocalTags>>();
+
+function parseFileTagsOnce(filePath: string): Promise<ParsedLocalTags> {
+  const key = pathKey(filePath);
+  let pending = fileTagCache.get(key);
+  if (!pending) {
+    pending = parseLocalFile(filePath, localTrackId(filePath), "smart");
+    fileTagCache.set(key, pending);
+    void pending.finally(() => {
+      window.setTimeout(() => {
+        if (fileTagCache.get(key) === pending) fileTagCache.delete(key);
+      }, 30_000);
+    });
+  }
+  return pending;
+}
+
 function fileBasename(filePath: string): string {
   return filePath.split(/[/\\]/).pop() ?? filePath;
 }
@@ -417,12 +538,12 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     version: number,
   ): boolean {
     const current = liveTrack(id);
-    return (
-      refreshVersions.get(id) === version &&
-      current?.filePath === filePath &&
-      !!current &&
-      localNameModeForTrack(current) === nameMode
-    );
+    if (!current || current.filePath !== filePath) return false;
+    if (localNameModeForTrack(current) !== nameMode) return false;
+    const latest = refreshVersions.get(id);
+    // Hydrated CUE rows never called beginTrackRefresh, so the map is empty.
+    // Treat that as "no newer read" instead of a failed disk permission.
+    return latest == null || latest === version;
   }
 
   function tagsHintFromTrack(track: LocalTrack): ParsedLocalTags {
@@ -432,6 +553,9 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       singer: song.singer,
       albumName: song.albumName,
       interval: song.interval,
+      durationSec: isCueClipMeta(song.meta)
+        ? Math.max(0, (song.meta.clipEnd ?? 0) - (song.meta.clipStart ?? 0))
+        : 0,
       qualitys: song.meta.qualitys,
       localCoverRel: song.meta.localCoverRel,
       picUrl: song.meta.picUrl,
@@ -485,6 +609,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       }
       if (latest.hydrated !== false) {
         const nameMode = localNameModeForTrack(latest);
+        if (!refreshVersions.has(track.id)) refreshVersions.set(track.id, 0);
         return {
           ok: true,
           tags: tagsHintFromTrack(latest),
@@ -497,6 +622,30 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       const nameMode = localNameModeForTrack(latest);
       const version = beginTrackRefresh(latest.id);
       try {
+        if (isCueClipMeta(latest.song.meta)) {
+          const tags = await parseFileTagsOnce(latest.filePath);
+          if (!canApplyTrackRefresh(track.id, latest.filePath, nameMode, version)) {
+            return { ok: false, nameMode, version };
+          }
+          const current = liveTrack(track.id);
+          if (!current) return { ok: false, nameMode, version };
+          const song = applyFileTagsToCueTrack(current, tags);
+          upsertRestoredTrack({
+            ...current,
+            unavailable: false,
+            hydrated: true,
+            hasTitleTag: current.hasTitleTag ?? true,
+            hasArtistTag: current.hasArtistTag ?? true,
+            song,
+          });
+          return {
+            ok: true,
+            tags: tagsHintFromTrack({ ...current, song, hydrated: true }),
+            song,
+            nameMode,
+            version,
+          };
+        }
         const tags = await parseLocalFile(latest.filePath, latest.id, nameMode);
         if (!canApplyTrackRefresh(track.id, latest.filePath, nameMode, version)) {
           return { ok: false, nameMode, version };
@@ -618,7 +767,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
           matchProgress: {
             done,
             total: tracks.length,
-            current: fileBasename(current.filePath),
+            current: current.song.name,
           },
         });
       });
@@ -648,19 +797,78 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     paths: string[],
     opts?: { refreshExisting?: boolean },
   ): Promise<{ added: number; importedIds: string[] }> {
-    const byPath = new Map(get().tracks.map((t) => [pathKey(t.filePath), t]));
+    const expanded = await collectCueImport(paths);
+    if (expanded.errors.length) {
+      notify({
+        message: t("local.cueFailed", {
+          msg: expanded.errors.slice(0, 3).join(" · "),
+        }),
+        variant: "error",
+      });
+    }
+
+    let added = 0;
+    const importedIds: string[] = [];
+
+    if (expanded.cueTracks.length > 0) {
+      commitPendingHydrates();
+      const now = Date.now();
+      const existingById = new Map(get().tracks.map((track) => [track.id, track]));
+      const cueIds = new Set(expanded.cueTracks.map((track) => track.id));
+      const cueFileKeys = new Set(
+        expanded.cueTracks.map((track) => pathKey(track.filePath)),
+      );
+      const built = expanded.cueTracks.map((spec, i) =>
+        cueImportToLocalTrack(
+          spec,
+          expanded.tagsByPath.get(pathKey(spec.filePath)),
+          existingById.get(spec.id),
+          now + i,
+        ),
+      );
+      const previous = get().tracks;
+      const kept = previous.filter((track) => {
+        if (cueIds.has(track.id)) return false;
+        const key = pathKey(track.filePath);
+        if (!cueFileKeys.has(key)) return true;
+        if (!isCueClipMeta(track.song.meta)) return false;
+        return false;
+      });
+      const droppedIds = previous
+        .filter((track) => !kept.some((item) => item.id === track.id) && !cueIds.has(track.id))
+        .map((track) => track.id);
+      set({
+        tracks: [...built.slice().reverse(), ...kept],
+      });
+      if (droppedIds.length) await dropRemovedFromPlayback(droppedIds);
+      for (const track of built) {
+        const existing = existingById.get(track.id);
+        if (!existing || existing.unavailable) {
+          added += 1;
+          importedIds.push(track.id);
+        }
+      }
+    }
+
+    const byPath = new Map(
+      get()
+        .tracks.filter((track) => !isCueClipMeta(track.song.meta))
+        .map((track) => [pathKey(track.filePath), track]),
+    );
     const toImport: string[] = [];
     const toRestore: LocalTrack[] = [];
     const toRefresh: LocalTrack[] = [];
     const seen = new Set<string>();
 
-    for (const filePath of paths) {
+    for (const filePath of expanded.singles) {
       const key = pathKey(filePath);
       if (seen.has(key)) continue;
       seen.add(key);
+      if (get().tracks.some((track) => pathKey(track.filePath) === key && isCueClipMeta(track.song.meta))) {
+        continue;
+      }
       const existing = byPath.get(key);
       if (existing) {
-        // Same path again: if it was marked missing, clear that on successful re-read.
         if (existing.unavailable) toRestore.push(existing);
         else if (opts?.refreshExisting) toRefresh.push(existing);
         continue;
@@ -670,12 +878,12 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
 
     const total = toImport.length + toRestore.length + toRefresh.length;
     if (total === 0) {
+      if (importedIds.length) flushPersist();
       set({ importProgress: null });
-      return { added: 0, importedIds: [] };
+      return { added, importedIds };
     }
 
     let done = 0;
-    let added = 0;
     set({ importProgress: { done: 0, total } });
 
     const bumpProgress = (current: string) => {
@@ -698,12 +906,10 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
     await mapPool(toRestore, IMPORT_CONCURRENCY, (existing) =>
       applyParsed(existing, true),
     );
-    // Open-with re-read: recover covers/tags after a prior failed (scoped) import.
     await mapPool(toRefresh, IMPORT_CONCURRENCY, (existing) =>
       applyParsed(existing, false),
     );
 
-    const importedIds: string[] = [];
     if (toImport.length > 0) {
       commitPendingHydrates();
       const now = Date.now();
@@ -715,7 +921,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
           filePath,
           addedAt: now + i,
           categoryId: null,
-          nameMode: "filename",
+          nameMode: "filename" as const,
           hydrated: false,
           hasTitleTag: false,
           hasArtistTag: false,
@@ -830,7 +1036,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
 
     async importPaths(paths, opts) {
       const filtered = paths.filter(
-        (p) => typeof p === "string" && isLocalAudioPath(p),
+        (p) => typeof p === "string" && isLocalImportPath(p),
       );
       if (!filtered.length) return 0;
       set({ importing: true, importProgress: null });
@@ -848,7 +1054,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       set({ tracks });
       persist(tracks, get().categories);
       await dropRemovedFromPlayback([id]);
-      if (track) await deleteFileIfNeeded(track.filePath);
+      if (track) await deleteFileIfNeeded(track.filePath, tracks);
     },
 
     async removeMany(ids) {
@@ -859,7 +1065,13 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       set({ tracks });
       persist(tracks, get().categories);
       await dropRemovedFromPlayback(ids);
-      for (const t of removing) await deleteFileIfNeeded(t.filePath);
+      const seen = new Set<string>();
+      for (const item of removing) {
+        const key = pathKey(item.filePath);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        await deleteFileIfNeeded(item.filePath, tracks);
+      }
     },
 
     updateSong(id, song) {
@@ -902,6 +1114,7 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
       commitPendingHydrates();
       const track = get().tracks.find((item) => item.id === id);
       if (!track || localNameModeForTrack(track) === mode) return;
+      if (isCueClipMeta(track.song.meta)) return;
       const tracks = get().tracks.map((item) =>
         item.id === id ? { ...item, nameMode: mode } : item,
       );
@@ -953,10 +1166,12 @@ export const useLocalMusicStore = create<LocalMusicState>((set, get) => {
         query: preview.query,
         hits: preview.hits,
         recommended: preview.recommended,
-        canRecognize: localTrackUntagged({
-          ...track,
-          song,
-        }),
+        canRecognize:
+          isCueClipMeta(song.meta) ||
+          localTrackUntagged({
+            ...track,
+            song,
+          }),
       };
     },
 

@@ -1,4 +1,5 @@
 import { t } from "@/lib/i18n"
+import { allowLocalFilePaths } from "./fsScope"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
@@ -35,6 +36,7 @@ export async function localFileToObjectUrl(filePath: string): Promise<string> {
   try {
     const { exists } = await import("@tauri-apps/plugin-fs")
     const { convertFileSrc } = await import("@tauri-apps/api/core")
+    await allowLocalFilePaths([filePath])
     if (!(await exists(filePath))) throw new Error(t("local.fileMissing"))
     return convertFileSrc(filePath)
   } catch (err) {

@@ -1,5 +1,5 @@
 import { isUnlimitedLocalScanDepth, normalizeLocalScanDepth } from "./depth"
-import { LOCAL_AUDIO_EXTS, isLocalAudioPath } from "./tags"
+import { LOCAL_AUDIO_EXTS, isLocalImportPath } from "./tags"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
@@ -15,13 +15,13 @@ export async function pickLocalAudioFiles(): Promise<string[]> {
     filters: [
       {
         name: "Audio",
-        extensions: [...LOCAL_AUDIO_EXTS],
+        extensions: [...LOCAL_AUDIO_EXTS, "cue"],
       },
     ],
   })
   if (!selected) return []
   const paths = Array.isArray(selected) ? selected : [selected]
-  return paths.filter((p) => typeof p === "string" && isLocalAudioPath(p)) as string[]
+  return paths.filter((p) => typeof p === "string" && isLocalImportPath(p)) as string[]
 }
 
 /**
@@ -60,7 +60,7 @@ async function collectAudioFiles(root: string, maxDepth: number): Promise<string
         if (unlimited || depth < maxDepth) await walk(full, depth + 1)
         continue
       }
-      if (entry.isFile && isLocalAudioPath(full)) {
+      if (entry.isFile && isLocalImportPath(full)) {
         const key = full.replace(/\\/g, "/").toLowerCase()
         if (seen.has(key)) continue
         seen.add(key)

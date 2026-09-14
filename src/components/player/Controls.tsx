@@ -77,7 +77,7 @@ export function Controls() {
         <Button
           variant="default"
           size="icon"
-          className="h-11 w-11 rounded-full shadow-[var(--shadow-elevated)] hover:scale-[1.04] transition-transform duration-200"
+          className="h-11 w-11 rounded-full shadow-[var(--shadow-elevated)] icon-hover-play-pause"
           onClick={togglePlay}
           disabled={!canPlay || loading}
         >

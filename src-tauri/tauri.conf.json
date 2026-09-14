@@ -138,6 +138,14 @@
         "description": "WAV Audio",
         "role": "Viewer",
         "rank": "Default"
+      },
+      {
+        "ext": ["cue"],
+        "mimeType": "application/x-cue",
+        "name": "CUE Sheet",
+        "description": "CUE Sheet",
+        "role": "Viewer",
+        "rank": "Default"
       }
     ],
     "macOS": {

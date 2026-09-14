@@ -3,9 +3,12 @@ export {
   buildLocalSong,
   tagsFromFilename,
   localTrackId,
+  localCueTrackId,
   localFilenameTitle,
   localResolvedTitle,
   isLocalAudioPath,
+  isCuePath,
+  isLocalImportPath,
   extOf,
   resolveLocalCoverUrl,
   peekLocalQuality,
@@ -17,6 +20,13 @@ export { normalizeLocalScanDepth, isUnlimitedLocalScanDepth } from "./depth";
 export { enrichLocalSong, applyCatalogHit, searchLocalCatalogCandidates, localTagsIncomplete, localTrackUntagged } from "./enrich";
 export type { LocalEnrichStatus, LocalCatalogPreview } from "./enrich";
 export { recognizeLocalFile } from "./recognizeFile";
+export { allowLocalFilePaths } from "./fsScope";
+export {
+  collectCueImport,
+  isCueClipMeta,
+  parseCueSheet,
+  cueIndexToSeconds,
+} from "./cue";
 export {
   localCatalogQuery,
   catalogIdentity,

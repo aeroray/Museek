@@ -4,6 +4,7 @@ import { readData, writeData } from "@/lib/db";
 import { sourceRunner } from "@/lib/sourceRunner";
 import { loadLyric } from "@/lib/lyrics";
 import { localFileToObjectUrl, mapLocalPlayError } from "@/lib/localMusic";
+import { isCueClipMeta, pathKey } from "@/lib/localMusic/cue";
 import {
   applyAudioSource,
   beginPlayGeneration,
@@ -79,6 +80,19 @@ function snapshotPlaybackSession(): PlaybackSession {
 
 function persistPlaybackSession(immediate = false) {
   schedulePlaybackSessionWrite(snapshotPlaybackSession(), immediate);
+}
+
+function songPlaybackClip(
+  song: MusicInfo,
+): { start: number; end: number } | null {
+  if (!isCueClipMeta(song.meta)) return null;
+  return { start: song.meta.clipStart as number, end: song.meta.clipEnd as number };
+}
+
+function applySongSource(src: string, song: MusicInfo) {
+  applyAudioSource(src);
+  const clip = songPlaybackClip(song);
+  audioPlayer.setClip(clip?.start ?? null, clip?.end ?? null);
 }
 
 function consumeResume(songId: string): number {
@@ -305,7 +319,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (restoreSourcePromise) await restoreSourcePromise;
       if (song.id !== sessionResumeSongId) clearResume();
       const preferred = quality ?? useSettingsStore.getState().playQuality;
-      const gen = beginPlayGeneration();
       const isLocal = song.source === "local";
 
       // No source loaded → can't resolve a playback URL. Prompt to import instead
@@ -320,25 +333,63 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         return;
       }
 
-      // Immediately silence the previous track so switching feels instant — don't
-      // let the old song keep playing while the new URL is being resolved.
-      audioPlayer.pause(false);
-      invalidateLyricLoad();
+      const current = get().currentSong;
+      if (
+        current?.id === song.id &&
+        get().sourceReady &&
+        audioPlayer.hasSource() &&
+        get().status !== "error"
+      ) {
+        if (get().status === "loading" || get().playPending) return;
+        if (!get().isPlaying) get().togglePlay();
+        return;
+      }
 
-      // status:"loading" must survive audio pause/timeupdate sync (see _syncFromAudio).
-      // Clear progress so the bar reads as inactive while the new URL resolves.
-      set({
-        currentSong: song,
-        currentQuality: preferred,
-        status: "loading",
-        error: null,
-        lyricLines: [],
-        lyricsLoading: true,
-        currentPicUrl: song.meta.picUrl ?? null,
-        duration: 0,
-        isPlaying: false,
-        sourceReady: false,
-      });
+      const currentPath = current?.meta.filePath;
+      const nextPath = song.meta.filePath;
+      const sameLocalFile =
+        isLocal &&
+        current?.source === "local" &&
+        Boolean(currentPath) &&
+        Boolean(nextPath) &&
+        currentPath != null &&
+        nextPath != null &&
+        pathKey(currentPath) === pathKey(nextPath) &&
+        get().sourceReady &&
+        audioPlayer.hasSource() &&
+        get().status !== "error" &&
+        get().status !== "loading";
+
+      const gen = beginPlayGeneration();
+
+      // Same-file CUE clip: seek in place. Don't drop into loading or the
+      // pause button and cover flash.
+      if (!sameLocalFile) {
+        audioPlayer.pause(false);
+        invalidateLyricLoad();
+        set({
+          currentSong: song,
+          currentQuality: preferred,
+          status: "loading",
+          error: null,
+          lyricLines: [],
+          lyricsLoading: true,
+          currentPicUrl: song.meta.picUrl ?? null,
+          duration: 0,
+          isPlaying: false,
+          sourceReady: false,
+        });
+      } else {
+        invalidateLyricLoad();
+        set({
+          currentSong: song,
+          currentQuality: preferred,
+          error: null,
+          lyricLines: [],
+          lyricsLoading: true,
+          currentPicUrl: song.meta.picUrl ?? get().currentPicUrl,
+        });
+      }
 
       // Add to queue if not already there
       const { queue } = get();
@@ -368,13 +419,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             if (q[idx]) q[idx] = { ...q[idx], playedQuality: best };
             return { currentQuality: best, queue: q };
           });
-          applyAudioSource(src);
+          applySongSource(src, song);
           attachedSource = true;
           holdRestoredClock = false;
           const resumeAt = consumeResume(song.id);
           await audioPlayer.whenReady();
           if (!isPlayGenerationCurrent(gen)) return;
-          if (resumeAt > 0) audioPlayer.seek(resumeAt);
+          audioPlayer.seek(resumeAt);
           set({ sourceReady: true });
           persistPlaybackSession(true);
           await playWithTimeout();
@@ -384,7 +435,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             song.name,
             song.singer,
             song.albumName ?? "",
-            song.meta.picUrl ?? null,
+            song.meta.picUrl ?? get().currentPicUrl ?? null,
             true,
           );
           useLocalMusicStore.getState().setTrackUnavailable(song.id, false);
@@ -461,7 +512,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             variant: "info",
           });
         }
-        applyAudioSource(src);
+        applySongSource(src, song);
         attachedSource = true;
         holdRestoredClock = false;
         if (fromCache) {
@@ -826,7 +877,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               .hydrateTrackOnPlay(song.id);
             const src = await localFileToObjectUrl(filePath);
             if (get().currentSong?.id !== song.id) return;
-            await audioPlayer.preparePausedSource(src, resumeAt);
+            await audioPlayer.preparePausedSource(
+              src,
+              resumeAt,
+              songPlaybackClip(song),
+            );
             holdRestoredClock = false;
             clearResume();
             set({

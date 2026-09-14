@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { CoverImage } from "@/components/common/CoverImage";
 import { recognizeLocalFile, localTrackUntagged } from "@/lib/localMusic";
+import { isCueClipMeta } from "@/lib/localMusic/cue";
 import { useLocalMusicStore } from "@/stores/localMusicStore";
 import type { MusicInfo } from "@/types/music";
 import { useT, t as translate } from "@/lib/i18n";
@@ -79,7 +80,7 @@ export function MatchOnlineDialog({
         if (!preview) {
           setError(
             translate("local.matchFailed", {
-              msg: translate("local.fileUnreadable"),
+              msg: translate("local.matchEmpty"),
             }),
           );
           return;
@@ -114,7 +115,13 @@ export function MatchOnlineDialog({
     setRecognizing(true);
     setError(null);
     try {
-      const songs = await recognizeLocalFile(track.filePath);
+      const clip = isCueClipMeta(track.song.meta)
+        ? {
+            start: track.song.meta.clipStart as number,
+            end: track.song.meta.clipEnd as number,
+          }
+        : undefined;
+      const songs = await recognizeLocalFile(track.filePath, clip);
       if (!openRef.current) return;
       if (!songs.length) {
         setError(t("local.matchRecognizeNone"));

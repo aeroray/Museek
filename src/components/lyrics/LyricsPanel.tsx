@@ -15,6 +15,7 @@ import {
   Minimize,
   ScanEye,
   MessageCircle,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,8 @@ import { SpecularFrame } from "@/components/common/SpecularFrame";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { hiResCover } from "@/lib/cover";
+import { notify } from "@/lib/notify";
+import { saveCoverToDisk } from "@/lib/saveCover";
 import { canToggleDesktopLyrics, hideDesktopLyrics, openDesktopLyrics } from "@/lib/desktopLyrics";
 import {
   clampLyricFontScale,
@@ -57,6 +60,8 @@ const SLIDE_MS = 320;
 const COVER_MS = 300;
 /** After the user scrolls lyrics, wait this long before snapping back to the sung line. */
 const FOLLOW_RESUME_MS = 2000;
+/** Hide immersive close + right-rail chrome after the pointer goes idle. */
+const IMMERSIVE_CHROME_IDLE_MS = 2000;
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const FADE =
@@ -105,6 +110,17 @@ export function LyricsPanel() {
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
+  const [savingCover, setSavingCover] = useState(false);
+  const savingCoverRef = useRef(false);
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const chromeVisibleRef = useRef(true);
+  const chromeHoldRef = useRef(false);
+  const chromeMenuOpenRef = useRef(false);
+  const commentsOpenRef = useRef(false);
+  const immersiveRef = useRef(false);
+  const chromeHideTimerRef = useRef(0);
+  commentsOpenRef.current = commentsOpen;
+  immersiveRef.current = immersive;
 
   const thumbSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null;
   const heroSrc = thumbSrc
@@ -116,6 +132,88 @@ export function LyricsPanel() {
   useEffect(() => {
     if (isLocalSong) setCommentsOpen(false);
   }, [isLocalSong]);
+
+  const scheduleImmersiveChromeHide = useCallback(() => {
+    window.clearTimeout(chromeHideTimerRef.current);
+    if (!immersiveRef.current) return;
+    chromeHideTimerRef.current = window.setTimeout(() => {
+      if (
+        chromeHoldRef.current ||
+        chromeMenuOpenRef.current ||
+        commentsOpenRef.current
+      ) {
+        return;
+      }
+      chromeVisibleRef.current = false;
+      setChromeVisible(false);
+    }, IMMERSIVE_CHROME_IDLE_MS);
+  }, []);
+
+  const revealImmersiveChrome = useCallback(() => {
+    if (!chromeVisibleRef.current) {
+      chromeVisibleRef.current = true;
+      setChromeVisible(true);
+    }
+    scheduleImmersiveChromeHide();
+  }, [scheduleImmersiveChromeHide]);
+
+  const onImmersiveChromeEnter = useCallback(() => {
+    chromeHoldRef.current = true;
+    window.clearTimeout(chromeHideTimerRef.current);
+    if (!chromeVisibleRef.current) {
+      chromeVisibleRef.current = true;
+      setChromeVisible(true);
+    }
+  }, []);
+
+  const onImmersiveChromeLeave = useCallback(() => {
+    chromeHoldRef.current = false;
+    scheduleImmersiveChromeHide();
+  }, [scheduleImmersiveChromeHide]);
+
+  const onLyricSourceMenuOpenChange = useCallback(
+    (open: boolean) => {
+      chromeMenuOpenRef.current = open;
+      if (open) {
+        if (!chromeVisibleRef.current) {
+          chromeVisibleRef.current = true;
+          setChromeVisible(true);
+        }
+        window.clearTimeout(chromeHideTimerRef.current);
+        return;
+      }
+      scheduleImmersiveChromeHide();
+    },
+    [scheduleImmersiveChromeHide],
+  );
+
+  useEffect(() => {
+    if (!immersive) {
+      chromeHoldRef.current = false;
+      chromeVisibleRef.current = true;
+      setChromeVisible(true);
+      window.clearTimeout(chromeHideTimerRef.current);
+      return;
+    }
+    const onMove = () => revealImmersiveChrome();
+    window.addEventListener("pointermove", onMove, { passive: true });
+    revealImmersiveChrome();
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.clearTimeout(chromeHideTimerRef.current);
+    };
+  }, [immersive, revealImmersiveChrome]);
+
+  useEffect(() => {
+    if (!immersive) return;
+    if (commentsOpen) {
+      chromeVisibleRef.current = true;
+      setChromeVisible(true);
+      window.clearTimeout(chromeHideTimerRef.current);
+      return;
+    }
+    scheduleImmersiveChromeHide();
+  }, [commentsOpen, immersive, scheduleImmersiveChromeHide]);
 
   useEffect(() => {
     if (showLyrics) {
@@ -306,6 +404,28 @@ export function LyricsPanel() {
     })();
   };
 
+  const saveCover = () => {
+    if (!currentSong || !thumbSrc || savingCoverRef.current) return;
+    savingCoverRef.current = true;
+    setSavingCover(true);
+    void (async () => {
+      try {
+        const result = await saveCoverToDisk({
+          song: currentSong,
+          displayUrl: heroSrc ?? thumbSrc,
+        });
+        if (result === "saved") {
+          notify({ message: t("lyrics.coverSaved"), variant: "success" });
+        }
+      } catch {
+        notify({ message: t("lyrics.coverSaveFailed"), variant: "error" });
+      } finally {
+        savingCoverRef.current = false;
+        setSavingCover(false);
+      }
+    })();
+  };
+
   if (!rendered) return null;
 
   const fontShortcut = t(
@@ -349,10 +469,15 @@ export function LyricsPanel() {
     setLyricsOnly(false);
     setCommentsOpen(true);
   };
+  const hideImmersiveChrome = immersive && !chromeVisible;
+  const immersiveChromeClass = cn(
+    "z-20 transition-opacity duration-200 ease-emphasized",
+    hideImmersiveChrome && "pointer-events-none opacity-0",
+  );
   const showBlur = !!thumbSrc;
 
   const coverArt = (
-    <div className="relative h-full w-full bg-muted/50">
+    <div className="group/cover relative h-full w-full bg-muted/50">
       {thumbSrc ? (
         <>
           <img
@@ -383,6 +508,34 @@ export function LyricsPanel() {
               />
             </div>
           )}
+          <div
+            className={cn(
+              "absolute inset-0 z-10 flex items-end justify-end bg-gradient-to-t from-black/50 via-black/10 to-transparent p-2.5 opacity-0 transition-opacity duration-200 ease-emphasized",
+              "pointer-events-none group-hover/cover:pointer-events-auto group-hover/cover:opacity-100",
+              "group-focus-within/cover:pointer-events-auto group-focus-within/cover:opacity-100",
+              savingCover && "pointer-events-auto opacity-100",
+            )}
+          >
+            <HintTooltip label={t("lyrics.downloadCover")} side="top">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/70 hover:text-white icon-hover-download"
+                disabled={savingCover}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  saveCover();
+                }}
+              >
+                {savingCover ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+              </Button>
+            </HintTooltip>
+          </div>
         </>
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/60 text-muted-foreground/50">
@@ -422,16 +575,45 @@ export function LyricsPanel() {
       />
       <div className="absolute inset-0 bg-background/65" />
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-4 right-4 z-20 h-9 w-9 text-muted-foreground/70 hover:text-foreground"
-        onClick={closeLyrics}
+      <div
+        className={cn("absolute top-4 right-4", immersiveChromeClass)}
+        onPointerEnter={onImmersiveChromeEnter}
+        onPointerLeave={onImmersiveChromeLeave}
+        onFocusCapture={onImmersiveChromeEnter}
+        onBlurCapture={(event) => {
+          if (
+            !event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
+            onImmersiveChromeLeave();
+          }
+        }}
       >
-        <X size={20} />
-      </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 text-muted-foreground/70 hover:text-foreground"
+          onClick={closeLyrics}
+        >
+          <X size={20} />
+        </Button>
+      </div>
 
-      <div className="absolute right-4 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-1">
+      <div
+        className={cn(
+          "absolute right-4 top-1/2 flex -translate-y-1/2 flex-col items-center gap-1",
+          immersiveChromeClass,
+        )}
+        onPointerEnter={onImmersiveChromeEnter}
+        onPointerLeave={onImmersiveChromeLeave}
+        onFocusCapture={onImmersiveChromeEnter}
+        onBlurCapture={(event) => {
+          if (
+            !event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
+            onImmersiveChromeLeave();
+          }
+        }}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -459,7 +641,10 @@ export function LyricsPanel() {
             {immersive ? <Minimize size={18} /> : <Maximize size={18} />}
           </Button>
         )}
-        <LyricSourceMenu song={currentSong} />
+        <LyricSourceMenu
+          song={currentSong}
+          onOpenChange={onLyricSourceMenuOpenChange}
+        />
         <HintTooltip
           label={isLocalSong ? t("comments.local") : t("comments.title")}
           side="left"
@@ -540,8 +725,10 @@ export function LyricsPanel() {
             </div>
           )}
           <div
-            className="lyric-cover-float w-60 shrink-0"
-            style={{ animationPlayState: isPlaying ? "running" : "paused" }}
+            className={cn(
+              "lyric-cover-float w-60 shrink-0",
+              !isPlaying && "is-paused",
+            )}
           >
             <SpecularFrame
               autoAnimate
