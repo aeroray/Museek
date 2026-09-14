@@ -40,6 +40,8 @@ interface UiState {
   // favorited playlist) and coming back restores the same tab.
   favoritesTab: "songs" | "playlists" | "albums"
   setFavoritesTab: (tab: "songs" | "playlists" | "albums") => void
+  listeningTab: "songs" | "artists" | "recent"
+  setListeningTab: (tab: "songs" | "artists" | "recent") => void
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -70,4 +72,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAlbumSource: (s) => set({ albumSource: s }),
   favoritesTab: "songs",
   setFavoritesTab: (tab) => set({ favoritesTab: tab }),
+  listeningTab: "songs",
+  setListeningTab: (tab) => set({ listeningTab: tab }),
 }))

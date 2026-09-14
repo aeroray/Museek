@@ -5,10 +5,12 @@ import {
   Disc3,
   TrendingUp,
   Heart,
+  Footprints,
   HardDrive,
   Fingerprint,
   Download,
   Settings,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isMacOs } from "@/lib/os";
@@ -18,13 +20,25 @@ import { usePlayerStore } from "@/stores/playerStore";
 import { SidebarUpdateCard } from "@/components/layout/SidebarUpdateCard";
 import { BrandMark } from "@/components/brand/BrandMark";
 
-// Settings is rendered separately at the bottom; these fill the main nav.
-const navItems = [
+type NavItem = {
+  to: string;
+  icon: LucideIcon;
+  labelKey: string;
+  iconHover: string;
+};
+
+const discoverItems: NavItem[] = [
   {
     to: "/search",
     icon: Search,
     labelKey: "nav.search",
     iconHover: "icon-hover-search",
+  },
+  {
+    to: "/library",
+    icon: TrendingUp,
+    labelKey: "nav.library",
+    iconHover: "icon-hover-trend",
   },
   {
     to: "/hot-playlists",
@@ -39,11 +53,14 @@ const navItems = [
     iconHover: "icon-hover-list",
   },
   {
-    to: "/library",
-    icon: TrendingUp,
-    labelKey: "nav.library",
-    iconHover: "icon-hover-trend",
+    to: "/recognize",
+    icon: Fingerprint,
+    labelKey: "nav.recognize",
+    iconHover: "icon-hover-search",
   },
+];
+
+const mineItems: NavItem[] = [
   {
     to: "/favorites",
     icon: Heart,
@@ -51,16 +68,16 @@ const navItems = [
     iconHover: "icon-hover-heart",
   },
   {
+    to: "/listening",
+    icon: Footprints,
+    labelKey: "nav.listening",
+    iconHover: "icon-hover-list",
+  },
+  {
     to: "/local",
     icon: HardDrive,
     labelKey: "nav.local",
     iconHover: "icon-hover-list",
-  },
-  {
-    to: "/recognize",
-    icon: Fingerprint,
-    labelKey: "nav.recognize",
-    iconHover: "icon-hover-search",
   },
   {
     to: "/downloads",
@@ -82,6 +99,74 @@ const navLinkClass =
         ? "bg-primary/10 text-foreground"
         : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
     );
+
+function SidebarNavLink({
+  item,
+  collapsed,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+}) {
+  const t = useT();
+  const { to, icon: Icon, labelKey, iconHover } = item;
+  return (
+    <NavLink
+      to={to}
+      title={collapsed ? t(labelKey) : undefined}
+      className={({ isActive }) =>
+        cn(navLinkClass(collapsed)({ isActive }), iconHover)
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && !collapsed && (
+            <span
+              aria-hidden
+              className="nav-active-bar absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary"
+            />
+          )}
+          <Icon
+            size={18}
+            strokeWidth={isActive ? 2.25 : 2}
+            className="shrink-0"
+          />
+          {!collapsed && (
+            <span className="min-w-0 flex-1 truncate">{t(labelKey)}</span>
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+function NavGroup({
+  label,
+  items,
+  collapsed,
+  divided = false,
+}: {
+  label: string;
+  items: NavItem[];
+  collapsed: boolean;
+  divided?: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      {collapsed ? (
+        divided ? (
+          <div className="mx-auto h-px w-6 bg-border/80" />
+        ) : null
+      ) : (
+        <p className="px-3 pt-1 pb-1 text-[11px] font-medium text-muted-foreground">
+          {label}
+        </p>
+      )}
+      {items.map((item) => (
+        <SidebarNavLink key={item.to} item={item} collapsed={collapsed} />
+      ))}
+    </div>
+  );
+}
 
 export function Sidebar() {
   const t = useT();
@@ -131,36 +216,18 @@ export function Sidebar() {
         )}
       </div>
 
-      <nav className="flex-1 px-2 py-3 space-y-1">
-        {navItems.map(({ to, icon: Icon, labelKey, iconHover }) => (
-          <NavLink
-            key={to}
-            to={to}
-            title={collapsed ? t(labelKey) : undefined}
-            className={({ isActive }) =>
-              cn(navLinkClass(collapsed)({ isActive }), iconHover)
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && !collapsed && (
-                  <span
-                    aria-hidden
-                    className="nav-active-bar absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary"
-                  />
-                )}
-                <Icon
-                  size={18}
-                  strokeWidth={isActive ? 2.25 : 2}
-                  className="shrink-0"
-                />
-                {!collapsed && (
-                  <span className="min-w-0 flex-1 truncate">{t(labelKey)}</span>
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+      <nav className="flex-1 px-2 py-2 space-y-3 overflow-y-auto">
+        <NavGroup
+          label={t("sidebar.discover")}
+          items={discoverItems}
+          collapsed={collapsed}
+        />
+        <NavGroup
+          label={t("sidebar.mine")}
+          items={mineItems}
+          collapsed={collapsed}
+          divided
+        />
       </nav>
 
       <div className="flex flex-col gap-1 p-2 pt-0 pb-3">

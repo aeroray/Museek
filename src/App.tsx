@@ -10,6 +10,7 @@ import { LocalMusic } from "@/routes/LocalMusic";
 import { Playlist } from "@/routes/Playlist";
 import { Downloads } from "@/routes/Downloads";
 import { Recognize } from "@/routes/Recognize";
+import { Listening } from "@/routes/Listening";
 import { Settings } from "@/routes/Settings";
 import { useSourceStore } from "@/stores/sourceStore";
 import { usePlaylistStore } from "@/stores/playlistStore";
@@ -28,6 +29,7 @@ import { CloseGuard } from "@/components/CloseGuard";
 import { WhatsNewDialog } from "@/components/whatsNew/WhatsNewDialog";
 import { useDownloadStore } from "@/stores/downloadStore";
 import { useLocalMusicStore } from "@/stores/localMusicStore";
+import { useListeningStore } from "@/stores/listeningStore";
 import { useUpdateStore } from "@/stores/updateStore";
 import { syncWindowTitle } from "@/lib/i18n";
 import { startOpenLocalFilesListener } from "@/lib/openLocalFiles";
@@ -54,6 +56,7 @@ function AppInit() {
   const { loadFromDisk: loadSettings } = useSettingsStore();
   const { loadFromDisk: loadDownloads } = useDownloadStore();
   const { loadFromDisk: loadLocalMusic } = useLocalMusicStore();
+  const { loadFromDisk: loadListening } = useListeningStore();
   const { loadFromDisk: loadPlayerPrefs } = usePlayerStore();
 
   // Global hotkeys (play / seek / lyrics / …), registered after settings hydrate.
@@ -74,6 +77,7 @@ function AppInit() {
       loadSources();
       loadPlaylists();
       loadHistory();
+      void loadListening();
       const playerReady = loadPlayerPrefs();
       // After settings load, trim the cache in case the limit was lowered.
       // Downloads need downloadDir from settings before unfinished tasks resume.
@@ -127,6 +131,7 @@ export default function App() {
             <Route path="/hot-albums" element={<HotAlbums />} />
             <Route path="/library" element={<Library />} />
             <Route path="/favorites" element={<Favorites />} />
+            <Route path="/listening" element={<Listening />} />
             <Route path="/local" element={<LocalMusic />} />
             <Route path="/playlist/:id" element={<Playlist />} />
             <Route path="/recognize" element={<Recognize />} />

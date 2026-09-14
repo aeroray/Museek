@@ -11,7 +11,7 @@ import {
 import { usePlayerStore } from "@/stores/playerStore";
 import { usePlaylistStore } from "@/stores/playlistStore";
 import { useDownloadStore } from "@/stores/downloadStore";
-import { QualityBadge } from "@/components/common/MetaBadges";
+import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges";
 import { bestQuality } from "@/lib/quality";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,10 @@ export const TrackRow = memo(function TrackRow({
   selectable = false,
   selected = false,
   onToggleSelect,
+  stat,
+  showAlbum = true,
+  showQuality = true,
+  showPlatform = false,
   className,
 }: {
   song: MusicInfo;
@@ -42,6 +46,11 @@ export const TrackRow = memo(function TrackRow({
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  /** Extra trailing figure (play count, relative time). */
+  stat?: string;
+  showAlbum?: boolean;
+  showQuality?: boolean;
+  showPlatform?: boolean;
   className?: string;
 }) {
   const play = usePlayerStore((s) => s.play);
@@ -117,17 +126,25 @@ export const TrackRow = memo(function TrackRow({
         <p className="text-xs text-muted-foreground truncate">{song.singer}</p>
       </div>
 
-      {song.albumName && (
+      {showAlbum && song.albumName && (
         <p className="text-xs text-muted-foreground truncate max-w-32 hidden lg:block">
           {song.albumName}
         </p>
       )}
 
-      {best && <QualityBadge quality={best} />}
+      {showQuality && best && <QualityBadge quality={best} />}
 
-      <span className="text-xs text-muted-foreground w-12 text-right shrink-0 tabular-nums">
+      {showPlatform && <PlatformBadge source={song.source} />}
+
+      <span className="text-xs text-muted-foreground w-14 shrink-0 tabular-nums text-center">
         {song.interval}
       </span>
+
+      {stat && (
+        <span className="text-xs text-muted-foreground shrink-0 tabular-nums max-w-24 truncate text-right">
+          {stat}
+        </span>
+      )}
 
       {!selectable && (
         <div className="flex items-center gap-0.5 shrink-0">

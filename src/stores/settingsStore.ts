@@ -32,6 +32,7 @@ export type StartupPage =
   | "hot-albums"
   | "library"
   | "favorites"
+  | "listening"
   | "local"
   | "recognize"
   | "downloads";
@@ -197,6 +198,7 @@ export const STARTUP_PAGES: StartupPage[] = [
   "hot-albums",
   "library",
   "favorites",
+  "listening",
   "local",
   "recognize",
   "downloads",

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Download, Upload, Loader2, Folder } from "lucide-react"
+import { Download, Upload, Loader2, Folder, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,7 @@ import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { gatherConfig, saveConfigFile, pickConfigFile, isValidConfig, type MuseekConfig } from "@/lib/configIO"
 import { backupToFolder, restoreFromFolder, applyConfigAndReload, WrongPassphraseError } from "@/lib/sync"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { useListeningStore } from "@/stores/listeningStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
 
@@ -23,7 +24,9 @@ export function DataSettings() {
   const t = useT()
   const [busy, setBusy] = useState(false)
   const [pending, setPending] = useState<MuseekConfig | null>(null)
+  const [clearListeningOpen, setClearListeningOpen] = useState(false)
   const { syncFolder, setSyncFolder, autoBackupOnExit, setAutoBackupOnExit } = useSettingsStore()
+  const hasListening = useListeningStore((s) => s.events.length > 0 || !!s.live)
   const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
   const canSync = !!syncFolder
 
@@ -126,6 +129,18 @@ export function DataSettings() {
             </div>
           </SettingRow>
 
+          <SettingRow title={t("data.clearListeningTitle")} desc={t("data.clearListeningDesc")}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setClearListeningOpen(true)}
+              disabled={busy || !hasListening}
+            >
+              <Trash2 size={14} className="mr-2" />
+              {t("data.clearListening")}
+            </Button>
+          </SettingRow>
+
           {/* Folder-based, encrypted cross-device sync */}
           <SettingRow title={t("sync.title")} desc={t("sync.desc")}>
             <div className="space-y-3">
@@ -176,6 +191,29 @@ export function DataSettings() {
             </Button>
             <Button variant="destructive" onClick={confirmImport}>
               {t("data.importConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={clearListeningOpen} onOpenChange={setClearListeningOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("data.clearListeningConfirmTitle")}</DialogTitle>
+            <DialogDescription>{t("data.clearListeningConfirmDesc")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearListeningOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                await useListeningStore.getState().clearHistory()
+                setClearListeningOpen(false)
+                useUiStore.getState().notify({ message: t("data.clearListeningDone"), variant: "success" })
+              }}
+            >
+              {t("data.clearListeningConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

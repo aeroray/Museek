@@ -30,6 +30,7 @@ import { notify } from "@/lib/notify";
 import { updateMediaControls, attachMediaControls } from "@/lib/smtc";
 import { setPreventSleep } from "@/lib/power";
 import { useLocalMusicStore } from "@/stores/localMusicStore";
+import { useListeningStore } from "@/stores/listeningStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { t } from "@/lib/i18n";
 import type { MusicInfo, LyricLine, Quality } from "@/types/music";
@@ -80,6 +81,14 @@ function snapshotPlaybackSession(): PlaybackSession {
 
 function persistPlaybackSession(immediate = false) {
   schedulePlaybackSessionWrite(snapshotPlaybackSession(), immediate);
+}
+
+function listenFinish(completed: boolean) {
+  useListeningStore.getState().finish(completed);
+}
+
+function listenSetPlaying(playing: boolean, song: MusicInfo | null) {
+  useListeningStore.getState().setPlaying(playing, song);
 }
 
 function songPlaybackClip(
@@ -345,6 +354,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         return;
       }
 
+      if (current && current.id !== song.id) listenFinish(false);
+
       const currentPath = current?.meta.filePath;
       const nextPath = song.meta.filePath;
       const sameLocalFile =
@@ -548,6 +559,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         if (isLocal) {
           if (raw === t("player.err.playTimeout")) {
             set({ status: "error", error: raw, lyricsLoading: false });
+            listenFinish(false);
             notify({ message: raw, variant: "error" });
             return;
           }
@@ -580,6 +592,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             sourceReady: false,
           });
           persistPlaybackSession(true);
+          listenFinish(false);
           notify({ message, variant: "error" });
           return;
         }
@@ -604,6 +617,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           sourceReady: false,
         });
         notify({ message, variant: "error" });
+        listenFinish(false);
         return;
       }
 
@@ -681,6 +695,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           sourceReady: false,
         });
         persistPlaybackSession(true);
+        listenFinish(false);
         return;
       }
 
@@ -986,6 +1001,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (status === "playing") persistPlaybackSession(false);
       else if (status === "paused") persistPlaybackSession(true);
 
+      listenSetPlaying(status === "playing", get().currentSong);
+
       // Keep the system awake only while actually playing (respecting the
       // setting). setPreventSleep de-dupes, so calling it every tick is cheap.
       setPreventSleep(
@@ -1010,9 +1027,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     _handleEnded() {
       const { playMode, queue, queueIndex } = get();
+      listenFinish(true);
       if (playMode === "repeat-one") {
         audioPlayer.seek(0);
         audioPlayer.play();
+        const song = get().currentSong;
+        if (song) listenSetPlaying(true, song);
         return;
       }
       // Sequential mode stops at the end of the queue; list-loop wraps; shuffle
@@ -1064,6 +1084,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         playPending: false,
         sourceReady: false,
       });
+      listenFinish(false);
     },
 
     async _loadLyric(song) {

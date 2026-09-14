@@ -9,7 +9,7 @@ import { LYRIC_FONT_SCALE_KEY } from "@/lib/lyrics/fontScale";
 // opens or plays them, so a later-deleted remote list still plays).
 // Deliberately excludes the on-disk audio/lyric cache,
 // downloaded files, localMusic.json, downloads.json, player.json (volume/
-// mute), fonts.json (UI / desktop-lyrics families), playbackSession.json (queue / now-playing), sourceProbe.json (source
+// mute), fonts.json (UI / desktop-lyrics families), playbackSession.json (queue / now-playing), listenLog.json (listening stats), sourceProbe.json (source
 // health-check results), miniPlayer.json (mini-bar
 // position), desktopLyrics.json, desktopLyricsGeometry.json, and
 // museek.whatsNew.seenVersion / AppData whats-new-*.json — those are device-local.

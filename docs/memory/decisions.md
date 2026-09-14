@@ -1,3 +1,11 @@
+## 2026-09-14 - Device-local listening stats
+
+Decision:
+Record play sessions in device-local `listenLog.json`. Show them on a sidebar Listening page (not Search). Count listen time from wall-clock while playing; count a ranked play after 30s, or on complete if the track is shorter.
+
+Reason:
+Users need recents and current ranks. Search is public discovery, and listen history should not ride config sync.
+
 ## 2026-09-14 - Local tags probe on a Rust worker
 
 Decision:
