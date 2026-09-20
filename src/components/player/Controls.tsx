@@ -1,6 +1,7 @@
-import { SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, Shuffle, Loader2, Heart, ListOrdered } from "lucide-react"
+import { SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Heart, ListOrdered } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
+import { PlayPauseButton } from "@/components/player/PlayPauseButton"
 import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useT } from "@/lib/i18n"
@@ -74,39 +75,16 @@ export function Controls() {
         label={t(isPlaying ? "player.pause" : "player.play")}
         action="playPause"
       >
-        <Button
+        <PlayPauseButton
           variant="default"
           size="icon"
-          className="h-11 w-11 rounded-full shadow-[var(--shadow-elevated)] icon-hover-play-pause"
+          className="size-11"
+          isPlaying={isPlaying}
+          loading={loading}
+          aria-label={t(isPlaying ? "player.pause" : "player.play")}
           onClick={togglePlay}
           disabled={!canPlay || loading}
-        >
-          {loading ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : (
-            <span className="relative block size-[19px]">
-              <span
-                className={cn(
-                  "icon-swap",
-                  isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
-                )}
-                aria-hidden={!isPlaying}
-              >
-                <Pause size={19} fill="currentColor" strokeWidth={0} />
-              </span>
-              <span
-                className={cn(
-                  "icon-swap",
-                  !isPlaying ? "scale-100 opacity-100 blur-0" : "scale-[0.25] opacity-0 blur-[4px]"
-                )}
-                aria-hidden={isPlaying}
-              >
-                {/* Optical shift: play triangles read left-heavy when geometrically centered. */}
-                <Play size={19} fill="currentColor" strokeWidth={0} className="ml-0.5" />
-              </span>
-            </span>
-          )}
-        </Button>
+        />
       </ShortcutTooltip>
 
       <ShortcutTooltip label={t("player.next")} action="next">

@@ -36,7 +36,7 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
-  /** Disable the press scale when motion would feel distracting. */
+  /** Disable hover and press scaling when motion would feel distracting. */
   static?: boolean
 }
 
@@ -47,7 +47,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(
           buttonVariants({ variant, size }),
-          !isStatic && variant !== "link" && tapScale,
+          !isStatic && variant !== "link" && size !== "icon" && tapScale,
+          !isStatic && size === "icon" && "icon-button-motion",
           className,
         )}
         ref={ref}

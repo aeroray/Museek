@@ -104,7 +104,7 @@ export function PlaylistCard({
                     : "hotPlaylists.favorite",
               )}
               className={cn(
-                "absolute top-2 left-2 h-8 w-8 rounded-full flex items-center justify-center transition-[opacity,background-color,transform] duration-150 ease-out bg-black/45 text-white hover:bg-black/65 active:scale-[0.96]",
+                "icon-button-motion absolute top-2 left-2 h-8 w-8 rounded-full flex items-center justify-center bg-black/45 text-white hover:bg-black/65",
                 favorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
               )}
             >
@@ -128,7 +128,7 @@ export function PlaylistCard({
                 onRemove()
               }}
               title={t("hotPlaylists.removeFavorite")}
-              className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/55 text-white flex items-center justify-center opacity-0 transition-[opacity,background-color,transform] duration-150 ease-out group-hover:opacity-100 hover:bg-black/75 active:scale-[0.96]"
+              className="icon-button-motion absolute top-2 right-2 h-8 w-8 rounded-full bg-black/55 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/75"
             >
               <X size={14} />
             </button>
@@ -141,7 +141,7 @@ export function PlaylistCard({
                 onPlay()
               }}
               title={t("common.playAll")}
-              className="absolute bottom-2 right-2 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center opacity-0 translate-y-1.5 transition-[opacity,transform] duration-200 ease-out group-hover:opacity-100 group-hover:translate-y-0 active:scale-[0.96]"
+              className="icon-button-motion absolute bottom-2 right-2 h-10 w-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center opacity-0 translate-y-1.5 group-hover:opacity-100 group-hover:translate-y-0"
             >
               <Play size={18} className="ml-0.5 icon-play-pop" fill="currentColor" strokeWidth={0} />
             </button>

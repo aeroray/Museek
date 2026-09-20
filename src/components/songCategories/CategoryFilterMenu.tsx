@@ -92,7 +92,7 @@ export function CategoryFilterMenu({
             <div className="absolute right-1 top-1/2 z-10 flex -translate-y-1/2">
               <button
                 type="button"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="icon-button-motion inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
                 title={labels.rename}
                 aria-label={labels.rename}
                 onPointerDown={stopItemSelect}
@@ -106,7 +106,7 @@ export function CategoryFilterMenu({
               </button>
               <button
                 type="button"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-destructive hover:bg-accent hover:text-destructive"
+                className="icon-button-motion inline-flex h-6 w-6 items-center justify-center rounded-sm text-destructive hover:bg-accent hover:text-destructive"
                 title={labels.delete}
                 aria-label={labels.delete}
                 onPointerDown={stopItemSelect}

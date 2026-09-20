@@ -5,8 +5,6 @@ import {
   Loader2,
   SkipBack,
   SkipForward,
-  Play,
-  Pause,
   ListMusic,
   X,
   Heart,
@@ -18,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip";
+import { PlayPauseButton } from "@/components/player/PlayPauseButton";
 import {
   exitMiniPlayer,
   notifyMiniPointerEnter,
@@ -330,27 +329,18 @@ export function MiniPlayer() {
             label={t(isPlaying ? "player.pause" : "player.play")}
             action="playPause"
           >
-            <Button
+            <PlayPauseButton
               type="button"
               variant="default"
               size="icon"
-              className="h-9 w-9 rounded-full shadow-[var(--shadow-elevated)]"
+              className="size-9"
+              isPlaying={isPlaying}
+              loading={playBusy}
+              iconSize={15}
+              aria-label={t(isPlaying ? "player.pause" : "player.play")}
               disabled={!canPlay || playBusy}
               onClick={() => togglePlay()}
-            >
-              {playBusy ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : isPlaying ? (
-                <Pause size={15} fill="currentColor" strokeWidth={0} />
-              ) : (
-                <Play
-                  size={15}
-                  fill="currentColor"
-                  strokeWidth={0}
-                  className="ml-0.5"
-                />
-              )}
-            </Button>
+            />
           </ShortcutTooltip>
           <ShortcutTooltip label={t("player.next")} action="next">
             <Button

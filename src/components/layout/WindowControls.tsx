@@ -21,7 +21,7 @@ export function WindowControls() {
   if (!isTauri || isMacOs()) return null
 
   const base =
-    "relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.96]"
+    "icon-button-motion relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground"
 
   return (
     <div className="flex items-center">

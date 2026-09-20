@@ -1,9 +1,59 @@
-import { Volume, Volume1, Volume2, VolumeX } from "lucide-react"
+import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
 import { Slider } from "@/components/ui/slider"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useT } from "@/lib/i18n"
+
+type VolumeLevel = "mute" | "low" | "mid" | "high"
+
+const INNER_WAVE: Record<VolumeLevel, string> = {
+  mute: "M 15 9 Q 17 12 19 15",
+  low: "M 15 12 Q 15 12 15 12",
+  mid: "M 15 9.5 Q 17 12 15 14.5",
+  high: "M 15 9.5 Q 17 12 15 14.5",
+}
+
+const OUTER_WAVE: Record<VolumeLevel, string> = {
+  mute: "M 19 9 Q 17 12 15 15",
+  low: "M 18 12 Q 18 12 18 12",
+  mid: "M 18 12 Q 18 12 18 12",
+  high: "M 17.5 7 Q 21 12 17.5 17",
+}
+
+function MorphingVolumeIcon({ level }: { level: VolumeLevel }) {
+  const reduceMotion = useReducedMotion()
+  const transition = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 180, damping: 20, mass: 1 }
+
+  return (
+    <motion.svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      data-icon="inline-start"
+    >
+      <path d="M 11 5 L 6 9 H 2 V 15 H 6 L 11 19 Z" />
+      <motion.path
+        initial={false}
+        animate={{ d: INNER_WAVE[level] }}
+        transition={transition}
+      />
+      <motion.path
+        initial={false}
+        animate={{ d: OUTER_WAVE[level] }}
+        transition={transition}
+      />
+    </motion.svg>
+  )
+}
 
 export function VolumeControl() {
   const { volume, muted, setVolume, setMuted } = usePlayerStore()
@@ -11,8 +61,7 @@ export function VolumeControl() {
 
   const pct = Math.round((muted ? 0 : volume) * 100)
 
-  const level = muted || volume === 0 ? "mute" : volume < 0.3 ? "low" : volume < 0.7 ? "mid" : "high"
-  const VolumeIcon = level === "mute" ? VolumeX : level === "low" ? Volume : level === "mid" ? Volume1 : Volume2
+  const level: VolumeLevel = muted || volume === 0 ? "mute" : volume < 0.3 ? "low" : volume < 0.7 ? "mid" : "high"
 
   return (
     <div className="flex items-center gap-2">
@@ -21,9 +70,7 @@ export function VolumeControl() {
         action="mute"
       >
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setMuted(!muted)}>
-          <span key={level} className="icon-pop-in">
-            <VolumeIcon size={16} />
-          </span>
+          <MorphingVolumeIcon level={level} />
         </Button>
       </ShortcutTooltip>
       <div className="group relative flex items-center">

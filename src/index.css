@@ -4,11 +4,30 @@
 
 /* Named motion tokens — avoids ambiguous arbitrary values like duration-[450ms]. */
 @layer utilities {
+  .icon-button-motion {
+    scale: 1;
+    transition-property:
+      color, background-color, border-color, transform, opacity, box-shadow, scale;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
   .duration-drawer-swipe {
     transition-duration: calc(var(--drawer-swipe-strength, 1) * 400ms);
   }
   .ease-emphasized {
     transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .icon-button-motion:hover:not(:disabled) {
+    scale: 1.04;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .icon-button-motion:active:not(:disabled) {
+    scale: 0.96;
   }
 }
 
@@ -288,7 +307,8 @@
   transition:
     background-color 140ms ease-out,
     color 140ms ease-out,
-    transform 140ms ease-out;
+    transform 140ms ease-out,
+    scale 140ms ease-out;
 }
 
 .desktop-lyrics-close:hover,
@@ -311,11 +331,6 @@
 .desktop-lyrics-mode:disabled {
   cursor: default;
   opacity: 0.42;
-}
-
-.desktop-lyrics-close:active,
-.desktop-lyrics-mode:active {
-  transform: scale(0.96);
 }
 
 .desktop-lyrics-close:focus-visible,
@@ -936,18 +951,6 @@ html[data-mini-peek="true"] .app-shell > * {
    Hover: interruptible pose on the SVG. State change: pop-in / heart burst.
    Respect reduced-motion; keep transforms interruptible where possible. */
 
-.icon-swap {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    opacity 300ms cubic-bezier(0.2, 0, 0, 1),
-    filter 300ms cubic-bezier(0.2, 0, 0, 1),
-    transform 300ms cubic-bezier(0.2, 0, 0, 1);
-}
-
 @keyframes iconPopIn {
   from {
     opacity: 0;
@@ -1115,15 +1118,11 @@ html[data-mini-peek="true"] .app-shell > * {
   .icon-hover-font-increase svg,
   .icon-hover-font-decrease svg,
   .icon-hover-comments svg,
-  .icon-hover-lyric-source svg,
-  .icon-hover-play-pause svg {
+  .icon-hover-lyric-source svg {
     transform-origin: center;
     transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
   }
 
-  .icon-hover-search:hover svg {
-    transform: rotate(-12deg);
-  }
   .icon-hover-list:hover svg {
     transform: translateY(-1.5px);
   }
@@ -1136,32 +1135,14 @@ html[data-mini-peek="true"] .app-shell > * {
   .icon-hover-download:hover svg {
     transform: translateY(2px);
   }
-  .icon-hover-settings:hover svg {
-    transform: rotate(30deg);
-  }
   .icon-hover-skip-prev:hover svg {
     transform: translateX(-2px);
   }
   .icon-hover-skip-next:hover svg {
     transform: translateX(2px);
   }
-  .icon-hover-shuffle:hover svg {
-    transform: rotate(-8deg);
-  }
-  .icon-hover-repeat:hover svg {
-    transform: rotate(45deg);
-  }
   .icon-hover-mic:hover svg {
     transform: translateY(-1.5px);
-  }
-  .icon-hover-plus:hover svg {
-    transform: rotate(90deg);
-  }
-  .icon-hover-sun:hover svg {
-    transform: rotate(30deg);
-  }
-  .icon-hover-moon:hover svg {
-    transform: rotate(-12deg);
   }
   .icon-hover-panel:hover svg {
     transform: translateX(-2px);
@@ -1176,7 +1157,7 @@ html[data-mini-peek="true"] .app-shell > * {
     transform: scale(1.08);
   }
   .icon-hover-pip:hover svg {
-    transform: scale(0.92) translate(1px, 1px);
+    transform: scale(0.94);
   }
   .icon-hover-captions:hover svg,
   .icon-hover-comments:hover svg,
@@ -1188,9 +1169,6 @@ html[data-mini-peek="true"] .app-shell > * {
   }
   .icon-hover-font-decrease:hover svg {
     transform: translateY(2px) scale(1.08);
-  }
-  .icon-hover-play-pause:hover svg {
-    transform: scale(1.08);
   }
 
   /* Nested icons (TrackRow / overlays) — animate the icon itself on parent hover */
@@ -1222,8 +1200,5 @@ html[data-mini-peek="true"] .app-shell > * {
   .hot-cloud-word,
   .lyric-cover-float {
     animation: none !important;
-  }
-  .icon-swap {
-    transition: none;
   }
 }

@@ -227,9 +227,9 @@ export function SidebarUpdateCard() {
           type="button"
           onClick={dismiss}
           className={cn(
-            "absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-md",
+            "icon-button-motion absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-md",
             "text-muted-foreground/70 transition-colors",
-            "hover:bg-muted hover:text-foreground active:scale-[0.96]",
+            "hover:bg-muted hover:text-foreground",
           )}
           aria-label={t("update.dismiss")}
         >
