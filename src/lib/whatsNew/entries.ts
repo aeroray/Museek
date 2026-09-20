@@ -17,6 +17,50 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.9.0": {
+    zh: {
+      sections: [
+        {
+          title: "👣 足迹",
+          bullets: [
+            "侧栏新增「足迹」页：听歌时长、歌曲/歌手排行和最近播放",
+            "只在真正播放时计时；听满 30 秒（或短曲播完）才计入排行",
+            "只保存在本机，不随配置同步；合作曲目会分别计入每位歌手",
+            "最近播放按歌曲去重，并显示相对时间",
+          ],
+        },
+        {
+          title: "✨ 界面",
+          bullets: [
+            "播放控件用同一套弹性动效；窗口最小化 / 最大化 / 关闭保持静止",
+            "对话框按内容高度居中，不再铺满窗口",
+            "搜索框聚焦描边不再被工具栏裁切",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "👣 History",
+          bullets: [
+            "New History page in the sidebar: listen time, song/artist ranks, and recents",
+            "Time counts only while playing; a ranked play counts after 30s, or when a short track finishes",
+            "Stored on this device only — not in config sync; collaborations credit each artist",
+            "Recents keep one row per song with a relative time",
+          ],
+        },
+        {
+          title: "✨ Interface",
+          bullets: [
+            "Playback icons share spring motion; window min/max/close stay still",
+            "Dialogs stay content-sized instead of filling the window",
+            "Search field focus ring is no longer clipped",
+          ],
+        },
+      ],
+    },
+  },
   "3.8.0": {
     zh: {
       sections: [
