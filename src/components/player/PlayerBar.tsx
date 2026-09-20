@@ -14,6 +14,7 @@ import { Controls } from "./Controls";
 import { ProgressSlider } from "./ProgressSlider";
 import { VolumeControl } from "./VolumeControl";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/common/IconSwap";
 import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip";
 import {
   DropdownMenu,
@@ -230,11 +231,11 @@ export function PlayerBar() {
               }
               disabled={desktopLyricsControlsDisabled}
             >
-              {desktopLyricsVisible ? (
-                <CaptionsOff size={16} />
-              ) : (
-                <Captions size={16} />
-              )}
+              <IconSwap
+                active={desktopLyricsVisible}
+                inactive={<Captions size={16} />}
+                activeNode={<CaptionsOff size={16} />}
+              />
             </Button>
           </ShortcutTooltip>
           <Button

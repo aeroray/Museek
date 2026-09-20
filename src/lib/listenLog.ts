@@ -1,10 +1,28 @@
-import { readData, writeData } from "@/lib/db";
+import { readData, writeDataCompact } from "@/lib/db";
 import { intervalToSeconds } from "@/lib/playbackSession";
 import type { MusicInfo, MusicInfoMeta } from "@/types/music";
 
 export const LISTEN_LOG_FILE = "listenLog.json";
 export const PLAY_COUNT_MS = 30_000;
-export const MAX_LISTEN_EVENTS = 8_000;
+
+/**
+ * Retention. The log is a history, not a library: it must stay small and
+ * predictable no matter how long the app is used, so there is exactly one rule —
+ * a hard cap on stored events, oldest dropped first.
+ *
+ * A count cap rather than an age cap on purpose. It gives a fixed, explainable
+ * ceiling on disk use ("this file never grows past ~1.2 MB"), whereas an age cap
+ * would let a heavy listener's file grow without bound inside the window, and
+ * would quietly make the "All time" period mean something narrower than it says.
+ *
+ * Measured, not guessed: a realistic online song snapshot (cover URL plus three
+ * quality entries) is ~620 bytes as compact JSON. 2,000 events therefore cap the
+ * file near 1.2 MB, and cover ~40 days at 50 songs/day or ~80 days at 25/day —
+ * comfortably more than the longest period the UI offers (30 days).
+ */
+export const MAX_LISTEN_EVENTS = 2_000;
+
+/** Distinct songs shown in the "Recently played" tab. */
 export const RECENT_LIMIT = 100;
 export const TOP_SONGS_LIMIT = 50;
 export const TOP_ARTISTS_LIMIT = 30;
@@ -40,7 +58,6 @@ export type TopArtistStat = {
   singer: string;
   playCount: number;
   listenedMs: number;
-  song: MusicInfo;
 };
 
 export type ListenAggregate = {
@@ -137,6 +154,37 @@ export function songDurationMs(song: MusicInfo): number {
   return Math.max(0, intervalToSeconds(song.interval) * 1000);
 }
 
+/**
+ * Splits a collab credit into individual artists.
+ *
+ * Every platform module joins artists with the ideographic comma `、`
+ * (`formatSingers` in the search/chart/playlist adapters, and KuWo/KuGou
+ * additionally rewrite `&` to it), so that is the one separator guaranteed by
+ * the data contract. `;` and `,` are included because local file tags use them.
+ *
+ * `/` and `&` are deliberately NOT separators: both occur inside real artist
+ * names (AC/DC, Simon & Garfunkel), and splitting them would invent artists that
+ * do not exist. The cost of missing an occasional collab is a slightly split
+ * stat; the cost of over-splitting is wrong data that cannot be undone.
+ */
+export function splitArtists(singer: string | undefined | null): string[] {
+  if (!singer) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of singer.split(/[、;；,，]+/)) {
+    const name = part.trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
+}
+
+/** Whether any artist on a collab credit matches `artist`. */
+function creditIncludes(singer: string, artist: string): boolean {
+  return splitArtists(singer).includes(artist);
+}
+
 /** Spotify-style 30s stream, plus completed tracks shorter than 30s. */
 export function countsAsPlay(event: PlayEvent): boolean {
   if (event.listenedMs >= PLAY_COUNT_MS) return true;
@@ -168,6 +216,13 @@ export function accrueSession(
   };
 }
 
+/**
+ * Enforce the retention cap. Events are appended chronologically, so dropping
+ * the oldest is a slice from the front.
+ *
+ * Applied on read *and* write, so an install upgrading from the previous 8,000
+ * cap shrinks on first load instead of staying oversized until the next play.
+ */
 export function trimEvents(events: PlayEvent[]): PlayEvent[] {
   if (events.length <= MAX_LISTEN_EVENTS) return events;
   return events.slice(events.length - MAX_LISTEN_EVENTS);
@@ -181,18 +236,40 @@ export function eventsWithLive(
   return [...events, live];
 }
 
+/**
+ * "Recently played" is a list of *songs*, not of play events: a song you have on
+ * repeat should occupy one row showing the latest time, not twenty rows pushing
+ * everything else off the list.
+ *
+ * Keeps the newest event per song id, then sorts by time, then caps. Events are
+ * already chronological, but the sort makes the result independent of input
+ * order — `eventsWithLive` appends the live session out of order.
+ */
 function collapseRecents(events: PlayEvent[]): PlayEvent[] {
-  const newestFirst = [...events].sort((a, b) => b.startedAt - a.startedAt);
-  const out: PlayEvent[] = [];
-  for (const event of newestFirst) {
-    const prev = out[out.length - 1];
-    if (prev && prev.song.id === event.song.id) continue;
-    out.push(event);
-    if (out.length >= RECENT_LIMIT) break;
+  const newestPerSong = new Map<string, PlayEvent>();
+  for (const event of events) {
+    const seen = newestPerSong.get(event.song.id);
+    if (!seen || event.startedAt > seen.startedAt) {
+      newestPerSong.set(event.song.id, event);
+    }
   }
-  return out;
+  return [...newestPerSong.values()]
+    .sort((a, b) => b.startedAt - a.startedAt)
+    .slice(0, RECENT_LIMIT);
 }
 
+/**
+ * Aggregate the log for one period.
+ *
+ * Artist stats are counted per *credited artist*, not per credit string: a song
+ * tagged `鬼才、刀酱` credits both 鬼才 and 刀酱 individually, so they add up with
+ * their solo work instead of forming a separate "鬼才、刀酱" row. A play is
+ * therefore counted once per song but once per artist on that song, which is
+ * what makes the artist ranking comparable across collabs and solo tracks.
+ *
+ * `singerFilter` matches if the artist appears anywhere in a credit, so opening
+ * an artist from the ranking shows their collabs too.
+ */
 export function aggregateListening(
   events: PlayEvent[],
   period: ListenPeriod,
@@ -202,7 +279,7 @@ export function aggregateListening(
   const start = periodStart(period, now);
   const inRange = events.filter((e) => e.startedAt >= start);
   const ranked = singerFilter
-    ? inRange.filter((e) => e.song.singer === singerFilter)
+    ? inRange.filter((e) => creditIncludes(e.song.singer, singerFilter))
     : inRange;
   const plays = ranked.filter(countsAsPlay);
 
@@ -212,7 +289,7 @@ export function aggregateListening(
   for (const event of ranked) {
     listenedMs += event.listenedMs;
     songIds.add(event.song.id);
-    if (event.song.singer) artists.add(event.song.singer);
+    for (const name of splitArtists(event.song.singer)) artists.add(name);
   }
 
   const songMap = new Map<string, TopSongStat>();
@@ -229,19 +306,19 @@ export function aggregateListening(
         listenedMs: event.listenedMs,
       });
     }
-    const singer = event.song.singer;
-    if (!singer) continue;
-    const artistStat = artistMap.get(singer);
-    if (artistStat) {
-      artistStat.playCount += 1;
-      artistStat.listenedMs += event.listenedMs;
-    } else {
-      artistMap.set(singer, {
-        singer,
-        playCount: 1,
-        listenedMs: event.listenedMs,
-        song: event.song,
-      });
+
+    for (const name of splitArtists(event.song.singer)) {
+      const artistStat = artistMap.get(name);
+      if (artistStat) {
+        artistStat.playCount += 1;
+        artistStat.listenedMs += event.listenedMs;
+      } else {
+        artistMap.set(name, {
+          singer: name,
+          playCount: 1,
+          listenedMs: event.listenedMs,
+        });
+      }
     }
   }
 
@@ -275,13 +352,17 @@ export async function readListenLog(): Promise<ListenLogFile> {
     : [];
   return {
     version: 1,
+    // Retention is re-applied here so an older, larger log shrinks on load
+    // instead of staying oversized until the next play.
     events: trimEvents(events),
     live: parseLive(raw.live),
   };
 }
 
 export async function writeListenLog(log: ListenLogFile): Promise<void> {
-  await writeData(LISTEN_LOG_FILE, {
+  // Compact, not pretty-printed: this file is machine-only and holds thousands
+  // of song snapshots, where indentation would roughly double the bytes.
+  await writeDataCompact(LISTEN_LOG_FILE, {
     version: 1,
     events: trimEvents(log.events),
     live: log.live

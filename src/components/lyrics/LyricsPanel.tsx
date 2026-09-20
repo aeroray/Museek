@@ -25,6 +25,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Controls } from "@/components/player/Controls";
 import { CoverImage } from "@/components/common/CoverImage";
+import { IconSwap } from "@/components/common/IconSwap";
 import { ProgressSlider } from "@/components/player/ProgressSlider";
 import { SpecularFrame } from "@/components/common/SpecularFrame";
 import { usePlayerStore } from "@/stores/playerStore";
@@ -638,7 +639,11 @@ export function LyricsPanel() {
             onClick={() => void toggleImmersive()}
             title={t(immersive ? "lyrics.exitFullscreen" : "lyrics.fullscreen")}
           >
-            {immersive ? <Minimize size={18} /> : <Maximize size={18} />}
+            <IconSwap
+              active={immersive}
+              inactive={<Maximize size={18} />}
+              activeNode={<Minimize size={18} />}
+            />
           </Button>
         )}
         <LyricSourceMenu
@@ -690,11 +695,11 @@ export function LyricsPanel() {
             }
             disabled={desktopLyricsControlsDisabled}
           >
-            {desktopLyricsVisible ? (
-              <CaptionsOff size={16} />
-            ) : (
-              <Captions size={16} />
-            )}
+            <IconSwap
+              active={desktopLyricsVisible}
+              inactive={<Captions size={16} />}
+              activeNode={<CaptionsOff size={16} />}
+            />
           </Button>
         </ShortcutTooltip>
       </div>

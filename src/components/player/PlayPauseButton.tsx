@@ -5,6 +5,13 @@ import {
   useReducedMotion,
 } from "motion/react"
 import { Button, type ButtonProps } from "@/components/ui/button"
+import {
+  ICON_SWAP_TRANSITION,
+  ICON_SWAP_VARIANTS,
+  NO_MOTION,
+  SPRING_HERO,
+  SPRING_MORPH,
+} from "@/lib/motion"
 import { cn } from "@/lib/utils"
 
 const PLAY_PATH =
@@ -44,26 +51,16 @@ function MorphingPlayPauseIcon({
         stroke="currentColor"
         strokeWidth="0.7"
         strokeLinejoin="round"
-        transition={
-          reduceMotion
-            ? { duration: 0 }
-            : {
-                type: "spring",
-                stiffness: 180,
-                damping: 20,
-                mass: 1,
-              }
-        }
+        transition={reduceMotion ? NO_MOTION : SPRING_MORPH}
       />
     </motion.svg>
   )
 }
 
+/** Loading ⇄ ready swap. Shares the app-wide glyph cross-fade. */
 const contextualIconMotion = {
-  initial: { opacity: 0, scale: 0.25, filter: "blur(4px)" },
-  animate: { opacity: 1, scale: 1, filter: "blur(0px)" },
-  exit: { opacity: 0, scale: 0.25, filter: "blur(4px)" },
-  transition: { type: "spring" as const, duration: 0.3, bounce: 0 },
+  ...ICON_SWAP_VARIANTS,
+  transition: ICON_SWAP_TRANSITION,
 }
 
 export function PlayPauseButton({
@@ -86,9 +83,7 @@ export function PlayPauseButton({
       whileTap={
         reduceMotion || disabled ? undefined : { scale: 0.96 }
       }
-      transition={{
-        scale: { type: "spring", stiffness: 400, damping: 24, mass: 0.55 },
-      }}
+      transition={{ scale: SPRING_HERO }}
     >
       <Button
         {...props}

@@ -1,5 +1,41 @@
 # Do Not Use
 
+## `inset-0` + `m-auto` + `h-fit` for centred dialogs
+
+Do not centre `DialogContent` with `fixed inset-0 m-auto h-fit`. With both insets at 0 the height comes from `height: fit-content` alone; if that does not resolve to the content height the used value falls back to `auto` and the box **stretches to the full containing block** — a dialog as tall as the whole window (observed on macOS, fine on Windows). Use `fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100%-2rem)]` with `height: auto`.
+
+## Variable-width trailing columns in TrackRow
+
+Do not use `max-w-*` or intrinsic width for `TrackRow`'s platform chip or `stat` column. The name column is `flex-1`, so anything after it is right-anchored and a variable width drags its left neighbours out of line between rows. Use the fixed `w-20` platform slot and the `statWidth` prop.
+
+## Outset focus ring on Input
+
+Do not give `Input` an outset focus ring (`focus-visible:ring-offset-2` with a non-inset ring). It overhangs 4px on every side and gets clipped by the fixed-height `overflow-hidden` toolbars that host the search boxes. Use `ring-2 ring-inset`.
+
+## Splitting artists on / or &
+
+Do not add `/` or `&` to the artist separators in `splitArtists`. Real names contain them (AC/DC, Simon & Garfunkel), so splitting would invent artists that do not exist. Only `、;；,，` are separators — `、` is what every platform adapter's `formatSingers` emits.
+
+## Song cover as an artist image
+
+Do not show a song's cover next to an artist in the 足迹 artist ranking. An artist has no artwork of its own, and a borrowed track cover changes with whichever song played last. Use the monogram.
+
+## Pretty-printed listen log
+
+Do not write `listenLog.json` with `writeData` (2-space JSON). Use `writeDataCompact`. The file is machine-only and holds thousands of song snapshots, where indentation roughly doubles the bytes (1.18 MB → 2.18 MB at the current cap; it reached 8.7 MB under the old 8,000-event cap).
+
+## Adjacent-only recents dedupe
+
+Do not dedupe "recently played" by skipping only consecutive repeats. Collapse by song id, keeping the newest play, so an interleaved repeat (A B A B …) does not fill the list with two songs.
+
+## Motion on the window controls
+
+Do not add `icon-button-motion`, a hover scale, or any transition to the minimize / maximize / close buttons in `WindowControls.tsx`. They are OS chrome; motion there reads as the window wobbling. Flat hover color only.
+
+## Hardcoded durations or easings in icon motion
+
+Do not write literal durations or easings into icon buttons (`duration-150`, `cubic-bezier(...)`, `transition: transform 150ms`). Read `--motion-fast` / `--motion-base` / `--motion-slow` and `--ease-spring-*` from `:root`, or the `SPRING_*` / `ICON_SWAP_*` presets in `src/lib/motion.ts`. Regenerate the spring curves with `node scripts/spring-easings.mjs` rather than hand-tuning a bezier. Also do not put `transform` on the same element as a `motion/react` animated `scale` — motion writes an inline transform that beats the CSS animation, so the effect silently never plays; nest instead (`IconBurst`).
+
 ## Lyrics rail particles
 
 Do not add canvas sparks, prism streaks, or a theme-color playhead bloom on the lyrics-page progress rail. Use the player-bar ProgressSlider flush to the window bottom. Keep the thumb the same height as the track; do not lift the rail to unclip a larger thumb.

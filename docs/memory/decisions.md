@@ -1,3 +1,75 @@
+## 2026-09-14 - Artist stats credit each artist, not each credit string
+
+Decision:
+`aggregateListening` splits a song's `singer` on `、;；,，` and credits every name individually, so a collab (`鬼才、刀酱`) adds to both 鬼才 and 刀酱 rather than forming a separate "鬼才、刀酱" row. A play counts once per song but once per credited artist. The `singerFilter` matches if the artist appears anywhere in a credit, so opening an artist shows their collabs too. `TopArtistStat` no longer carries a `song` snapshot. The artist list shows a monogram instead of a song cover.
+
+Reason:
+Every platform adapter joins artists with `、` (`formatSingers`), so it is the one separator guaranteed by the data contract. `/` and `&` are deliberately not separators — they occur inside real names (AC/DC, Simon & Garfunkel) and splitting them would invent artists. The per-credit-string keying made collabs rank separately from the same artist's solo work, so a listener's real top artist could be buried under fragmented rows. Dropping the song cover is honest: an artist has no artwork of its own, and a borrowed track cover changes depending on which song played last.
+
+## 2026-09-14 - DialogContent centres by translate, not inset + margin auto
+
+Decision:
+`DialogContent` is positioned `fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100%-2rem)]` with `height: auto`.
+
+Reason:
+The previous `fixed inset-0 m-auto h-fit` made the dialog's height depend entirely on `height: fit-content` resolving, because `inset-0` pins top *and* bottom to 0. When it does not resolve to the content height the used value falls back to `auto`, and with both insets at 0 that stretches the box to the full containing block — the changelog dialog filled the whole window on macOS while looking correct on Windows. Verified in Chromium that `inset-0` + `height: auto` yields full viewport height (691px) while `top/left:50%` + translate yields content height, correctly centred, and caps at `max-height`. The `max-h` cap also keeps a tall dialog from overflowing both edges.
+
+## 2026-09-14 - Fixed-width trailing columns in TrackRow
+
+Decision:
+`TrackRow`'s trailing columns are fixed-width: the platform chip sits in a `w-20` slot (chip flush right), `stat` is a fixed slot sized by a `statWidth` prop (default `w-20`). `stat` renders **before** the platform chip and duration, not after. Never use `max-w` or intrinsic width on these columns.
+
+Reason:
+The name column is `flex-1`, so every column to its right is anchored from the row's right edge — which means any *variable* width pushes its left neighbours sideways. A `max-w-24` stat looked harmless because the value was right-aligned, but its left edge moved with the text (`2 小时前` 52px vs `9/14 15:08` 67px), shifting the duration and platform columns per row. Platform chips vary too (`酷我` 46px vs `QQ Music` 74px). Fixed slots pin every anchor so all rows share column edges. Widths are measured, not guessed: the widest real stat is `12/31 20:00` at 74px and the widest English play count is `1,234 plays` at 70px, so one `w-20` (80px) slot serves both tabs. Placing `stat` before the platform chip keeps it adjacent to the song it describes and puts the slack from short titles to its left, instead of leaving a hole between the title and the trailing metadata.
+
+## 2026-09-14 - Inset focus ring on Input
+
+Decision:
+`src/components/ui/input.tsx` draws its focus ring with `ring-[1.5px] ring-inset` plus a border-color change, not the default outset `ring` + `ring-offset-2`. Do not revert to an outset ring without auditing every container that hosts an `Input` for `overflow-hidden`.
+
+Reason:
+An outset ring paints outside the element's box (2px offset + 2px ring = 4px of overhang). Search boxes sit in fixed-height toolbars — the playlist detail row is `h-9` holding an `h-8` input with only 2px of slack, and no horizontal padding — so `overflow-hidden` sliced the ring on all four sides. An inset ring needs no overhang and therefore cannot be clipped, which fixes every occurrence centrally instead of padding each container. The ring is 1.5px rather than 2px because it sits directly against the 1px border in the same colour, so the two read as one stroke and 2px looked like a 3px edge.
+
+## 2026-09-14 - Listen log retention and recents identity
+
+Decision:
+`listenLog.json` keeps at most `MAX_LISTEN_EVENTS` (2,000) events, oldest dropped first; the cap is re-applied on both read and write so an install upgrading from the old 8,000 cap shrinks on first load. Recents collapse to one row per song id (newest play wins), then sort by time and cap at `RECENT_LIMIT` (100). The log is written with `writeDataCompact` (no indentation). Relative timestamps are rendered by `formatRelativePlayed` in `src/lib/listenFormat.ts`, with `useMinuteTick` supplying a ticking `now`.
+
+Reason:
+The log is a history, not a library, so it needs one predictable ceiling on disk use. Measured: a realistic online snapshot is ~620 bytes compact, so 2,000 events cap the file near 1.2 MB and still cover ~40 days at 50 plays/day, comfortably past the longest 30-day period. The old 8,000 cap with pretty-printing reached 8.7 MB. Dedupe by song id (not by adjacent repeats) is what makes "recently played" a list of songs: a track on repeat previously filled the list with itself.
+
+## 2026-09-14 - Relative "recently played" time ladder
+
+Decision:
+Recents show 刚刚 → N 分钟前 → N 小时前 → 昨天 HH:MM → 前天 HH:MM → M/D HH:MM, and a play from a *previous year* shows the date alone (2025/12/31). The relative branches are gated on the calendar day, not only on elapsed time, so a 23:00 play read at 02:00 is 昨天 23:00 rather than 3 小时前; minutes still win over the day boundary, so 23:50 read at 00:10 stays 20 分钟前.
+
+Reason:
+Day labels are the more useful anchor once the calendar has changed, but a clock time must stay alongside them — on a history screen "昨天" alone does not say whether it was morning or late night. Keeping minutes relative across midnight avoids the jarring case where a play from twenty minutes ago is labelled with a day name. Dropping the clock for a previous year keeps the whole ladder inside one narrow fixed-width column: `2025/12/31 20:00` measured 108px and forced the column to `w-28`, while the date alone is 72px and fits the same `w-20` slot as every other value. The exact minute of a play from last year is not worth the column width.
+
+## 2026-09-14 - One shared spring motion language for icon controls
+
+Decision:
+Icon motion has three layers, all driven by spring physics rather than linear or plain ease curves. Poses (hover/active nudge) are CSS transitions reading `--motion-*` and `--ease-spring-*` from `:root`; state swaps cross-fade both glyphs via `IconSwap` / `IconCycle` in `src/components/common/IconSwap.tsx`; one-shot accents use `IconBurst`. `motion/react` presets live in `src/lib/motion.ts`. The CSS spring curves are generated by `node scripts/spring-easings.mjs` (settle duration + bounce → stiffness/damping/mass → minimax cubic-bezier fit), declared as cubic-bezier for compatibility with an exact `linear()` set layered under `@supports`. Reduced motion flattens every curve to `ease-out` and cuts the travel while keeping the static cue.
+
+Reason:
+Springs are what make motion read as "light and elastic" instead of mechanical, and bridging both glyphs of a state change is what makes it feel connected rather than cut. Deriving the curves from real physics (instead of hand-picked beziers) keeps hover, press, and swap tuned to the same scale. One generator and one token set means the whole app stays consistent instead of drifting per component.
+
+## 2026-09-14 - Window min/max/close stay static
+
+Decision:
+The custom minimize / maximize / close buttons in `src/components/layout/WindowControls.tsx` carry no hover scale, spring, or transition. Only the flat hover color changes.
+
+Reason:
+They are OS chrome, not app controls. A spring there reads as the window itself wobbling, and animating the least interesting corner of the UI pulls attention away from real controls.
+
+## 2026-09-14 - Play/pause and volume morphs keep their own spring
+
+Decision:
+The play/pause SVG path morph keeps `stiffness 180 / damping 20 / mass 1` (`SPRING_MORPH`), and the primary transport button keeps its own hover spring (`SPRING_HERO`, `400/24/0.55`) rather than the shared CSS token. Do not fold these into the shared hover spring.
+
+Reason:
+A path morph is one shape *becoming* another, so it wants a long, nearly critically damped settle; the snappier springs that suit a pose make the morph look like it snaps. The play button is the largest control on screen, so at equal travel it moves further in absolute pixels and needs a heavier settle to feel planted. Both were already tuned and approved.
+
 ## 2026-09-14 - Device-local listening stats
 
 Decision:

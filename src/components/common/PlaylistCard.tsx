@@ -1,5 +1,6 @@
 import { Play, Music, X, Heart, User, Headphones, Check, Calendar } from "lucide-react"
 import { CoverImage } from "@/components/common/CoverImage"
+import { IconBurst, IconSwap } from "@/components/common/IconSwap"
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
 import type { Playlist } from "@/lib/playlists"
@@ -105,19 +106,22 @@ export function PlaylistCard({
               )}
               className={cn(
                 "icon-button-motion absolute top-2 left-2 h-8 w-8 rounded-full flex items-center justify-center bg-black/45 text-white hover:bg-black/65",
-                favorited ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                favorited ? "text-red-500 opacity-100 hover:text-red-500" : "opacity-0 group-hover:opacity-100"
               )}
             >
-              <Heart
-                size={14}
-                className={cn(
-                  // Lucide heart path is optically top-left heavy inside a circle.
-                  "block shrink-0 translate-x-px translate-y-px",
-                  favorited ? "text-red-500 icon-heart-burst" : "",
-                )}
-                fill={favorited ? "currentColor" : "none"}
-                key={favorited ? "on" : "off"}
-              />
+              <IconBurst active={!!favorited}>
+                <IconSwap
+                  active={!!favorited}
+                  inactive={<Heart size={14} className="block shrink-0 translate-x-px translate-y-px" />}
+                  activeNode={
+                    <Heart
+                      size={14}
+                      fill="currentColor"
+                      className="block shrink-0 translate-x-px translate-y-px"
+                    />
+                  }
+                />
+              </IconBurst>
             </button>
           )}
 

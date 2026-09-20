@@ -4,7 +4,6 @@ import {
   ListFilter,
   Play,
   Search,
-  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CoverImage } from "@/components/common/CoverImage";
 import { TrackRow } from "@/components/common/TrackRow";
 import { useListeningStore } from "@/stores/listeningStore";
 import { usePlayerStore } from "@/stores/playerStore";
@@ -24,46 +22,20 @@ import { useUiStore } from "@/stores/uiStore";
 import {
   aggregateListening,
   eventsWithLive,
+  RECENT_LIMIT,
   type ListenPeriod,
   type PlayEvent,
   type TopArtistStat,
   type TopSongStat,
 } from "@/lib/listenLog";
-import { formatListenDuration } from "@/lib/listenFormat";
+import { formatListenDuration, formatRelativePlayed } from "@/lib/listenFormat";
+import { useMinuteTick } from "@/hooks/useMinuteTick";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const PERIODS: ListenPeriod[] = ["today", "week", "month", "all"];
 const TABS = ["songs", "artists", "recent"] as const;
 type ListenTab = (typeof TABS)[number];
-
-function pad2(n: number): string {
-  return n.toString().padStart(2, "0");
-}
-
-function formatRelativePlayed(
-  startedAt: number,
-  now: number,
-  t: (key: string, vars?: Record<string, string | number>) => string,
-): string {
-  const delta = Math.max(0, now - startedAt);
-  if (delta < 60_000) return t("listening.justNow");
-  if (delta < 60 * 60_000) {
-    return t("listening.minutesAgo", { count: Math.floor(delta / 60_000) });
-  }
-  const date = new Date(startedAt);
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const time = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-  if (startedAt >= today.getTime()) return time;
-  if (startedAt >= yesterday.getTime()) return t("listening.yesterdayAt", { time });
-  return t("listening.dateAt", {
-    date: `${date.getMonth() + 1}/${date.getDate()}`,
-    time,
-  });
-}
 
 function matchesQuery(
   query: string,
@@ -72,6 +44,18 @@ function matchesQuery(
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return fields.some((field) => (field ?? "").toLowerCase().includes(q));
+}
+
+/**
+ * First user-perceived character of a name, for the artist monogram.
+ *
+ * `Array.from` rather than `name[0]` so a CJK or emoji name is not cut in half
+ * by slicing a surrogate pair, and the locale-aware uppercase gives a Latin name
+ * a capital while leaving CJK unchanged.
+ */
+function firstGrapheme(name: string): string {
+  const [first] = Array.from(name.trim());
+  return first ? first.toLocaleUpperCase() : "?";
 }
 
 export function Listening() {
@@ -84,7 +68,10 @@ export function Listening() {
   const [period, setPeriod] = useState<ListenPeriod>("week");
   const [artist, setArtist] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const now = live?.playing ? Date.now() : live?.lastTick ?? Date.now();
+  const hasHistory = events.length > 0 || live !== null;
+  // One clock for both the period boundaries and the relative labels, so a page
+  // left open does not keep saying "刚刚" an hour later.
+  const now = useMinuteTick(hasHistory);
 
   const allEvents = useMemo(
     () => eventsWithLive(events, live),
@@ -331,6 +318,11 @@ export function Listening() {
                 formatPlayed={(startedAt) =>
                   formatRelativePlayed(startedAt, now, t)
                 }
+                footer={
+                  searching || recents.length === 0
+                    ? null
+                    : t("listening.recentLimit", { count: RECENT_LIMIT })
+                }
               />
             )}
           </div>
@@ -405,15 +397,17 @@ function ArtistList({
           <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0 font-medium">
             {i + 1}
           </span>
-          <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-muted shadow-[var(--shadow-border)]">
-            {row.song.meta.picUrl ? (
-              <CoverImage src={row.song.meta.picUrl} />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                <Users size={16} />
-              </div>
-            )}
-          </div>
+          {/* No artwork: an artist has no cover of its own, and borrowing a
+              song's cover to stand in for one is misleading — it reads as the
+              artist's image while actually being a track they appear on, and it
+              changes depending on which song happened to be played last. A
+              monogram is honest about being a placeholder. */}
+          <span
+            aria-hidden
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/70 text-sm font-medium text-muted-foreground shadow-[var(--shadow-border)]"
+          >
+            {firstGrapheme(row.singer)}
+          </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm truncate font-medium">{row.singer}</p>
           </div>
@@ -433,10 +427,12 @@ function RecentList({
   rows,
   emptyLabel,
   formatPlayed,
+  footer,
 }: {
   rows: PlayEvent[];
   emptyLabel: string;
   formatPlayed: (startedAt: number) => string;
+  footer?: string | null;
 }) {
   if (rows.length === 0) {
     return (
@@ -449,7 +445,7 @@ function RecentList({
     <>
       {rows.map((event) => (
         <TrackRow
-          key={event.id}
+          key={event.song.id}
           song={event.song}
           stat={formatPlayed(event.startedAt)}
           showAlbum={false}
@@ -457,6 +453,13 @@ function RecentList({
           showPlatform
         />
       ))}
+      {/* States the cap outright, so the list ending is understood as a limit
+          rather than as history having been lost. */}
+      {footer && (
+        <p className="pt-3 pb-1 text-center text-xs text-muted-foreground">
+          {footer}
+        </p>
+      )}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { SkipBack, SkipForward, Repeat, Repeat1, Shuffle, Heart, ListOrdered } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { IconBurst, IconCycle, IconSwap } from "@/components/common/IconSwap"
 import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
 import { PlayPauseButton } from "@/components/player/PlayPauseButton"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -7,13 +8,17 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-function ModeIcon({ playMode }: { playMode: string }) {
-  const common = { size: 16 as const }
-  if (playMode === "repeat-one") return <Repeat1 {...common} />
-  if (playMode === "shuffle") return <Shuffle {...common} />
-  if (playMode === "repeat-list") return <Repeat {...common} />
-  return <ListOrdered {...common} />
-}
+/**
+ * Play mode cycles through four states, so each change is a *swap* with its
+ * neighbour rather than a remount. A map keeps every mode's glyph in one place
+ * and lets the cross-fade bridge any step in the cycle.
+ */
+const MODE_ICON = {
+  sequence: ListOrdered,
+  shuffle: Shuffle,
+  "repeat-list": Repeat,
+  "repeat-one": Repeat1,
+} as const
 
 function modeHoverClass(playMode: string) {
   if (playMode === "shuffle") return "icon-hover-shuffle"
@@ -54,9 +59,13 @@ export function Controls() {
         onClick={cyclePlayMode}
         title={t(`playMode.${playMode}`)}
       >
-        <span key={playMode} className="icon-pop-in">
-          <ModeIcon playMode={playMode} />
-        </span>
+        <IconCycle
+          value={playMode}
+          render={(mode) => {
+            const Glyph = MODE_ICON[mode as keyof typeof MODE_ICON] ?? ListOrdered
+            return <Glyph size={16} />
+          }}
+        />
       </Button>
 
       <ShortcutTooltip label={t("player.prev")} action="prev">
@@ -107,12 +116,13 @@ export function Controls() {
         disabled={!currentSong || isLocal}
         title={isLocal ? t("local.favoriteDisabled") : t("common.favorite")}
       >
-        <Heart
-          key={fav ? "on" : "off"}
-          size={16}
-          fill={fav ? "currentColor" : "none"}
-          className={fav ? "icon-heart-burst" : undefined}
-        />
+        <IconBurst active={fav}>
+          <IconSwap
+            active={fav}
+            inactive={<Heart size={16} />}
+            activeNode={<Heart size={16} fill="currentColor" />}
+          />
+        </IconBurst>
       </Button>
     </div>
   )

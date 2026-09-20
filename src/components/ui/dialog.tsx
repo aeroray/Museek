@@ -50,7 +50,24 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed inset-0 z-50 m-auto grid h-fit w-full min-w-0 max-w-[calc(100%-2rem)]",
+          // Centred with `top/left: 50%` + translate, NOT `inset-0` + `m-auto`
+          // + `h-fit`.
+          //
+          // `inset-0` pins top AND bottom to 0, so the element's height comes
+          // from `h-fit` alone. If `height: fit-content` does not resolve to the
+          // content height — whatever the reason, and the intrinsic contribution
+          // of a `max-height`-only Radix ScrollArea is the fragile part here —
+          // the used height falls back to `auto`, and with both insets at 0 that
+          // *stretches* to the full containing block: a dialog as tall as the
+          // whole window. macOS reports exactly that while Windows does not,
+          // and there is no platform CSS that could reach this popup (it is
+          // portaled to <body>, and the app's only OS-specific rules style
+          // `.app-shell`).
+          //
+          // `height: auto` + `max-height` needs no intrinsic-sizing keyword, so
+          // every engine agrees: content height, capped to the viewport, centred.
+          // The cap is a backstop only — the ScrollArea below caps far lower.
+          "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100%-2rem)] w-full min-w-0 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2",
           "gap-4 overflow-hidden rounded-2xl bg-popover p-4 text-sm text-popover-foreground outline-none",
           "ring-1 ring-foreground/10 shadow-[var(--shadow-elevated)]",
           "sm:max-w-md",

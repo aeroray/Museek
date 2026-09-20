@@ -16,12 +16,18 @@ async function currentWindow() {
 // macOS uses native traffic lights via titleBarStyle: Overlay — hide these.
 // Close still goes through CloseGuard (onCloseRequested).
 // In tray close-mode, the minimize button also hides to tray (matches the setting label).
+//
+// These three buttons are deliberately static. They are OS chrome, not app
+// controls: a scale or spring here reads as the window itself wobbling, and the
+// rest of the app's icon motion would draw the eye to the least interesting
+// corner of the UI. Only the flat hover color changes, with no transition, so
+// nothing moves. Do not add `icon-button-motion` or a hover transform here.
 export function WindowControls() {
   const t = useT()
   if (!isTauri || isMacOs()) return null
 
   const base =
-    "icon-button-motion relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground"
+    "relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground"
 
   return (
     <div className="flex items-center">

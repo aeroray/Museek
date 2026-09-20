@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import { Play, Plus, Heart, Download, Music, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconBurst, IconSwap } from "@/components/common/IconSwap";
 import { CoverImage } from "@/components/common/CoverImage";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ export const TrackRow = memo(function TrackRow({
   selected = false,
   onToggleSelect,
   stat,
+  statWidth = "w-20",
   showAlbum = true,
   showQuality = true,
   showPlatform = false,
@@ -48,6 +50,15 @@ export const TrackRow = memo(function TrackRow({
   onToggleSelect?: () => void;
   /** Extra trailing figure (play count, relative time). */
   stat?: string;
+  /**
+   * Width of the `stat` column. Must be a fixed width (not `max-w`) so the
+   * column's left edge does not move with the text and shove its neighbours out
+   * of line between rows.
+   *
+   * `w-20` (80px) is measured, not guessed: it fits the widest real value in
+   * either tab — `12/31 20:00` at 74px and `1,234 plays` at 70px.
+   */
+  statWidth?: string;
   showAlbum?: boolean;
   showQuality?: boolean;
   showPlatform?: boolean;
@@ -109,7 +120,7 @@ export const TrackRow = memo(function TrackRow({
               e.stopPropagation();
               play(song);
             }}
-            className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 focus-visible:opacity-100"
           >
             <Play
               size={16}
@@ -134,17 +145,41 @@ export const TrackRow = memo(function TrackRow({
 
       {showQuality && best && <QualityBadge quality={best} />}
 
-      {showPlatform && <PlatformBadge source={song.source} />}
+      {/* `stat` sits before the platform chip, not after the duration, so it
+          reads as a fact about the song rather than as trailing metadata. The
+          name column is `flex-1`, so it absorbs the slack either way: with short
+          titles the empty space lands to the *left* of `stat`, which is where a
+          wide fixed column used to leave an awkward hole.
+          Right-aligned so every value ends at the same x, against the platform
+          chip. The fixed `statWidth` (not `max-w`) is what keeps that x — and
+          therefore the platform and duration columns — identical on every row. */}
+      {stat && (
+        <span
+          className={cn(
+            "text-xs text-muted-foreground shrink-0 tabular-nums truncate text-right",
+            statWidth,
+          )}
+        >
+          {stat}
+        </span>
+      )}
+
+      {/* Platform labels differ in width by language and platform ("酷我" 46px
+          vs "QQ Music" 74px). Because the name column is `flex-1`, every column
+          to its right is anchored from the right edge, so a variable width here
+          shoves the quality and duration of that row sideways relative to its
+          neighbours. A fixed slot with the chip flush right keeps the column
+          edge stable while still letting the chip size to its own label.
+          Width covers the widest real chip ("QQ Music" / "NetEase" at 10px). */}
+      {showPlatform && (
+        <span className="flex w-20 shrink-0 justify-end">
+          <PlatformBadge source={song.source} />
+        </span>
+      )}
 
       <span className="text-xs text-muted-foreground w-14 shrink-0 tabular-nums text-center">
         {song.interval}
       </span>
-
-      {stat && (
-        <span className="text-xs text-muted-foreground shrink-0 tabular-nums max-w-24 truncate text-right">
-          {stat}
-        </span>
-      )}
 
       {!selectable && (
         <div className="flex items-center gap-0.5 shrink-0">
@@ -152,7 +187,7 @@ export const TrackRow = memo(function TrackRow({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
+            className="h-8 w-8 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 icon-hover-plus"
             onClick={(e) => {
               e.stopPropagation();
               addToQueue([song]);
@@ -170,7 +205,9 @@ export const TrackRow = memo(function TrackRow({
                 size="icon"
                 className={cn(
                   "h-8 w-8 icon-hover-heart",
-                  fav ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                  fav
+                    ? "text-red-500 opacity-100 hover:text-red-500"
+                    : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -180,13 +217,13 @@ export const TrackRow = memo(function TrackRow({
                 }}
                 title={t(fav ? "common.unfavorite" : "common.favorite")}
               >
-                <Heart
-                  key={fav ? "on" : "off"}
-                  size={14}
-                  className={cn(
-                    fav && "fill-red-500 text-red-500 icon-heart-burst",
-                  )}
-                />
+                <IconBurst active={fav}>
+                  <IconSwap
+                    active={fav}
+                    inactive={<Heart size={14} />}
+                    activeNode={<Heart size={14} fill="currentColor" />}
+                  />
+                </IconBurst>
               </Button>
 
               <DropdownMenu>
@@ -195,7 +232,7 @@ export const TrackRow = memo(function TrackRow({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
                     onClick={(e) => e.stopPropagation()}
                     title={t("common.download")}
                   >

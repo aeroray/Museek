@@ -8,6 +8,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/common/IconSwap";
 import { WindowControls } from "./WindowControls";
 import { WarmWelcome } from "@/components/search/SearchWelcome";
 import { useUiStore } from "@/stores/uiStore";
@@ -132,13 +133,11 @@ export function TopBar() {
         onClick={toggleSidebar}
         title={sidebarCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
       >
-        <span key={sidebarCollapsed ? "open" : "close"} className="icon-pop-in">
-          {sidebarCollapsed ? (
-            <PanelLeftOpen size={16} />
-          ) : (
-            <PanelLeftClose size={16} />
-          )}
-        </span>
+        <IconSwap
+          active={sidebarCollapsed}
+          inactive={<PanelLeftClose size={16} />}
+          activeNode={<PanelLeftOpen size={16} />}
+        />
       </Button>
 
       <Button
@@ -148,16 +147,11 @@ export function TopBar() {
         onClick={toggleTopBarLyrics}
         title={topBarLyrics ? t("topBar.lyricsHide") : t("topBar.lyricsShow")}
       >
-        <span
-          key={topBarLyrics ? "on" : "off"}
-          className="icon-pop-in inline-flex"
-        >
-          {topBarLyrics ? (
-            <Eye size={18} strokeWidth={2} />
-          ) : (
-            <EyeClosed size={18} strokeWidth={2} />
-          )}
-        </span>
+        <IconSwap
+          active={topBarLyrics}
+          inactive={<EyeClosed size={18} strokeWidth={2} />}
+          activeNode={<Eye size={18} strokeWidth={2} />}
+        />
       </Button>
 
       <TopBarLyrics />

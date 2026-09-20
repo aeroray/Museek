@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip"
 import { Slider } from "@/components/ui/slider"
+import { NO_MOTION, SPRING_MORPH } from "@/lib/motion"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useT } from "@/lib/i18n"
 
@@ -23,9 +24,9 @@ const OUTER_WAVE: Record<VolumeLevel, string> = {
 
 function MorphingVolumeIcon({ level }: { level: VolumeLevel }) {
   const reduceMotion = useReducedMotion()
-  const transition = reduceMotion
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 180, damping: 20, mass: 1 }
+  // Same preset as the play/pause path morph: the two are the app's only
+  // shape morphs and should settle identically.
+  const transition = reduceMotion ? NO_MOTION : SPRING_MORPH
 
   return (
     <motion.svg
@@ -69,7 +70,12 @@ export function VolumeControl() {
         label={t(muted ? "player.unmute" : "player.mute")}
         action="mute"
       >
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setMuted(!muted)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 icon-hover-volume"
+          onClick={() => setMuted(!muted)}
+        >
           <MorphingVolumeIcon level={level} />
         </Button>
       </ShortcutTooltip>

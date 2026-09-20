@@ -33,16 +33,39 @@ export async function readData<T>(filename: string, fallback: T): Promise<T> {
 }
 
 export async function writeData<T>(filename: string, data: T): Promise<void> {
+  return writeDataWith(filename, data, true)
+}
+
+/**
+ * Same as `writeData` but without indentation.
+ *
+ * Use for append-mostly logs where a human never reads the file: pretty-printing
+ * roughly doubles the bytes on disk for no benefit, and the listen log holds
+ * thousands of song snapshots.
+ */
+export async function writeDataCompact<T>(
+  filename: string,
+  data: T,
+): Promise<void> {
+  return writeDataWith(filename, data, false)
+}
+
+async function writeDataWith<T>(
+  filename: string,
+  data: T,
+  pretty: boolean,
+): Promise<void> {
+  const text = pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data)
   if (!isTauri) {
     try {
-      localStorage.setItem(`${BASE}/${filename}`, JSON.stringify(data))
+      localStorage.setItem(`${BASE}/${filename}`, text)
     } catch {
       // ignore quota / serialization errors in the preview
     }
     return
   }
   await ensureDir()
-  await writeTextFile(`${BASE}/${filename}`, JSON.stringify(data, null, 2), {
+  await writeTextFile(`${BASE}/${filename}`, text, {
     baseDir: BaseDirectory.AppData,
   })
 }

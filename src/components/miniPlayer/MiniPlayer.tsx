@@ -14,6 +14,7 @@ import {
   ListOrdered,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IconBurst, IconCycle, IconSwap } from "@/components/common/IconSwap";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShortcutTooltip } from "@/components/ui/shortcut-tooltip";
 import { PlayPauseButton } from "@/components/player/PlayPauseButton";
@@ -32,19 +33,18 @@ import { cn } from "@/lib/utils";
 const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-function ModeIcon({ playMode }: { playMode: string }) {
-  const common = { size: 14 as const };
-  if (playMode === "repeat-one") return <Repeat1 {...common} />;
-  if (playMode === "shuffle") return <Shuffle {...common} />;
-  if (playMode === "repeat-list") return <Repeat {...common} />;
-  return <ListOrdered {...common} />;
+function ModeGlyph({ playMode, size }: { playMode: string; size: number }) {
+  if (playMode === "repeat-one") return <Repeat1 size={size} />
+  if (playMode === "shuffle") return <Shuffle size={size} />
+  if (playMode === "repeat-list") return <Repeat size={size} />
+  return <ListOrdered size={size} />
 }
 
 function modeHoverClass(playMode: string) {
-  if (playMode === "shuffle") return "icon-hover-shuffle";
+  if (playMode === "shuffle") return "icon-hover-shuffle"
   if (playMode === "repeat-one" || playMode === "repeat-list")
-    return "icon-hover-repeat";
-  return "icon-hover-list";
+    return "icon-hover-repeat"
+  return "icon-hover-list"
 }
 
 /**
@@ -309,9 +309,10 @@ export function MiniPlayer() {
             title={t(`playMode.${playMode}`)}
             onClick={cyclePlayMode}
           >
-            <span key={playMode} className="icon-pop-in">
-              <ModeIcon playMode={playMode} />
-            </span>
+            <IconCycle
+              value={playMode}
+              render={(mode) => <ModeGlyph playMode={mode} size={14} />}
+            />
           </Button>
           <ShortcutTooltip label={t("player.prev")} action="prev">
             <Button
@@ -366,12 +367,13 @@ export function MiniPlayer() {
             disabled={!currentSong || isLocal}
             title={isLocal ? t("local.favoriteDisabled") : t("common.favorite")}
           >
-            <Heart
-              key={fav ? "on" : "off"}
-              size={14}
-              fill={fav ? "currentColor" : "none"}
-              className={fav ? "icon-heart-burst" : undefined}
-            />
+            <IconBurst active={fav}>
+              <IconSwap
+                active={fav}
+                inactive={<Heart size={14} />}
+                activeNode={<Heart size={14} fill="currentColor" />}
+              />
+            </IconBurst>
           </Button>
         </div>
 

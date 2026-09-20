@@ -214,6 +214,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "listening.topSongsEmpty": "还没有达到统计次数的播放（听满 30 秒才计入排行）。",
     "listening.topArtistsEmpty": "还没有达到统计次数的歌手。",
     "listening.recentEmpty": "这段时间没有播放记录。",
+    "listening.recentLimit": "仅保留最近 {count} 首，更早的记录会自动清理。",
     "listening.playCount": "{count} 次",
     "listening.minutes": "{count} 分钟",
     "listening.seconds": "{count} 秒",
@@ -221,8 +222,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "listening.hoursMinutes": "{hours} 小时 {minutes} 分钟",
     "listening.justNow": "刚刚",
     "listening.minutesAgo": "{count} 分钟前",
+    "listening.hoursAgo": "{count} 小时前",
     "listening.yesterdayAt": "昨天 {time}",
+    "listening.dayBeforeYesterdayAt": "前天 {time}",
     "listening.dateAt": "{date} {time}",
+    "listening.dateOnly": "{date}",
 
     // Favorites
     "favorites.title": "我的收藏",
@@ -968,6 +972,7 @@ const dict: Record<Lang, Record<string, string>> = {
       "No ranked plays yet (a play counts after 30 seconds).",
     "listening.topArtistsEmpty": "No ranked artists yet.",
     "listening.recentEmpty": "Nothing played in this period.",
+    "listening.recentLimit": "Keeps the latest {count} songs; older plays are cleared automatically.",
     "listening.playCount": "{count} plays",
     "listening.minutes": "{count} min",
     "listening.seconds": "{count} sec",
@@ -975,8 +980,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "listening.hoursMinutes": "{hours} hr {minutes} min",
     "listening.justNow": "Just now",
     "listening.minutesAgo": "{count} min ago",
+    "listening.hoursAgo": "{count} hr ago",
     "listening.yesterdayAt": "Yesterday {time}",
+    "listening.dayBeforeYesterdayAt": "2 days ago {time}",
     "listening.dateAt": "{date} {time}",
+    "listening.dateOnly": "{date}",
 
     // Favorites
     "favorites.title": "Favorites",

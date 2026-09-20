@@ -2,6 +2,7 @@ import { Sun, Moon, Monitor, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
+import { IconSwap } from "@/components/common/IconSwap"
 import { FontFamilyPicker } from "@/components/settings/FontFamilyPicker"
 import { useThemeStore, PALETTES, type ThemeMode } from "@/stores/themeStore"
 import { useFontStore } from "@/stores/fontStore"
@@ -94,7 +95,21 @@ export function ThemeSettings() {
                       )}
                       style={{ backgroundColor: p.color }}
                     >
-                      {active && <Check size={15} className="text-white drop-shadow icon-pop-in" strokeWidth={2.5} />}
+                      {/* The check swaps in rather than mounting, so leaving one
+                          palette for another bridges both glyphs instead of
+                          blinking the old one out. The resting state reserves
+                          the same box so the swatch never resizes. */}
+                      <IconSwap
+                        active={active}
+                        inactive={<span className="size-[15px]" />}
+                        activeNode={
+                          <Check
+                            size={15}
+                            className="text-white drop-shadow"
+                            strokeWidth={2.5}
+                          />
+                        }
+                      />
                     </span>
                     <span className={cn("text-xs", active ? "text-foreground font-medium" : "text-muted-foreground")}>
                       {t(`palette.${p.id}`)}
