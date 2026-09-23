@@ -9,6 +9,8 @@ import {
   applyAudioSource,
   beginPlayGeneration,
   findBestCachedSrc,
+  findCachedAtOrBelow,
+  findCachedExactQuality,
   findCachedMeetingPreferred,
   findCachedPlayableSrc,
   isPlayGenerationCurrent,
@@ -34,10 +36,12 @@ import { useListeningStore } from "@/stores/listeningStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { t } from "@/lib/i18n";
 import { formatRemotePlayError, isIgnorablePlayError } from "@/lib/playError";
+import { isRedundantPlayRequest } from "@/lib/playRequest";
 import {
-  isRedundantPlayRequest,
-  shouldUpgradeOnResume,
-} from "@/lib/playRequest";
+  nextQualityOverride,
+  resolveTargetQuality,
+  resumeResolveQuality,
+} from "@/lib/songQuality";
 import type { MusicInfo, LyricLine, Quality } from "@/types/music";
 import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player";
 
@@ -213,6 +217,12 @@ interface PlayerState {
     opts?: { force?: boolean },
   ) => Promise<void>;
   playFromQueue: (index: number) => Promise<void>;
+  /**
+   * Set the quality for one track only, overriding the global default for this
+   * play session and persisting with the queue. Passing the current default
+   * clears the override, so the track follows the default like any other.
+   */
+  setSongQuality: (quality: Quality) => Promise<void>;
   addToQueue: (songs: MusicInfo[]) => void;
   playAll: (songs: MusicInfo[]) => void;
   clearQueue: () => void;
@@ -294,11 +304,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     async play(song, quality, opts) {
       if (restoreSourcePromise) await restoreSourcePromise;
       if (song.id !== sessionResumeSongId) clearResume();
-      const preferred = quality ?? useSettingsStore.getState().playQuality;
       const isLocal = song.source === "local";
       // A deliberate reload of the already-attached track (quality switch) must
       // not be mistaken for a redundant request — see isRedundantPlayRequest.
       const force = opts?.force ?? false;
+      const existing = get().queue.find((item) => item.music.id === song.id);
+      // A per-song choice is a standing instruction, so it outranks the target
+      // stamped on the queue item when it was enqueued.
+      const preferred =
+        existing?.qualityOverride ??
+        quality ??
+        useSettingsStore.getState().playQuality;
+      const hasOverride = Boolean(existing?.qualityOverride);
 
       // No source loaded → can't resolve a playback URL. Prompt to import instead
       // of silently failing. Local files play from disk and need no lx source.
@@ -445,15 +462,25 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
         const settings = useSettingsStore.getState();
 
-        const meeting = await findCachedMeetingPreferred(
-          song,
-          preferred,
-          settings.audioCache,
-        );
+        // An explicit per-song choice means exactly that tier, so the cached
+        // copy must match it rather than be "at least as good" — otherwise
+        // picking 128K while a FLAC is cached plays the FLAC and the badge
+        // shows FLAC, making the switch look broken.
+        const meeting = hasOverride
+          ? await findCachedExactQuality(song, preferred, settings.audioCache)
+          : await findCachedMeetingPreferred(
+              song,
+              preferred,
+              settings.audioCache,
+            );
         if (!isPlayGenerationCurrent(gen)) return;
+        // The fallback must also not exceed an explicit choice: silently playing
+        // a better tier would undo the very thing the user asked for.
         const lower = meeting
           ? null
-          : await findBestCachedSrc(song, settings.audioCache);
+          : hasOverride
+            ? await findCachedAtOrBelow(song, preferred, settings.audioCache)
+            : await findBestCachedSrc(song, settings.audioCache);
         if (!isPlayGenerationCurrent(gen)) return;
 
         let src: string;
@@ -616,6 +643,40 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       get()._loadPic(song);
     },
 
+    async setSongQuality(quality) {
+      const song = get().currentSong;
+      if (!song || song.source === "local") return;
+      const defaultQuality = useSettingsStore.getState().playQuality;
+      // Normalise at the moment of the choice: picking the default means "no
+      // override", so the track behaves like every other song — including
+      // following the default if the user changes it later.
+      const override = nextQualityOverride(quality, defaultQuality);
+
+      set((s) => {
+        const queue = s.queue.map((item) =>
+          item.music.id === song.id
+            ? { ...item, qualityOverride: override }
+            : item,
+        );
+        return { queue };
+      });
+
+      // Re-resolving re-attaches the source, which always starts playback. A
+      // quality change must not resume a track the user had paused, so remember
+      // the transport state and restore it afterwards.
+      const wasPlaying = get().isPlaying;
+      const target = override ?? defaultQuality;
+      const needsReload = get().currentQuality !== target;
+      if (needsReload) await get().play(song, target, { force: true });
+
+      if (!wasPlaying && get().isPlaying) {
+        audioPlayer.pause();
+        persistPlaybackSession(true);
+      } else {
+        persistPlaybackSession(true);
+      }
+    },
+
     async playFromQueue(index) {
       const item = get().queue[index];
       if (!item) return;
@@ -748,21 +809,28 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         try {
           if (restoreSourcePromise) await restoreSourcePromise;
           const song = get().currentSong;
-          const preferred = useSettingsStore.getState().playQuality;
-          if (
-            song &&
-            shouldUpgradeOnResume({
-              meetsPreferred: qualityMeets(get().currentQuality, preferred),
-              isLocal: song.source === "local",
-              upgradeSkipped: !shouldAttemptQualityUpgrade(song, preferred),
-            })
-          ) {
+          const defaultQuality = useSettingsStore.getState().playQuality;
+          const override = get().queue.find(
+            (item) => item.music.id === song?.id,
+          )?.qualityOverride;
+          const target = resolveTargetQuality(override, defaultQuality);
+          const resolveAt = song
+            ? resumeResolveQuality({
+                override,
+                target,
+                currentQuality: get().currentQuality,
+                meetsTarget: qualityMeets(get().currentQuality, target),
+                isLocal: song.source === "local",
+                upgradeSkipped: !shouldAttemptQualityUpgrade(song, target),
+              })
+            : null;
+          if (song && resolveAt) {
             // `force` is required: the track is already attached, so without it
             // `play()` short-circuits on the same-song check. `playPending` is
             // set above, which the short-circuit also treats as "busy", so the
             // request was dropped and every later press repeated it — playback
             // could never resume after a quality change.
-            await get().play(song, preferred, { force: true });
+            await get().play(song, resolveAt, { force: true });
             return;
           }
           if (audioPlayer.hasSource()) {
@@ -770,7 +838,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
             await playWithTimeout();
             return;
           }
-          if (song) await get().play(song, preferred);
+          // No source attached yet (nothing was restored): load at the target.
+          if (song) await get().play(song, target);
         } catch (err) {
           if (get().status === "loading") return;
           if (isIgnorablePlayError(err)) return;
@@ -919,11 +988,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           }
 
           const settings = useSettingsStore.getState();
-          const cached = await findCachedPlayableSrc(
-            song,
-            get().currentQuality,
-            settings.audioCache,
-          );
+          const restoreOverride = get().queue.find(
+            (item) => item.music.id === song.id,
+          )?.qualityOverride;
+          // With an explicit per-song choice, restore must not pick a tier above
+          // it — `findCachedPlayableSrc` prefers the best copy overall, which
+          // would silently undo a deliberate downgrade before the user even
+          // presses play. Below the choice is still allowed so startup is never
+          // blocked; the resume path re-resolves upward if it can.
+          const cached = restoreOverride
+            ? await findCachedAtOrBelow(song, restoreOverride, settings.audioCache)
+            : await findCachedPlayableSrc(
+                song,
+                get().currentQuality,
+                settings.audioCache,
+              );
           if (get().currentSong?.id !== song.id) return;
           if (!cached) {
             holdRestoredClock = true;

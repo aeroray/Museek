@@ -110,6 +110,49 @@ export async function findCachedMeetingPreferred(
   return null
 }
 
+/**
+ * The cached copy for an exact tier, for a quality the user chose deliberately
+ * for one song.
+ *
+ * Deliberately not `findCachedMeetingPreferred`: that walks the ladder from the
+ * BEST tier down, which is right for the global default (a cached FLAC should
+ * satisfy a 320k preference) but wrong for an explicit choice — picking 128K
+ * while a FLAC sits on disk would play the FLAC and show FLAC on the badge, so
+ * the switch would look broken. An explicit choice means exactly that tier.
+ */
+export async function findCachedExactQuality(
+  song: MusicInfo,
+  quality: Quality,
+  audioCache: boolean,
+): Promise<CachedSrc | null> {
+  if (!isTauri || !audioCache) return null
+  return cachedUrl(song, quality)
+}
+
+/**
+ * Best cached copy that is NOT better than `ceiling`, used as a fallback for an
+ * explicit per-song choice.
+ *
+ * `findBestCachedSrc` returns the best copy overall, which for an explicit
+ * downgrade can be a HIGHER tier — the one thing the user just opted out of.
+ * Capping at the chosen tier keeps a network failure from silently undoing the
+ * choice, while still playing something rather than nothing.
+ */
+export async function findCachedAtOrBelow(
+  song: MusicInfo,
+  ceiling: Quality,
+  audioCache: boolean,
+): Promise<CachedSrc | null> {
+  if (!isTauri || !audioCache) return null
+  const limit = QUALITY_LADDER.indexOf(ceiling)
+  if (limit < 0) return null
+  for (const quality of QUALITY_LADDER.slice(limit)) {
+    const hit = await cachedUrl(song, quality)
+    if (hit) return hit
+  }
+  return null
+}
+
 /** Best cached copy of this song, including tiers below the current setting. */
 export async function findBestCachedSrc(
   song: MusicInfo,

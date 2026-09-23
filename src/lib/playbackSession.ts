@@ -54,6 +54,13 @@ function isQueueItem(v: unknown): v is QueueItem {
   ) {
     return false;
   }
+  if (
+    v.qualityOverride !== undefined &&
+    (typeof v.qualityOverride !== "string" ||
+      !QUALITIES.includes(v.qualityOverride as Quality))
+  ) {
+    return false;
+  }
   return true;
 }
 

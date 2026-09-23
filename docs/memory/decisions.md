@@ -6,6 +6,14 @@ Decision:
 Reason:
 Every platform adapter joins artists with `、` (`formatSingers`), so it is the one separator guaranteed by the data contract. `/` and `&` are deliberately not separators — they occur inside real names (AC/DC, Simon & Garfunkel) and splitting them would invent artists. The per-credit-string keying made collabs rank separately from the same artist's solo work, so a listener's real top artist could be buried under fragmented rows. Dropping the song cover is honest: an artist has no artwork of its own, and a borrowed track cover changes depending on which song played last.
 
+## 2026-09-24 - A per-song quality choice normalises to "no choice"
+
+Decision:
+`QueueItem.qualityOverride` holds a quality chosen for one track only; absent means "follow the global default". `nextQualityOverride(picked, defaultQuality)` returns `undefined` when the pick equals the current default, so setting a track back to the default makes it an ordinary song again. The player-bar badge opens a `SongQualityMenu` offering exactly `QUALITY_LADDER`. Local files show a plain badge (their quality is a property of the file). An explicit choice uses `findCachedExactQuality` plus `findCachedAtOrBelow`, never the "best copy" helpers. All of this lives in `src/lib/songQuality.ts` / `src/lib/playback.ts`.
+
+Reason:
+Normalising must happen when the user makes the choice, not when playback reads it. A stored override outlives a later change to the default: a track set back to 320k would stay pinned to 320k after the user switched their default to FLAC, behaving unlike every other song — the exact thing "treat it as never touched" is meant to prevent. The cache rule is the other half: `findCachedMeetingPreferred` walks the ladder from the BEST tier down, which is right for the default (a cached FLAC satisfies a 320k preference) but wrong for an explicit choice — picking 128K while a FLAC sits on disk would play the FLAC and show FLAC on the badge, so the switch would look broken. `resumeResolveQuality` handles the asymmetry on resume: without an override only a shortfall is worth a round trip, but an override must be able to move playback *down*, which the upgrade ladder cannot express. 192k/256k are excluded because they are local display tiers absent from `QUALITY_LADDER`, so offering them yields an empty candidate list.
+
 ## 2026-09-24 - A forced play request is never redundant
 
 Decision:

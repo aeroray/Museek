@@ -152,7 +152,14 @@ export function PlayQueue() {
                               {item.music.singer}
                             </p>
                             <QualityBadge
-                              quality={item.playedQuality ?? item.quality}
+                              quality={
+                                // A per-song choice outranks the tier stamped at
+                                // enqueue time; playedQuality still wins, since
+                                // it records what a source really delivered.
+                                item.playedQuality ??
+                                item.qualityOverride ??
+                                item.quality
+                              }
                             />
                           </div>
                         </div>

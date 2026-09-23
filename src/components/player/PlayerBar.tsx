@@ -25,9 +25,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   PlatformBadge,
-  QualityBadge,
   PLATFORM_BRAND,
 } from "@/components/common/MetaBadges";
+import { SongQualityMenu } from "./SongQualityMenu";
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs";
 import { DownloadSongButton } from "@/components/common/DownloadSongButton";
 import { enterMiniPlayer } from "@/lib/miniPlayer";
@@ -41,7 +41,6 @@ import type { OnlineSource } from "@/types/music";
 export function PlayerBar() {
   const {
     currentSong,
-    currentQuality,
     currentPicUrl,
     queue,
     showQueue,
@@ -149,7 +148,7 @@ export function PlayerBar() {
                 >
                   {currentSong.singer}
                 </p>
-                <QualityBadge quality={currentQuality} />
+                <SongQualityMenu />
               </div>
             </div>
           ) : (

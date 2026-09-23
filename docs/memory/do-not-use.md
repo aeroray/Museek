@@ -36,6 +36,10 @@ Do not let the resume-time upgrade in `togglePlay` override a quality the user c
 
 Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
 
+## Storing a per-song override that equals the default
+
+Do not persist a per-song quality that happens to equal the current default, and do not defer that comparison to read time. A stored override outlives a later change to the default, so a track set back to 320k would stay pinned to 320k after the user switched their default to FLAC — unlike every other song. Normalise at the moment of the choice (`nextQualityOverride`) so "set it back to the default" means "never touched".
+
 ## Outset focus ring on Input
 
 Do not give `Input` an outset focus ring (`focus-visible:ring-offset-2` with a non-inset ring). It overhangs 4px on every side and gets clipped by the fixed-height `overflow-hidden` toolbars that host the search boxes. Use `ring-2 ring-inset`.

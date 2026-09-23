@@ -12,25 +12,6 @@
 import type { PlayerStatus } from "@/types/player";
 
 /**
- * Should pressing play re-resolve the current track at a better quality?
- *
- * Local files have no tier to choose — their quality is a property of the file,
- * so they are never re-resolved. `upgradeSkipped` mirrors
- * `shouldAttemptQualityUpgrade`: once a source has under-delivered we stop
- * retrying until the enabled source list changes.
- */
-export function shouldUpgradeOnResume(opts: {
-  /** `qualityMeets(currentQuality, preferred)` — the caller owns the ladder. */
-  meetsPreferred: boolean;
-  isLocal: boolean;
-  upgradeSkipped: boolean;
-}): boolean {
-  if (opts.isLocal) return false;
-  if (opts.meetsPreferred) return false;
-  return !opts.upgradeSkipped;
-}
-
-/**
  * Can `play()` return immediately because the requested song is already loaded?
  *
  * `force` always wins, and that escape hatch is load-bearing. A caller that
