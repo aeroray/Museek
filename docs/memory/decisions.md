@@ -6,7 +6,31 @@ Decision:
 Reason:
 Every platform adapter joins artists with `、` (`formatSingers`), so it is the one separator guaranteed by the data contract. `/` and `&` are deliberately not separators — they occur inside real names (AC/DC, Simon & Garfunkel) and splitting them would invent artists. The per-credit-string keying made collabs rank separately from the same artist's solo work, so a listener's real top artist could be buried under fragmented rows. Dropping the song cover is honest: an artist has no artwork of its own, and a borrowed track cover changes depending on which song played last.
 
-## 2026-09-14 - DialogContent centres by translate, not inset + margin auto
+## 2026-09-23 - Classify playback errors in one pure module
+
+Decision:
+Playback-error copy lives in `src/lib/playError.ts` (`formatRemotePlayError`, `isIgnorablePlayError`) and takes the translator as an argument. `playerStore` imports it instead of keeping private copies. `Audio request failed (NNN)` is classified by status: 401/403/404/410/451 → `player.err.urlExpired`, 429 → `player.err.rateLimited`, 5xx → `player.err.network`, anything else → `player.err.invalidAudio`. Already-localized copy passes through unchanged so a second format pass is a no-op.
+
+Reason:
+`fetchWebAudio` in `lib/audio.ts` threw `Audio request failed (403)`, which matched none of the existing patterns, so it fell through to `player.failedDetail` and users saw raw English inside a localized string: `播放失败：Audio request failed (403)`. The status also carries the actionable advice — a 403/404 almost always means the resolved play URL expired and a refresh is needed, which is different from "switch sources". Passing `t` in keeps the module pure so `scripts/check-play-error.mjs` can verify the mapping without a browser. Idempotence matters because `_handleError` may format a message a previous layer already formatted; without the pass-through the network case rendered as `播放失败：网络连接失败，请检查网络或换音源`.
+
+## 2026-09-23 - One owner per playback failure, and retries must re-fetch
+
+Decision:
+`AudioPlayer` reports a failure through exactly one channel. The HTML element uses `onError` (DOM events, no promise). The Web Audio path reports *only* by rejecting the `whenReady()`/`play()` promise, which `playerStore` awaits; `ensureWebBuffer` no longer calls `onError` and now clears its `loadPromise`/`loadAbort` on failure. `setSource(url)` re-applies an identical URL when the element is in an error state instead of returning early.
+
+Reason:
+Both bugs were invisible until the real module was driven in a browser (`scripts/check-audio-harness.mjs`, both backends). (1) `ensureWebBuffer`'s catch called `onError` *and* rejected the promise, so `playerStore` handled one failure twice: `_handleError` ran `listenFinish(false)` and closed the listening session before `play()` could retry — writing a bogus near-zero-length entry into the user's history for a track that then played fine. (2) The rejected promise was retained forever, so a retry reusing a byte-identical URL (a CDN url with no timestamp, or a cached response) replayed the settled rejection and **no second request ever left the app** — the same error appeared twice. The same defect existed on the HTML path via the early return in `setSource`. Fixing only the Web Audio path would have left macOS/Linux broken, which is why the harness asserts both.
+
+## 2026-09-23 - Shrink desktop lyrics to fit the window instead of overflowing
+
+Decision:
+The desktop lyrics line shrinks (`FIT_MIN_SCALE` 0.4, `FIT_GUTTER` 20px) so its capsule always fits inside the native window. `src/lib/desktopLyricsFit.ts` computes the scale as a closed form: `(viewportWidth - gutters) / ((contentWidth + padding*2) / appliedFit)`. The scale multiplies font size *and* capsule padding together.
+
+Reason:
+The lyrics window is sized to the monitor's **physical** width, so the CSS viewport is `physicalWidth / scaleFactor` logical pixels, while lyric text is laid out in logical pixels at a size that does not change with display scaling. Raising the OS scale factor therefore shrinks the available width while the text stays the same size. The capsule is centred, and a centred flex item wider than its container overflows both edges equally — the native window hard-clips it, so the rounded left and right ends disappear and the capsule reads as a rectangle. This supersedes "Preserve intrinsic width for long desktop lyrics" (letting lines overflow the screen is not viable when the OS clips them) while keeping the single-line, no-wrap presentation that decision protected. Measured: capsule width is linear in the applied scale to within 0.003% over a 40% range, so one pass converges — the effect re-runs on `fitScale`, and the returned scale is a fixed point, which is what stops it looping.
+
+## 2026-09-23 - DialogContent centres by translate, not inset + margin auto
 
 Decision:
 `DialogContent` is positioned `fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100%-2rem)]` with `height: auto`.

@@ -33,6 +33,7 @@ import { useLocalMusicStore } from "@/stores/localMusicStore";
 import { useListeningStore } from "@/stores/listeningStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { t } from "@/lib/i18n";
+import { formatRemotePlayError, isIgnorablePlayError } from "@/lib/playError";
 import type { MusicInfo, LyricLine, Quality } from "@/types/music";
 import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player";
 
@@ -168,49 +169,6 @@ function playWithTimeout(): Promise<void> {
       },
     );
   });
-}
-
-function isIgnorablePlayError(err: unknown): boolean {
-  const name = err instanceof Error ? err.name : "";
-  const raw = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  if (name === "AbortError") return true;
-  return (
-    raw.includes("the operation was aborted") ||
-    raw.includes("signal is aborted") ||
-    raw.includes("request canceled") ||
-    raw.includes("request cancelled") ||
-    raw.includes("audio source changed")
-  );
-}
-
-/** Map engine/DOM exceptions so the toast is readable, not a WebView string. */
-function formatRemotePlayError(raw: string): string {
-  if (isIgnorablePlayError(raw)) {
-    return raw;
-  }
-  if (
-    raw === t("player.err.playTimeout") ||
-    raw === t("player.err.invalidAudio") ||
-    raw === t("player.err.unknown")
-  ) {
-    return raw;
-  }
-  if (
-    /sending request|trying to connect|dns|resolve|tls|handshake|timed out|timeout|connection/i.test(
-      raw,
-    )
-  ) {
-    return t("player.err.network", { msg: raw });
-  }
-  // HTMLAudio / Web Audio NotSupportedError, decode failures, empty bodies.
-  if (
-    /not supported|unable to decode|encodingerror|no supported source|media_element_error|format error|empty audio/i.test(
-      raw,
-    )
-  ) {
-    return t("player.err.invalidAudio");
-  }
-  return t("player.failedDetail", { msg: raw });
 }
 
 interface PlayerState {
@@ -604,7 +562,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         }
         urlRetryFor = "";
         const isTimeout = raw === t("player.err.playTimeout");
-        const message = isTimeout ? raw : formatRemotePlayError(raw);
+        const message = isTimeout ? raw : formatRemotePlayError(raw, t);
         audioPlayer.stop();
         revokeCurrentObjectUrl();
         lastMediaPlaying = false;
@@ -780,6 +738,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           get()._handleError(
             formatRemotePlayError(
               (err as Error).message || t("player.err.unknown"),
+              t,
             ),
           );
         } finally {
@@ -1030,7 +989,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       listenFinish(true);
       if (playMode === "repeat-one") {
         audioPlayer.seek(0);
-        audioPlayer.play();
+        // The buffer/element is already loaded (the track just finished), so this
+        // rarely rejects — but the Web Audio path now reports load failures only
+        // through this promise, so keep a channel open instead of leaving it
+        // unhandled.
+        audioPlayer.play().catch((err) => {
+          get()._handleError((err as Error).message || t("player.err.unknown"));
+        });
         const song = get().currentSong;
         if (song) listenSetPlaying(true, song);
         return;
@@ -1079,7 +1044,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       lastMediaPlaying = false;
       set({
         status: "error",
-        error: formatRemotePlayError(msg),
+        error: formatRemotePlayError(msg, t),
         isPlaying: false,
         playPending: false,
         sourceReady: false,

@@ -1,4 +1,9 @@
 import { cdnFetchStrategies } from "@/lib/cdnHeaders";
+import { describeMediaError } from "@/lib/playError";
+import {
+  looksLikeNonAudioBytes,
+  maybeGunzipAudio,
+} from "@/lib/audioBytes";
 import { httpFetch } from "@/lib/http";
 import type { PlayerStatus } from "@/types/player";
 
@@ -125,7 +130,12 @@ class AudioPlayer {
     audio.addEventListener("error", () => {
       if (!htmlActive()) return;
       this.stopSmoothClock();
-      this.onError?.(audio.error?.message ?? "Playback error");
+      // Classify by `MediaError.code` rather than `message`: a plain 404 was
+      // measured to produce `message === ""`, which rendered the toast as
+      // `播放失败：` with nothing after it, and when a message *is* present it is
+      // English engine prose that would leak into a localized UI.
+      const message = describeMediaError(audio.error?.code, audio.error?.message);
+      if (message) this.onError?.(message);
     });
   }
 
@@ -381,9 +391,33 @@ class AudioPlayer {
     signal: AbortSignal,
   ): Promise<AudioBuffer> {
     const response = await this.fetchWebAudio(url, signal);
-    const bytes = await response.arrayBuffer();
+    const raw = new Uint8Array(await response.arrayBuffer());
+    if (!raw.byteLength) throw new Error("Empty audio response");
+
+    // Parity with the cache/download paths (see `lib/playback.ts`): Tauri's HTTP
+    // plugin can hand back a still-gzipped body, and `decodeAudioData` then fails
+    // with a bare "Unable to decode audio data" that says nothing about the cause.
+    const bytes = maybeGunzipAudio(raw);
     if (!bytes.byteLength) throw new Error("Empty audio response");
-    return this.getWebContext().decodeAudioData(bytes);
+
+    // A 200 whose body is an HTML/JSON error page (hotlink block, geo notice,
+    // VIP stub) otherwise reaches `decodeAudioData` and surfaces as a generic
+    // decode failure. Naming it lets `formatRemotePlayError` give real advice.
+    if (looksLikeNonAudioBytes(bytes)) {
+      throw new Error(`Audio request failed (${response.status})`);
+    }
+
+    // `decodeAudioData` needs an ArrayBuffer and detaches what it is given, so
+    // hand over the underlying buffer directly when the view already spans it
+    // (the common case) instead of copying a whole track.
+    const body =
+      bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+        ? (bytes.buffer as ArrayBuffer)
+        : (bytes.buffer.slice(
+            bytes.byteOffset,
+            bytes.byteOffset + bytes.byteLength,
+          ) as ArrayBuffer);
+    return this.getWebContext().decodeAudioData(body);
   }
 
   private ensureWebBuffer(): Promise<AudioBuffer> {
@@ -393,7 +427,7 @@ class AudioPlayer {
     const version = this.sourceVersion;
     const abort = new AbortController();
     this.loadAbort = abort;
-    this.loadPromise = this.decodeWebAudio(this.sourceUrl, abort.signal)
+    const loadPromise = this.decodeWebAudio(this.sourceUrl, abort.signal)
       .then((buffer) => {
         if (version !== this.sourceVersion) {
           throw new Error("Audio source changed");
@@ -408,11 +442,31 @@ class AudioPlayer {
         if (version === this.sourceVersion && !abort.signal.aborted) {
           this.webStatus = "error";
           this.notifyWebState();
-          this.onError?.((error as Error).message || "Playback error");
+          // Deliberately no `onError` here. A failed decode is delivered through
+          // this promise to whoever awaits `whenReady()`/`play()`, and that
+          // caller owns the retry: `playerStore.play()` invalidates the expired
+          // URL and plays again. Reporting from here as well made the store treat
+          // the failure as final *before* the retry — it ran `listenFinish()`,
+          // closing the listening session and appending a bogus near-zero-length
+          // entry to the user's history for a track that then played fine.
+          // `onError` remains the channel for the HTML element, whose failures
+          // arrive as DOM events with no promise to reject.
+        }
+        // Drop the rejected promise so a retry actually re-fetches. Without this,
+        // `ensureWebBuffer` handed back the *settled rejection* forever whenever
+        // the retry reused a byte-identical URL — which happens for a CDN url
+        // with no timestamp, or when the source returns a cached one. The retry
+        // replayed the same error and no second request ever left the app.
+        // Guarded by identity so a newer load that already replaced this entry
+        // (via `setSource`) is not clobbered.
+        if (this.loadPromise === loadPromise) {
+          this.loadPromise = null;
+          this.loadAbort = null;
         }
         throw error;
       });
-    return this.loadPromise;
+    this.loadPromise = loadPromise;
+    return loadPromise;
   }
 
   private notifyWebState() {
@@ -505,7 +559,15 @@ class AudioPlayer {
         return;
       }
       // Keep the element running so CUE track changes can seek in place.
-      return;
+      //
+      // But if the element is sitting in an error state, re-applying the same URL
+      // must reload it: `playerStore` retries by invalidating the resolved URL and
+      // calling `play()` again, and the retry is only distinguishable by a fresh
+      // `setSource`. Sources can hand back a byte-identical URL (no timestamp, or
+      // a cached response), and returning early left the element dead — the retry
+      // failed instantly with the same error and never issued a request. This
+      // path is the one macOS/Linux use, so it affected every non-Windows build.
+      if (!this.element.error) return;
     }
 
     this.clipStart = 0;

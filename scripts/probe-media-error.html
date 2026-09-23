@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<body>
+<pre id="out">running</pre>
+<script>
+const PORT = new URLSearchParams(location.search).get("port");
+const base = `http://127.0.0.1:${PORT}`;
+
+// One case per fresh element, so state never leaks between them.
+function trial(name, run) {
+  return new Promise((resolve) => {
+    const a = new Audio();
+    a.preload = "auto";
+    let settled = false;
+    const done = (note) => {
+      if (settled) return;
+      settled = true;
+      resolve({
+        name,
+        note,
+        code: a.error ? a.error.code : null,
+        message: a.error ? a.error.message : null,
+        readyState: a.readyState,
+        networkState: a.networkState,
+      });
+    };
+    a.addEventListener("error", () => done("error-event"));
+    a.addEventListener("loadedmetadata", () => done("loadedmetadata"));
+    a.addEventListener("abort", () => done("abort-event"));
+    setTimeout(() => done("timeout"), 2500);
+    run(a, done);
+  });
+}
+
+(async () => {
+  const results = [];
+  const cases = [
+    ["valid wav", (a) => { a.src = `${base}/ok.wav`; }],
+    ["http 404 text", (a) => { a.src = `${base}/404`; }],
+    ["http 200 html body", (a) => { a.src = `${base}/html`; }],
+    ["http 200 json body", (a) => { a.src = `${base}/json`; }],
+    ["empty src attribute", (a) => { a.setAttribute("src", ""); a.load(); }],
+    ["removeAttribute+load", (a) => { a.setAttribute("src", `${base}/ok.wav`); a.removeAttribute("src"); a.load(); }],
+    ["pause then clear (stop())", (a) => {
+      a.setAttribute("src", `${base}/ok.wav`);
+      a.play().catch(() => {});
+      setTimeout(() => { a.pause(); a.removeAttribute("src"); a.load(); }, 120);
+    }],
+    ["abort in-flight load", (a) => {
+      a.setAttribute("src", `${base}/slow`);
+      a.load();
+      setTimeout(() => { a.pause(); a.removeAttribute("src"); a.load(); }, 120);
+    }],
+    ["src set to undefined string", (a) => { a.src = "undefined"; }],
+    ["bad host", (a) => { a.src = "http://127.0.0.1:1/x.mp3"; }],
+  ];
+
+  for (const [name, run] of cases) {
+    results.push(await trial(name, run));
+  }
+  document.getElementById("out").textContent = JSON.stringify(results, null, 1);
+  // Report to the server: --dump-dom snapshots before async work finishes.
+  await fetch(`${base}/report`, { method: "POST", body: JSON.stringify(results) });
+})();
+</script>
+</body>
+</html>

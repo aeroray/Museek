@@ -1,5 +1,21 @@
 # Do Not Use
 
+## Raw engine error strings as user-facing copy
+
+Do not let an unmapped engine/DOM error reach the user. Anything not matched by `formatRemotePlayError` falls through to `player.failedDetail` and renders raw English inside a localized string (`播放失败：Audio request failed (403)`). Add a branch to `src/lib/playError.ts` for every new error shape you throw, and keep already-localized copy passing through so re-formatting is a no-op.
+
+## Reporting one playback failure on two channels
+
+Do not call `onError` from a path that also rejects a promise the caller awaits. `playerStore` treats `onError` as final (it stops playback and closes the listening session), so a double-report kills the retry and logs a false near-zero-length play. The HTML element owns `onError`; the Web Audio path owns its promise rejection.
+
+## Retaining a rejected load promise
+
+Do not cache a rejected `loadPromise`. A retry can reuse a byte-identical URL, and handing back the settled rejection means no request is ever re-issued — the user sees the same error twice. Clear it on failure (guarded by identity) and let `setSource` reload an element that is in an error state.
+
+## Letting desktop lyrics overflow the native window
+
+Do not rely on a long desktop lyric overflowing the screen edge. The lyrics window is monitor-physical-width while text is laid out in logical px, so at raised display scaling the OS hard-clips the centred capsule and its rounded ends become a rectangle. Keep the fit-to-width shrink (`computeLyricFitScale`) and scale padding with the font so capsule width stays linear in the fit.
+
 ## `inset-0` + `m-auto` + `h-fit` for centred dialogs
 
 Do not centre `DialogContent` with `fixed inset-0 m-auto h-fit`. With both insets at 0 the height comes from `height: fit-content` alone; if that does not resolve to the content height the used value falls back to `auto` and the box **stretches to the full containing block** — a dialog as tall as the whole window (observed on macOS, fine on Windows). Use `fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100%-2rem)]` with `height: auto`.

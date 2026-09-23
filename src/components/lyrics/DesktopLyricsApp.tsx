@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -24,6 +25,10 @@ import {
   writeLyricFontScale,
 } from "@/lib/lyrics/fontScale";
 import { isMacOs } from "@/lib/os";
+import {
+  computeLyricFitScale,
+  fitChanged,
+} from "@/lib/desktopLyricsFit";
 import { findActiveLyricIndex, desktopLyricSecondaryText } from "@/lib/lyrics";
 import { applyThemeSnapshot } from "@/stores/themeStore";
 import { applyFontStacks } from "@/lib/uiFonts";
@@ -104,6 +109,29 @@ export function DesktopLyricsApp() {
   );
   const [isLyricsHovered, setIsLyricsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  /**
+   * Shrink factor applied when the active line is wider than the native window.
+   * `1` means the line fits as-is. Kept in state rather than a ref because it
+   * feeds the rendered font size and padding. Recomputed from the *natural*
+   * width of each new line (the fit is divided back out), so a long line cannot
+   * leave the next short one permanently shrunk.
+   */
+  const [fitScale, setFitScale] = useState(1);
+  /**
+   * CSS viewport width — what the native window actually gives the webview.
+   * Tracked in state because it changes when the user drags the lyrics to
+   * another monitor or changes display scaling.
+   */
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === "undefined" ? 0 : window.innerWidth,
+  );
+  /**
+   * Bumped to force a re-measure when something other than a React input
+   * changes the text's natural width — currently web-font loading. It is only
+   * ever read as an effect dependency, so a change always re-runs the fit effect
+   * (unlike re-setting an equal `viewportWidth`, which React bails out of).
+   */
+  const [measureNonce, setMeasureNonce] = useState(0);
   const fontScaleRef = useRef(fontScale);
   const resizePromiseRef = useRef(Promise.resolve());
   const headingGroupRef = useRef<HTMLDivElement | null>(null);
@@ -416,6 +444,39 @@ export function DesktopLyricsApp() {
       disposed = true;
       window.cancelAnimationFrame(frameId);
     };
+    // `fitScale` is a dependency because shrinking the lyric changes the visible
+    // group's bounds, which is what the work-area clamp is applied to.
+  }, [hasLyricContent, fitScale]);
+
+  /**
+   * Track the CSS viewport width, which is what the native window gives the
+   * webview. It changes when the user drags the lyrics to another monitor or
+   * changes display scaling — both of which change how much room a line has.
+   */
+  useEffect(() => {
+    const sync = () => setViewportWidth(window.innerWidth);
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
+
+  /**
+   * Re-measure once web fonts settle. The first paint can use fallback metrics,
+   * and the lyric font is user-selectable, so the natural width can change after
+   * the fit was computed. `document.fonts` is absent in older webviews; the
+   * optional chain keeps this a no-op there.
+   */
+  useEffect(() => {
+    if (!hasLyricContent) return;
+    let disposed = false;
+    void document.fonts?.ready
+      .then(() => {
+        if (!disposed) setMeasureNonce((n) => n + 1);
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+    };
   }, [hasLyricContent]);
 
   const setScale = (value: number) => {
@@ -584,6 +645,61 @@ export function DesktopLyricsApp() {
     ? ({ "--desktop-lyric": lyricColor } as CSSProperties)
     : undefined;
 
+  // Every em-relative dimension shrinks together, which is what keeps capsule
+  // width linear in `fitScale` and the closed form in `computeLyricFitScale`
+  // exact.
+  const effectiveFontScale = fontScale * fitScale;
+  const effectivePaddingScale = lyricPaddingScale * fitScale;
+  const effectivePadding = DEFAULT_LYRIC_PADDING.horizontal * effectivePaddingScale;
+
+  /**
+   * Shrink the active line until its capsule fits inside the window.
+   *
+   * Measures the lyric *text* rather than the capsule, because `LyricTransition`
+   * locks the capsule's inline width to the outgoing line's width during a
+   * crossfade — reading the capsule right after a line change would measure the
+   * previous line. The heading and sub-line both carry `width: max-content`, so
+   * their own boxes always report natural width regardless of that lock.
+   *
+   * `computeLyricFitScale` divides the measurement by the fit that produced it,
+   * so it converges in one pass from any starting fit and cannot oscillate. A
+   * shorter line simply yields `1` and the lyric returns to full size.
+   */
+  useLayoutEffect(() => {
+    if (!hasLyricContent || !viewportWidth) return;
+    const shell = lyricShellRef.current;
+    if (!shell) return;
+
+    // Layers render as [outgoing, incoming], so the newest line is last.
+    const lines = shell.querySelectorAll<HTMLElement>(".desktop-lyrics-lines");
+    const active = lines[lines.length - 1];
+    if (!active) return;
+
+    let contentWidth = 0;
+    for (const node of active.children) {
+      const width = (node as HTMLElement).getBoundingClientRect().width;
+      if (width > contentWidth) contentWidth = width;
+    }
+
+    const next = computeLyricFitScale({
+      contentWidth,
+      padding: effectivePadding,
+      appliedFit: fitScale,
+      viewportWidth,
+    });
+    if (fitChanged(fitScale, next)) setFitScale(next);
+  }, [
+    fitScale,
+    effectivePadding,
+    viewportWidth,
+    measureNonce,
+    hasLyricContent,
+    displayedLyricIndex,
+    twoLines,
+    fontScale,
+    lyricColor,
+  ]);
+
   return (
     <div
       className="desktop-lyrics-window"
@@ -666,7 +782,7 @@ export function DesktopLyricsApp() {
                 className="desktop-lyrics-heading-shell"
                 onWheel={handleLyricWheel}
                 style={{
-                  padding: `${DEFAULT_LYRIC_PADDING.top * lyricPaddingScale}px ${DEFAULT_LYRIC_PADDING.horizontal * lyricPaddingScale}px ${DEFAULT_LYRIC_PADDING.bottom * lyricPaddingScale}px`,
+                  padding: `${DEFAULT_LYRIC_PADDING.top * effectivePaddingScale}px ${DEFAULT_LYRIC_PADDING.horizontal * effectivePaddingScale}px ${DEFAULT_LYRIC_PADDING.bottom * effectivePaddingScale}px`,
                 }}
               >
                 <LyricTransition
@@ -680,14 +796,14 @@ export function DesktopLyricsApp() {
                       currentTime={currentTime}
                       until={lineUntil}
                       className="desktop-lyrics-heading"
-                      style={{ fontSize: `${LYRIC_FONT_SIZE * fontScale}px` }}
+                      style={{ fontSize: `${LYRIC_FONT_SIZE * effectiveFontScale}px` }}
                       onPointerEnter={() => setIsLyricsHovered(true)}
                     />
                     {twoLines ? (
                       <span
                         className="desktop-lyrics-sub"
                         style={{
-                          fontSize: `${LYRIC_FONT_SIZE * fontScale * 0.62}px`,
+                          fontSize: `${LYRIC_FONT_SIZE * effectiveFontScale * 0.62}px`,
                         }}
                       >
                         {secondaryText || "\u00a0"}
