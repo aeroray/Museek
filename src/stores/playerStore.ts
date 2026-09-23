@@ -209,6 +209,14 @@ interface PlayerState {
   sourceReady: boolean;
   /** True while togglePlay is waiting (restore, decode, or URL resolve). */
   playPending: boolean;
+  /**
+   * True while the CURRENT track is being reloaded at another quality.
+   *
+   * The song, cover and lyrics are unchanged by such a reload, so the UI must
+   * not show its full "loading a new track" treatment — otherwise the cover
+   * dims and a spinner covers it for a switch that does not affect it.
+   */
+  reloadingCurrentTrack: boolean;
 
   play: (
     song: MusicInfo,
@@ -300,6 +308,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     currentPicUrl: null,
     sourceReady: false,
     playPending: false,
+    reloadingCurrentTrack: false,
 
     async play(song, quality, opts) {
       if (restoreSourcePromise) await restoreSourcePromise;
@@ -374,9 +383,33 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           ? audioPlayer.getCurrentTime()
           : 0;
 
+      // Reloading the SAME track at another quality changes only the audio
+      // source, so the cover, lyrics and duration must be left alone. Resetting
+      // them made the player bar flash for a switch that does not affect them —
+      // most visibly the cover, because `song.meta.picUrl` is often absent even
+      // though a cover has already been resolved, so `currentPicUrl` was wiped
+      // to null and `_loadPic` had to fetch it again.
+      //
+      // Set unconditionally (not only when true) so any later play() call
+      // re-establishes the correct value and a stale flag cannot linger.
+      const sameSongReload = force && current?.id === song.id;
+      set({ reloadingCurrentTrack: sameSongReload });
+
       // Same-file CUE clip: seek in place. Don't drop into loading or the
       // pause button and cover flash.
-      if (!sameLocalFile) {
+      if (sameSongReload) {
+        audioPlayer.pause(false);
+        set({
+          currentSong: song,
+          currentQuality: preferred,
+          status: "loading",
+          error: null,
+          isPlaying: false,
+          sourceReady: false,
+          // Keep the cover already on screen when the song carries no picUrl.
+          currentPicUrl: song.meta.picUrl ?? get().currentPicUrl,
+        });
+      } else if (!sameLocalFile) {
         audioPlayer.pause(false);
         invalidateLyricLoad();
         set({
@@ -636,11 +669,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         notify({ message, variant: "error" });
         listenFinish(false);
         return;
+      } finally {
+        // Guarded so a superseded play cannot clear a newer one's flag; the
+        // generation is bumped at the start of every play().
+        if (isPlayGenerationCurrent(gen)) {
+          set({ reloadingCurrentTrack: false });
+        }
       }
 
-      // Load lyric and pic in parallel, non-blocking
-      get()._loadLyric(song);
-      get()._loadPic(song);
+      // Load lyric and pic in parallel, non-blocking. A same-song reload keeps
+      // the ones already on screen: refetching them flashed the cover and the
+      // lyric list for a switch that cannot change either.
+      if (!sameSongReload) {
+        get()._loadLyric(song);
+        get()._loadPic(song);
+      }
     },
 
     async setSongQuality(quality) {

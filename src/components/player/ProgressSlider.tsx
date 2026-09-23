@@ -27,6 +27,10 @@ export function ProgressSlider({
   const status = usePlayerStore((s) => s.status);
   const currentSong = usePlayerStore((s) => s.currentSong);
   const sourceReady = usePlayerStore((s) => s.sourceReady);
+  // A same-song quality switch re-attaches the source, which really does reset
+  // the element to 0:00 before the store seeks back. Showing that would snap the
+  // bar to the start for a switch that does not change the track's position.
+  const reloadingCurrentTrack = usePlayerStore((s) => s.reloadingCurrentTrack);
   const seek = usePlayerStore((s) => s.seek);
   const playbackTime = usePlaybackTime();
   const t = useT();
@@ -49,10 +53,12 @@ export function ProgressSlider({
 
   useEffect(() => {
     if (scrubbing || status === "playing") return;
+    // Keep the last position across a quality reload instead of jumping to 0.
+    if (status === "loading" && reloadingCurrentTrack) return;
     setDisplayTime(
       status === "loading" || status === "idle" ? 0 : playbackTime,
     );
-  }, [playbackTime, status, scrubbing]);
+  }, [playbackTime, status, scrubbing, reloadingCurrentTrack]);
 
   const time = scrubTime ?? (status === "playing" ? playbackTime : displayTime);
   const pct =

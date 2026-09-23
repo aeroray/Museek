@@ -32,6 +32,16 @@ Do not call `play(song, quality)` to change the quality of the track that is alr
 
 Do not add a global `:focus-visible { outline: none }` or a blanket `outline-none` to suppress the menu focus ring. Focus rings are the only affordance keyboard users get, and the reported annoyance comes from a *modality mismatch*: Radix restores focus to a menu trigger on close, which after a mouse click paints a ring the user did not ask for. Fix it where the modality is known (`DropdownMenuContent`'s `onCloseAutoFocus` plus `src/lib/focusModality.ts`) so keyboard closes keep the ring. Also do not assume `focus({ focusVisible: false })` clears an existing ring — it does not; `focus()` on an already-focused element is a no-op, so blur first.
 
+## Resetting the cover/lyrics when only the quality changed
+
+Do not clear `currentPicUrl`, `lyricLines` or `duration` when `play()` is re-attaching the source for the track that is already current. Guard those resets behind `sameSongReload` (`force && current?.id === song.id`), and skip the trailing `_loadPic`/`_loadLyric` refetch. A quality switch changes only the audio source; resetting the rest blanked the cover (because `song.meta.picUrl` is usually absent while `currentPicUrl` holds the resolved URL) and made `_loadPic` repaint a different URL — a visible flash. Do not clear the `reloadingCurrentTrack` flag on the success path only; a failed reload must clear it too, or the cover stays undimmed forever. The seek bar has the same trap: `ProgressSlider` must not reset its displayed time to 0 while `reloadingCurrentTrack` is set, because the re-attached element really does report 0:00 before the store seeks back.
+
+## Turning a global shortcut off by clearing its binding
+
+Do not implement "disable this global shortcut" by setting the accelerator to `""`. That destroys the binding, so re-enabling forces the user to re-record the combo, and the settings row can no longer show what was released. Keep the binding and track the action in `disabledGlobalShortcuts` instead — the only thing that can clash with another application is the OS registration. For the same reason, do not make that list sync across devices: the clash comes from software installed on one machine.
+
+
+
 ## Letting a manual downgrade be silently re-upgraded
 
 Do not let the resume-time upgrade in `togglePlay` override a quality the user chose deliberately for one song. It reads the global `settings.playQuality`, so a per-song downgrade would be undone on the next pause/resume. A per-song choice must be distinguishable from the global default before that path is touched.

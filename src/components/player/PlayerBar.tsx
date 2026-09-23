@@ -62,6 +62,11 @@ export function PlayerBar() {
     visible: desktopLyricsVisible,
   });
   const loading = status === "loading";
+  // A quality switch reloads the audio source of the track already playing, so
+  // the cover and title are unchanged. Dimming the cover and covering it with a
+  // spinner made that switch look like a fresh load.
+  const reloadingCurrentTrack = usePlayerStore((s) => s.reloadingCurrentTrack);
+  const showCoverLoading = loading && !reloadingCurrentTrack;
   // Prefer the resolved cover; while loading fall back to the song's own pic so
   // the art doesn't blank out — the spinner overlay still signals resolving.
   const coverSrc = currentPicUrl ?? currentSong?.meta.picUrl ?? null;
@@ -92,8 +97,10 @@ export function PlayerBar() {
             <ShortcutTooltip label={t("player.lyrics")} action="lyrics">
             <button
               type="button"
-              onClick={() => !loading && hasLyrics && setShowLyrics(true)}
-              disabled={loading || !hasLyrics}
+              onClick={() => !showCoverLoading && hasLyrics && setShowLyrics(true)}
+              // Lyrics are unchanged by a quality switch, so the button stays
+              // usable while the source is reloaded.
+              disabled={showCoverLoading || !hasLyrics}
               // Inner clips overlay so it never paints past rounded corners.
               className="group relative h-12 w-12 shrink-0 transition-transform duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none"
             >
@@ -103,10 +110,10 @@ export function PlayerBar() {
                   alt=""
                   className={cn(
                     "h-full w-full object-cover transition-opacity duration-200",
-                    loading && "opacity-60",
+                    showCoverLoading && "opacity-60",
                   )}
                 />
-                {loading ? (
+                {showCoverLoading ? (
                   <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/45">
                     <Loader2 size={18} className="animate-spin text-white" />
                   </span>
@@ -120,7 +127,7 @@ export function PlayerBar() {
             </ShortcutTooltip>
           ) : (
             <div className="relative h-12 w-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden shrink-0 shadow-[var(--shadow-border)]">
-              {loading ? (
+              {showCoverLoading ? (
                 <Loader2
                   size={18}
                   className="animate-spin text-muted-foreground"

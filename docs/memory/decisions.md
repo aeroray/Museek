@@ -14,6 +14,25 @@ Decision:
 Reason:
 Radix restores focus to the menu trigger on close (`onCloseAutoFocus` → `triggerRef.current?.focus()`). That is right for keyboard users — focus must not be dropped to `<body>` — but after a mouse-only interaction the browser matches `:focus-visible` on the trigger and paints its ring, leaving a keyboard affordance on screen for a click. Measured in Chromium (both WebView2 and WKWebView): `focus({ focusVisible: false })` does clear the ring when the element is not already focused, but a plain `focus()` on an already-focused element is a no-op that preserves the ring, hence the blur. The fix sits in the shared content wrapper so all 15 menus inherit it, and it keys off `aria-haspopup` on the newly focused element so an interaction outside the menu is untouched. Deferring via `queueMicrotask` is required because Radix's own focus-moving handler is composed to run *after* this callback.
 
+## 2026-09-24 - A same-song quality reload preserves the cover, lyrics and duration
+
+Decision:
+`playerStore.play()` computes `const sameSongReload = force && current?.id === song.id` and, when true, updates only `currentQuality` / `status` / `sourceReady` — it keeps `currentPicUrl` (falling back to the existing value when the song has no `meta.picUrl`), `lyricLines`, `lyricsLoading` and `duration` untouched, and skips the trailing `_loadLyric` / `_loadPic` refetch. A new `reloadingCurrentTrack` state flag is set from the same expression and cleared in a `finally` guarded by `isPlayGenerationCurrent(gen)`; `PlayerBar` uses it to suppress the cover dim/spinner and `ProgressSlider` uses it to hold its position instead of snapping to 0:00.
+
+Reason:
+Changing one track's quality re-attaches the audio source, which is the only thing that actually changes. Wiping `currentPicUrl` to `song.meta.picUrl ?? null` blanked the cover whenever `picUrl` was absent — the common case, because the cover was already resolved from the source and stored only in `currentPicUrl`. `_loadPic` then refetched and repainted a *different* URL, which is the visible flash. `duration: 0` also made the seek bar jump to 0:00 for a switch that does not change the track's length. The flag must clear in a `finally` rather than on the success path, because a failed reload would otherwise leave the cover permanently undimmed; the generation guard stops a superseded `play()` from clearing a newer one's flag.
+
+## 2026-09-24 - Global shortcuts can be switched off without losing their binding
+
+Decision:
+`disabledGlobalShortcuts: ShortcutAction[]` in `settingsStore` lists actions whose OS-global hotkey is not registered. `activeGlobalShortcuts(map, disabled)` in `src/lib/shortcutKeys.ts` is the single source of truth for what gets registered; `syncGlobalShortcuts` and the settings UI both call it. The panel gets a master switch plus one switch per action row. `setShortcut` clears an action's disabled flag when a new combo is recorded. The list is in `DEVICE_LOCAL_SETTINGS` so it never syncs.
+
+Reason:
+The complaint is a combo clash with another application, and only the OS-global registration can clash — a focused window cannot conflict with anything. So the fix is to release the combo, not to disable the feature: the binding is kept, the in-app binding keeps working, and re-enabling needs no re-recording. Clearing on record matters because keeping a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine; syncing it would disable a perfectly working shortcut elsewhere. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
+
+
+
+Decision:
 ## 2026-09-24 - A per-song quality choice normalises to "no choice"
 
 Decision:
