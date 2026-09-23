@@ -46,6 +46,14 @@ Decision:
 Reason:
 The name column is `flex-1`, so every column to its right is anchored from the row's right edge — which means any *variable* width pushes its left neighbours sideways. A `max-w-24` stat looked harmless because the value was right-aligned, but its left edge moved with the text (`2 小时前` 52px vs `9/14 15:08` 67px), shifting the duration and platform columns per row. Platform chips vary too (`酷我` 46px vs `QQ Music` 74px). Fixed slots pin every anchor so all rows share column edges. Widths are measured, not guessed: the widest real stat is `12/31 20:00` at 74px and the widest English play count is `1,234 plays` at 70px, so one `w-20` (80px) slot serves both tabs. Placing `stat` before the platform chip keeps it adjacent to the song it describes and puts the slack from short titles to its left, instead of leaving a hole between the title and the trailing metadata.
 
+## 2026-09-23 - A slider owns only its own keys, and a drag must not focus it
+
+Decision:
+`ProgressSlider`'s track calls `preventDefault()` on `pointerdown` so a mouse drag never moves keyboard focus onto it, and draws its focus ring on the bar (`group-focus-visible/slider:ring-2`) rather than leaving the browser's default outline on the 40px-tall hit area. `isShortcutBlockedTarget` moved to `src/lib/shortcutTargets.ts` and now takes the pressed key: a `role="slider"` blocks only `SLIDER_KEYS` (arrows, Home/End/PageUp/PageDown), while text fields and composite roles still block everything.
+
+Reason:
+Confirmed with real mouse/key input over CDP (`scripts/check-shortcut-targets.mjs`), because focus and `:focus-visible` are decided by the browser's input pipeline and synthetic DOM events cannot reproduce them. The seek bar is a `role="slider"`, which `isShortcutBlockedTarget` treats as an opaque widget — deliberately, so arrows seek. But a pointer drag focused it, so after scrubbing the user's very next Space was swallowed and playback could not be resumed from the keyboard; clicking elsewhere fixed it, which is exactly the reported symptom. The default outline also wrapped the whole hit area (40px tall in the lyrics overlay, bar pinned to its bottom), reading as a stray horizontal bar above the progress line. Both fixes are needed: `preventDefault` stops the focus being stolen, and the key-aware block means a *keyboard* user who tabs to the slider can still press Space. Note `@radix-ui/react-slider` (the volume control) already calls `focus({ focusVisible: false })` on pointerdown, so it never had the first problem.
+
 ## 2026-09-14 - Inset focus ring on Input
 
 Decision:

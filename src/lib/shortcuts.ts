@@ -9,6 +9,7 @@ import {
   type ShortcutMap,
 } from "@/lib/shortcutKeys";
 import { runShortcutAction } from "@/lib/shortcutActions";
+import { isShortcutBlockedTarget } from "@/lib/shortcutTargets";
 import { notify } from "@/lib/notify";
 import { t } from "@/lib/i18n";
 import { isMacOs } from "@/lib/os";
@@ -149,23 +150,6 @@ async function syncGlobalShortcuts(
   }
 }
 
-function isShortcutBlockedTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false;
-  if (
-    el.tagName === "INPUT" ||
-    el.tagName === "TEXTAREA" ||
-    el.tagName === "SELECT" ||
-    el.isContentEditable
-  ) {
-    return true;
-  }
-  return Boolean(
-    el.closest(
-      '[role="slider"], [role="combobox"], [role="listbox"], [role="menu"], [role="menuitem"], [role="dialog"], [role="tablist"]',
-    ),
-  );
-}
-
 /**
  * Window-local keydown for in-app bindings (and global ones while focused),
  * plus OS hotkeys for the global map.
@@ -180,7 +164,7 @@ export function useGlobalShortcuts(): void {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (isShortcutCaptureLocked() || isShortcutBlockedTarget(e.target))
+      if (isShortcutCaptureLocked() || isShortcutBlockedTarget(e.target, e.key))
         return;
       const maps = [localShortcuts, shortcuts];
       for (const map of maps) {
