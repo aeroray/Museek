@@ -6,6 +6,14 @@ Decision:
 Reason:
 Every platform adapter joins artists with `、` (`formatSingers`), so it is the one separator guaranteed by the data contract. `/` and `&` are deliberately not separators — they occur inside real names (AC/DC, Simon & Garfunkel) and splitting them would invent artists. The per-credit-string keying made collabs rank separately from the same artist's solo work, so a listener's real top artist could be buried under fragmented rows. Dropping the song cover is honest: an artist has no artwork of its own, and a borrowed track cover changes depending on which song played last.
 
+## 2026-09-24 - A forced play request is never redundant
+
+Decision:
+`playerStore.play()` takes a third `opts?: { force?: boolean }`. `force` bypasses the same-song short-circuit and the same-local-file seek-in-place branch, and the position is captured before the reload and re-seeked after, so a forced reload does not restart the track. `togglePlay`'s resume-time quality upgrade passes `{ force: true }`. The two predicates (`isRedundantPlayRequest`, `shouldUpgradeOnResume`) live in `src/lib/playRequest.ts` — import-free so plain node can exercise them.
+
+Reason:
+`togglePlay` set `playPending = true`, then called `play(song, preferred)` to upgrade the current track. `play` saw the same song already attached *and* `playPending` set, so it returned without doing anything, and `finally` reset the flag — every later press re-entered the identical branch. Playback could never resume. Reachable without any per-song feature: an earlier auto-downgrade leaves a lower tier in the disk cache, so on the next launch `restorePlaybackSource` sets `currentQuality` to that cached tier while `skipQualityUpgrade` is still empty (it is module state), and the first Space press deadlocks. `force` must also skip the CUE seek-in-place branch, otherwise a reload of a local file would silently keep the old source. Note the guard is deliberately *not* "remove the `playPending` check" — that check is what stops a double-press from starting two loads.
+
 ## 2026-09-23 - Classify playback errors in one pure module
 
 Decision:

@@ -34,6 +34,10 @@ import { useListeningStore } from "@/stores/listeningStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { t } from "@/lib/i18n";
 import { formatRemotePlayError, isIgnorablePlayError } from "@/lib/playError";
+import {
+  isRedundantPlayRequest,
+  shouldUpgradeOnResume,
+} from "@/lib/playRequest";
 import type { MusicInfo, LyricLine, Quality } from "@/types/music";
 import type { QueueItem, PlayMode, PlayerStatus } from "@/types/player";
 
@@ -202,7 +206,12 @@ interface PlayerState {
   /** True while togglePlay is waiting (restore, decode, or URL resolve). */
   playPending: boolean;
 
-  play: (song: MusicInfo, quality?: Quality) => Promise<void>;
+  play: (
+    song: MusicInfo,
+    quality?: Quality,
+    /** `force` reloads the track even when it is already attached (quality switch). */
+    opts?: { force?: boolean },
+  ) => Promise<void>;
   playFromQueue: (index: number) => Promise<void>;
   addToQueue: (songs: MusicInfo[]) => void;
   playAll: (songs: MusicInfo[]) => void;
@@ -282,11 +291,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     sourceReady: false,
     playPending: false,
 
-    async play(song, quality) {
+    async play(song, quality, opts) {
       if (restoreSourcePromise) await restoreSourcePromise;
       if (song.id !== sessionResumeSongId) clearResume();
       const preferred = quality ?? useSettingsStore.getState().playQuality;
       const isLocal = song.source === "local";
+      // A deliberate reload of the already-attached track (quality switch) must
+      // not be mistaken for a redundant request — see isRedundantPlayRequest.
+      const force = opts?.force ?? false;
 
       // No source loaded → can't resolve a playback URL. Prompt to import instead
       // of silently failing. Local files play from disk and need no lx source.
@@ -302,10 +314,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
       const current = get().currentSong;
       if (
-        current?.id === song.id &&
-        get().sourceReady &&
-        audioPlayer.hasSource() &&
-        get().status !== "error"
+        isRedundantPlayRequest({
+          sameSong: current?.id === song.id,
+          sourceReady: get().sourceReady,
+          hasSource: audioPlayer.hasSource(),
+          status: get().status,
+          force,
+        })
       ) {
         if (get().status === "loading" || get().playPending) return;
         if (!get().isPlaying) get().togglePlay();
@@ -316,7 +331,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
       const currentPath = current?.meta.filePath;
       const nextPath = song.meta.filePath;
+      // `!force` keeps a deliberate reload from falling into the seek-in-place
+      // branch below, which would leave the requested quality silently unapplied.
       const sameLocalFile =
+        !force &&
         isLocal &&
         current?.source === "local" &&
         Boolean(currentPath) &&
@@ -330,6 +348,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         get().status !== "loading";
 
       const gen = beginPlayGeneration();
+
+      // A forced reload re-attaches the source, which resets the element to 0:00.
+      // Capture the position first so switching quality does not restart the
+      // track. Only meaningful when reloading the song already playing.
+      const reloadAt =
+        force && current?.id === song.id && audioPlayer.hasSource()
+          ? audioPlayer.getCurrentTime()
+          : 0;
 
       // Same-file CUE clip: seek in place. Don't drop into loading or the
       // pause button and cover flash.
@@ -494,6 +520,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           await audioPlayer.whenReady();
           if (!isPlayGenerationCurrent(gen)) return;
         }
+        // Restore the position captured before a forced quality reload.
+        if (reloadAt > 0) audioPlayer.seek(reloadAt);
         set({ sourceReady: true });
         persistPlaybackSession(true);
         await playWithTimeout();
@@ -719,11 +747,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           const preferred = useSettingsStore.getState().playQuality;
           if (
             song &&
-            song.source !== "local" &&
-            !qualityMeets(get().currentQuality, preferred) &&
-            shouldAttemptQualityUpgrade(song, preferred)
+            shouldUpgradeOnResume({
+              meetsPreferred: qualityMeets(get().currentQuality, preferred),
+              isLocal: song.source === "local",
+              upgradeSkipped: !shouldAttemptQualityUpgrade(song, preferred),
+            })
           ) {
-            await get().play(song, preferred);
+            // `force` is required: the track is already attached, so without it
+            // `play()` short-circuits on the same-song check. `playPending` is
+            // set above, which the short-circuit also treats as "busy", so the
+            // request was dropped and every later press repeated it — playback
+            // could never resume after a quality change.
+            await get().play(song, preferred, { force: true });
             return;
           }
           if (audioPlayer.hasSource()) {
