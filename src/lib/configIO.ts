@@ -35,8 +35,10 @@ const LS_KEYS = [
 
 // Settings specific to THIS device that must never travel via sync: the sync
 // folder path, the stored passphrase, the auto-backup flag, the last-synced
-// timestamp, and the download location (Windows/macOS paths differ, so it's
-// per-device). Stripped on export; preserved (not overwritten) on import.
+// timestamp, the download location (Windows/macOS paths differ, so it's
+// per-device), and the disabled-global-shortcut list (a combo is switched off
+// because another application INSTALLED ON THIS MACHINE already owns it, so
+// syncing it would needlessly disable a working shortcut elsewhere).
 const DEVICE_LOCAL_SETTINGS = [
   "syncFolder",
   "syncPassphrase",
@@ -49,6 +51,7 @@ const DEVICE_LOCAL_SETTINGS = [
   "localMatchOnImport",
   "openAtLogin",
   "startHiddenToTray",
+  "disabledGlobalShortcuts",
 ];
 
 export interface MuseekConfig {

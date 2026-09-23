@@ -6,8 +6,10 @@ import { syncOpenAtLogin } from "@/lib/autostart";
 import {
   DEFAULT_SHORTCUTS,
   DEFAULT_LOCAL_SHORTCUTS,
+  SHORTCUT_ACTIONS,
   parseShortcutMap,
   parseLocalShortcutMap,
+  parseDisabledGlobalShortcuts,
   shortcutMapEquals,
   canonicalizeShortcut,
   isValidGlobalShortcut,
@@ -93,6 +95,14 @@ interface Persisted {
   shortcuts: ShortcutMap;
   /** Main-window-only shortcuts. Empty string means unset. */
   localShortcuts: ShortcutMap;
+  /**
+   * Actions whose OS-global hotkey is switched off.
+   *
+   * The binding is kept, not cleared: this releases the combo for other
+   * applications without forgetting the shortcut. The in-app binding keeps
+   * working, since a focused window cannot conflict with another app.
+   */
+  disabledGlobalShortcuts: ShortcutAction[];
   // Folder-based sync target (absolute path to a cloud-synced folder), or null.
   syncFolder: string | null;
   // Stored so auto-sync can run silently; the cloud file stays encrypted regardless.
@@ -133,6 +143,10 @@ interface SettingsState extends Persisted {
   setStartupPage: (p: StartupPage) => void;
   setShortcut: (action: ShortcutAction, accel: string | null) => boolean;
   setLocalShortcut: (action: ShortcutAction, accel: string | null) => boolean;
+  /** Switch one action's OS-global hotkey on or off, keeping its binding. */
+  setGlobalShortcutEnabled: (action: ShortcutAction, enabled: boolean) => void;
+  /** Master switch for every OS-global hotkey at once. */
+  setAllGlobalShortcutsEnabled: (enabled: boolean) => void;
   resetShortcuts: () => void;
   setSyncFolder: (dir: string | null) => void;
   setSyncPassphrase: (p: string | null) => void;
@@ -173,6 +187,7 @@ const DEFAULTS: Persisted = {
   startupPage: "search",
   shortcuts: { ...DEFAULT_SHORTCUTS },
   localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS },
+  disabledGlobalShortcuts: [],
   syncFolder: null,
   syncPassphrase: null,
   autoBackupOnExit: true,
@@ -241,6 +256,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       startupPage,
       shortcuts,
       localShortcuts,
+      disabledGlobalShortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -276,6 +292,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       startupPage,
       shortcuts,
       localShortcuts,
+      disabledGlobalShortcuts,
       syncFolder,
       syncPassphrase,
       autoBackupOnExit,
@@ -424,7 +441,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       ) {
         return false;
       }
-      set({ shortcuts: { ...get().shortcuts, [action]: next ?? "" } });
+      set({
+        shortcuts: { ...get().shortcuts, [action]: next ?? "" },
+        // Recording a fresh combo is an explicit request for it to work, so it
+        // re-enables the action. Keeping a stale "disabled" flag here would make
+        // the new binding look broken for no visible reason.
+        disabledGlobalShortcuts: next
+          ? get().disabledGlobalShortcuts.filter((a) => a !== action)
+          : get().disabledGlobalShortcuts,
+      });
       persist();
       return true;
     },
@@ -444,10 +469,31 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       persist();
       return true;
     },
+    setGlobalShortcutEnabled(action, enabled) {
+      const current = get().disabledGlobalShortcuts;
+      const next = enabled
+        ? current.filter((a) => a !== action)
+        : current.includes(action)
+          ? current
+          : [...current, action];
+      set({ disabledGlobalShortcuts: next });
+      persist();
+    },
+    setAllGlobalShortcutsEnabled(enabled) {
+      // Disabling everything means every action that HAS a global binding is
+      // switched off, so re-enabling restores exactly the ones that were live.
+      set({
+        disabledGlobalShortcuts: enabled
+          ? []
+          : SHORTCUT_ACTIONS.filter((action) => get().shortcuts[action]),
+      });
+      persist();
+    },
     resetShortcuts() {
       set({
         shortcuts: { ...DEFAULT_SHORTCUTS },
         localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS },
+        disabledGlobalShortcuts: [],
       });
       persist();
     },
@@ -582,6 +628,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           : DEFAULTS.startupPage,
         shortcuts,
         localShortcuts,
+        disabledGlobalShortcuts: parseDisabledGlobalShortcuts(
+          data.disabledGlobalShortcuts,
+        ),
         syncFolder:
           typeof data.syncFolder === "string" ? data.syncFolder : null,
         syncPassphrase:

@@ -2,10 +2,11 @@ import { useEffect } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
   SHORTCUT_ACTIONS,
+  activeGlobalShortcuts,
   eventMatchesShortcut,
   formatShortcut,
   isShortcutCaptureLocked,
-  isValidGlobalShortcut,
+  type ShortcutAction,
   type ShortcutMap,
 } from "@/lib/shortcutKeys";
 import { runShortcutAction } from "@/lib/shortcutActions";
@@ -71,9 +72,10 @@ export async function suspendGlobalShortcuts(): Promise<void> {
 
 export async function resumeGlobalShortcuts(): Promise<void> {
   if (!isTauri) return;
-  const { hydrated, shortcuts } = useSettingsStore.getState();
+  const { hydrated, shortcuts, disabledGlobalShortcuts } =
+    useSettingsStore.getState();
   if (!hydrated) return;
-  await syncGlobalShortcuts(shortcuts, { silent: true });
+  await syncGlobalShortcuts(shortcuts, disabledGlobalShortcuts, { silent: true });
 }
 
 /** Try the OS hotkey table without keeping the binding. */
@@ -102,6 +104,7 @@ export async function probeGlobalShortcut(
 
 async function syncGlobalShortcuts(
   map: ShortcutMap,
+  disabled: readonly ShortcutAction[],
   options: { silent?: boolean } = {},
 ): Promise<void> {
   const gen = ++registerGeneration;
@@ -115,13 +118,11 @@ async function syncGlobalShortcuts(
     /* nothing registered yet */
   }
   if (gen !== registerGeneration) return;
-  const reverse = new Map<string, (typeof SHORTCUT_ACTIONS)[number]>();
-  for (const action of SHORTCUT_ACTIONS) {
-    if (!map[action] || !isValidGlobalShortcut(map[action])) continue;
-    if (!reverse.has(map[action])) reverse.set(map[action], action);
-  }
+  // Only bound, valid, ENABLED shortcuts reach the OS. A disabled action keeps
+  // its binding but releases the combo so other applications can use it.
+  const reverse = activeGlobalShortcuts(map, disabled);
   const failed: { combo: string; reason: string }[] = [];
-  for (const [accel, action] of reverse) {
+  for (const { accel, action } of reverse) {
     try {
       await register(accel, (event) => {
         if (event.state !== "Pressed") return;
@@ -158,6 +159,9 @@ export function useGlobalShortcuts(): void {
   const hydrated = useSettingsStore((s) => s.hydrated);
   const shortcuts = useSettingsStore((s) => s.shortcuts);
   const localShortcuts = useSettingsStore((s) => s.localShortcuts);
+  const disabledGlobalShortcuts = useSettingsStore(
+    (s) => s.disabledGlobalShortcuts,
+  );
 
   useEffect(() => {
     if (!hydrated) return;
@@ -166,6 +170,10 @@ export function useGlobalShortcuts(): void {
       if (e.repeat) return;
       if (isShortcutCaptureLocked() || isShortcutBlockedTarget(e.target, e.key))
         return;
+      // The in-app bindings stay live even for an action whose GLOBAL hotkey is
+      // disabled: the user is freeing a combo for another application, not
+      // turning the feature off inside Museek, and a focused window cannot
+      // conflict with anything else.
       const maps = [localShortcuts, shortcuts];
       for (const map of maps) {
         for (const action of SHORTCUT_ACTIONS) {
@@ -187,7 +195,7 @@ export function useGlobalShortcuts(): void {
       return () => window.removeEventListener("keydown", onKey, true);
     }
 
-    void syncGlobalShortcuts(shortcuts);
+    void syncGlobalShortcuts(shortcuts, disabledGlobalShortcuts);
     return () => {
       window.removeEventListener("keydown", onKey, true);
       registerGeneration += 1;
@@ -195,5 +203,5 @@ export function useGlobalShortcuts(): void {
         .then((m) => m.unregisterAll())
         .catch(() => {});
     };
-  }, [hydrated, localShortcuts, shortcuts]);
+  }, [hydrated, localShortcuts, shortcuts, disabledGlobalShortcuts]);
 }

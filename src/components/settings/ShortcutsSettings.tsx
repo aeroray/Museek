@@ -2,13 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { SettingsCard } from "@/components/settings/SettingsCard";
+import { Switch } from "@/components/ui/switch";
+import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/lib/i18n";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import {
+  SHORTCUT_ACTIONS,
   formatHeldShortcut,
   formatShortcut,
   hasForbiddenModifier,
@@ -119,8 +121,17 @@ export function ShortcutsSettings() {
   const t = useT();
   const shortcuts = useSettingsStore((s) => s.shortcuts);
   const localShortcuts = useSettingsStore((s) => s.localShortcuts);
+  const disabledGlobalShortcuts = useSettingsStore(
+    (s) => s.disabledGlobalShortcuts,
+  );
   const setShortcut = useSettingsStore((s) => s.setShortcut);
   const setLocalShortcut = useSettingsStore((s) => s.setLocalShortcut);
+  const setGlobalShortcutEnabled = useSettingsStore(
+    (s) => s.setGlobalShortcutEnabled,
+  );
+  const setAllGlobalShortcutsEnabled = useSettingsStore(
+    (s) => s.setAllGlobalShortcutsEnabled,
+  );
   const resetShortcuts = useSettingsStore((s) => s.resetShortcuts);
   const [recording, setRecording] = useState<Recording | null>(null);
   const [draft, setDraft] = useState("");
@@ -322,6 +333,14 @@ export function ShortcutsSettings() {
     return accel ? formatShortcut(accel) : t("shortcuts.unset");
   };
 
+  // A global hotkey is "live" only when it has a binding AND is not switched
+  // off. The master switch reflects whether any are live.
+  const boundGlobals = SHORTCUT_ACTIONS.filter((a) => shortcuts[a]);
+  const enabledGlobals = boundGlobals.filter(
+    (a) => !disabledGlobalShortcuts.includes(a),
+  );
+  const globalEnabled = enabledGlobals.length > 0;
+
   return (
     <ScrollArea className="h-full">
       <div className="pr-3 pb-4 space-y-3">
@@ -339,6 +358,22 @@ export function ShortcutsSettings() {
             {t("shortcuts.reset")}
           </Button>
         </div>
+
+        {/* Master switch. Global hotkeys are the ones that can clash with other
+            applications, so this is the quick escape hatch when one does. */}
+        <SettingsCard>
+          <SettingRow
+            title={t("shortcuts.globalMasterTitle")}
+            desc={t("shortcuts.globalMasterDesc")}
+            control={
+              <Switch
+                checked={globalEnabled}
+                onCheckedChange={setAllGlobalShortcutsEnabled}
+              />
+            }
+          />
+        </SettingsCard>
+
         <SettingsCard>
           <div className="flex items-center gap-3 px-3.5 py-1.5">
             <span className="min-w-0 flex-1" />
@@ -392,17 +427,47 @@ export function ShortcutsSettings() {
                       )}
                     </Keycap>
                   </div>
-                  <div className="flex w-[11rem] justify-end">
+                  <div className="flex w-[11rem] items-center justify-end gap-2">
                     <Keycap
                       active={
                         recording?.action === row.action &&
                         recording.slot === "global"
                       }
-                      muted={!shortcuts[row.action]}
+                      muted={
+                        !shortcuts[row.action] ||
+                        disabledGlobalShortcuts.includes(row.action)
+                      }
                       onClick={() => startRecording(row.action, "global")}
                     >
                       {bindingLabel(row.action, "global", shortcuts[row.action])}
                     </Keycap>
+                    {/* Per-action switch, so only the clashing hotkey is
+                        released and every other one keeps working. */}
+                    <Tooltip delayDuration={400}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Switch
+                            className="scale-[0.7]"
+                            checked={
+                              Boolean(shortcuts[row.action]) &&
+                              !disabledGlobalShortcuts.includes(row.action)
+                            }
+                            disabled={!shortcuts[row.action]}
+                            onCheckedChange={(v) =>
+                              setGlobalShortcutEnabled(row.action, v)
+                            }
+                            aria-label={t("shortcuts.globalToggleLabel", {
+                              action: t(row.titleKey),
+                            })}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs">
+                        {shortcuts[row.action]
+                          ? t("shortcuts.globalToggleHint")
+                          : t("shortcuts.globalToggleUnset")}
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </>
               )}

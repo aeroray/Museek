@@ -437,6 +437,58 @@ function formatKey(key: string): string {
   return map[key] ?? key;
 }
 
+/**
+ * Actions whose OS-global registration is turned off.
+ *
+ * The binding is deliberately KEPT: disabling is about not claiming the combo
+ * system-wide (so another app can use it), not about forgetting the shortcut.
+ * Re-enabling restores it without re-recording, and the in-app binding still
+ * works because a focused window cannot conflict with another application.
+ */
+export function parseDisabledGlobalShortcuts(raw: unknown): ShortcutAction[] {
+  if (!Array.isArray(raw)) return [];
+  const known = new Set<string>(SHORTCUT_ACTIONS);
+  const out: ShortcutAction[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string" || !known.has(item)) continue;
+    const action = item as ShortcutAction;
+    if (!out.includes(action)) out.push(action);
+  }
+  return out;
+}
+
+/** True when this action should be registered with the OS. */
+export function isGlobalShortcutEnabled(
+  disabled: readonly ShortcutAction[],
+  action: ShortcutAction,
+): boolean {
+  return !disabled.includes(action);
+}
+
+/**
+ * Global shortcuts that will actually be registered: bound, valid, and enabled.
+ *
+ * Shared by the registrar and the settings UI so the two cannot disagree about
+ * what is live.
+ */
+export function activeGlobalShortcuts(
+  map: ShortcutMap,
+  disabled: readonly ShortcutAction[],
+): { accel: string; action: ShortcutAction }[] {
+  const out: { accel: string; action: ShortcutAction }[] = [];
+  const seen = new Set<string>();
+  for (const action of SHORTCUT_ACTIONS) {
+    const accel = map[action];
+    if (!accel || !isValidGlobalShortcut(accel)) continue;
+    if (!isGlobalShortcutEnabled(disabled, action)) continue;
+    // First action wins a duplicated combo, matching the registrar.
+    if (seen.has(accel)) continue;
+    seen.add(accel);
+    out.push({ accel, action });
+  }
+  return out;
+}
+
 /** True while the settings recorder is capturing a combo (skip dispatch). */
 let captureLock = false;
 

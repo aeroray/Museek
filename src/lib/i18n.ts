@@ -601,6 +601,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.winHeld": "不能使用 Win 键，请改用 Ctrl、Alt、Shift。",
     "shortcuts.macCtrlHeld": "Mac 上请用 ⌘，不要用 Control。",
     "shortcuts.reset": "恢复默认",
+    "shortcuts.globalMasterTitle": "启用全局快捷键",
+    "shortcuts.globalMasterDesc": "关闭后，本软件不再占用系统级热键，其他软件即可使用这些组合键；应用内的快捷键仍然有效。",
+    "shortcuts.globalToggleLabel": "启用「{action}」的全局快捷键",
+    "shortcuts.globalToggleHint": "关闭后释放该组合键给其他软件使用；应用内仍然有效。",
+    "shortcuts.globalToggleUnset": "先设置一个全局快捷键，再决定是否启用。",
     "shortcuts.fontHint": "歌词页内仍可用 Ctrl/⌘ + 滚轮调节字号（仅当前窗口）。",
     "shortcuts.registerFailed": "系统无法注册快捷键 {combo}",
     "shortcuts.registerFailedMany": "有 {n} 个快捷键无法注册为全局热键",
@@ -1388,6 +1393,14 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.winHeld": "The Windows key cannot be used. Use Ctrl, Alt, or Shift.",
     "shortcuts.macCtrlHeld": "On Mac use ⌘, not Control.",
     "shortcuts.reset": "Restore defaults",
+    "shortcuts.globalMasterTitle": "Enable global shortcuts",
+    "shortcuts.globalMasterDesc":
+      "When off, Museek stops claiming system-wide hotkeys so other applications can use those combos. In-app shortcuts keep working.",
+    "shortcuts.globalToggleLabel": "Enable the global shortcut for {action}",
+    "shortcuts.globalToggleHint":
+      "Turn off to release this combo for other applications. It still works inside Museek.",
+    "shortcuts.globalToggleUnset":
+      "Set a global shortcut first, then choose whether it is enabled.",
     "shortcuts.fontHint":
       "In the lyrics view, Ctrl/⌘ + scroll still changes font size (this window only).",
     "shortcuts.registerFailed": "Could not register {combo} as a global hotkey",
