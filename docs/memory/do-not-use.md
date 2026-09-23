@@ -26,7 +26,7 @@ Do not use `max-w-*` or intrinsic width for `TrackRow`'s platform chip or `stat`
 
 ## Re-resolving the current track without `force`
 
-Do not call `play(song, quality)` to change the quality of the track that is already attached. The same-song short-circuit treats it as redundant and returns without doing anything, and `togglePlay` sets `playPending` first, which that short-circuit also reads as "busy" — so the request is dropped and every retry repeats it. Pass `{ force: true }`, which also skips the CUE seek-in-place branch. Do not "fix" this by deleting the `playPending` check: that check is what prevents a double-press from starting two loads.
+Do not call `play(song, quality)` to change the quality of the track that is already attached. The same-song short-circuit treats it as redundant and returns without doing anything, and `togglePlay` sets `playPending` first, which that short-circuit also reads as "busy" — so the request is dropped and every retry repeats it. Pass `{ force: true }`, which also skips the CUE seek-in-place branch. This applies to any deliberate reload of the current track, including the expired-URL retry in `play()`'s catch. Do not "fix" this by deleting the `playPending` check: that check is what prevents a double-press from starting two loads.
 
 ## Letting a manual downgrade be silently re-upgraded
 
