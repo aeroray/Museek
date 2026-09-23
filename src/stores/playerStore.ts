@@ -585,7 +585,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         if (attachedSource && urlRetryFor !== song.id) {
           urlRetryFor = song.id;
           sourceRunner.invalidateMusicUrl(song);
-          await get().play(song, preferred);
+          // `force` because this is the same track: without it the request is
+          // dropped whenever the source is still attached (a play timeout leaves
+          // status "loading" and sourceReady true), so the one-shot retry for an
+          // expired URL silently never happened.
+          await get().play(song, preferred, { force: true });
           return;
         }
         urlRetryFor = "";
