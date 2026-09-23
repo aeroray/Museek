@@ -4,10 +4,9 @@ import type { Transition } from "motion/react"
  * Spring presets for the `motion/react` icons.
  *
  * Hover poses and press feedback are CSS-only — they read the `--motion-*` and
- * `--ease-spring-*` tokens in `src/index.css`, which are generated from real
- * damped-harmonic physics by `node scripts/spring-easings.mjs`. Only the icons
- * that need JS to animate (SVG path morphs, glyph cross-fades) live here, so
- * there is exactly one place to tune each kind of motion.
+ * `--ease-spring-*` tokens in `src/index.css`. Only the icons that need JS to
+ * animate (SVG path morphs, glyph cross-fades) live here, so there is exactly
+ * one place to tune each kind of motion.
  */
 
 /**

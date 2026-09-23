@@ -20,10 +20,10 @@ export const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
  * Turn a `MediaError` into something classifiable, or `null` when it is not a
  * failure at all.
  *
- * Measured in Chromium (`scripts/probe-media-error-server.mjs`), the element
- * reports code 4 (`SRC_NOT_SUPPORTED`) as a catch-all for a 404, an HTML/JSON
- * error body, an empty `src` and an unreachable host alike, so the code alone
- * cannot separate "network" from "bad audio" — it only needs to be *stable*.
+ * Measured in Chromium, the element reports code 4 (`SRC_NOT_SUPPORTED`) as a
+ * catch-all for a 404, an HTML/JSON error body, an empty `src` and an
+ * unreachable host alike, so the code alone cannot separate "network" from
+ * "bad audio" — it only needs to be *stable*.
  *
  * The numeric code is preferred over `message` because `message` is unreliable:
  * a plain 404 produced `message === ""` (not null/undefined), so the old

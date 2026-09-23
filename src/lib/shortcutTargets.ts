@@ -1,8 +1,9 @@
 /**
  * Which focused elements should swallow the app's keyboard shortcuts.
  *
- * Kept dependency-free so it can be checked in a real browser
- * (`scripts/check-shortcut-targets.mjs`) without booting the stores.
+ * Kept dependency-free so it can be exercised in a real browser without
+ * booting the stores (focus and `:focus-visible` are decided by the browser's
+ * input pipeline, not by synthetic DOM events).
  */
 
 /** Keys a focused slider legitimately consumes for its own seeking. */

@@ -50,7 +50,7 @@ Do not add `icon-button-motion`, a hover scale, or any transition to the minimiz
 
 ## Hardcoded durations or easings in icon motion
 
-Do not write literal durations or easings into icon buttons (`duration-150`, `cubic-bezier(...)`, `transition: transform 150ms`). Read `--motion-fast` / `--motion-base` / `--motion-slow` and `--ease-spring-*` from `:root`, or the `SPRING_*` / `ICON_SWAP_*` presets in `src/lib/motion.ts`. Regenerate the spring curves with `node scripts/spring-easings.mjs` rather than hand-tuning a bezier. Also do not put `transform` on the same element as a `motion/react` animated `scale` — motion writes an inline transform that beats the CSS animation, so the effect silently never plays; nest instead (`IconBurst`).
+Do not write literal durations or easings into icon buttons (`duration-150`, `cubic-bezier(...)`, `transition: transform 150ms`). Read `--motion-fast` / `--motion-base` / `--motion-slow` and `--ease-spring-*` from `:root`, or the `SPRING_*` / `ICON_SWAP_*` presets in `src/lib/motion.ts`, rather than hand-tuning a bezier. Also do not put `transform` on the same element as a `motion/react` animated `scale` — motion writes an inline transform that beats the CSS animation, so the effect silently never plays; nest instead (`IconBurst`).
 
 ## Lyrics rail particles
 
