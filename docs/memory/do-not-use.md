@@ -28,6 +28,10 @@ Do not use `max-w-*` or intrinsic width for `TrackRow`'s platform chip or `stat`
 
 Do not call `play(song, quality)` to change the quality of the track that is already attached. The same-song short-circuit treats it as redundant and returns without doing anything, and `togglePlay` sets `playPending` first, which that short-circuit also reads as "busy" — so the request is dropped and every retry repeats it. Pass `{ force: true }`, which also skips the CUE seek-in-place branch. This applies to any deliberate reload of the current track, including the expired-URL retry in `play()`'s catch. Do not "fix" this by deleting the `playPending` check: that check is what prevents a double-press from starting two loads.
 
+## Removing focus rings globally
+
+Do not add a global `:focus-visible { outline: none }` or a blanket `outline-none` to suppress the menu focus ring. Focus rings are the only affordance keyboard users get, and the reported annoyance comes from a *modality mismatch*: Radix restores focus to a menu trigger on close, which after a mouse click paints a ring the user did not ask for. Fix it where the modality is known (`DropdownMenuContent`'s `onCloseAutoFocus` plus `src/lib/focusModality.ts`) so keyboard closes keep the ring. Also do not assume `focus({ focusVisible: false })` clears an existing ring — it does not; `focus()` on an already-focused element is a no-op, so blur first.
+
 ## Letting a manual downgrade be silently re-upgraded
 
 Do not let the resume-time upgrade in `togglePlay` override a quality the user chose deliberately for one song. It reads the global `settings.playQuality`, so a per-song downgrade would be undone on the next pause/resume. A per-song choice must be distinguishable from the global default before that path is touched.

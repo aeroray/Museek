@@ -6,6 +6,14 @@ Decision:
 Reason:
 Every platform adapter joins artists with `、` (`formatSingers`), so it is the one separator guaranteed by the data contract. `/` and `&` are deliberately not separators — they occur inside real names (AC/DC, Simon & Garfunkel) and splitting them would invent artists. The per-credit-string keying made collabs rank separately from the same artist's solo work, so a listener's real top artist could be buried under fragmented rows. Dropping the song cover is honest: an artist has no artwork of its own, and a borrowed track cover changes depending on which song played last.
 
+## 2026-09-24 - Suppress the focus ring only for pointer-driven menu closes
+
+Decision:
+`DropdownMenuContent` (in `src/components/ui/dropdown-menu.tsx`) handles `onCloseAutoFocus` itself: when the last interaction was a pointer, it re-focuses the restored trigger with `focus({ focusVisible: false })` in a `queueMicrotask`. Keyboard closes keep the ring. `src/lib/focusModality.ts` records the modality from capture-phase `pointerdown`/`keydown` listeners and exposes `focusWithoutRing`, which blurs first because `focus()` on an already-focused element keeps the existing `:focus-visible` state.
+
+Reason:
+Radix restores focus to the menu trigger on close (`onCloseAutoFocus` → `triggerRef.current?.focus()`). That is right for keyboard users — focus must not be dropped to `<body>` — but after a mouse-only interaction the browser matches `:focus-visible` on the trigger and paints its ring, leaving a keyboard affordance on screen for a click. Measured in Chromium (both WebView2 and WKWebView): `focus({ focusVisible: false })` does clear the ring when the element is not already focused, but a plain `focus()` on an already-focused element is a no-op that preserves the ring, hence the blur. The fix sits in the shared content wrapper so all 15 menus inherit it, and it keys off `aria-haspopup` on the newly focused element so an interaction outside the menu is untouched. Deferring via `queueMicrotask` is required because Radix's own focus-moving handler is composed to run *after* this callback.
+
 ## 2026-09-24 - A per-song quality choice normalises to "no choice"
 
 Decision:

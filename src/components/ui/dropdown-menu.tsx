@@ -2,6 +2,7 @@ import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { focusWithoutRing, isPointerModality } from "@/lib/focusModality";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -51,11 +52,31 @@ DropdownMenuSubContent.displayName =
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
+>(({ className, sideOffset = 4, onCloseAutoFocus, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
+      onCloseAutoFocus={(event) => {
+        onCloseAutoFocus?.(event);
+        if (event.defaultPrevented) return;
+        // Radix restores focus to the trigger when the menu closes, which is
+        // right for keyboard users. After a MOUSE interaction it also paints the
+        // trigger's :focus-visible ring, leaving a keyboard affordance on screen
+        // for a click. Re-focus without the ring in that case only.
+        //
+        // Deferred because Radix's own handler — the one that moves focus — is
+        // composed to run *after* this callback.
+        if (!isPointerModality()) return;
+        queueMicrotask(() => {
+          const active = document.activeElement;
+          // `aria-haspopup` identifies "Radix just restored focus to a menu
+          // trigger", so an interaction outside the menu is left alone.
+          if (active instanceof HTMLElement && active.hasAttribute("aria-haspopup")) {
+            focusWithoutRing(active);
+          }
+        });
+      }}
       className={cn(
         "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className,
