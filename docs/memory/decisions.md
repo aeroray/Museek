@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-24 - A per-song quality choice outlives the queue
+
+Decision:
+Per-song quality lives in `src/lib/songQualityPrefs.ts`, persisted to the device-local `songQualityPrefs.json`, keyed by `MusicInfo.id` (already globally unique: `wy_123`, `local_<md5>`). `QueueItem.qualityOverride` is now a *projection* of that store, re-applied by `hydrateQualityOverrides` wherever a queue is built or restored — `playAll`, `addToQueue`, the new-item branch of `play()`, and the session restore. `play()`/`togglePlay`/`restorePlaybackSource` read `getStoredQuality(id) ?? item.qualityOverride`. Choices are capped (default 100, max 1000) with least-recently-used eviction, applied on read and write; Settings → Cache gets its own card with the cap and a confirmed clear.
+
+Reason:
+The choice is a standing instruction about a *song*, not about the queue it happened to be in, so keying it to the queue meant "play all" on another playlist silently forgot it. `MusicInfo.id` is the right key because it is already what every queue/UI comparison uses and it is unique across sources. The cap matters because the map is otherwise unbounded: one entry per track ever touched. LRU rather than oldest-set is the honest rule — the choices a user is living with are the recent ones — and re-applying it on read as well as write means an install that lowers the cap shrinks its file immediately, matching `trimEvents` in `listenLog`. The store is device-local by being absent from `configIO`'s `DB_FILES`, so a config import can never wipe it; `setStoredQuality` holds writes made before the file has loaded, because startup reads settings and player prefs in parallel and the badge is clickable in that window.
+
 ## 2026-09-24 - A per-song quality choice normalises to "no choice"
 
 Decision:

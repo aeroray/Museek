@@ -11,7 +11,8 @@ import { LYRIC_FONT_SCALE_KEY } from "@/lib/lyrics/fontScale";
 // downloaded files, localMusic.json, downloads.json, player.json (volume/
 // mute), fonts.json (UI / desktop-lyrics families), playbackSession.json (queue / now-playing), listenLog.json (listening stats), sourceProbe.json (source
 // health-check results), miniPlayer.json (mini-bar
-// position), desktopLyrics.json, desktopLyricsGeometry.json, and
+// position), desktopLyrics.json, desktopLyricsGeometry.json,
+// songQualityPrefs.json (per-song quality choices), and
 // museek.whatsNew.seenVersion / AppData whats-new-*.json — those are device-local.
 
 const isTauri =

@@ -38,6 +38,12 @@ import { t } from "@/lib/i18n";
 import { formatRemotePlayError, isIgnorablePlayError } from "@/lib/playError";
 import { isRedundantPlayRequest } from "@/lib/playRequest";
 import {
+  getStoredQuality,
+  hydrateQualityOverrides,
+  loadSongQualities,
+  setStoredQuality,
+} from "@/lib/songQualityPrefs";
+import {
   nextQualityOverride,
   resolveTargetQuality,
   resumeResolveQuality,
@@ -319,12 +325,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       const force = opts?.force ?? false;
       const existing = get().queue.find((item) => item.music.id === song.id);
       // A per-song choice is a standing instruction, so it outranks the target
-      // stamped on the queue item when it was enqueued.
+      // stamped on the queue item when it was enqueued. The persistent store is
+      // authoritative; the queue item is a projection of it (see
+      // songQualityPrefs), consulted only as a fallback for the window before
+      // the store has loaded.
+      const override = getStoredQuality(song.id) ?? existing?.qualityOverride;
       const preferred =
-        existing?.qualityOverride ??
-        quality ??
-        useSettingsStore.getState().playQuality;
-      const hasOverride = Boolean(existing?.qualityOverride);
+        override ?? quality ?? useSettingsStore.getState().playQuality;
+      const hasOverride = Boolean(override);
 
       // No source loaded → can't resolve a playback URL. Prompt to import instead
       // of silently failing. Local files play from disk and need no lx source.
@@ -436,11 +444,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         });
       }
 
-      // Add to queue if not already there
+      // Add to queue if not already there. A new item carries the stored choice
+      // so the queue badge shows it immediately.
       const { queue } = get();
       let idx = queue.findIndex((item) => item.music.id === song.id);
       if (idx === -1) {
-        const newQueue = [...queue, { music: song, quality: preferred }];
+        const newQueue = [
+          ...queue,
+          { music: song, quality: preferred, qualityOverride: override },
+        ];
         idx = newQueue.length - 1;
         set({ queue: newQueue, queueIndex: idx });
       } else {
@@ -695,6 +707,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       // following the default if the user changes it later.
       const override = nextQualityOverride(quality, defaultQuality);
 
+      // Persist first: this is the standing instruction, and it must outlive the
+      // queue. `undefined` forgets the choice, matching "set it back to default".
+      setStoredQuality(song.id, override);
+
+      // Mirror onto every queue item for this song, so the badge updates even if
+      // the same track is queued more than once.
       set((s) => {
         const queue = s.queue.map((item) =>
           item.music.id === song.id
@@ -735,9 +753,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       set((s) => ({
         queue: [
           ...s.queue,
-          ...songs
-            .filter((song) => !s.queue.some((q) => q.music.id === song.id))
-            .map((song) => ({ music: song, quality: preferred })),
+          ...hydrateQualityOverrides(
+            songs
+              .filter((song) => !s.queue.some((q) => q.music.id === song.id))
+              .map((song) => ({ music: song, quality: preferred })),
+          ),
         ],
       }));
       persistPlaybackSession(true);
@@ -814,7 +834,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           ? Math.floor(Math.random() * songs.length)
           : 0;
       set({
-        queue: songs.map((song) => ({ music: song, quality: preferred })),
+        // Re-apply every stored per-song choice, so "play all" on a different
+        // playlist does not forget what the user set for these tracks.
+        queue: hydrateQualityOverrides(
+          songs.map((song) => ({ music: song, quality: preferred })),
+        ),
         queueIndex: startIdx,
       });
       persistPlaybackSession(true);
@@ -853,9 +877,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           if (restoreSourcePromise) await restoreSourcePromise;
           const song = get().currentSong;
           const defaultQuality = useSettingsStore.getState().playQuality;
-          const override = get().queue.find(
-            (item) => item.music.id === song?.id,
-          )?.qualityOverride;
+          const override = song
+            ? (getStoredQuality(song.id) ??
+              get().queue.find((item) => item.music.id === song.id)
+                ?.qualityOverride)
+            : undefined;
           const target = resolveTargetQuality(override, defaultQuality);
           const resolveAt = song
             ? resumeResolveQuality({
@@ -941,6 +967,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         }
       });
 
+      // Before the session restore below, so restored queue items pick up the
+      // stored choices. The cap is re-applied from settings once they load
+      // (see App.tsx), because settings may still be in flight here.
+      await loadSongQualities();
+
       const session = await readPlaybackSession();
       if (!session?.currentSong && !session?.queue.length) {
         set({ volume, muted });
@@ -959,7 +990,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       set({
         volume,
         muted,
-        queue: session.queue,
+        // Re-apply stored choices over the restored queue: the session file may
+        // predate a choice, and the store is the authority.
+        queue: hydrateQualityOverrides(session.queue),
         queueIndex: session.queueIndex,
         currentSong: session.currentSong,
         currentQuality: session.currentQuality,
@@ -1031,9 +1064,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
           }
 
           const settings = useSettingsStore.getState();
-          const restoreOverride = get().queue.find(
-            (item) => item.music.id === song.id,
-          )?.qualityOverride;
+          const restoreOverride =
+            getStoredQuality(song.id) ??
+            get().queue.find((item) => item.music.id === song.id)
+              ?.qualityOverride;
           // With an explicit per-song choice, restore must not pick a tier above
           // it — `findCachedPlayableSrc` prefers the best copy overall, which
           // would silently undo a deliberate downgrade before the user even

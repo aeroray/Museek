@@ -14,6 +14,11 @@ import {
 import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { useSettingsStore, CACHE_LIMITS_MB } from "@/stores/settingsStore"
 import { getCacheBytes, clearCache, enforceLimit, formatBytes } from "@/lib/mediaCache"
+import {
+  SONG_QUALITY_LIMITS,
+  clearStoredQualities,
+  countStoredQualities,
+} from "@/lib/songQualityPrefs"
 import { useT } from "@/lib/i18n"
 
 function limitLabel(mb: number): string {
@@ -21,12 +26,24 @@ function limitLabel(mb: number): string {
 }
 
 export function CacheSettings() {
-  const { audioCache, maxCacheMB, setAudioCache, setMaxCacheMB } = useSettingsStore()
+  const {
+    audioCache,
+    maxCacheMB,
+    songQualityLimit,
+    setAudioCache,
+    setMaxCacheMB,
+    setSongQualityLimit,
+  } = useSettingsStore()
   const t = useT()
 
   const [cacheSize, setCacheSize] = useState(0)
   const [clearing, setClearing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [qualityConfirmOpen, setQualityConfirmOpen] = useState(false)
+  // Seeded lazily rather than in an effect: the store is already loaded by the
+  // time Settings can be opened, and an effect would render "0 remembered" for
+  // one frame. Every mutation below refreshes it explicitly.
+  const [qualityCount, setQualityCount] = useState(countStoredQualities)
   useEffect(() => {
     getCacheBytes().then(setCacheSize)
   }, [])
@@ -41,6 +58,16 @@ export function CacheSettings() {
   const handleSetLimit = (mb: number) => {
     setMaxCacheMB(mb)
     enforceLimit(mb * 1024 * 1024).then(() => getCacheBytes().then(setCacheSize))
+  }
+
+  const handleSetQualityLimit = (n: number) => {
+    setSongQualityLimit(n)
+    setQualityCount(countStoredQualities())
+  }
+
+  const handleClearQualities = () => {
+    clearStoredQualities()
+    setQualityCount(0)
   }
 
   return (
@@ -84,6 +111,45 @@ export function CacheSettings() {
             </div>
           </SettingRow>
         </SettingsCard>
+
+        {/* Per-song quality choices are a separate thing from the audio cache:
+            they are tiny, and clearing them changes how songs PLAY rather than
+            what is on disk. So they get their own card and their own confirm. */}
+        <SettingsCard className="mt-3">
+          <SettingRow
+            title={t("cache.songQualityTitle")}
+            desc={t("cache.songQualityDesc")}
+          >
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {SONG_QUALITY_LIMITS.map((n) => (
+                  <Button
+                    key={n}
+                    variant={songQualityLimit === n ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleSetQualityLimit(n)}
+                  >
+                    {t("cache.songQualityLimitValue", { n })}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {t("cache.songQualityCount", { n: qualityCount })}
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setQualityConfirmOpen(true)}
+                  disabled={qualityCount === 0}
+                >
+                  <Trash2 size={14} className="mr-2" />
+                  {t("cache.songQualityClear")}
+                </Button>
+              </div>
+            </div>
+          </SettingRow>
+        </SettingsCard>
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -104,6 +170,34 @@ export function CacheSettings() {
               }}
             >
               {t("cache.clearConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={qualityConfirmOpen} onOpenChange={setQualityConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("cache.songQualityClearTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("cache.songQualityClearDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setQualityConfirmOpen(false)}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                handleClearQualities()
+                setQualityConfirmOpen(false)
+              }}
+            >
+              {t("cache.songQualityClearConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

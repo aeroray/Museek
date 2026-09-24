@@ -21,6 +21,7 @@ import { usePlayerStore } from "@/stores/playerStore";
 import { bindNotify, bindDownloadLocationPrompt } from "@/lib/notify";
 import { bindPlayAll } from "@/lib/playback/playAllPort";
 import { enforceLimit } from "@/lib/mediaCache";
+import { applySongQualityLimit } from "@/lib/songQualityPrefs";
 import { setTrayVisible } from "@/lib/power";
 import { maybeAutoImport } from "@/lib/sync";
 import { useGlobalShortcuts } from "@/lib/shortcuts";
@@ -85,6 +86,10 @@ function AppInit() {
         if (cancelled) return;
         const s = useSettingsStore.getState();
         enforceLimit(s.maxCacheMB * 1024 * 1024);
+        // Player prefs load in parallel with settings, so the per-song quality
+        // store may have been read before the configured cap was available.
+        // Re-apply it now, which also evicts if the cap was lowered.
+        applySongQualityLimit(s.songQualityLimit);
         // Show the tray icon only if the saved close-behavior is "hide to tray".
         setTrayVisible(s.closeBehavior === "tray" || s.startHiddenToTray);
         void loadDownloads();

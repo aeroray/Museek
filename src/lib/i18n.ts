@@ -660,6 +660,14 @@ const dict: Record<Lang, Record<string, string>> = {
     "cache.clearConfirmTitle": "确定清理缓存？",
     "cache.clearConfirmDesc": "将清除已缓存的音频和歌词，不影响收藏和下载。",
     "cache.clearConfirm": "清理",
+    "cache.songQualityTitle": "单曲音质设置",
+    "cache.songQualityDesc": "为某一首歌单独设置的播放音质会保存在本机，换歌单或重启后依然生效。超出上限时，最早设置的会被清理。",
+    "cache.songQualityLimitValue": "{n} 首",
+    "cache.songQualityCount": "已记录：{n} 首",
+    "cache.songQualityClear": "清除音质设置",
+    "cache.songQualityClearTitle": "确定清除单曲音质设置？",
+    "cache.songQualityClearDesc": "这些歌曲将恢复使用默认音质，收藏和下载不受影响。",
+    "cache.songQualityClearConfirm": "清除",
 
     // Config import / export
     "data.title": "配置同步",
@@ -1465,6 +1473,16 @@ const dict: Record<Lang, Record<string, string>> = {
     "cache.clearConfirmDesc":
       "Clears cached audio and lyrics. Favorites and downloads are kept.",
     "cache.clearConfirm": "Clear",
+    "cache.songQualityTitle": "Per-song quality",
+    "cache.songQualityDesc":
+      "A quality chosen for one song is remembered on this device and survives switching playlists or restarting. Beyond the limit, the oldest choices are dropped.",
+    "cache.songQualityLimitValue": "{n} songs",
+    "cache.songQualityCount": "Remembered: {n}",
+    "cache.songQualityClear": "Clear quality choices",
+    "cache.songQualityClearTitle": "Clear per-song quality choices?",
+    "cache.songQualityClearDesc":
+      "These songs go back to the default quality. Favorites and downloads are unaffected.",
+    "cache.songQualityClearConfirm": "Clear",
 
     // Config import / export
     "data.title": "Config sync",

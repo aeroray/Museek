@@ -20,6 +20,11 @@ import {
   type ShortcutSlot,
 } from "@/lib/shortcutKeys";
 import { parseLyricColor } from "@/lib/lyricColor";
+import {
+  DEFAULT_SONG_QUALITY_LIMIT,
+  applySongQualityLimit,
+  clampSongQualityLimit,
+} from "@/lib/songQualityPrefs";
 import type { LocalNameMode, OnlineSource, Quality } from "@/types/music";
 
 export type NamingScheme = "singer-name" | "name-singer" | "name";
@@ -66,6 +71,11 @@ interface Persisted {
   audioCache: boolean;
   // Disk cache size cap in MB; least-recently-used audio is evicted beyond this.
   maxCacheMB: number;
+  /**
+   * How many per-song quality choices to remember. Least recently used are
+   * dropped beyond this, so the list cannot grow without bound.
+   */
+  songQualityLimit: number;
   // Keep the system awake (but allow display sleep/lock) while music plays.
   preventSleepWhilePlaying: boolean;
   // Open the separate desktop lyrics window in locked mode by default.
@@ -129,6 +139,7 @@ interface SettingsState extends Persisted {
   setLocalMatchOnImport: (v: boolean) => void;
   setAudioCache: (v: boolean) => void;
   setMaxCacheMB: (n: number) => void;
+  setSongQualityLimit: (n: number) => void;
   setPreventSleepWhilePlaying: (v: boolean) => void;
   setAutoLockDesktopLyrics: (v: boolean) => void;
   setDesktopLyricsCapsuleVisible: (v: boolean) => void;
@@ -174,6 +185,7 @@ const DEFAULTS: Persisted = {
   localMatchOnImport: false,
   audioCache: true,
   maxCacheMB: 1024,
+  songQualityLimit: DEFAULT_SONG_QUALITY_LIMIT,
   preventSleepWhilePlaying: true,
   autoLockDesktopLyrics: false,
   desktopLyricsCapsuleVisible: true,
@@ -243,6 +255,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localMatchOnImport,
       audioCache,
       maxCacheMB,
+      songQualityLimit,
       preventSleepWhilePlaying,
       autoLockDesktopLyrics,
       desktopLyricsCapsuleVisible,
@@ -279,6 +292,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       localMatchOnImport,
       audioCache,
       maxCacheMB,
+      songQualityLimit,
       preventSleepWhilePlaying,
       autoLockDesktopLyrics,
       desktopLyricsCapsuleVisible,
@@ -356,6 +370,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     },
     setMaxCacheMB(n) {
       set({ maxCacheMB: n });
+      persist();
+    },
+    setSongQualityLimit(n) {
+      const limit = clampSongQualityLimit(n);
+      set({ songQualityLimit: limit });
+      // Evict beyond the new cap immediately, so lowering it shrinks the stored
+      // list right away rather than at the next choice.
+      applySongQualityLimit(limit);
       persist();
     },
     setPreventSleepWhilePlaying(v) {
@@ -585,6 +607,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         maxCacheMB: CACHE_LIMITS_MB.includes(data.maxCacheMB as number)
           ? (data.maxCacheMB as number)
           : DEFAULTS.maxCacheMB,
+        songQualityLimit: clampSongQualityLimit(
+          typeof data.songQualityLimit === "number"
+            ? data.songQualityLimit
+            : DEFAULTS.songQualityLimit,
+        ),
         preventSleepWhilePlaying:
           typeof data.preventSleepWhilePlaying === "boolean"
             ? data.preventSleepWhilePlaying
