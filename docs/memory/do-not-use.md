@@ -56,6 +56,8 @@ Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality
 
 Do not treat `QueueItem.qualityOverride` as the storage for a per-song choice. The queue is replaced constantly — "play all" on another playlist, a shuffle, a restart — so a choice kept only there is lost for no reason the user can see. The authoritative copy is `src/lib/songQualityPrefs.ts`; the queue field is a projection re-applied by `hydrateQualityOverrides` at every point a queue is built or restored. For the same reason, do not add the store to `configIO`'s `DB_FILES`: being absent is what keeps it out of sync exports and makes a config import unable to wipe it.
 
+Do not add a user-facing limit for the per-song quality store. An entry is ~113 bytes, so the whole file is ~224 KB even at its 2,000-entry cap — a control for it would be a question the user cannot answer about a file that cannot matter. It is a fixed constant with automatic LRU eviction; the UI shows the count and a clear, nothing more.
+
 ## Storing a per-song override that equals the default
 
 Do not persist a per-song quality that happens to equal the current default, and do not defer that comparison to read time. A stored override outlives a later change to the default, so a track set back to 320k would stay pinned to 320k after the user switched their default to FLAC — unlike every other song. Normalise at the moment of the choice (`nextQualityOverride`) so "set it back to the default" means "never touched".

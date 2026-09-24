@@ -15,7 +15,7 @@ import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard"
 import { useSettingsStore, CACHE_LIMITS_MB } from "@/stores/settingsStore"
 import { getCacheBytes, clearCache, enforceLimit, formatBytes } from "@/lib/mediaCache"
 import {
-  SONG_QUALITY_LIMITS,
+  MAX_STORED_QUALITIES,
   clearStoredQualities,
   countStoredQualities,
 } from "@/lib/songQualityPrefs"
@@ -29,10 +29,8 @@ export function CacheSettings() {
   const {
     audioCache,
     maxCacheMB,
-    songQualityLimit,
     setAudioCache,
     setMaxCacheMB,
-    setSongQualityLimit,
   } = useSettingsStore()
   const t = useT()
 
@@ -58,11 +56,6 @@ export function CacheSettings() {
   const handleSetLimit = (mb: number) => {
     setMaxCacheMB(mb)
     enforceLimit(mb * 1024 * 1024).then(() => getCacheBytes().then(setCacheSize))
-  }
-
-  const handleSetQualityLimit = (n: number) => {
-    setSongQualityLimit(n)
-    setQualityCount(countStoredQualities())
   }
 
   const handleClearQualities = () => {
@@ -113,40 +106,31 @@ export function CacheSettings() {
         </SettingsCard>
 
         {/* Per-song quality choices are a separate thing from the audio cache:
-            they are tiny, and clearing them changes how songs PLAY rather than
-            what is on disk. So they get their own card and their own confirm. */}
+            they are tiny (a few hundred KB at most), and clearing them changes
+            how songs PLAY rather than what is on disk. So they get their own
+            card and their own confirm.
+
+            There is no size/limit control on purpose: an entry is ~113 bytes, so
+            the cap is a constant and the only thing a user needs to see is how
+            many are stored and how to clear them. */}
         <SettingsCard className="mt-3">
           <SettingRow
             title={t("cache.songQualityTitle")}
-            desc={t("cache.songQualityDesc")}
+            desc={t("cache.songQualityDesc", { max: MAX_STORED_QUALITIES })}
           >
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {SONG_QUALITY_LIMITS.map((n) => (
-                  <Button
-                    key={n}
-                    variant={songQualityLimit === n ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleSetQualityLimit(n)}
-                  >
-                    {t("cache.songQualityLimitValue", { n })}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-muted-foreground">
-                  {t("cache.songQualityCount", { n: qualityCount })}
-                </span>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setQualityConfirmOpen(true)}
-                  disabled={qualityCount === 0}
-                >
-                  <Trash2 size={14} className="mr-2" />
-                  {t("cache.songQualityClear")}
-                </Button>
-              </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">
+                {t("cache.songQualityCount", { n: qualityCount })}
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setQualityConfirmOpen(true)}
+                disabled={qualityCount === 0}
+              >
+                <Trash2 size={14} className="mr-2" />
+                {t("cache.songQualityClear")}
+              </Button>
             </div>
           </SettingRow>
         </SettingsCard>

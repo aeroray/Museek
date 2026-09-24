@@ -23,19 +23,24 @@ import type { Quality } from "@/types/music";
 export const SONG_QUALITY_FILE = "songQualityPrefs.json";
 
 /**
- * Retention. A choice is tiny (a song id plus a tier), but the map is unbounded
- * in principle — a user who fiddles with quality for years would accumulate one
- * entry per track they ever touched, and every entry is a song id they may never
- * play again.
+ * Retention.
  *
- * A count cap with least-recently-used eviction, matching the disk cache: the
- * choices a user is actually living with are the ones they used most recently,
- * and a forgotten choice costs one menu click to restore.
+ * A choice is a song id plus a tier, and an entry measures ~113 bytes
+ * pretty-printed in the worst case (a 40-char local id, `flac24bit`, and a
+ * 13-digit timestamp). So the cap IS a size cap: 2,000 entries is ~220 KB.
+ *
+ * That is why this is a fixed constant rather than a setting. Asking a user how
+ * many songs to remember is asking them a question they cannot answer — nobody
+ * knows how many tracks they have individually adjusted — for a file that is
+ * ~5,000x smaller than the default audio cache (1 GB) and ~5x smaller than the
+ * listen log's 1.2 MB. Past the cap the least recently used choice is dropped,
+ * which degrades invisibly: the choices a user is actually living with are the
+ * recent ones, and re-picking a forgotten one costs a single menu click.
+ *
+ * Settings → Cache therefore shows the COUNT and offers a clear, but no limit
+ * to choose.
  */
-export const DEFAULT_SONG_QUALITY_LIMIT = 100;
-export const MAX_SONG_QUALITY_LIMIT = 1000;
-/** Offered in Settings → Cache, mirroring CACHE_LIMITS_MB. */
-export const SONG_QUALITY_LIMITS = [50, 100, 250, 500, 1000];
+export const MAX_STORED_QUALITIES = 2_000;
 
 export type SongQualityEntry = {
   /** `MusicInfo.id` — globally unique across sources. */
@@ -98,7 +103,6 @@ export function parseSongQualityEntries(raw: unknown): SongQualityEntry[] {
 
 let entries: SongQualityEntry[] = [];
 let loaded = false;
-let limit = DEFAULT_SONG_QUALITY_LIMIT;
 
 /**
  * Choices made before the file finished loading.
@@ -113,22 +117,19 @@ let limit = DEFAULT_SONG_QUALITY_LIMIT;
 const pendingBeforeLoad = new Map<string, Quality | null>();
 
 function persist(): void {
-  writeData(SONG_QUALITY_FILE, trimSongQualityEntries(entries, limit));
+  writeData(SONG_QUALITY_FILE, trimSongQualityEntries(entries, MAX_STORED_QUALITIES));
 }
 
 /**
- * Load once.
- *
- * `maxEntries` is optional because of a startup race: settings and player prefs
- * load in parallel, so the configured cap may not be readable yet. Loading with
- * the default and re-applying the real cap via `applySongQualityLimit` once
- * settings are in (as App.tsx does for the disk cache) is what keeps the two
- * from depending on which `readData` settles first.
+ * Load once. There is no limit parameter: the cap is a constant, so nothing has
+ * to be read from settings first and the startup race simply does not arise.
  */
-export async function loadSongQualities(maxEntries?: number): Promise<void> {
-  if (maxEntries !== undefined) limit = clampSongQualityLimit(maxEntries);
+export async function loadSongQualities(): Promise<void> {
   const raw = await readData<unknown>(SONG_QUALITY_FILE, []);
-  entries = trimSongQualityEntries(parseSongQualityEntries(raw), limit);
+  entries = trimSongQualityEntries(
+    parseSongQualityEntries(raw),
+    MAX_STORED_QUALITIES,
+  );
   // A choice the user made while this read was in flight beats the file.
   if (pendingBeforeLoad.size) {
     for (const [id, quality] of pendingBeforeLoad) {
@@ -139,17 +140,12 @@ export async function loadSongQualities(maxEntries?: number): Promise<void> {
           : [{ id, quality, lastUsed: Date.now() }, ...rest];
     }
     pendingBeforeLoad.clear();
-    entries = trimSongQualityEntries(entries, limit);
+    entries = trimSongQualityEntries(entries, MAX_STORED_QUALITIES);
   }
   loaded = true;
-  // Re-write when parsing, the cap, or a pending write changed the set, so a
-  // lowered limit shrinks the file immediately instead of at the next choice.
+  // Re-write when parsing or a pending write changed the set, so an oversized
+  // or malformed file is cleaned up on load rather than at the next choice.
   if (JSON.stringify(entries) !== JSON.stringify(raw)) persist();
-}
-
-export function clampSongQualityLimit(n: number): number {
-  if (!Number.isFinite(n)) return DEFAULT_SONG_QUALITY_LIMIT;
-  return Math.min(MAX_SONG_QUALITY_LIMIT, Math.max(1, Math.round(n)));
 }
 
 /**
@@ -182,14 +178,7 @@ export function setStoredQuality(
     quality === undefined
       ? rest
       : [{ id: songId, quality, lastUsed: Date.now() }, ...rest];
-  entries = trimSongQualityEntries(entries, limit);
-  persist();
-}
-
-/** Apply a new cap, evicting least-recently-used entries beyond it. */
-export function applySongQualityLimit(next: number): void {
-  limit = clampSongQualityLimit(next);
-  entries = trimSongQualityEntries(entries, limit);
+  entries = trimSongQualityEntries(entries, MAX_STORED_QUALITIES);
   persist();
 }
 

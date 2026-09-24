@@ -124,8 +124,13 @@ function ColumnLabel({
   onReset?: () => void;
   resetLabel?: string;
 }) {
+  // The reset button is absolutely positioned rather than laid out beside the
+  // label. As a flex sibling it consumed part of the centring, so the TEXT
+  // landed left of the column's true centre and looked misaligned against the
+  // keycaps below. Taking it out of flow centres the label on its own, and the
+  // button still sits at the column's right edge.
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="relative flex w-full items-center justify-center">
       <Tooltip delayDuration={400}>
         <TooltipTrigger asChild>
           <span className="text-[11px] font-medium text-muted-foreground">
@@ -141,7 +146,7 @@ function ColumnLabel({
               type="button"
               onClick={onReset}
               aria-label={resetLabel}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="absolute right-0 inline-flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <RotateCcw size={12} />
             </button>
