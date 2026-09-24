@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { SettingsCard, SettingRow } from "@/components/settings/SettingsCard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -71,6 +70,15 @@ const ROWS: ShortcutRow[] = [
 
 type Recording = { action: ShortcutAction; slot: ShortcutSlot };
 
+/**
+ * Column widths, shared by the header and every row so the two cannot drift.
+ * The global column is the widest because it holds a keycap plus a switch.
+ */
+const COLUMN_CLASS = {
+  local: "w-[10rem]",
+  global: "w-[13rem]",
+} as const;
+
 function Keycap({
   children,
   active,
@@ -101,19 +109,43 @@ function Keycap({
 function ColumnLabel({
   label,
   hint,
+  onReset,
+  resetLabel,
 }: {
   label: string;
   hint: string;
+  /** Present when this column has its own "restore defaults" affordance. */
+  onReset?: () => void;
+  resetLabel?: string;
 }) {
   return (
-    <Tooltip delayDuration={400}>
-      <TooltipTrigger asChild>
-        <span className="text-[11px] font-medium text-muted-foreground">
-          {label}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs text-xs">{hint}</TooltipContent>
-    </Tooltip>
+    <span className="inline-flex items-center gap-1">
+      <Tooltip delayDuration={400}>
+        <TooltipTrigger asChild>
+          <span className="text-[11px] font-medium text-muted-foreground">
+            {label}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{hint}</TooltipContent>
+      </Tooltip>
+      {onReset ? (
+        <Tooltip delayDuration={400}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onReset}
+              aria-label={resetLabel}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <RotateCcw size={12} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">
+            {resetLabel}
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
+    </span>
   );
 }
 
@@ -344,20 +376,9 @@ export function ShortcutsSettings() {
   return (
     <ScrollArea className="h-full">
       <div className="pr-3 pb-4 space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <p className="px-1 text-xs text-muted-foreground">
-            {t("shortcuts.desc")}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 h-8"
-            onClick={() => resetShortcuts()}
-          >
-            <RotateCcw size={14} className="mr-1.5" />
-            {t("shortcuts.reset")}
-          </Button>
-        </div>
+        <p className="px-1 text-xs text-muted-foreground">
+          {t("shortcuts.desc")}
+        </p>
 
         {/* Master switch. Global hotkeys are the ones that can clash with other
             applications, so this is the quick escape hatch when one does. */}
@@ -375,18 +396,28 @@ export function ShortcutsSettings() {
         </SettingsCard>
 
         <SettingsCard>
+          {/* Column header. The two key columns carry their own "restore
+              defaults" affordance, so resetting one column never touches the
+              other. Widths are shared with the rows below via COLUMN_CLASS so
+              the header cannot drift out of alignment. */}
           <div className="flex items-center gap-3 px-3.5 py-1.5">
-            <span className="min-w-0 flex-1" />
-            <div className="flex w-[8.5rem] justify-end">
+            <span className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground">
+              {t("shortcuts.columnAction")}
+            </span>
+            <div className={cn("flex justify-center", COLUMN_CLASS.local)}>
               <ColumnLabel
                 label={t("shortcuts.scopeLocal")}
                 hint={t("shortcuts.localHint")}
+                onReset={() => resetShortcuts("local")}
+                resetLabel={t("shortcuts.resetLocal")}
               />
             </div>
-            <div className="flex w-[11rem] justify-end">
+            <div className={cn("flex justify-center", COLUMN_CLASS.global)}>
               <ColumnLabel
                 label={t("shortcuts.scopeGlobal")}
                 hint={t("shortcuts.globalHint")}
+                onReset={() => resetShortcuts("global")}
+                resetLabel={t("shortcuts.resetGlobal")}
               />
             </div>
           </div>
@@ -400,18 +431,33 @@ export function ShortcutsSettings() {
               </span>
               {"staticKeys" in row ? (
                 <>
-                  <div className="flex w-[8.5rem] flex-wrap justify-end gap-1">
+                  <div
+                    className={cn(
+                      "flex flex-wrap justify-center gap-1",
+                      COLUMN_CLASS.local,
+                    )}
+                  >
                     {row.staticKeys.map((label) => (
                       <Keycap key={label}>{label}</Keycap>
                     ))}
                   </div>
-                  <div className="flex w-[11rem] justify-end">
+                  <div
+                    className={cn(
+                      "flex items-center justify-center",
+                      COLUMN_CLASS.global,
+                    )}
+                  >
                     <span className="text-[11px] text-muted-foreground">—</span>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="flex w-[8.5rem] justify-end">
+                  <div
+                    className={cn(
+                      "flex justify-center",
+                      COLUMN_CLASS.local,
+                    )}
+                  >
                     <Keycap
                       active={
                         recording?.action === row.action &&
@@ -427,7 +473,12 @@ export function ShortcutsSettings() {
                       )}
                     </Keycap>
                   </div>
-                  <div className="flex w-[11rem] items-center justify-end gap-2">
+                  <div
+                    className={cn(
+                      "flex items-center justify-center gap-2",
+                      COLUMN_CLASS.global,
+                    )}
+                  >
                     <Keycap
                       active={
                         recording?.action === row.action &&

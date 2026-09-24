@@ -25,14 +25,11 @@ Changing one track's quality re-attaches the audio source, which is the only thi
 ## 2026-09-24 - Global shortcuts can be switched off without losing their binding
 
 Decision:
-`disabledGlobalShortcuts: ShortcutAction[]` in `settingsStore` lists actions whose OS-global hotkey is not registered. `activeGlobalShortcuts(map, disabled)` in `src/lib/shortcutKeys.ts` is the single source of truth for what gets registered; `syncGlobalShortcuts` and the settings UI both call it. The panel gets a master switch plus one switch per action row. `setShortcut` clears an action's disabled flag when a new combo is recorded. The list is in `DEVICE_LOCAL_SETTINGS` so it never syncs.
+`disabledGlobalShortcuts: ShortcutAction[]` in `settingsStore` lists actions whose OS-global hotkey is switched off. Two pure helpers in `src/lib/shortcutKeys.ts` are the single source of truth: `activeGlobalShortcuts(map, disabled)` for what reaches the OS, and `inAppShortcutBindings(localMap, globalMap, disabled)` for what the in-app keydown handler matches (all local bindings first, then enabled globals). The panel gets a master switch plus one switch per action row, and each key column has its own reset button (`resetShortcuts(slot)`). The list is in `DEVICE_LOCAL_SETTINGS` so it never syncs.
 
 Reason:
-The complaint is a combo clash with another application, and only the OS-global registration can clash — a focused window cannot conflict with anything. So the fix is to release the combo, not to disable the feature: the binding is kept, the in-app binding keeps working, and re-enabling needs no re-recording. Clearing on record matters because keeping a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine; syncing it would disable a perfectly working shortcut elsewhere. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
+The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
-
-
-Decision:
 ## 2026-09-24 - A per-song quality choice normalises to "no choice"
 
 Decision:

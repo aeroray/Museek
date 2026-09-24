@@ -17,6 +17,7 @@ import {
   shortcutConflict,
   type ShortcutAction,
   type ShortcutMap,
+  type ShortcutSlot,
 } from "@/lib/shortcutKeys";
 import { parseLyricColor } from "@/lib/lyricColor";
 import type { LocalNameMode, OnlineSource, Quality } from "@/types/music";
@@ -147,7 +148,8 @@ interface SettingsState extends Persisted {
   setGlobalShortcutEnabled: (action: ShortcutAction, enabled: boolean) => void;
   /** Master switch for every OS-global hotkey at once. */
   setAllGlobalShortcutsEnabled: (enabled: boolean) => void;
-  resetShortcuts: () => void;
+  /** Restore one column's bindings (and, for "global", re-enable them). */
+  resetShortcuts: (slot: ShortcutSlot) => void;
   setSyncFolder: (dir: string | null) => void;
   setSyncPassphrase: (p: string | null) => void;
   setAutoBackupOnExit: (v: boolean) => void;
@@ -489,12 +491,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       });
       persist();
     },
-    resetShortcuts() {
-      set({
-        shortcuts: { ...DEFAULT_SHORTCUTS },
-        localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS },
-        disabledGlobalShortcuts: [],
-      });
+    resetShortcuts(slot) {
+      if (slot === "local") {
+        set({ localShortcuts: { ...DEFAULT_LOCAL_SHORTCUTS } });
+      } else {
+        set({
+          shortcuts: { ...DEFAULT_SHORTCUTS },
+          // Restoring the global column must also re-enable it, or the user
+          // gets defaults that silently do not work.
+          disabledGlobalShortcuts: [],
+        });
+      }
       persist();
     },
     setSyncFolder(dir) {

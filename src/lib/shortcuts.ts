@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
-  SHORTCUT_ACTIONS,
   activeGlobalShortcuts,
   eventMatchesShortcut,
   formatShortcut,
+  inAppShortcutBindings,
   isShortcutCaptureLocked,
   type ShortcutAction,
   type ShortcutMap,
@@ -170,23 +170,25 @@ export function useGlobalShortcuts(): void {
       if (e.repeat) return;
       if (isShortcutCaptureLocked() || isShortcutBlockedTarget(e.target, e.key))
         return;
-      // The in-app bindings stay live even for an action whose GLOBAL hotkey is
-      // disabled: the user is freeing a combo for another application, not
-      // turning the feature off inside Museek, and a focused window cannot
-      // conflict with anything else.
-      const maps = [localShortcuts, shortcuts];
-      for (const map of maps) {
-        for (const action of SHORTCUT_ACTIONS) {
-          if (!map[action] || !eventMatchesShortcut(e, map[action])) continue;
-          if (!runShortcutAction(action)) return;
-          e.preventDefault();
-          e.stopPropagation();
-          const active = document.activeElement;
-          if (active instanceof HTMLElement && active !== document.body) {
-            active.blur();
-          }
-          return;
+      // Local bindings first, then any ENABLED global one. A global shortcut the
+      // user switched off must not fire here either: the global map is matched
+      // in-app as well, so leaving it live would make the switch look broken to
+      // anyone who tries it with the window focused.
+      const bindings = inAppShortcutBindings(
+        localShortcuts,
+        shortcuts,
+        disabledGlobalShortcuts,
+      );
+      for (const { action, accel } of bindings) {
+        if (!eventMatchesShortcut(e, accel)) continue;
+        if (!runShortcutAction(action)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) {
+          active.blur();
         }
+        return;
       }
     };
     window.addEventListener("keydown", onKey, true);

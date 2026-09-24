@@ -489,6 +489,37 @@ export function activeGlobalShortcuts(
   return out;
 }
 
+/**
+ * Bindings the in-app keydown handler should match, in priority order.
+ *
+ * Local bindings always apply. A global binding applies only while it is
+ * enabled, because switching one off has to mean off everywhere: the global map
+ * is matched in-app too (so the shortcut still works when OS registration is
+ * unavailable), so leaving it live here would make the switch look broken for
+ * anyone testing it with the window focused. In-app use is not lost — that is
+ * what the local slot is for.
+ *
+ * Order matters: every local binding is offered before any global one, so a
+ * combo bound in both slots resolves to the local action, as it always has.
+ */
+export function inAppShortcutBindings(
+  localMap: ShortcutMap,
+  globalMap: ShortcutMap,
+  disabled: readonly ShortcutAction[],
+): { action: ShortcutAction; accel: string }[] {
+  const out: { action: ShortcutAction; accel: string }[] = [];
+  for (const action of SHORTCUT_ACTIONS) {
+    const accel = localMap[action];
+    if (accel) out.push({ action, accel });
+  }
+  for (const action of SHORTCUT_ACTIONS) {
+    if (!isGlobalShortcutEnabled(disabled, action)) continue;
+    const accel = globalMap[action];
+    if (accel) out.push({ action, accel });
+  }
+  return out;
+}
+
 /** True while the settings recorder is capturing a combo (skip dispatch). */
 let captureLock = false;
 

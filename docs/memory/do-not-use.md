@@ -38,7 +38,9 @@ Do not clear `currentPicUrl`, `lyricLines` or `duration` when `play()` is re-att
 
 ## Turning a global shortcut off by clearing its binding
 
-Do not implement "disable this global shortcut" by setting the accelerator to `""`. That destroys the binding, so re-enabling forces the user to re-record the combo, and the settings row can no longer show what was released. Keep the binding and track the action in `disabledGlobalShortcuts` instead — the only thing that can clash with another application is the OS registration. For the same reason, do not make that list sync across devices: the clash comes from software installed on one machine.
+Do not implement "disable this global shortcut" by setting the accelerator to `""`. That destroys the binding, so re-enabling forces the user to re-record the combo, and the settings row can no longer show what was released. Keep the binding and track the action in `disabledGlobalShortcuts` instead. Do not make that list sync across devices: the clash comes from software installed on one machine.
+
+Also do not check the disabled list only where the OS hotkeys are registered. The global map is matched by the in-app keydown handler as well, so a switch consulted in `syncGlobalShortcuts` alone leaves the combo firing whenever the window has focus — the user turns it off and it still works. Both paths must read the same helper (`activeGlobalShortcuts` for the OS, `inAppShortcutBindings` for the window), and the in-app list must keep every local binding ahead of any global one so a combo bound in both slots still resolves to the local action.
 
 
 

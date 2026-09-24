@@ -601,10 +601,13 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.winHeld": "不能使用 Win 键，请改用 Ctrl、Alt、Shift。",
     "shortcuts.macCtrlHeld": "Mac 上请用 ⌘，不要用 Control。",
     "shortcuts.reset": "恢复默认",
+    "shortcuts.columnAction": "功能",
+    "shortcuts.resetLocal": "恢复默认应用内快捷键",
+    "shortcuts.resetGlobal": "恢复默认全局快捷键",
     "shortcuts.globalMasterTitle": "启用全局快捷键",
-    "shortcuts.globalMasterDesc": "关闭后，本软件不再占用系统级热键，其他软件即可使用这些组合键；应用内的快捷键仍然有效。",
+    "shortcuts.globalMasterDesc": "关闭后，本软件不再占用系统级热键，其他软件即可使用这些组合键；这些组合键在本软件内也不再生效。应用内那一列的快捷键不受影响。",
     "shortcuts.globalToggleLabel": "启用「{action}」的全局快捷键",
-    "shortcuts.globalToggleHint": "关闭后释放该组合键给其他软件使用；应用内仍然有效。",
+    "shortcuts.globalToggleHint": "关闭后释放该组合键给其他软件使用，在本软件内也不再生效。",
     "shortcuts.globalToggleUnset": "先设置一个全局快捷键，再决定是否启用。",
     "shortcuts.fontHint": "歌词页内仍可用 Ctrl/⌘ + 滚轮调节字号（仅当前窗口）。",
     "shortcuts.registerFailed": "系统无法注册快捷键 {combo}",
@@ -1393,12 +1396,15 @@ const dict: Record<Lang, Record<string, string>> = {
     "shortcuts.winHeld": "The Windows key cannot be used. Use Ctrl, Alt, or Shift.",
     "shortcuts.macCtrlHeld": "On Mac use ⌘, not Control.",
     "shortcuts.reset": "Restore defaults",
+    "shortcuts.columnAction": "Action",
+    "shortcuts.resetLocal": "Restore default in-app shortcuts",
+    "shortcuts.resetGlobal": "Restore default global shortcuts",
     "shortcuts.globalMasterTitle": "Enable global shortcuts",
     "shortcuts.globalMasterDesc":
-      "When off, Museek stops claiming system-wide hotkeys so other applications can use those combos. In-app shortcuts keep working.",
+      "When off, Museek stops claiming system-wide hotkeys so other applications can use those combos. They also stop working inside Museek; the in-app column is unaffected.",
     "shortcuts.globalToggleLabel": "Enable the global shortcut for {action}",
     "shortcuts.globalToggleHint":
-      "Turn off to release this combo for other applications. It still works inside Museek.",
+      "Turn off to release this combo for other applications. It stops working inside Museek too.",
     "shortcuts.globalToggleUnset":
       "Set a global shortcut first, then choose whether it is enabled.",
     "shortcuts.fontHint":
