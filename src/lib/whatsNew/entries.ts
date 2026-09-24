@@ -17,6 +17,70 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.10.0": {
+    zh: {
+      sections: [
+        {
+          title: "🎚️ 单曲音质",
+          bullets: [
+            "点播放栏的音质徽章，可以只给这一首歌换音质，不影响其他歌曲的默认音质",
+            "这个设置会记在本机，换歌单、点「播放全部」或重启后依然生效",
+            "换音质时封面、歌词和播放进度不再闪动",
+            "「设置 → 缓存」可查看已记住多少首，并一键清除",
+          ],
+        },
+        {
+          title: "⌨️ 快捷键",
+          bullets: [
+            "每个全局快捷键都能单独关闭：关闭后该组合键交还给其他软件，应用内快捷键仍然可用",
+            "新增总开关，可一次性关闭全部全局快捷键",
+            "修复：关闭全局快捷键后，它在软件内也不再生效（之前仍然会触发）",
+            "快捷键列表的开关现在整齐对齐，且只有列表本身滚动",
+          ],
+        },
+        {
+          title: "▶️ 播放",
+          bullets: [
+            "修复：自动降级音质后，按空格可能再也无法继续播放",
+            "修复：播放链接过期时会真正重试一次（之前静默失败）",
+            "修复：播放失败时不再显示「Audio request failed (403)」这类英文原文",
+            "修复：拖动进度条时不会再把空格键抢走",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎚️ Per-song quality",
+          bullets: [
+            "Click the quality badge in the player bar to change the quality for one song only, leaving other songs on your default",
+            "The choice is remembered on this device and survives switching playlists, pressing Play all, or restarting",
+            "Switching quality no longer flashes the cover or resets the lyrics and position",
+            "Settings → Cache shows how many choices are remembered, with a clear button",
+          ],
+        },
+        {
+          title: "⌨️ Shortcuts",
+          bullets: [
+            "Every global shortcut can be switched off on its own: the combo is released for other apps while the in-app binding keeps working",
+            "A master switch turns all global shortcuts off at once",
+            "Fix: a switched-off global shortcut no longer fires inside Museek either",
+            "The shortcut list aligns its toggles, and only the list scrolls",
+          ],
+        },
+        {
+          title: "▶️ Playback",
+          bullets: [
+            "Fix: after an automatic quality downgrade, pressing Space could stop resuming playback entirely",
+            "Fix: an expired play URL is now actually retried once instead of failing silently",
+            'Fix: playback failures no longer show raw English such as "Audio request failed (403)"',
+            "Fix: dragging the seek bar no longer steals the Space key",
+          ],
+        },
+      ],
+    },
+  },
   "3.9.0": {
     zh: {
       sections: [
