@@ -52,6 +52,10 @@ Do not let the resume-time upgrade in `togglePlay` override a quality the user c
 
 Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
 
+## Restarting playback without re-arming the ended latch
+
+Do not add a way to start or restart a track that skips the `endedSent` reset in `AudioPlayer.play()` / `seek()`. `endedSent` suppresses a second `emitEnded` for the same pass, so any restart that does not clear it reports one end and then goes silent. This is easy to miss because most restarts re-attach a source (`setSource` / `setClip` / `startWebPlayback` all clear it) — the two that do not are repeat-one (`seek(0)` + `play()`) and a ONE-SONG queue wrapping in repeat-list/shuffle, where `next()` lands on the same index and only `play()` runs. It also only reproduces on the HTML `<audio>` backend; Web Audio hides it, so testing one backend is not enough.
+
 ## Handing a song to every enabled source script
 
 Do not resolve a song's play URL, lyric or cover by asking every enabled script. Filter by the platform the script declares in `sources` (and by the action within that platform). A script asked about a platform it does not serve cannot resolve the id it was given, and some fall back to searching their OWN service by track name — which returns a different recording of the same title, so the player bar shows the chosen song while a different artist plays. A script declaring no `sources` at all must still be asked, and if the platform filter leaves nothing to ask the unfiltered list is used, so a lone under-declaring script keeps working. Keep the platform and action filters separate: a combined filter plus that fallback silently re-admits scripts that explicitly omitted the action.

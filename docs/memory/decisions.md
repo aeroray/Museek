@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-24 - A new playback pass re-arms the ended latch in play() and seek()
+
+Decision:
+`AudioPlayer.play()` and `AudioPlayer.seek()` both reset `endedSent` before doing anything else. `endedSent` is the "this pass already reported its end" latch that stops `emitEnded` firing twice.
+
+Reason:
+`playerStore._handleEnded` implements repeat-one as `seek(0)` + `play()`. It is the only mode that restarts WITHOUT re-attaching a source, and every other restart path re-arms the latch through `setSource` / `setClip` / `startWebPlayback`. So on the HTML `<audio>` backend repeat-one reported one end and then went silent — the reported "repeat-one only loops once". The Web Audio backend masked it because `startWebPlayback` clears the flag. Measured in the audio harness: HTML reached 1 end before timing out, Web Audio reached 3. The same latch is reached without any `seek()` when a ONE-SONG queue wraps: `next()` computes `(queueIndex + 1) % queue.length` = the same index, so `play()` is the only call made and the element rewinds itself — hence the second reset in `play()`. Reverting either reset fails its scenario (1 end, then stuck), so both are load-bearing.
+
 ## 2026-09-24 - A song is only dispatched to source scripts that serve its platform
 
 Decision:

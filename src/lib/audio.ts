@@ -658,6 +658,15 @@ class AudioPlayer {
   }
 
   async play(): Promise<void> {
+    // Starting playback begins a new pass, so any end reported for the previous
+    // one is stale. This matters for the element path when it is restarted AT
+    // its end: `HTMLMediaElement.play()` rewinds on its own, so no `seek()` runs
+    // and nothing else re-arms the latch — the audio would loop while
+    // `emitEnded` kept returning early, so the player reported one end and then
+    // sat silent. A ONE-SONG queue reaches this through repeat-list and shuffle,
+    // because `next()` wraps back to the same index and `play()` is the only
+    // call made. The Web Audio path re-arms inside `startWebPlayback`.
+    this.endedSent = false;
     const clip = this.clipWindow();
     if (clip) {
       const fileTime = this.fileTime();
@@ -723,6 +732,14 @@ class AudioPlayer {
   }
 
   seek(time: number) {
+    // Moving the playhead makes any end already reported for this pass stale, so
+    // a later end must be reported again. Without this, repeat-one loops exactly
+    // once and then goes silent: it is the only mode that restarts by seeking
+    // rather than by re-attaching a source, and every other path re-arms through
+    // `setSource` / `setClip` / `startWebPlayback`. The Web Audio backend
+    // re-arms implicitly because `startWebPlayback` clears the flag, which is
+    // why this only ever showed up on the element path.
+    this.endedSent = false;
     const clip = this.clipWindow();
     const start = clip?.start ?? 0;
     const fileDur = this.fileDuration();
