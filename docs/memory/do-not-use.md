@@ -52,6 +52,10 @@ Do not let the resume-time upgrade in `togglePlay` override a quality the user c
 
 Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
 
+## Handing a song to every enabled source script
+
+Do not resolve a song's play URL, lyric or cover by asking every enabled script. Filter by the platform the script declares in `sources` (and by the action within that platform). A script asked about a platform it does not serve cannot resolve the id it was given, and some fall back to searching their OWN service by track name — which returns a different recording of the same title, so the player bar shows the chosen song while a different artist plays. A script declaring no `sources` at all must still be asked, and if the platform filter leaves nothing to ask the unfiltered list is used, so a lone under-declaring script keeps working. Keep the platform and action filters separate: a combined filter plus that fallback silently re-admits scripts that explicitly omitted the action.
+
 ## Measuring a lyric from a parent layout effect
 
 Do not measure the desktop lyric's width from a parent layout effect keyed on the displayed line. `LyricTransition` mounts the incoming layer from its own layout effect, and React runs layout effects child-first, so the parent's runs while the DOM still holds the OUTGOING line — the fit is then computed from the wrong text, a long line is never shrunk, and the native window clips it into a rectangle. Measure from `onLayerMounted`, which fires once the new layer is committed. Do not key that callback on `transitionKey` either: the effect that calls `setLayers` does not have its update flushed before the rest of the commit's layout effects, so the callback would fire while the old layer is still the only one mounted. Depend on `layers`, and check `isConnected`.

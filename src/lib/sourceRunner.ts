@@ -141,10 +141,41 @@ export class SourceRunner {
 
   // Enabled+loaded sources in UI list order (used for lyric/pic failover and
   // as the musicUrl race participant set).
-  private getOrderedIds(): string[] {
-    return this.registry
+  //
+  // A script's `sources` map is its own statement of which platforms it serves,
+  // so a song must not be handed to a script that does not claim its platform.
+  // Such a script cannot resolve the id it was given and some fall back to
+  // looking the track up BY NAME on their own service — which answers with a
+  // different recording of the same title. The user hears another artist while
+  // the player bar still shows the song they picked.
+  //
+  // Scripts declaring no `sources` at all are kept (nothing to check against),
+  // and if the platform filter would leave nothing to ask, the unfiltered list
+  // is returned so a lone under-declaring script keeps working rather than
+  // failing. The fallback deliberately covers only the PLATFORM filter: a script
+  // that claims a platform but omits an action from its list has made a specific
+  // statement about that platform, so it is respected instead of overridden.
+  private getOrderedIds(
+    action?: "musicUrl" | "lyric" | "pic",
+    platform?: string,
+  ): string[] {
+    const scripts = this.registry
       .getScripts()
-      .filter((s) => s.enabled && this.sessions.has(s.id))
+      .filter((s) => s.enabled && this.sessions.has(s.id));
+    if (!action || !platform) return scripts.map((s) => s.id);
+
+    const forPlatform = scripts.filter((s) => {
+      const declared = s.sources;
+      if (!declared) return true;
+      return Boolean(declared[platform]);
+    });
+    if (!forPlatform.length) return scripts.map((s) => s.id);
+
+    return forPlatform
+      .filter((s) => {
+        const actions = s.sources?.[platform]?.actions;
+        return !actions?.length || actions.includes(action);
+      })
       .map((s) => s.id);
   }
 
@@ -260,7 +291,7 @@ export class SourceRunner {
   }
 
   async getMusicUrl(payload: LxRequestPayload): Promise<string> {
-    const ids = this.getOrderedIds();
+    const ids = this.getOrderedIds("musicUrl", payload.source);
     if (!ids.length) throw new Error(t("sources.err.noEnabled"));
 
     const quality = (payload.type ?? "128k") as Quality;
@@ -368,7 +399,7 @@ export class SourceRunner {
   }
 
   async getLyric(payload: LxRequestPayload): Promise<LyricInfo | null> {
-    for (const id of this.getOrderedIds()) {
+    for (const id of this.getOrderedIds("lyric", payload.source)) {
       const session = this.sessions.get(id);
       if (!session) continue;
       try {
@@ -385,7 +416,7 @@ export class SourceRunner {
   async getPic(payload: LxRequestPayload): Promise<string | null> {
     const key = `${payload.source}:${payload.info.meta.songId}`;
     return picCache(key, async () => {
-      for (const id of this.getOrderedIds()) {
+      for (const id of this.getOrderedIds("pic", payload.source)) {
         const session = this.sessions.get(id);
         if (!session) continue;
         try {

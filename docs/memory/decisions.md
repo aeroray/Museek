@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-24 - A song is only dispatched to source scripts that serve its platform
+
+Decision:
+`SourceRunner.getOrderedIds(action, platform)` filters enabled+loaded scripts by the platform they declare in `sources`, and additionally by whether that platform's `actions` list includes the requested action. `getMusicUrl`, `getLyric` and `getPic` each pass their own `payload.source` and action. A script declaring no `sources` at all is kept (there is nothing to check against), and if the PLATFORM filter leaves nothing to ask, the unfiltered list is returned so a lone under-declaring script still plays.
+
+Reason:
+Dispatch previously filtered only on `enabled` + "is loaded", so a `tx` song was handed to every enabled script regardless of the platforms it serves. A script that cannot resolve the id it was given may fall back to looking the track up BY NAME on its own service, which answers with a different recording of the same title — the player bar keeps showing the picked song while another artist is heard. Reported as: QQ Music selected, searched aimyon, played 春日, heard a different Japanese singer. Proven with stub sessions: for one tx song, `script-wy-only` and `script-kw-only` both received a musicUrl request. The action filter is checked separately from the platform filter on purpose: a script that claims a platform but omits an action has made a specific statement about that platform, so it is respected rather than overridden by the fallback (an early version used one combined filter, and the fallback then defeated the action check).
+
 ## 2026-09-24 - The desktop-lyrics fit is measured after the layer is committed
 
 Decision:
