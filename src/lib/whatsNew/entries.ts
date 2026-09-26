@@ -17,6 +17,62 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.10.1": {
+    zh: {
+      sections: [
+        {
+          title: "🔁 播放",
+          bullets: [
+            "修复：单曲循环现在会一直循环下去，不再只播一遍就停住",
+            "修复：歌单里只有一首歌时，列表循环和随机播放同样只会播一遍",
+            "这两个问题出现在本地音乐、已缓存音频和 macOS / Linux 上；Windows 在线播放不受影响",
+          ],
+        },
+        {
+          title: "🎵 音源",
+          bullets: [
+            "修复：播放时不再向不支持该平台的音源脚本索取链接",
+            "修复：点播 QQ 音乐等平台的歌曲时，可能播出另一位歌手的同名歌曲",
+            "歌词和封面也遵循同样的规则，不会再配错",
+          ],
+        },
+        {
+          title: "📝 桌面歌词",
+          bullets: [
+            "修复：长句歌词两端的胶囊形状不再被截断成矩形",
+            "切换「显示双行」后，当前句和之后的句子都能保持正确的胶囊形状",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🔁 Playback",
+          bullets: [
+            "Fix: repeat-one now keeps repeating instead of stopping after a single loop",
+            "Fix: with only one song in the queue, repeat-all and shuffle also stopped after one play",
+            "Both affected local music, cached audio and macOS / Linux; Windows streaming was unaffected",
+          ],
+        },
+        {
+          title: "🎵 Sources",
+          bullets: [
+            "Fix: playback no longer asks source scripts for platforms they do not serve",
+            "Fix: playing a song from QQ Music could play a different artist's song with the same title",
+            "Lyrics and covers follow the same rule, so they no longer mismatch",
+          ],
+        },
+        {
+          title: "📝 Desktop lyrics",
+          bullets: [
+            "Fix: the rounded capsule ends are no longer clipped into a rectangle on long lines",
+            "Toggling Two lines now keeps the capsule shape correct for the current line and the ones after it",
+          ],
+        },
+      ],
+    },
+  },
   "3.10.0": {
     zh: {
       sections: [
