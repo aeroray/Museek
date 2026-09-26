@@ -18,6 +18,16 @@ interface LyricTransitionProps {
   children: ReactNode;
   className?: string;
   animateSize?: boolean;
+  /**
+   * Fired after the incoming layer is committed to the DOM.
+   *
+   * A parent that measures the lyric (to fit it to the window, say) cannot do so
+   * from its own layout effect: this component mounts the new layer from ITS
+   * layout effect, and React runs layout effects child-first, so the parent's
+   * runs while the DOM still holds only the outgoing layer. This callback is the
+   * earliest point at which the new line can be measured.
+   */
+  onLayerMounted?: () => void;
 }
 
 export function LyricTransition({
@@ -25,12 +35,20 @@ export function LyricTransition({
   children,
   className,
   animateSize = false,
+  onLayerMounted,
 }: LyricTransitionProps) {
   const latestChildrenRef = useRef(children);
   latestChildrenRef.current = children;
   const wrapperRef = useRef<HTMLDivElement>(null);
   const layerElementsRef = useRef(new Map<number, HTMLDivElement>());
   const layerIdRef = useRef(0);
+  /**
+   * Kept in a ref, not read from the closure: the effect below deliberately does
+   * not list it as a dependency (a new callback identity every render would
+   * re-run the transition), so the ref is what keeps it current.
+   */
+  const onLayerMountedRef = useRef(onLayerMounted);
+  onLayerMountedRef.current = onLayerMounted;
   const activeLayerRef = useRef<LyricLayer>({
     id: 0,
     key: transitionKey,
@@ -136,6 +154,23 @@ export function LyricTransition({
       }
     };
   }, [animateSize, transitionKey]);
+
+  // Report the newly mounted layer. This must depend on `layers`, not on
+  // `transitionKey`: the effect above calls `setLayers`, and React runs the
+  // remaining layout effects of THIS commit before flushing that update, so a
+  // key-only dependency would fire while the DOM still holds the old layer.
+  // `layers` changing identity is what proves the new one is committed.
+  const reportedKeyRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const active = activeLayerRef.current;
+    if (active.key !== transitionKey) return;
+    const element = layerElementsRef.current.get(active.id);
+    // The element must exist and be in the document, not just in the map.
+    if (!element || !element.isConnected) return;
+    if (reportedKeyRef.current === active.key) return;
+    reportedKeyRef.current = active.key;
+    onLayerMountedRef.current?.();
+  }, [layers, transitionKey]);
 
   const activeLayerId = activeLayerRef.current.id;
   const isPendingTransition = activeLayerRef.current.key !== transitionKey;

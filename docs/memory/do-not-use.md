@@ -52,6 +52,10 @@ Do not let the resume-time upgrade in `togglePlay` override a quality the user c
 
 Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
 
+## Measuring a lyric from a parent layout effect
+
+Do not measure the desktop lyric's width from a parent layout effect keyed on the displayed line. `LyricTransition` mounts the incoming layer from its own layout effect, and React runs layout effects child-first, so the parent's runs while the DOM still holds the OUTGOING line — the fit is then computed from the wrong text, a long line is never shrunk, and the native window clips it into a rectangle. Measure from `onLayerMounted`, which fires once the new layer is committed. Do not key that callback on `transitionKey` either: the effect that calls `setLayers` does not have its update flushed before the rest of the commit's layout effects, so the callback would fire while the old layer is still the only one mounted. Depend on `layers`, and check `isConnected`.
+
 ## Storing a per-song quality only on the queue item
 
 Do not treat `QueueItem.qualityOverride` as the storage for a per-song choice. The queue is replaced constantly — "play all" on another playlist, a shuffle, a restart — so a choice kept only there is lost for no reason the user can see. The authoritative copy is `src/lib/songQualityPrefs.ts`; the queue field is a projection re-applied by `hydrateQualityOverrides` at every point a queue is built or restored. For the same reason, do not add the store to `configIO`'s `DB_FILES`: being absent is what keeps it out of sync exports and makes a config import unable to wipe it.

@@ -94,3 +94,62 @@ export function computeLyricFitScale({
 export function fitChanged(current: number, next: number): boolean {
   return Math.abs(current - next) > FIT_EPSILON;
 }
+
+/**
+ * The lyric layer currently being displayed.
+ *
+ * `LyricTransition` renders layers as [outgoing, incoming], so the newest is
+ * last. Exported so callers and tests agree on which layer is "the" lyric.
+ */
+export function activeLyricLines(shell: HTMLElement): HTMLElement | null {
+  const lines = shell.querySelectorAll<HTMLElement>(".desktop-lyrics-lines");
+  return lines[lines.length - 1] ?? null;
+}
+
+/**
+ * Measure the lyric on screen and return the fit it needs, or `null` when the
+ * fit is already correct (so the caller can skip a re-render).
+ *
+ * Measures the lyric *text* rather than the capsule: `LyricTransition` locks the
+ * capsule's inline width to the outgoing line's width during a crossfade, so
+ * reading the capsule right after a line change would measure the previous line.
+ * The heading and sub-line both carry `width: max-content`, so their own boxes
+ * always report natural width regardless of that lock.
+ *
+ * `appliedFit` is the scale that produced the measurement, so `computeLyricFitScale`
+ * can divide it back out and converge in one pass from any starting fit.
+ *
+ * IMPORTANT: this reads the DOM, so it is only correct once the layer for the
+ * line being measured is actually mounted. See the caller for why that is not
+ * automatic.
+ */
+export function measureLyricFit(
+  shell: HTMLElement,
+  opts: {
+    /** Horizontal capsule padding on one side, with `appliedFit` in effect. */
+    padding: number;
+    appliedFit: number;
+    viewportWidth: number;
+    gutter?: number;
+    min?: number;
+  },
+): number | null {
+  const active = activeLyricLines(shell);
+  if (!active) return null;
+
+  let contentWidth = 0;
+  for (const node of Array.from(active.children)) {
+    const width = (node as HTMLElement).getBoundingClientRect().width;
+    if (width > contentWidth) contentWidth = width;
+  }
+
+  const next = computeLyricFitScale({
+    contentWidth,
+    padding: opts.padding,
+    appliedFit: opts.appliedFit,
+    viewportWidth: opts.viewportWidth,
+    gutter: opts.gutter,
+    min: opts.min,
+  });
+  return fitChanged(opts.appliedFit, next) ? next : null;
+}

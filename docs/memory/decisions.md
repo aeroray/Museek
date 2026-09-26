@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-24 - The desktop-lyrics fit is measured after the layer is committed
+
+Decision:
+`LyricTransition` takes `onLayerMounted`, fired from a layout effect that depends on `layers` and verifies the active layer's element `isConnected`; `DesktopLyricsApp` passes its `measureFit` callback to it. The measurement itself lives in `measureLyricFit(shell, opts)` in `src/lib/desktopLyricsFit.ts`, which finds the active `.desktop-lyrics-lines` layer (the last one) and returns the needed fit or `null`. `fitScale` is mirrored into `fitScaleRef` because the callback is passed down, so reading state directly would capture a stale value.
+
+Reason:
+The parent's fit effect ran when `displayedLyricIndex` changed, but `LyricTransition` mounts the new layer from its OWN layout effect and React runs layout effects child-first — so the parent's ran while the DOM still held only the outgoing layer, and `lines[lines.length - 1]` was the PREVIOUS line. Measured in headless Chromium against the real CSS: for a long new line the effect saw `wanted "这是一句非常非常长的" but the DOM held "短句"`, kept `fitScale` at 1, and the capsule rendered 902px in an 884px viewport. A native window hard-clips its content, so both rounded ends were cut and the capsule read as a rectangle. That also explains the reported workaround exactly: toggling 双行 forced an unrelated re-render while the long line happened to be the mounted layer, so that one line finally got measured and shrunk, and the next line reverted. The callback must depend on `layers` rather than `transitionKey`, because the layout effect that calls `setLayers` does not have its update flushed before the rest of that commit's layout effects run.
+
 ## 2026-09-24 - A per-song quality choice outlives the queue
 
 Decision:

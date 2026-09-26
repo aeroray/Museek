@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -25,10 +26,7 @@ import {
   writeLyricFontScale,
 } from "@/lib/lyrics/fontScale";
 import { isMacOs } from "@/lib/os";
-import {
-  computeLyricFitScale,
-  fitChanged,
-} from "@/lib/desktopLyricsFit";
+import { measureLyricFit } from "@/lib/desktopLyricsFit";
 import { findActiveLyricIndex, desktopLyricSecondaryText } from "@/lib/lyrics";
 import { applyThemeSnapshot } from "@/stores/themeStore";
 import { applyFontStacks } from "@/lib/uiFonts";
@@ -133,6 +131,14 @@ export function DesktopLyricsApp() {
    */
   const [measureNonce, setMeasureNonce] = useState(0);
   const fontScaleRef = useRef(fontScale);
+  /**
+   * Mirrors `fitScale` for the same reason `fontScaleRef` mirrors `fontScale`:
+   * `measureFit` is passed down as a callback, and reading the state directly
+   * would capture a stale value (making the fit converge from the wrong base, or
+   * never settle).
+   */
+  const fitScaleRef = useRef(fitScale);
+  fitScaleRef.current = fitScale;
   const resizePromiseRef = useRef(Promise.resolve());
   const headingGroupRef = useRef<HTMLDivElement | null>(null);
   const lyricShellRef = useRef<HTMLDivElement | null>(null);
@@ -664,36 +670,33 @@ export function DesktopLyricsApp() {
    * `computeLyricFitScale` divides the measurement by the fit that produced it,
    * so it converges in one pass from any starting fit and cannot oscillate. A
    * shorter line simply yields `1` and the lyric returns to full size.
+   *
+   * Runs through `measureFit`, which is also what `LyricTransition` calls once a
+   * new layer is committed. This effect alone is NOT enough: it fires when
+   * `displayedLyricIndex` changes, but at that point `LyricTransition` has only
+   * just been asked to mount the new layer (child layout effects run first), so
+   * the DOM still holds the outgoing line and the fit would be computed from the
+   * wrong text. That is what left a long line unshrunk — and therefore clipped
+   * into a rectangle — until some unrelated re-render happened to re-measure it.
    */
-  useLayoutEffect(() => {
+  const measureFit = useCallback(() => {
     if (!hasLyricContent || !viewportWidth) return;
     const shell = lyricShellRef.current;
     if (!shell) return;
-
-    // Layers render as [outgoing, incoming], so the newest line is last.
-    const lines = shell.querySelectorAll<HTMLElement>(".desktop-lyrics-lines");
-    const active = lines[lines.length - 1];
-    if (!active) return;
-
-    let contentWidth = 0;
-    for (const node of active.children) {
-      const width = (node as HTMLElement).getBoundingClientRect().width;
-      if (width > contentWidth) contentWidth = width;
-    }
-
-    const next = computeLyricFitScale({
-      contentWidth,
+    const next = measureLyricFit(shell, {
       padding: effectivePadding,
-      appliedFit: fitScale,
+      appliedFit: fitScaleRef.current,
       viewportWidth,
     });
-    if (fitChanged(fitScale, next)) setFitScale(next);
+    if (next !== null) setFitScale(next);
+  }, [effectivePadding, viewportWidth, hasLyricContent]);
+
+  useLayoutEffect(() => {
+    measureFit();
   }, [
+    measureFit,
     fitScale,
-    effectivePadding,
-    viewportWidth,
     measureNonce,
-    hasLyricContent,
     displayedLyricIndex,
     twoLines,
     fontScale,
@@ -789,6 +792,9 @@ export function DesktopLyricsApp() {
                   transitionKey={`${displayedLyricIndex}:${activeLine.time}:${secondaryText ?? ""}`}
                   className="w-max"
                   animateSize
+                  // The new line is only measurable once it is committed; the
+                  // effect above runs too early to see it.
+                  onLayerMounted={measureFit}
                 >
                   <div className="desktop-lyrics-lines">
                     <KaraokeText
