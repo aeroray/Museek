@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - Last.fm is a tab on the footprints page, and its credentials are a dialog
+
+Decision:
+The Last.fm stats are a TAB in the 足迹 page's own tab bar, prepended only while the integration is enabled (`listeningTab` gained `"lastfm"` and the list is built from `enabled`). Credentials live in `LastfmCredentialsDialog`, reached from a single account row in Settings → Last.fm; the dialog saves and connects in one action and closes itself when the session key changes. No `font-mono` anywhere — those inputs use the UI font.
+
+Reason:
+Stacking the stats above the local history made the page open with a section most users never look at, and the two are alternative answers to "what have I been listening to", which is what tabs are for. Keeping the tab out of the bar when disabled leaves the page untouched for everyone who has not set Last.fm up, and `activeTab` falls back to `songs` for the window where the stored tab no longer exists rather than rendering a blank page. Credentials moved into a dialog because they are set once and never revisited, and leaving two opaque strings inline pushed the toggles a user does revisit below the fold. `font-mono` was the only monospace text in the app and its default stack clashed with the serif UI face.
+
 ## 2026-09-28 - Scrobbling is driven from the listening store, not the player
 
 Decision:

@@ -40,8 +40,11 @@ interface UiState {
   // favorited playlist) and coming back restores the same tab.
   favoritesTab: "songs" | "playlists" | "albums"
   setFavoritesTab: (tab: "songs" | "playlists" | "albums") => void
-  listeningTab: "songs" | "artists" | "recent"
-  setListeningTab: (tab: "songs" | "artists" | "recent") => void
+  // "lastfm" only appears as a tab while the Last.fm integration is switched on,
+  // but it is part of the union unconditionally so the selected tab survives
+  // toggling the integration off and on again.
+  listeningTab: "lastfm" | "songs" | "artists" | "recent"
+  setListeningTab: (tab: "lastfm" | "songs" | "artists" | "recent") => void
 }
 
 export const useUiStore = create<UiState>((set, get) => ({

@@ -52,6 +52,10 @@ Do not let the resume-time upgrade in `togglePlay` override a quality the user c
 
 Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
 
+## Reading state written by a sibling effect in the same commit
+
+Do not read `useState` written by another effect in the same commit — it still holds the previous render's value. In the Last.fm credentials dialog an "open" effect recorded the stored session key and a "close" effect compared against it, so the close effect saw the initial `""`, judged the session new, and shut the dialog the instant it opened. The dialog stayed in the DOM at `opacity: 0` and every text assertion still passed, because the content was present and correct — only invisible. Use a `useRef` when two effects in one commit must share a value. And when a UI check asserts a dialog or overlay, assert it is actually VISIBLE (`getComputedStyle(...).opacity === "1"`, plus a bounding box on screen), not merely present.
+
 ## Hooking scrobbling into the player store
 
 Do not add scrobble calls to `playerStore`. The listening store's `finish()` is the one place a listen session closes for every possible reason, so scrobbling lives there; the player has five separate `listenFinish(false)` call sites and would need the logic duplicated at each, which is how a skipped track ends up never scrobbled. Likewise, do not re-derive listened duration in the player — the session already tracks it.

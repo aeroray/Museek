@@ -3,6 +3,7 @@ import {
   Footprints,
   ListFilter,
   Play,
+  Radio,
   Search,
   X,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import {
 import { TrackRow } from "@/components/common/TrackRow";
 import { LastfmStatsPanel } from "@/components/listening/LastfmStatsPanel";
 import { useListeningStore } from "@/stores/listeningStore";
+import { useLastfmStore } from "@/stores/lastfmStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useUiStore } from "@/stores/uiStore";
 import {
@@ -35,8 +37,12 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const PERIODS: ListenPeriod[] = ["today", "week", "month", "all"];
-const TABS = ["songs", "artists", "recent"] as const;
-type ListenTab = (typeof TABS)[number];
+/**
+ * The Last.fm tab is prepended only while the integration is on, so the tab bar
+ * is unchanged for anyone who has not set it up.
+ */
+const LOCAL_TABS = ["songs", "artists", "recent"] as const;
+type ListenTab = "lastfm" | (typeof LOCAL_TABS)[number];
 
 function matchesQuery(
   query: string,
@@ -66,6 +72,17 @@ export function Listening() {
   const playAll = usePlayerStore((s) => s.playAll);
   const tab = useUiStore((s) => s.listeningTab);
   const setTab = useUiStore((s) => s.setListeningTab);
+  const lastfmEnabled = useLastfmStore((s) => s.enabled);
+  // Build the tab list once: the Last.fm tab leads because it is the only one
+  // backed by an account rather than this device's log.
+  const tabs: ListenTab[] = useMemo(
+    () => (lastfmEnabled ? ["lastfm", ...LOCAL_TABS] : [...LOCAL_TABS]),
+    [lastfmEnabled],
+  );
+  // The stored tab survives switching the integration off (the choice is kept so
+  // it comes back), but a tab that no longer exists must not render an empty
+  // page — fall back to the default without overwriting the stored value.
+  const activeTab: ListenTab = tabs.includes(tab) ? tab : "songs";
   const [period, setPeriod] = useState<ListenPeriod>("week");
   const [artist, setArtist] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -131,16 +148,16 @@ export function Listening() {
   };
 
   const playable =
-    tab === "artists"
+    activeTab === "artists" || activeTab === "lastfm"
       ? []
-      : tab === "recent"
+      : activeTab === "recent"
         ? recents.map((event) => event.song)
         : songs.map((row) => row.song);
 
   const searchPlaceholder =
-    tab === "artists"
+    activeTab === "artists"
       ? t("listening.searchArtists")
-      : tab === "recent"
+      : activeTab === "recent"
         ? t("listening.searchRecent")
         : t("listening.searchSongs");
 
@@ -155,14 +172,16 @@ export function Listening() {
             {t("listening.title")}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {empty
-              ? t("listening.subtitle")
-              : t("listening.summary", {
-                  period: t(`listening.period.${period}`),
-                  time: formatListenDuration(periodStats.listenedMs, t),
-                  songs: periodStats.uniqueSongs,
-                  artists: periodStats.uniqueArtists,
-                })}
+            {activeTab === "lastfm"
+              ? t("lastfm.stats.desc")
+              : empty
+                ? t("listening.subtitle")
+                : t("listening.summary", {
+                    period: t(`listening.period.${period}`),
+                    time: formatListenDuration(periodStats.listenedMs, t),
+                    songs: periodStats.uniqueSongs,
+                    artists: periodStats.uniqueArtists,
+                  })}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -183,24 +202,27 @@ export function Listening() {
             </Button>
           )}
           <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
-            {TABS.map((id) => (
+            {tabs.map((id) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => switchTab(id)}
                 className={cn(
-                  "px-3 py-1 rounded-full text-sm font-medium transition-colors",
-                  tab === id
+                  "flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium transition-colors",
+                  activeTab === id
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
+                {id === "lastfm" && <Radio size={13} className="shrink-0" />}
                 {t(
-                  id === "songs"
-                    ? "listening.tabSongs"
-                    : id === "artists"
-                      ? "listening.tabArtists"
-                      : "listening.tabRecent",
+                  id === "lastfm"
+                    ? "lastfm.tab"
+                    : id === "songs"
+                      ? "listening.tabSongs"
+                      : id === "artists"
+                        ? "listening.tabArtists"
+                        : "listening.tabRecent",
                 )}
               </button>
             ))}
@@ -208,7 +230,9 @@ export function Listening() {
         </div>
       </div>
 
-      {!empty && (
+      {/* The local period filter, artist chip and search box do not apply to the
+          Last.fm tab, which brings its own period selector. */}
+      {!empty && tab !== "lastfm" && (
         <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -237,7 +261,7 @@ export function Listening() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {artist && tab === "songs" && (
+          {artist && activeTab === "songs" && (
             <Button
               variant="secondary"
               size="sm"
@@ -265,12 +289,16 @@ export function Listening() {
         </div>
       )}
 
-      {empty ? (
+      {activeTab === "lastfm" ? (
+        // Independent of local history: the account may have plays from other
+        // clients even on a machine that has never played anything.
+        <ScrollArea className="flex-1">
+          <div className="px-4 py-3">
+            <LastfmStatsPanel />
+          </div>
+        </ScrollArea>
+      ) : empty ? (
         <div className="flex-1 overflow-y-auto">
-          {/* Shown even with no local history: the Last.fm account may well have
-              plays from other clients, and hiding the section until this device
-              has recorded something would make it look unsupported. */}
-          <LastfmStatsPanel />
           <div className="mx-auto w-full max-w-5xl p-4">
             <div className="flex min-h-[18rem] flex-col items-center justify-center px-4 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
@@ -285,9 +313,8 @@ export function Listening() {
         </div>
       ) : (
         <ScrollArea className="flex-1">
-          <LastfmStatsPanel />
           <div className="px-4 py-2">
-            {tab === "songs" ? (
+            {activeTab === "songs" ? (
               <SongList
                 rows={songs}
                 emptyLabel={
@@ -299,7 +326,7 @@ export function Listening() {
                   t("listening.playCount", { count })
                 }
               />
-            ) : tab === "artists" ? (
+            ) : activeTab === "artists" ? (
               <ArtistList
                 rows={artists}
                 emptyLabel={

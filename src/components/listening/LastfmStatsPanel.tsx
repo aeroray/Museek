@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Radio, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -9,31 +9,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLastfmStore, type LastfmPeriod } from "@/stores/lastfmStore";
+import { openExternal } from "@/components/settings/LastfmSettings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const PERIODS: LastfmPeriod[] = ["overall", "7day", "1month", "3month", "12month"];
-
-async function openExternal(url: string) {
-  try {
-    const { open } = await import("@tauri-apps/plugin-shell");
-    await open(url);
-  } catch {
-    window.open(url, "_blank");
-  }
-}
 
 function formatCount(n: number): string {
   return n.toLocaleString();
 }
 
 /**
- * The user's Last.fm profile, shown above the local history on the 足迹 page.
+ * The Last.fm tab body on the 足迹 page.
  *
- * Deliberately a self-contained section rather than a replacement for the local
- * stats: the local log is what this device played, Last.fm is what the account
- * has accumulated across every client. Showing both lets them be compared
- * instead of one silently standing in for the other.
+ * A tab rather than a banner above the local stats: the two are alternative
+ * views of "what have I been listening to", and stacking them made the page open
+ * with a section most users never look at. The tab only exists while the
+ * integration is switched on, so the page is unchanged for everyone else.
  */
 export function LastfmStatsPanel() {
   const t = useT();
@@ -42,17 +34,12 @@ export function LastfmStatsPanel() {
     statsLoading,
     statsError,
     username,
-    sessionKey,
     apiKey,
-    enabled,
     loadStats,
-    clearStats,
   } = useLastfmStore();
   const [period, setPeriod] = useState<LastfmPeriod>("overall");
 
-  const connected = Boolean(sessionKey);
-  // Stats are readable with an api_key alone, so the section is offered whenever
-  // there is a username to read — not only when a session exists.
+  // Stats read with an api_key alone, so a username is what is actually required.
   const canLoad = Boolean(apiKey && username);
 
   const reload = (next: LastfmPeriod) => {
@@ -60,156 +47,124 @@ export function LastfmStatsPanel() {
     void loadStats(next);
   };
 
-  return (
-    <section className="mx-auto w-full max-w-5xl px-4 pt-4">
-      <div className="rounded-2xl bg-card/60 p-4 shadow-[var(--shadow-border)]">
-        <div className="flex flex-wrap items-center gap-2">
-          <Radio size={16} className="shrink-0 text-muted-foreground" />
-          <h3 className="text-sm font-medium">{t("lastfm.stats.title")}</h3>
-          <span className="text-xs text-muted-foreground">
-            {connected ? `@${username}` : t("lastfm.stats.desc")}
-          </span>
-
-          <div className="ml-auto flex items-center gap-2">
-            {stats && (
-              <Select value={period} onValueChange={(v) => reload(v as LastfmPeriod)}>
-                <SelectTrigger className="h-8 w-[9.5rem] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERIODS.map((p) => (
-                    <SelectItem key={p} value={p} className="text-xs">
-                      {t(`lastfm.period.${p}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8"
-              disabled={statsLoading || !canLoad}
-              onClick={() => void loadStats(period)}
-            >
-              <RefreshCw
-                size={13}
-                className={cn("mr-1.5", statsLoading && "animate-spin")}
-              />
-              {stats ? t("lastfm.stats.reload") : t("lastfm.stats.load")}
-            </Button>
-            {stats && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8"
-                onClick={clearStats}
-              >
-                {t("lastfm.stats.hide")}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {!enabled && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {t("lastfm.enableDesc")}
-          </p>
-        )}
-
-        {statsError && (
-          <p className="mt-3 text-xs text-destructive" role="alert">
-            {statsError}
-          </p>
-        )}
-
-        {statsLoading && !stats && (
-          <p className="mt-4 text-xs text-muted-foreground">
-            {t("lastfm.stats.loading")}
-          </p>
-        )}
-
-        {!stats && !statsLoading && !statsError && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {t("lastfm.stats.empty")}
-          </p>
-        )}
-
-        {stats && (
-          <>
-            <p className="mt-3 text-xs text-muted-foreground">
-              {t("lastfm.stats.playcount")}:{" "}
-              <span className="font-medium tabular-nums text-foreground">
-                {formatCount(stats.playcount)}
-              </span>
-            </p>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <StatColumn title={t("lastfm.stats.topArtists")}>
-                {stats.topArtists.length === 0 ? (
-                  <EmptyRow />
-                ) : (
-                  stats.topArtists.map((a, i) => (
-                    <StatRow
-                      key={`${a.name}-${i}`}
-                      rank={i + 1}
-                      image={a.image}
-                      // An artist has no artwork of its own, so the monogram is
-                      // used rather than borrowing a track cover (the same rule
-                      // the local artist ranking follows).
-                      monogram={a.name.slice(0, 1)}
-                      title={a.name}
-                      meta={t("listening.playCount", { count: a.playcount })}
-                      url={a.url}
-                    />
-                  ))
-                )}
-              </StatColumn>
-
-              <StatColumn title={t("lastfm.stats.topTracks")}>
-                {stats.topTracks.length === 0 ? (
-                  <EmptyRow />
-                ) : (
-                  stats.topTracks.map((tr, i) => (
-                    <StatRow
-                      key={`${tr.name}-${i}`}
-                      rank={i + 1}
-                      image={tr.image}
-                      title={tr.name}
-                      subtitle={tr.artist}
-                      meta={t("listening.playCount", { count: tr.playcount })}
-                      url={tr.url}
-                    />
-                  ))
-                )}
-              </StatColumn>
-
-              <StatColumn title={t("lastfm.stats.recent")}>
-                {stats.recent.length === 0 ? (
-                  <EmptyRow />
-                ) : (
-                  stats.recent.map((tr, i) => (
-                    <StatRow
-                      key={`${tr.name}-${i}`}
-                      image={tr.image}
-                      title={tr.name}
-                      subtitle={tr.artist}
-                      meta={
-                        tr.nowPlaying
-                          ? t("lastfm.stats.nowPlaying")
-                          : undefined
-                      }
-                      highlight={tr.nowPlaying}
-                      url={tr.url}
-                    />
-                  ))
-                )}
-              </StatColumn>
-            </div>
-          </>
-        )}
+  if (!stats) {
+    // One compact prompt. The previous version stacked a heading, a subtitle, a
+    // button and an empty-state sentence for what is a single action.
+    return (
+      <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
+        <p className="text-sm text-muted-foreground">
+          {statsError ?? t("lastfm.stats.empty")}
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-4"
+          disabled={statsLoading || !canLoad}
+          onClick={() => void loadStats(period)}
+        >
+          <RefreshCw
+            size={13}
+            className={cn("mr-1.5", statsLoading && "animate-spin")}
+          />
+          {statsLoading ? t("lastfm.stats.loading") : t("lastfm.stats.load")}
+        </Button>
       </div>
-    </section>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs text-muted-foreground">
+          {t("lastfm.stats.playcount")}{" "}
+          <span className="font-medium tabular-nums text-foreground">
+            {formatCount(stats.playcount)}
+          </span>
+        </p>
+        <span className="text-xs text-muted-foreground">·</span>
+        <span className="text-xs text-muted-foreground">@{stats.username}</span>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Select value={period} onValueChange={(v) => reload(v as LastfmPeriod)}>
+            <SelectTrigger className="h-8 w-[9.5rem] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map((p) => (
+                <SelectItem key={p} value={p} className="text-xs">
+                  {t(`lastfm.period.${p}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8"
+            disabled={statsLoading}
+            onClick={() => void loadStats(period)}
+          >
+            <RefreshCw
+              size={13}
+              className={cn(statsLoading && "animate-spin")}
+            />
+          </Button>
+        </div>
+      </div>
+
+      {statsError && (
+        <p className="text-xs text-destructive" role="alert">
+          {statsError}
+        </p>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatColumn title={t("lastfm.stats.topArtists")}>
+          {stats.topArtists.map((a, i) => (
+            <StatRow
+              key={`${a.name}-${i}`}
+              rank={i + 1}
+              image={a.image}
+              // An artist has no artwork of its own, so the monogram is used
+              // rather than borrowing a track cover (the same rule the local
+              // artist ranking follows).
+              monogram={a.name.slice(0, 1)}
+              title={a.name}
+              meta={t("listening.playCount", { count: a.playcount })}
+              url={a.url}
+            />
+          ))}
+        </StatColumn>
+
+        <StatColumn title={t("lastfm.stats.topTracks")}>
+          {stats.topTracks.map((tr, i) => (
+            <StatRow
+              key={`${tr.name}-${i}`}
+              rank={i + 1}
+              image={tr.image}
+              title={tr.name}
+              subtitle={tr.artist}
+              meta={t("listening.playCount", { count: tr.playcount })}
+              url={tr.url}
+            />
+          ))}
+        </StatColumn>
+
+        <StatColumn title={t("lastfm.stats.recent")}>
+          {stats.recent.map((tr, i) => (
+            <StatRow
+              key={`${tr.name}-${i}`}
+              image={tr.image}
+              title={tr.name}
+              subtitle={tr.artist}
+              meta={tr.nowPlaying ? t("lastfm.stats.nowPlaying") : undefined}
+              highlight={tr.nowPlaying}
+              url={tr.url}
+            />
+          ))}
+        </StatColumn>
+      </div>
+    </div>
   );
 }
 
@@ -226,10 +181,6 @@ function StatColumn({
       <div className="space-y-0.5">{children}</div>
     </div>
   );
-}
-
-function EmptyRow() {
-  return <p className="py-2 text-xs text-muted-foreground">—</p>;
 }
 
 /**

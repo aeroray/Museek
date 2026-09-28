@@ -232,6 +232,7 @@ const dict: Record<Lang, Record<string, string>> = {
     // Last.fm
     "lastfm.desc":
       "把播放记录同步到 Last.fm。需要你自己的 API Key 与 Secret（在 Last.fm 免费申请）。",
+    "lastfm.tab": "Last.fm",
     "lastfm.enable": "启用 Last.fm",
     "lastfm.enableDesc": "关闭后不会发送任何请求，已排队的记录会保留。",
     "lastfm.apiKey": "API Key",
@@ -242,6 +243,7 @@ const dict: Record<Lang, Record<string, string>> = {
       "在 Last.fm 的「API 账户」页面创建应用即可获得；两者都只保存在本机。",
     "lastfm.createApiLink": "申请 API 账号",
     "lastfm.connect": "连接账号",
+    "lastfm.reconnect": "重新连接",
     "lastfm.connecting": "等待浏览器授权…",
     "lastfm.connectingHint":
       "已在浏览器打开授权页面。完成授权后这里会自动连接，无需手动操作。",
@@ -1068,6 +1070,7 @@ const dict: Record<Lang, Record<string, string>> = {
     // Last.fm
     "lastfm.desc":
       "Sync your listening to Last.fm. Requires your own API Key and Secret (free from Last.fm).",
+    "lastfm.tab": "Last.fm",
     "lastfm.enable": "Enable Last.fm",
     "lastfm.enableDesc":
       "When off, no requests are sent. Anything already queued is kept.",
@@ -1079,6 +1082,7 @@ const dict: Record<Lang, Record<string, string>> = {
       "Create an application on Last.fm's API accounts page to get both. They are stored only on this device.",
     "lastfm.createApiLink": "Create an API account",
     "lastfm.connect": "Connect account",
+    "lastfm.reconnect": "Reconnect",
     "lastfm.connecting": "Waiting for authorization…",
     "lastfm.connectingHint":
       "The authorization page is open in your browser. This connects automatically once you approve — nothing else to do here.",
