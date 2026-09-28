@@ -82,6 +82,16 @@ export type LastfmStats = {
   fetchedAt: number;
 };
 
+/**
+ * Fetched stats, keyed by the period they were fetched for.
+ *
+ * Cached per period rather than kept as a single "current" object so that
+ * switching back to a period shows it immediately, and so the data survives a
+ * restart. Top artists/tracks genuinely differ per period; `recent` does not,
+ * but it rides along with whichever period was fetched and is cheap to store.
+ */
+export type LastfmStatsCache = Partial<Record<LastfmPeriod, LastfmStats>>;
+
 type Persisted = {
   apiKey: string;
   apiSecret: string;
@@ -91,6 +101,7 @@ type Persisted = {
   scrobbleEnabled: boolean;
   nowPlayingEnabled: boolean;
   pending: PendingScrobble[];
+  statsCache: LastfmStatsCache;
 };
 
 const DEFAULTS: Persisted = {
@@ -102,7 +113,88 @@ const DEFAULTS: Persisted = {
   scrobbleEnabled: true,
   nowPlayingEnabled: true,
   pending: [],
+  statsCache: {},
 };
+
+const PERIOD_KEYS: LastfmPeriod[] = [
+  "overall",
+  "7day",
+  "1month",
+  "3month",
+  "12month",
+];
+
+/** Optional string: keeps `undefined` distinct from `""` for `image`. */
+function optStr(v: unknown): string | undefined {
+  return typeof v === "string" && v ? v : undefined;
+}
+
+/**
+ * Rebuild one cached period, dropping anything malformed.
+ *
+ * This shares a file with the credentials, so it must never throw and never
+ * yield a half-built object: a row with no name would render as a blank line,
+ * so those entries are filtered out rather than kept.
+ */
+function parseStatsEntry(raw: unknown): LastfmStats | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const rows = (v: unknown) => (Array.isArray(v) ? v : []);
+  return {
+    username: str(r.username),
+    playcount: num(r.playcount),
+    topArtists: rows(r.topArtists)
+      .map((a) => {
+        const x = asRecord(a);
+        return {
+          name: str(x.name),
+          playcount: num(x.playcount),
+          url: str(x.url),
+          image: optStr(x.image),
+        };
+      })
+      .filter((a) => a.name),
+    topTracks: rows(r.topTracks)
+      .map((t) => {
+        const x = asRecord(t);
+        return {
+          name: str(x.name),
+          artist: str(x.artist),
+          playcount: num(x.playcount),
+          url: str(x.url),
+          image: optStr(x.image),
+        };
+      })
+      .filter((t) => t.name),
+    recent: rows(r.recent)
+      .map((t) => {
+        const x = asRecord(t);
+        return {
+          name: str(x.name),
+          artist: str(x.artist),
+          album: str(x.album),
+          url: str(x.url),
+          image: optStr(x.image),
+          // A cached row is never "now playing": that is true only at the moment
+          // of the fetch, and claiming it after a restart would be a lie.
+          nowPlaying: false,
+          playedAt: num(x.playedAt) > 0 ? num(x.playedAt) : undefined,
+        };
+      })
+      .filter((t) => t.name),
+    fetchedAt: num(r.fetchedAt),
+  };
+}
+
+function parseStatsCache(raw: unknown): LastfmStatsCache {
+  const r = asRecord(raw);
+  const out: LastfmStatsCache = {};
+  for (const period of PERIOD_KEYS) {
+    const entry = parseStatsEntry(r[period]);
+    if (entry) out[period] = entry;
+  }
+  return out;
+}
 
 /**
  * Validate whatever was on disk. Every field is checked because this file holds
@@ -125,6 +217,7 @@ export function parsePersisted(raw: unknown): Persisted {
     scrobbleEnabled: bool(r.scrobbleEnabled, DEFAULTS.scrobbleEnabled),
     nowPlayingEnabled: bool(r.nowPlayingEnabled, DEFAULTS.nowPlayingEnabled),
     pending: dedupePending(trimPending(parsePendingList(r.pending))),
+    statsCache: parseStatsCache(r.statsCache),
   };
 }
 
@@ -140,8 +233,9 @@ type LastfmState = Persisted & {
   /** The URL the user must open; shown so they can re-open it manually. */
   authUrl: string | null;
   error: string | null;
-  /** Last.fm account stats, fetched on demand. */
-  stats: LastfmStats | null;
+  /** Fetched account stats, per period, surviving a restart. */
+  statsCache: LastfmStatsCache;
+  /** True while a stats fetch is in flight. */
   statsLoading: boolean;
   statsError: string | null;
   /** True while a flush is in flight, so flushes do not overlap. */
@@ -166,6 +260,7 @@ type LastfmState = Persisted & {
     durationMs: number;
   }) => void;
   flush: (opts?: { force?: boolean }) => Promise<void>;
+  /** Fetch (or refresh) one period. Already-cached data stays visible meanwhile. */
   loadStats: (period: LastfmPeriod) => Promise<void>;
   clearStats: () => void;
 };
@@ -207,6 +302,7 @@ function snapshot(state: LastfmState): Persisted {
     scrobbleEnabled: state.scrobbleEnabled,
     nowPlayingEnabled: state.nowPlayingEnabled,
     pending: trimPending(state.pending),
+    statsCache: state.statsCache,
   };
 }
 
@@ -238,7 +334,6 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
   connecting: false,
   authUrl: null,
   error: null,
-  stats: null,
   statsLoading: false,
   statsError: null,
   flushing: false,
@@ -264,7 +359,9 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
       apiKey: trimmedKey,
       apiSecret: trimmedSecret,
       error: null,
-      ...(changed ? { sessionKey: "", username: "", stats: null } : {}),
+      ...(changed
+        ? { sessionKey: "", username: "", statsCache: {}, statsError: null }
+        : {}),
     });
     persist(get(), true);
   },
@@ -362,7 +459,12 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
   async disconnect() {
     stopAuthWait();
     lastNowPlayingKey = "";
-    set({ sessionKey: "", username: "", stats: null, error: null });
+    // The cache is deliberately NOT cleared here. Disconnect also runs
+    // automatically when a request hits an auth error, and wiping the user's
+    // fetched stats because a background scrobble failed would be a nasty
+    // surprise. Entries are matched against the current username instead, so a
+    // different account can never display them.
+    set({ sessionKey: "", username: "", error: null });
     persist(get(), true);
   },
 
@@ -543,19 +645,44 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
         lastfmGet(apiKey, "user.getTopTracks", { user, period, limit: 12 }),
         lastfmGet(apiKey, "user.getRecentTracks", { user, limit: 12 }),
       ]);
-      set({
-        stats: buildStats(user, info, artists, tracks, recent),
+      const built = buildStats(user, info, artists, tracks, recent);
+      // Merge rather than replace: another period's data must not be dropped
+      // just because this one was refreshed.
+      set((state) => ({
+        statsCache: { ...state.statsCache, [period]: built },
         statsLoading: false,
-      });
+      }));
+      persist(get(), true);
     } catch (err) {
       set({ statsLoading: false, statsError: lastfmErrorLabel(err) });
     }
   },
 
   clearStats() {
-    set({ stats: null, statsError: null });
+    set({ statsCache: {}, statsError: null });
+    persist(get(), true);
   },
 }));
+
+/**
+ * The cached stats for a period, or null when there is nothing usable.
+ *
+ * Validated against the CURRENT username so a cached payload can never be shown
+ * for a different account — the cache outlives a disconnect on purpose, and this
+ * is what keeps that safe. An entry with no fetchedAt is treated as absent: it
+ * could not have come from a real fetch.
+ */
+export function cachedStatsFor(
+  cache: LastfmStatsCache,
+  period: LastfmPeriod,
+  username: string,
+): LastfmStats | null {
+  const entry = cache[period];
+  if (!entry || !entry.fetchedAt) return null;
+  const user = username.trim();
+  if (user && entry.username && entry.username !== user) return null;
+  return entry;
+}
 
 // ---------------------------------------------------------------------------
 // Response shaping

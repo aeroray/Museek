@@ -30,6 +30,22 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - Last.fm stats are cached per period on disk and auto-loaded
+
+Decision:
+`statsCache: Partial<Record<LastfmPeriod, LastfmStats>>` replaces the single in-memory `stats` field and is part of the persisted payload. The 足迹 page reads it through `cachedStatsFor(cache, period, username)`, which rejects an entry whose `username` does not match the current one and any entry with no `fetchedAt`. Opening the Last.fm tab fetches a period only when it is not already cached; a refresh button in the filter bar forces one. `disconnect()` deliberately does NOT clear the cache.
+
+Reason:
+The stats were runtime-only, so every launch showed an empty tab and the only way to see data was to press a button — the reported behaviour. Caching per period rather than keeping one "current" object means switching back to a period is instant and a refresh of one period does not discard another. The username check is what makes it safe to keep the cache across a disconnect: `disconnect()` also runs automatically when a background request hits an auth error, and wiping the user's data because a scrobble failed would be a nasty surprise, so the entries are validated on read instead of being deleted on write. `nowPlaying` is forced false when rehydrating, because it is true only at the moment of the fetch and claiming it after a restart would be a lie.
+
+## 2026-09-28 - The Last.fm lists are sub-tabs in the shared filter bar
+
+Decision:
+常听歌手 / 常听歌曲 / 最近记录 are three sub-tabs rendered in the 足迹 page's filter bar, in the same pill style as the page's own 歌曲/歌手/最近 tabs, with the refresh button at the end of the row. `LastfmStatsPanel` is presentational: it takes `stats` and `view` and renders one list. The page owns the period, the view and the cache.
+
+Reason:
+Stacking three sections made the Last.fm tab the only page in the app that scrolled through every category at once, while its sibling tabs each show one list — the two halves of the same page disagreed about how to present a list. Moving the choice into the filter bar keeps the whole page on one control row.
+
 ## 2026-09-28 - What gets sent to Last.fm is decided by identity quality, not by "was it matched"
 
 Decision:

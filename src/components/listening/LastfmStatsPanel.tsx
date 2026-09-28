@@ -1,9 +1,10 @@
-import { ExternalLink, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useLastfmStore, type LastfmPeriod } from "@/stores/lastfmStore";
+import { ExternalLink } from "lucide-react";
+import type { LastfmStats } from "@/stores/lastfmStore";
 import { openExternal } from "@/components/settings/LastfmSettings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+export type LastfmStatsView = "topArtists" | "topTracks" | "recent";
 
 /**
  * The Last.fm tab body on the 足迹 page.
@@ -13,107 +14,82 @@ import { cn } from "@/lib/utils";
  * with a section most users never look at. The tab only exists while the
  * integration is switched on, so the page is unchanged for everyone else.
  *
- * Laid out like the other tabs on purpose — a `px-4 py-2` list of rows that
- * share TrackRow's spacing, radius and hover, with the period selector living in
- * the page's shared filter bar rather than inside the panel. An earlier version
- * was a self-contained card with its own header and three columns, which read as
- * a different kind of screen bolted onto the page.
+ * The three lists are sub-tabs rather than three stacked sections. Stacking made
+ * the Last.fm tab the only page in the app that scrolled through every category
+ * at once, while 歌曲/歌手/最近 all show one list — so the two halves of the same
+ * page disagreed about how to present a list. The sub-tab choice lives in the
+ * page's filter bar, next to the period, so the whole page keeps one control row.
+ *
+ * Laid out like the other tabs on purpose: a `px-4 py-2` list of rows that share
+ * TrackRow's spacing, radius and hover.
  */
-export function LastfmStatsPanel({ period }: { period: LastfmPeriod }) {
+export function LastfmStatsPanel({
+  stats,
+  view,
+}: {
+  stats: LastfmStats | null;
+  view: LastfmStatsView;
+}) {
   const t = useT();
-  const { stats, statsLoading, statsError, username, apiKey, loadStats } =
-    useLastfmStore();
 
-  // Stats read with an api_key alone, so a username is what is actually required.
-  const canLoad = Boolean(apiKey && username);
+  if (!stats) return null;
 
-  if (!stats) {
+  const rows =
+    view === "topArtists"
+      ? stats.topArtists.map((a, i) => ({
+          key: `a-${a.name}-${i}`,
+          rank: i + 1,
+          image: a.image,
+          // An artist has no artwork of its own, so the monogram is used rather
+          // than borrowing a track cover — the same rule the local artist
+          // ranking follows.
+          monogram: a.name.slice(0, 1),
+          title: a.name,
+          subtitle: undefined,
+          stat: t("listening.playCount", { count: a.playcount }),
+          highlight: false,
+          url: a.url,
+        }))
+      : view === "topTracks"
+        ? stats.topTracks.map((tr, i) => ({
+            key: `t-${tr.name}-${i}`,
+            rank: i + 1,
+            image: tr.image,
+            monogram: undefined,
+            title: tr.name,
+            subtitle: tr.artist,
+            stat: t("listening.playCount", { count: tr.playcount }),
+            highlight: false,
+            url: tr.url,
+          }))
+        : stats.recent.map((tr, i) => ({
+            key: `r-${tr.name}-${i}`,
+            rank: undefined,
+            image: tr.image,
+            monogram: undefined,
+            title: tr.name,
+            subtitle: tr.artist,
+            stat: tr.nowPlaying ? t("lastfm.stats.nowPlaying") : undefined,
+            highlight: tr.nowPlaying,
+            url: tr.url,
+          }));
+
+  if (!rows.length) {
     return (
-      <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
+      <div className="px-4 py-16 text-center">
         <p className="text-sm text-muted-foreground">
-          {statsError ?? t("lastfm.stats.empty")}
+          {t("lastfm.stats.noRows")}
         </p>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-4"
-          disabled={statsLoading || !canLoad}
-          onClick={() => void loadStats(period)}
-        >
-          <RefreshCw
-            size={13}
-            className={cn("mr-1.5", statsLoading && "animate-spin")}
-          />
-          {statsLoading ? t("lastfm.stats.loading") : t("lastfm.stats.load")}
-        </Button>
       </div>
     );
   }
 
   return (
     <div className="px-4 py-2">
-      <Section title={t("lastfm.stats.topArtists")}>
-        {stats.topArtists.map((a, i) => (
-          <StatRow
-            key={`${a.name}-${i}`}
-            rank={i + 1}
-            image={a.image}
-            // An artist has no artwork of its own, so the monogram is used rather
-            // than borrowing a track cover — the same rule the local artist
-            // ranking follows.
-            monogram={a.name.slice(0, 1)}
-            title={a.name}
-            stat={t("listening.playCount", { count: a.playcount })}
-            url={a.url}
-          />
-        ))}
-      </Section>
-
-      <Section title={t("lastfm.stats.topTracks")}>
-        {stats.topTracks.map((tr, i) => (
-          <StatRow
-            key={`${tr.name}-${i}`}
-            rank={i + 1}
-            image={tr.image}
-            title={tr.name}
-            subtitle={tr.artist}
-            stat={t("listening.playCount", { count: tr.playcount })}
-            url={tr.url}
-          />
-        ))}
-      </Section>
-
-      <Section title={t("lastfm.stats.recent")}>
-        {stats.recent.map((tr, i) => (
-          <StatRow
-            key={`${tr.name}-${i}`}
-            image={tr.image}
-            title={tr.name}
-            subtitle={tr.artist}
-            stat={tr.nowPlaying ? t("lastfm.stats.nowPlaying") : undefined}
-            highlight={tr.nowPlaying}
-            url={tr.url}
-          />
-        ))}
-      </Section>
+      {rows.map(({ key, ...row }) => (
+        <StatRow key={key} {...row} />
+      ))}
     </div>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mb-4 last:mb-0">
-      <h4 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
-        {title}
-      </h4>
-      {children}
-    </section>
   );
 }
 

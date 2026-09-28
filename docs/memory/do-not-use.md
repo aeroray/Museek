@@ -72,6 +72,14 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Keeping fetched Last.fm stats in memory only
+
+Do not add a fetched-from-the-network view to the Last.fm store without persisting it. The stats were runtime-only, so every launch showed an empty tab and the user had to press a button again — and a store field is easy to assume is persisted when it is not, because `snapshot()` lists fields explicitly rather than spreading state. If you add a field that survives a restart, add it to `snapshot()` AND to `parsePersisted`, and assert BOTH paths: a check that seeds the file only covers the read path, so dropping the field from `snapshot()` still passes it.
+
+## Clearing the Last.fm stats cache on disconnect
+
+Do not clear `statsCache` in `disconnect()`. That function also runs automatically when a background request hits an auth error, so clearing there would throw away the user's fetched data because an unrelated scrobble failed. Validate cached entries against the current username on read instead.
+
 ## Assuming Last.fm can be told to stop showing "now playing"
 
 Do not look for a way to clear the now-playing state. There is no such method, and `track.updateNowPlaying` has no timestamp and must not be retried. The consequence is that the client must be accurate when it ANNOUNCES: an announcement that is never superseded leaves the profile showing a stale track indefinitely. That is why the dedupe key is cleared whenever a listen session ends, not only on pause.

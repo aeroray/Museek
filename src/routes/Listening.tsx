@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Footprints,
   ListFilter,
   Play,
+  RefreshCw,
   Search,
   X,
 } from "lucide-react";
@@ -16,9 +17,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TrackRow } from "@/components/common/TrackRow";
-import { LastfmStatsPanel } from "@/components/listening/LastfmStatsPanel";
+import {
+  LastfmStatsPanel,
+  type LastfmStatsView,
+} from "@/components/listening/LastfmStatsPanel";
 import { useListeningStore } from "@/stores/listeningStore";
-import { useLastfmStore, type LastfmPeriod } from "@/stores/lastfmStore";
+import {
+  cachedStatsFor,
+  useLastfmStore,
+  type LastfmPeriod,
+} from "@/stores/lastfmStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useUiStore } from "@/stores/uiStore";
 import {
@@ -55,6 +63,12 @@ const LASTFM_PERIODS: LastfmPeriod[] = [
 const LOCAL_TABS = ["songs", "artists", "recent"] as const;
 type ListenTab = "lastfm" | (typeof LOCAL_TABS)[number];
 
+/**
+ * The three Last.fm lists, in the order they are shown. The keys match the
+ * `lastfm.stats.*` labels, which are also the section titles they replaced.
+ */
+const LASTFM_VIEWS: LastfmStatsView[] = ["topArtists", "topTracks", "recent"];
+
 function matchesQuery(
   query: string,
   ...fields: Array<string | undefined>
@@ -84,6 +98,12 @@ export function Listening() {
   const tab = useUiStore((s) => s.listeningTab);
   const setTab = useUiStore((s) => s.setListeningTab);
   const lastfmEnabled = useLastfmStore((s) => s.enabled);
+  const lastfmApiKey = useLastfmStore((s) => s.apiKey);
+  const lastfmUsername = useLastfmStore((s) => s.username);
+  const statsCache = useLastfmStore((s) => s.statsCache);
+  const lastfmStatsLoading = useLastfmStore((s) => s.statsLoading);
+  const lastfmStatsError = useLastfmStore((s) => s.statsError);
+  const loadStats = useLastfmStore((s) => s.loadStats);
   // Build the tab list once: the Last.fm tab leads because it is the only one
   // backed by an account rather than this device's log.
   const tabs: ListenTab[] = useMemo(
@@ -96,9 +116,26 @@ export function Listening() {
   const activeTab: ListenTab = tabs.includes(tab) ? tab : "songs";
   const [period, setPeriod] = useState<ListenPeriod>("week");
   const [lastfmPeriod, setLastfmPeriod] = useState<LastfmPeriod>("overall");
+  const [lastfmView, setLastfmView] = useState<LastfmStatsView>("topArtists");
   const [artist, setArtist] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const hasHistory = events.length > 0 || live !== null;
+
+  // Stats are read with an api_key alone, so a username is what is actually
+  // required — the same rule the panel used before it moved here.
+  const lastfmCanLoad = Boolean(lastfmApiKey.trim() && lastfmUsername.trim());
+  const stats = cachedStatsFor(statsCache, lastfmPeriod, lastfmUsername);
+
+  // Fetch a period the first time it is opened, and never re-fetch one already
+  // cached. Without this the page showed an empty state on every launch even
+  // though the data was on disk, and the only way to see it was the button.
+  // Refresh stays available for data that has genuinely gone stale.
+  useEffect(() => {
+    if (activeTab !== "lastfm" || !lastfmCanLoad) return;
+    if (stats) return;
+    void loadStats(lastfmPeriod);
+  }, [activeTab, lastfmCanLoad, stats, lastfmPeriod, loadStats]);
+
   // One clock for both the period boundaries and the relative labels, so a page
   // left open does not keep saying "刚刚" an hour later.
   const now = useMinuteTick(hasHistory);
@@ -242,8 +279,8 @@ export function Listening() {
       </div>
 
       {/* The filter bar is shared by both sources. The Last.fm tab swaps the
-          local period menu for Last.fm's own periods but keeps the same ghost
-          button, so the two tabs present the same control in the same place. */}
+          local period menu for Last.fm's own periods, and adds its three list
+          views, so the whole page keeps one control row. */}
       {activeTab === "lastfm" ? (
         <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
           <DropdownMenu>
@@ -263,18 +300,51 @@ export function Listening() {
                   key={id}
                   checked={lastfmPeriod === id}
                   showUncheckedIndicator
-                  onCheckedChange={() => {
-                    setLastfmPeriod(id);
-                    // Changing the period is a request for that period's data, so
-                    // it refetches rather than showing the previous range.
-                    void useLastfmStore.getState().loadStats(id);
-                  }}
+                  onCheckedChange={() => setLastfmPeriod(id)}
                 >
                   {t(`lastfm.period.${id}`)}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* The three Last.fm lists, presented exactly like the page's own
+              tabs so the two halves of the page agree on how a list is chosen. */}
+          <div className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/70 p-1">
+            {LASTFM_VIEWS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setLastfmView(id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                  lastfmView === id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t(`lastfm.stats.${id}`)}
+              </button>
+            ))}
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            // Disabled while a fetch is running so a second one cannot overlap,
+            // and when there is nothing to fetch with.
+            disabled={lastfmStatsLoading || !lastfmCanLoad}
+            onClick={() => void loadStats(lastfmPeriod)}
+            title={
+              stats ? t("lastfm.stats.reload") : t("lastfm.stats.load")
+            }
+          >
+            <RefreshCw
+              size={15}
+              className={cn(lastfmStatsLoading && "animate-spin")}
+            />
+          </Button>
         </div>
       ) : !empty ? (
         <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
@@ -337,7 +407,38 @@ export function Listening() {
         // Independent of local history: the account may have plays from other
         // clients even on a machine that has never played anything.
         <ScrollArea className="flex-1">
-          <LastfmStatsPanel period={lastfmPeriod} />
+          {stats ? (
+            <LastfmStatsPanel stats={stats} view={lastfmView} />
+          ) : (
+            <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
+              <p className="text-sm text-muted-foreground">
+                {lastfmStatsError ??
+                  (lastfmStatsLoading
+                    ? t("lastfm.stats.loading")
+                    : lastfmCanLoad
+                      ? t("lastfm.stats.empty")
+                      : t("lastfm.err.notConnected"))}
+              </p>
+              {/* The button is kept here as well as in the filter bar: this is
+                  where the eye already is when the list is empty, and an empty
+                  state that only says "no data" gives no way forward. */}
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-4"
+                disabled={lastfmStatsLoading || !lastfmCanLoad}
+                onClick={() => void loadStats(lastfmPeriod)}
+              >
+                <RefreshCw
+                  size={13}
+                  className={cn("mr-1.5", lastfmStatsLoading && "animate-spin")}
+                />
+                {lastfmStatsLoading
+                  ? t("lastfm.stats.loading")
+                  : t("lastfm.stats.load")}
+              </Button>
+            </div>
+          )}
         </ScrollArea>
       ) : empty ? (
         <div className="flex-1 overflow-y-auto">
