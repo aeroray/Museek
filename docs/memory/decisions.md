@@ -30,6 +30,22 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - Placeholder-tagged local files are never sent to Last.fm
+
+Decision:
+`isScrobblableSong(song)` in `src/lib/lastfm/scrobble.ts` rejects a song whose title or artist is one of the local-import placeholders, and both `reportNowPlaying` and `reportListenEnded` return early on it. It reuses `isPlaceholderArtist` / `isPlaceholderTitle` from `lib/localMusic/catalogQuery`, the same test that gates the online catalog lookup.
+
+Reason:
+An untagged local file falls back to "未知歌曲" / "未知歌手" (or the English pair). Those are ordinary strings as far as Last.fm is concerned, so the app was announcing and scrobbling them — and because every untagged file produces the SAME artist and title, they all collapse into one junk entry on the profile, which is worse than not scrobbling at all. Reusing the catalog test keeps one definition of "this file has no real metadata": a file that cannot be matched online is also one that cannot be meaningfully scrobbled. Verified from observed request bodies, not by reading the code.
+
+## 2026-09-28 - The now-playing dedupe key is cleared when a session ends
+
+Decision:
+`useListeningStore.finish()` calls `resetNowPlayingDedupe()`, in addition to `pauseLive()` doing so.
+
+Reason:
+A session can end without a pause. At the end of a one-song queue in sequence mode, `playerStore._handleEnded` clears its state and calls `listenFinish(true)` but never calls `listenSetPlaying(false)` — so the dedupe key survived, and replaying that same song sent no now-playing request at all. Last.fm kept showing the earlier announcement while the profile's now-playing went stale, which is what the report described. The key must be tied to the session's lifetime, not to the pause path alone.
+
 ## 2026-09-28 - The Last.fm tab shares the page's filter bar and TrackRow's geometry
 
 Decision:

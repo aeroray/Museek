@@ -1,4 +1,5 @@
 import { splitArtists } from "@/lib/listenLog";
+import { isPlaceholderArtist, isPlaceholderTitle } from "@/lib/localMusic/catalogQuery";
 import type { MusicInfo } from "@/types/music";
 
 /**
@@ -107,6 +108,24 @@ export function isScrobbleComplete(fields: ScrobbleFields): boolean {
     fields.track.trim().length > 0 &&
     Number.isFinite(fields.timestamp) &&
     fields.timestamp > 0
+  );
+}
+
+/**
+ * Whether a track carries real metadata, as opposed to the placeholders a local
+ * file falls back to when its tags never parsed.
+ *
+ * A local import substitutes "未知歌曲" / "未知歌手" (or the English pair) for
+ * missing tags. Those strings are real values as far as Last.fm is concerned, so
+ * without this check every untagged local file scrobbles to the same junk artist
+ * and title — and they all collapse into ONE entry on the user's profile, which
+ * is worse than not scrobbling at all. The same test already gates the online
+ * catalog lookup, so a file that cannot be matched is also a file that cannot be
+ * meaningfully scrobbled.
+ */
+export function isScrobblableSong(song: MusicInfo): boolean {
+  return (
+    !isPlaceholderArtist(song.singer) && !isPlaceholderTitle(song.name)
   );
 }
 

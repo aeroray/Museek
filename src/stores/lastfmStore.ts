@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { readData, writeDataCompact } from "@/lib/db";
 import { notify } from "@/lib/notify";
 import { t } from "@/lib/i18n";
+import { songDurationMs } from "@/lib/listenLog";
 import {
   LastfmError,
   isAuthError,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/lastfm/client";
 import {
   batchScrobbleParams,
+  isScrobblableSong,
   isScrobbleComplete,
   scrobbleFields,
   shouldScrobble,
@@ -387,7 +389,12 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
   reportNowPlaying(song) {
     const state = get();
     if (!state.enabled || !state.nowPlayingEnabled || !state.sessionKey) return;
-    const fields = scrobbleFields(song, Date.now(), 0);
+    // Untagged local files carry placeholder metadata ("未知歌曲" / "未知歌手"),
+    // which Last.fm would accept as a real artist and track. Announcing those
+    // would put a junk entry on the profile for every untagged file.
+    if (!isScrobblableSong(song)) return;
+    const durationMs = songDurationMs(song);
+    const fields = scrobbleFields(song, Date.now(), durationMs);
     if (!fields.artist || !fields.track) return;
     // Deduped because the player announces the current track on every state
     // change (play/pause/resume), not only on a track change. Without this, a
@@ -401,6 +408,10 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
       artist: fields.artist,
       track: fields.track,
       album: fields.album || undefined,
+      // Last.fm accepts `duration` here, and it is what lets the profile show a
+      // track length and lets Last.fm apply its own rules. It was previously
+      // omitted because this call passed a hard-coded 0.
+      duration: fields.duration > 0 ? fields.duration : undefined,
     }).catch((err) => {
       // A failed now-playing is never retried: it describes the present moment
       // and is worthless by the time a retry could land. A dead session is still
@@ -415,6 +426,7 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
   reportListenEnded({ song, startedAt, listenedMs, completed, durationMs }) {
     const state = get();
     if (!state.enabled || !state.scrobbleEnabled || !state.sessionKey) return;
+    if (!isScrobblableSong(song)) return;
     if (!shouldScrobble({ listenedMs, durationMs, completed })) return;
 
     const fields = scrobbleFields(song, startedAt, durationMs);

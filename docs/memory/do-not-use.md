@@ -60,6 +60,14 @@ Do not conclude a "this button looks bigger" report is a bug from `getBoundingCl
 
 Do not put `leading-none` on a short label next to an icon in a flex row. A line-height of 1 makes the line box hug the font's full ascent+descent, so CJK glyphs — which sit high in the em box and have no descender — look pushed up against the icon even though the line box is perfectly centred. `leading-tight` gives the glyphs the leading they need; the settings sidebar rows grew from 27px to 29.5px and now read as centred.
 
+## Sending a local file's placeholder metadata to Last.fm
+
+Do not scrobble or announce a song whose title/artist is still the local-import placeholder ("未知歌曲" / "未知歌手" / "Unknown title" / "Unknown artist"). They are valid strings to Last.fm, so every untagged file collapses into ONE junk entry on the profile. Gate on `isScrobblableSong`, which reuses the catalog-lookup placeholder test rather than defining a second list.
+
+## Assuming Last.fm can be told to stop showing "now playing"
+
+Do not look for a way to clear the now-playing state. There is no such method, and `track.updateNowPlaying` has no timestamp and must not be retried. The consequence is that the client must be accurate when it ANNOUNCES: an announcement that is never superseded leaves the profile showing a stale track indefinitely. That is why the dedupe key is cleared whenever a listen session ends, not only on pause.
+
 ## Reading state written by a sibling effect in the same commit
 
 Do not read `useState` written by another effect in the same commit — it still holds the previous render's value. In the Last.fm credentials dialog an "open" effect recorded the stored session key and a "close" effect compared against it, so the close effect saw the initial `""`, judged the session new, and shut the dialog the instant it opened. The dialog stayed in the DOM at `opacity: 0` and every text assertion still passed, because the content was present and correct — only invisible. Use a `useRef` when two effects in one commit must share a value. And when a UI check asserts a dialog or overlay, assert it is actually VISIBLE (`getComputedStyle(...).opacity === "1"`, plus a bounding box on screen), not merely present.
