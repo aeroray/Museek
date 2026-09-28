@@ -77,6 +77,11 @@ export function LastfmSettings() {
   return (
     <ScrollArea className="h-full">
       <div className="pr-3 pb-4">
+        {/* One line of context up front: the feature needs the user to go and
+            create an API application, which is not obvious from a form alone. */}
+        <p className="mb-3 text-xs leading-relaxed text-muted-foreground text-pretty">
+          {t("lastfm.desc")}
+        </p>
         <SettingsCard>
           <SettingRow
             title={t("lastfm.enable")}
@@ -94,25 +99,35 @@ export function LastfmSettings() {
             desc={t("lastfm.credentialsHint")}
           >
             <div className="space-y-2">
-              <Input
-                value={keyDraft}
-                onChange={(e) => setKeyDraft(e.target.value)}
-                onBlur={commit}
-                placeholder={t("lastfm.apiKeyPlaceholder")}
-                autoComplete="off"
-                spellCheck={false}
-                className="h-9 font-mono text-xs"
-              />
-              <Input
-                value={secretDraft}
-                onChange={(e) => setSecretDraft(e.target.value)}
-                onBlur={commit}
-                type="password"
-                placeholder={t("lastfm.apiSecretPlaceholder")}
-                autoComplete="off"
-                spellCheck={false}
-                className="h-9 font-mono text-xs"
-              />
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t("lastfm.apiKey")}
+                </span>
+                <Input
+                  value={keyDraft}
+                  onChange={(e) => setKeyDraft(e.target.value)}
+                  onBlur={commit}
+                  placeholder={t("lastfm.apiKeyPlaceholder")}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-9 font-mono text-xs"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t("lastfm.apiSecret")}
+                </span>
+                <Input
+                  value={secretDraft}
+                  onChange={(e) => setSecretDraft(e.target.value)}
+                  onBlur={commit}
+                  type="password"
+                  placeholder={t("lastfm.apiSecretPlaceholder")}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-9 font-mono text-xs"
+                />
+              </label>
               <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"

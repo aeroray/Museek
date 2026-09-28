@@ -230,7 +230,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "listening.dateOnly": "{date}",
 
     // Last.fm
-    "lastfm.title": "Last.fm",
     "lastfm.desc":
       "把播放记录同步到 Last.fm。需要你自己的 API Key 与 Secret（在 Last.fm 免费申请）。",
     "lastfm.enable": "启用 Last.fm",
@@ -1067,7 +1066,6 @@ const dict: Record<Lang, Record<string, string>> = {
     "listening.dateOnly": "{date}",
 
     // Last.fm
-    "lastfm.title": "Last.fm",
     "lastfm.desc":
       "Sync your listening to Last.fm. Requires your own API Key and Secret (free from Last.fm).",
     "lastfm.enable": "Enable Last.fm",
