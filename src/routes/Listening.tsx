@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -90,6 +91,30 @@ function firstGrapheme(name: string): string {
   return first ? first.toLocaleUpperCase() : "?";
 }
 
+/**
+ * Placeholder for the Last.fm list while the first fetch of a launch is in
+ * flight. Mirrors {@link LastfmStatsPanel}'s row geometry — `px-3 py-2` with an
+ * h-10 avatar — so the list does not jump when the real rows arrive, and it sits
+ * in the same `px-4 py-2` body.
+ */
+function LastfmStatsSkeleton() {
+  return (
+    <div className="px-4 py-2" aria-busy="true">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="flex items-center gap-3 px-3 py-2">
+          <Skeleton className="h-4 w-5 shrink-0" />
+          <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Skeleton className="h-3.5 w-2/5 max-w-[12rem]" />
+            <Skeleton className="h-3 w-1/4 max-w-[8rem]" />
+          </div>
+          <Skeleton className="h-3 w-12 shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Listening() {
   const t = useT();
   const events = useListeningStore((s) => s.events);
@@ -104,6 +129,7 @@ export function Listening() {
   const lastfmStatsLoading = useLastfmStore((s) => s.statsLoading);
   const lastfmStatsError = useLastfmStore((s) => s.statsError);
   const loadStats = useLastfmStore((s) => s.loadStats);
+  const loadStatsForTab = useLastfmStore((s) => s.loadStatsForTab);
   // Build the tab list once: the Last.fm tab leads because it is the only one
   // backed by an account rather than this device's log.
   const tabs: ListenTab[] = useMemo(
@@ -126,15 +152,16 @@ export function Listening() {
   const lastfmCanLoad = Boolean(lastfmApiKey.trim() && lastfmUsername.trim());
   const stats = cachedStatsFor(statsCache, lastfmPeriod, lastfmUsername);
 
-  // Fetch a period the first time it is opened, and never re-fetch one already
-  // cached. Without this the page showed an empty state on every launch even
-  // though the data was on disk, and the only way to see it was the button.
-  // Refresh stays available for data that has genuinely gone stale.
+  // Fetch when the tab is opened. `loadStatsForTab` decides whether that means a
+  // real request: it refreshes once per launch and fills in any period that has
+  // never been fetched, so returning to a period during the same run is instant.
+  //
+  // No `if (stats) return` guard here: a cached period must still refresh on the
+  // first visit of a launch, which is the whole point.
   useEffect(() => {
     if (activeTab !== "lastfm" || !lastfmCanLoad) return;
-    if (stats) return;
-    void loadStats(lastfmPeriod);
-  }, [activeTab, lastfmCanLoad, stats, lastfmPeriod, loadStats]);
+    void loadStatsForTab(lastfmPeriod);
+  }, [activeTab, lastfmCanLoad, lastfmPeriod, loadStatsForTab]);
 
   // One clock for both the period boundaries and the relative labels, so a page
   // left open does not keep saying "刚刚" an hour later.
@@ -411,16 +438,21 @@ export function Listening() {
         // clients even on a machine that has never played anything.
         <ScrollArea className="flex-1">
           {stats ? (
+            // Cached data stays on screen during a background refresh, so the tab
+            // never blanks out to show something it already has. The refresh
+            // button carries the spinner in that case.
             <LastfmStatsPanel stats={stats} view={lastfmView} />
+          ) : lastfmStatsLoading ? (
+            // Nothing cached to show, so the wait gets a placeholder shaped like
+            // the list it will become rather than a bare line of text.
+            <LastfmStatsSkeleton />
           ) : (
             <div className="flex flex-col items-center justify-center px-4 py-20 text-center">
               <p className="text-sm text-muted-foreground">
                 {lastfmStatsError ??
-                  (lastfmStatsLoading
-                    ? t("lastfm.stats.loading")
-                    : lastfmCanLoad
-                      ? t("lastfm.stats.empty")
-                      : t("lastfm.err.notConnected"))}
+                  (lastfmCanLoad
+                    ? t("lastfm.stats.empty")
+                    : t("lastfm.err.notConnected"))}
               </p>
               {/* The button is kept here as well as in the filter bar: this is
                   where the eye already is when the list is empty, and an empty
@@ -429,16 +461,11 @@ export function Listening() {
                 variant="secondary"
                 size="sm"
                 className="mt-4"
-                disabled={lastfmStatsLoading || !lastfmCanLoad}
+                disabled={!lastfmCanLoad}
                 onClick={() => void loadStats(lastfmPeriod)}
               >
-                <RefreshCw
-                  size={13}
-                  className={cn("mr-1.5", lastfmStatsLoading && "animate-spin")}
-                />
-                {lastfmStatsLoading
-                  ? t("lastfm.stats.loading")
-                  : t("lastfm.stats.load")}
+                <RefreshCw size={13} className="mr-1.5" />
+                {t("lastfm.stats.load")}
               </Button>
             </div>
           )}

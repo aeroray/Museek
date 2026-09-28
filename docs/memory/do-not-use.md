@@ -72,6 +72,14 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Persisting a "once per launch" flag
+
+Do not put a once-per-run flag in the persisted payload. `statsRefreshedThisLaunch` is module-level on purpose: on disk it would survive the restart it exists to detect, and the refresh would never happen again. The same applies to any "first time this run" bookkeeping.
+
+## Asserting a loading state against an instantly-resolving stub
+
+Do not assert that a loading skeleton appears while a stubbed fetch resolves synchronously — the window does not exist and the assertion is vacuous. The shim in `check-lastfm-tab.mjs` exposes `window.__httpDelay(ms)` so the in-flight window is real. When reverting a change to prove a check is non-vacuous, confirm the injection APPLIED and the harness still BUILT: a regex that produces invalid JSX makes the run fail with `bundle failed`, which reads as a passing check if you only grep for FAIL.
+
 ## Trusting a persisted "playing: true" flag after a restart
 
 Do not let a restored listen session keep `playing: true` from the run that wrote it. `parseLive` forces it false on read, and that single line is what stops a restart from counting as an in-progress listen — which would put the restored track on the user's profile as "now playing" while they have not pressed anything. Any new persisted field describing *live* activity needs the same treatment: the disk remembers what was happening, not what is happening now.

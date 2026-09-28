@@ -262,6 +262,11 @@ type LastfmState = Persisted & {
   flush: (opts?: { force?: boolean }) => Promise<void>;
   /** Fetch (or refresh) one period. Already-cached data stays visible meanwhile. */
   loadStats: (period: LastfmPeriod) => Promise<void>;
+  /**
+   * Fetch for the stats tab being opened: refreshes once per launch even when the
+   * period is already cached, and fills in a period that has never been fetched.
+   */
+  loadStatsForTab: (period: LastfmPeriod) => Promise<void>;
   clearStats: () => void;
 };
 
@@ -271,6 +276,13 @@ let authPoll: ReturnType<typeof setInterval> | null = null;
 let authTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastNowPlayingKey = "";
 let loaded = false;
+/**
+ * Whether the stats tab has already refreshed itself since this launch.
+ *
+ * Deliberately module-level and NOT persisted: the point is "once per run". On
+ * disk it would survive a restart and defeat the whole thing.
+ */
+let statsRefreshedThisLaunch = false;
 
 function stopAuthWait() {
   if (authPoll) {
@@ -656,6 +668,23 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
     } catch (err) {
       set({ statsLoading: false, statsError: lastfmErrorLabel(err) });
     }
+  },
+
+  async loadStatsForTab(period) {
+    const state = get();
+    // Nothing to fetch with, and nothing to report: the page shows its own
+    // "not connected" message rather than an error from here.
+    if (!state.apiKey.trim() || !state.username.trim()) return;
+    if (state.statsLoading) return;
+
+    const cached = cachedStatsFor(state.statsCache, period, state.username);
+    // Once per launch, refresh even a cached period — the account may have plays
+    // from other clients since the last run, which is exactly what a user opening
+    // this tab wants to see. Afterwards the cache is used as-is, so navigating
+    // back and forth does not hammer the API.
+    if (cached && statsRefreshedThisLaunch) return;
+    statsRefreshedThisLaunch = true;
+    await get().loadStats(period);
   },
 
   clearStats() {

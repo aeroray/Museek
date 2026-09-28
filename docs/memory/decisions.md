@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - The Last.fm tab refreshes once per launch, and shows a skeleton while it does
+
+Decision:
+`loadStatsForTab(period)` is what the 足迹 page calls when the Last.fm tab is opened. It refreshes a cached period the FIRST time the tab is opened in a run, fills in a period that has never been fetched, and does nothing on subsequent visits. The "already refreshed" flag is module-level and deliberately not persisted. While a fetch is in flight with nothing cached, the body renders `LastfmStatsSkeleton`; when something IS cached, the cached list stays on screen and the refresh button carries the spinner.
+
+Reason:
+Caching alone left the tab showing yesterday's numbers forever unless the user pressed refresh, and the account can gain plays from other clients between runs — which is exactly what someone opening this tab wants to see. Refreshing once per launch gets that without hammering the API on every tab switch, and the flag must not be persisted or it would survive the restart it is meant to detect. The skeleton mirrors the real row geometry (`px-3 py-2`, h-10 avatar) so the list does not jump when data lands, and it only appears when there is nothing to show: blanking a populated list to display a placeholder would be worse than showing slightly stale rows.
+
 ## 2026-09-28 - Restoring a playback session never scrobbles
 
 Decision:
