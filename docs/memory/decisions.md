@@ -30,7 +30,23 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
-## 2026-09-24 - A new playback pass re-arms the ended latch in play() and seek()
+## 2026-09-28 - Scrobbling is driven from the listening store, not the player
+
+Decision:
+`useListeningStore` calls `reportNowPlaying(song)` when a session starts or resumes, and `reportListenEnded({song, startedAt, listenedMs, completed, durationMs})` from `finish()`. The player store is untouched; `playerStore` still only calls `listenSetPlaying` / `listenFinish`.
+
+Reason:
+`finish()` is the single point where a listen session closes, whatever closed it — a natural end, a skip, an error, a quality reload, or a track change. Hooking there means one call site covers every ending, whereas hooking the player would need the same logic at each `listenFinish(false)` (there are five). It also puts the scrobble decision next to the data it needs: `listenedMs` and `completed` are already computed there, so `shouldScrobble` gets real facts instead of the player re-deriving them. `reportNowPlaying` is deduped by artist+track because the player announces the current track on every state change, and the dedupe is cleared on pause so a resume re-announces.
+
+## 2026-09-28 - Last.fm lives in the frontend, with the user's own credentials
+
+Decision:
+Last.fm integration is `src/lib/lastfm/{api,scrobble,queue,client}.ts` plus `src/stores/lastfmStore.ts`, with UI in `src/components/settings/LastfmSettings.tsx` (new Settings → Last.fm tab) and `src/components/listening/LastfmStatsPanel.tsx` (top of the 足迹 page). Requests go through `@/lib/http`, i.e. Tauri's HTTP plugin, which bypasses CORS. The app ships **no** bundled API key or secret: each user registers their own free Last.fm API application and pastes both values, which are stored in a separate `lastfm.json` (deliberately absent from `configIO`'s `DB_FILES`, so a config export never carries them). Scrobbles are queued to disk first and only removed once Last.fm settles them.
+
+Reason:
+The reference player (SPlayer) is Electron and dodges CORS with `webSecurity: false`, which Tauri has no equivalent for — but this project already solves that with `plugin-http`, so no Rust proxy is needed. Signing in the frontend is acceptable here specifically because the secret is the *user's own*, not a shared app secret; a bundled secret would be extractable from every install, which is why there is none. The queue exists because a scrobble records something that already happened: a network failure must not lose it, and Last.fm rejects anything older than two weeks (error 3), which is the queue's hard retention bound. `isAuthError` (4/9/26) drops the session and asks the user to reconnect, `isTransientError` (8/11/16/29) backs off instead — the two must not be conflated or a rate limit would log the user out.
+
+## 2026-09-28 - A new playback pass re-arms the ended latch in play() and seek()
 
 Decision:
 `AudioPlayer.play()` and `AudioPlayer.seek()` both reset `endedSent` before doing anything else. `endedSent` is the "this pass already reported its end" latch that stops `emitEnded` firing twice.

@@ -52,6 +52,22 @@ Do not let the resume-time upgrade in `togglePlay` override a quality the user c
 
 Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
 
+## Hooking scrobbling into the player store
+
+Do not add scrobble calls to `playerStore`. The listening store's `finish()` is the one place a listen session closes for every possible reason, so scrobbling lives there; the player has five separate `listenFinish(false)` call sites and would need the logic duplicated at each, which is how a skipped track ends up never scrobbled. Likewise, do not re-derive listened duration in the player — the session already tracks it.
+
+## Bundling a shared Last.fm API secret
+
+Do not commit an API key/secret for Last.fm into the app, and do not add `lastfm.json` to `configIO`'s `DB_FILES`. The signature scheme needs the secret in the client, so a bundled one is extractable from every install — each user registers their own free API application instead. Keeping the file out of `DB_FILES` is what stops a config export from carrying the user's credentials and a config import from overwriting them.
+
+## Treating every Last.fm error the same
+
+Do not retry an authentication error, and do not log the user out over a transient one. Error 9 (invalid session key) and 26 (suspended key) mean the stored session is dead and must be cleared with a reconnect prompt, keeping the pending queue because those plays really happened. Errors 8, 11, 16 and 29 are transient and must back off and retry. Conflating them either retries forever against a dead session or discards a working connection because of a rate limit. Also: Last.fm reports most failures with HTTP 200 and an `error` field in the body, so the body must be inspected — a status check alone sees success.
+
+## Sorting batch scrobble parameters numerically
+
+Do not sort `track.scrobble` parameters by their parsed index. Last.fm requires the ASCII table order, where `artist[10]` comes BEFORE `artist[1]` ("0" is 0x30, "]" is 0x5D). A numeric sort produces a different `api_sig` and every batch of 11 or more scrobbles fails with error 13. Plain string comparison in JS is already correct for these ASCII names.
+
 ## Restarting playback without re-arming the ended latch
 
 Do not add a way to start or restart a track that skips the `endedSent` reset in `AudioPlayer.play()` / `seek()`. `endedSent` suppresses a second `emitEnded` for the same pass, so any restart that does not clear it reports one end and then goes silent. This is easy to miss because most restarts re-attach a source (`setSource` / `setClip` / `startWebPlayback` all clear it) — the two that do not are repeat-one (`seek(0)` + `play()`) and a ONE-SONG queue wrapping in repeat-list/shuffle, where `next()` lands on the same index and only `play()` runs. It also only reproduces on the HTML `<audio>` backend; Web Audio hides it, so testing one backend is not enough.
