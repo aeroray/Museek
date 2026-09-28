@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - The Last.fm tab shares the page's filter bar and TrackRow's geometry
+
+Decision:
+`LastfmStatsPanel` renders only the three ranked lists, as `px-4 py-2` sections whose rows copy TrackRow's geometry (`gap-3 px-3 py-2 rounded-xl` with an `h-10` avatar → 56px tall). The period selector lives in the 足迹 page's shared filter bar, reusing the same ghost `ListFilter` button as the local tabs but listing Last.fm's own periods. The tab label is text only — no icon. The account buttons use `secondary` rather than the filled `primary`.
+
+Reason:
+An earlier version was a self-contained card with its own header, subtitle, three columns and its own period `Select`, which read as a different kind of screen bolted onto the page rather than a fourth tab. Reusing the shared filter bar and TrackRow's metrics makes the tab indistinguishable in structure from Songs/Artists/Recent, which is what "keep it similar" means in practice. The icon was dropped because the other three tabs are text-only. `primary` next to the outlined Disconnect button looked visibly larger although both measure 36px — a contrast/weight illusion, so the fix is matching weight rather than size.
+
 ## 2026-09-28 - Last.fm is a tab on the footprints page, and its credentials are a dialog
 
 Decision:

@@ -3,7 +3,6 @@ import {
   Footprints,
   ListFilter,
   Play,
-  Radio,
   Search,
   X,
 } from "lucide-react";
@@ -19,7 +18,7 @@ import {
 import { TrackRow } from "@/components/common/TrackRow";
 import { LastfmStatsPanel } from "@/components/listening/LastfmStatsPanel";
 import { useListeningStore } from "@/stores/listeningStore";
-import { useLastfmStore } from "@/stores/lastfmStore";
+import { useLastfmStore, type LastfmPeriod } from "@/stores/lastfmStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useUiStore } from "@/stores/uiStore";
 import {
@@ -37,6 +36,18 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const PERIODS: ListenPeriod[] = ["today", "week", "month", "all"];
+/**
+ * Last.fm's own period enum. Kept separate from the local `PERIODS` because the
+ * two sets genuinely differ ("today" has no Last.fm equivalent, and Last.fm
+ * offers 3/12 months).
+ */
+const LASTFM_PERIODS: LastfmPeriod[] = [
+  "overall",
+  "7day",
+  "1month",
+  "3month",
+  "12month",
+];
 /**
  * The Last.fm tab is prepended only while the integration is on, so the tab bar
  * is unchanged for anyone who has not set it up.
@@ -84,6 +95,7 @@ export function Listening() {
   // page — fall back to the default without overwriting the stored value.
   const activeTab: ListenTab = tabs.includes(tab) ? tab : "songs";
   const [period, setPeriod] = useState<ListenPeriod>("week");
+  const [lastfmPeriod, setLastfmPeriod] = useState<LastfmPeriod>("overall");
   const [artist, setArtist] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const hasHistory = events.length > 0 || live !== null;
@@ -214,7 +226,6 @@ export function Listening() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {id === "lastfm" && <Radio size={13} className="shrink-0" />}
                 {t(
                   id === "lastfm"
                     ? "lastfm.tab"
@@ -230,9 +241,42 @@ export function Listening() {
         </div>
       </div>
 
-      {/* The local period filter, artist chip and search box do not apply to the
-          Last.fm tab, which brings its own period selector. */}
-      {!empty && tab !== "lastfm" && (
+      {/* The filter bar is shared by both sources. The Last.fm tab swaps the
+          local period menu for Last.fm's own periods but keeps the same ghost
+          button, so the two tabs present the same control in the same place. */}
+      {activeTab === "lastfm" ? (
+        <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 shrink-0 gap-1.5"
+              >
+                <ListFilter size={14} />
+                <span>{t(`lastfm.period.${lastfmPeriod}`)}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {LASTFM_PERIODS.map((id) => (
+                <DropdownMenuCheckboxItem
+                  key={id}
+                  checked={lastfmPeriod === id}
+                  showUncheckedIndicator
+                  onCheckedChange={() => {
+                    setLastfmPeriod(id);
+                    // Changing the period is a request for that period's data, so
+                    // it refetches rather than showing the previous range.
+                    void useLastfmStore.getState().loadStats(id);
+                  }}
+                >
+                  {t(`lastfm.period.${id}`)}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : !empty ? (
         <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -287,15 +331,13 @@ export function Listening() {
             />
           </div>
         </div>
-      )}
+      ) : null}
 
       {activeTab === "lastfm" ? (
         // Independent of local history: the account may have plays from other
         // clients even on a machine that has never played anything.
         <ScrollArea className="flex-1">
-          <div className="px-4 py-3">
-            <LastfmStatsPanel />
-          </div>
+          <LastfmStatsPanel period={lastfmPeriod} />
         </ScrollArea>
       ) : empty ? (
         <div className="flex-1 overflow-y-auto">

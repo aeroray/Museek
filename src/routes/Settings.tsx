@@ -100,7 +100,12 @@ export function Settings() {
                     className="shrink-0"
                     aria-hidden
                   />
-                  <span className="leading-none">{t(tabItem.labelKey)}</span>
+                  {/* No `leading-none`: a line-height of 1 makes the line box
+                      hug the font's full ascent+descent, so CJK glyphs — which
+                      sit high in the em box and have no descender — look pushed
+                      up relative to the icon beside them. Letting the line box
+                      keep a normal leading centres the two against each other. */}
+                  <span className="leading-tight">{t(tabItem.labelKey)}</span>
                 </TabsTrigger>
               );
             })}

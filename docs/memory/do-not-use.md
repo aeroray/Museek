@@ -52,6 +52,14 @@ Do not let the resume-time upgrade in `togglePlay` override a quality the user c
 
 Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
 
+## Comparing two buttons by their computed size alone
+
+Do not conclude a "this button looks bigger" report is a bug from `getBoundingClientRect` alone, and do not dismiss it either. The Last.fm Reconnect and Disconnect buttons measure identically (36px, same font, same padding) in both languages, yet the filled `default` variant beside the outlined one reads as larger — the fix is matching visual weight (`secondary`), not changing a size. Conversely, measure before concluding "it's just your eyes": a reported sidebar misalignment measured 0.00px on the line box and only showed up once the *ink* extent was measured with canvas font metrics. Also measure in the reporter's language: a Chinese UI has different glyph metrics, and an assertion matching English label text silently finds nothing and passes vacuously.
+
+## Using `leading-none` on a label that sits beside an icon
+
+Do not put `leading-none` on a short label next to an icon in a flex row. A line-height of 1 makes the line box hug the font's full ascent+descent, so CJK glyphs — which sit high in the em box and have no descender — look pushed up against the icon even though the line box is perfectly centred. `leading-tight` gives the glyphs the leading they need; the settings sidebar rows grew from 27px to 29.5px and now read as centred.
+
 ## Reading state written by a sibling effect in the same commit
 
 Do not read `useState` written by another effect in the same commit — it still holds the previous render's value. In the Last.fm credentials dialog an "open" effect recorded the stored session key and a "close" effect compared against it, so the close effect saw the initial `""`, judged the session new, and shut the dialog the instant it opened. The dialog stayed in the DOM at `opacity: 0` and every text assertion still passed, because the content was present and correct — only invisible. Use a `useRef` when two effects in one commit must share a value. And when a UI check asserts a dialog or overlay, assert it is actually VISIBLE (`getComputedStyle(...).opacity === "1"`, plus a bounding box on screen), not merely present.

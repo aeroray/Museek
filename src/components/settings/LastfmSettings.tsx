@@ -268,7 +268,15 @@ export function LastfmSettings() {
             desc={connected ? undefined : t("lastfm.credentialsHint")}
           >
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => setDialogOpen(true)}>
+              {/* `secondary`, not the default `primary`: a filled high-contrast
+                  pill next to the outlined Disconnect button read as noticeably
+                  larger even though both measure the same 36px. Matching their
+                  visual weight is what the eye actually compares. */}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setDialogOpen(true)}
+              >
                 <Link2 size={14} className="mr-2" />
                 {connected ? t("lastfm.reconnect") : t("lastfm.connect")}
               </Button>
