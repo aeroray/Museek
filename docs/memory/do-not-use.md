@@ -72,6 +72,14 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Concluding a release failed because `gh release view` says "not found"
+
+Do not treat "release not found" as a failed release. tauri-action is configured with `releaseDraft: true`, and the GitHub API hides draft releases from tokens without push access — this repo's token has only `pull`, so a perfectly successful build looks like nothing happened. Read the workflow log for `Creating one` / `Found draft release` and the `Uploading …` lines, then confirm with a HEAD request: a published asset answers 302 and a draft answers 404.
+
+## Shipping a version without a whatsNew entry
+
+Do not tag a release before adding the entry to `src/lib/whatsNew/entries.ts`. `check-whatsnew-entry.mjs` defaults to the package.json version and is part of the suite, and the dialog looks up its copy by that exact key — without it the release ships with an empty What's New. Bump `package.json` only: `tauri.conf.json` reads the version from it.
+
 ## Persisting a "once per launch" flag
 
 Do not put a once-per-run flag in the persisted payload. `statsRefreshedThisLaunch` is module-level on purpose: on disk it would survive the restart it exists to detect, and the refresh would never happen again. The same applies to any "first time this run" bookkeeping.

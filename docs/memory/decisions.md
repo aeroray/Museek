@@ -30,6 +30,22 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - A release is a version bump plus a whatsNew entry, then a tag
+
+Decision:
+Shipping a version means: bump `package.json`, add a bilingual entry to `src/lib/whatsNew/entries.ts` keyed by the exact version, run the suite, commit, push `main`, then create a lightweight tag `vX.Y.Z` and push it. `src-tauri/tauri.conf.json` reads `"version": "../package.json"`, so package.json is the single source of truth and nothing else needs editing.
+
+Reason:
+The tag is what triggers `.github/workflows/release.yml`, which builds Windows NSIS and macOS Apple Silicon and uploads the assets. The whatsNew entry is not optional: `check-whatsnew-entry.mjs` defaults to the version in package.json, so it is part of the suite and the dialog looks up notes by that exact key — a release without one ships a version whose "What's New" is empty. Previous releases used lightweight tags, so that convention is followed.
+
+## 2026-09-28 - The release workflow creates a DRAFT, and a read-only token cannot see it
+
+Decision:
+Do not report a release as missing because `gh release view vX.Y.Z` returns "release not found". Check the workflow log for "Creating one" / "Found draft release" and the `Uploading …` lines instead, and confirm with a HEAD request against the asset URL.
+
+Reason:
+`releaseDraft: true` means tauri-action creates the release unpublished, and the GitHub API hides draft releases from a token without push access. This token has only `pull` on this repo, so `gh release list` and the releases API showed 30 published releases and no sign of the new one, while the log plainly recorded the creation and six uploaded assets. The tell is a HEAD on `releases/download/vX.Y.Z/latest.json`: a published release answers 302, a draft or absent one answers 404. Publishing the draft requires a write-capable token or the GitHub UI, and is a deliberate manual step — previous releases were published roughly 14 minutes after creation, by someone with write access.
+
 ## 2026-09-28 - The Last.fm tab refreshes once per launch, and shows a skeleton while it does
 
 Decision:
