@@ -1195,3 +1195,11 @@ Reason:
 macOS can render the menu bar according to the desktop wallpaper independently
 of the app window. The tray icon must follow that status-bar surface while the
 app UI continues to follow its own theme mode.
+
+## 2026-09-28 - Long now-playing text marquees on hover, not always
+
+Decision:
+`MarqueeText` (in `src/components/common/MarqueeText.tsx`) replaces the ellipsized song title and artist in the player bar and on the lyrics page. At rest it renders the same ellipsis as before; when the pointer rests on it for 300ms AND the text actually overflows, the full text scrolls leftward in a seamless loop (~32px/s, one duplicated copy with a 48px gap) and unmounts on leave. `prefers-reduced-motion` users get no scroll; they keep a native `title` tooltip instead. Short or fitting text never mounts the track.
+
+Reason:
+The bar and lyrics page are permanent chrome, and both a title AND an artist could scroll at once — always-on motion there is noise that competes with the lyrics, and auto-started endless scrolling is exactly what WCAG 2.2.2 asks to make pausable. Hover is a deliberate "I want to read this" gesture and upgrades the interaction users already had (the `title` tooltip). Marqueeing only when truncated keeps short titles perfectly still. The loop is measured, not timed: `shift = copyWidth + gap` and `duration = shift / 32` are set inline in the same commit that mounts the track, so a stale distance can never paint; the resize observer re-measures both branches (idle `scrollWidth` for overflow, active `offsetWidth` for the shift) with compare-before-set so it cannot feed back. The track is a block-level `width: max-content` flex, which is why the centered lyrics-page title still starts the scroll from its left edge instead of overflowing both ways.

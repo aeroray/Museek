@@ -1333,3 +1333,38 @@ html[data-mini-peek="true"] .app-shell > * {
     animation: none !important;
   }
 }
+
+/* ── Hover marquee (MarqueeText) ───────────────────────────────────
+   Long song titles and artist names scroll while hovered instead of hiding
+   behind an ellipsis. The track is a block-level max-content flex, so a
+   centered container (lyrics page) still starts the scroll from its left
+   edge instead of overflowing both ways. The duplicated copy plus the gap
+   make the loop seamless: when the copy lands where the first one started,
+   the animation restarts on the identical frame. */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.marquee-copy {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .marquee-track {
+    animation-name: marquee-scroll;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+}
+
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-1 * var(--marquee-shift, 0px)));
+  }
+}
