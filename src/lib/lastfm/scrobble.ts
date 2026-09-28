@@ -86,15 +86,21 @@ export type ScrobbleFields = {
  * `startedAt` is passed in rather than read here: the timestamp must be the
  * moment playback began, and by the time a scrobble is sent the app may be
  * minutes past that.
+ *
+ * The artist and title come from `scrobbleIdentity`, so a matched local file is
+ * scrobbled under its real catalog name rather than its filename. Callers must
+ * have checked `isScrobblableSong` first; an unidentifiable song falls back to
+ * the display values, which that guard has already rejected.
  */
 export function scrobbleFields(
   song: MusicInfo,
   startedAtMs: number,
   durationMs: number,
 ): ScrobbleFields {
+  const identity = scrobbleIdentity(song);
   return {
-    artist: primaryArtist(song.singer),
-    track: song.name,
+    artist: identity?.artist ?? primaryArtist(song.singer),
+    track: identity?.track ?? song.name,
     album: song.albumName ?? "",
     duration: Math.max(0, Math.round(durationMs / 1000)),
     timestamp: Math.floor(startedAtMs / 1000),
@@ -112,21 +118,50 @@ export function isScrobbleComplete(fields: ScrobbleFields): boolean {
 }
 
 /**
- * Whether a track carries real metadata, as opposed to the placeholders a local
- * file falls back to when its tags never parsed.
+ * The artist and title to send to Last.fm, or null when the song has no
+ * trustworthy identity to send.
+ *
+ * Resolution is CATALOG-FIRST. A local file can be matched to a real online
+ * song while its *display* name stays whatever the user chose: filename mode
+ * keeps the basename, and an untagged file keeps the placeholder. Those values
+ * are right for the library and wrong for Last.fm — sending `01 - 冷冰冰` as a
+ * track name, or `未知歌曲` for every untagged file, creates junk that never
+ * resolves to the real song. The stored catalog identity IS the real song, so it
+ * wins whenever it exists.
+ *
+ * When there is no match, the display name is used only if it is real. That is
+ * why "was it matched online" is the wrong question to gate on: a properly
+ * tagged local file has a perfectly good artist and title without any match, and
+ * refusing to scrobble it would silently drop legitimate plays.
+ */
+export function scrobbleIdentity(
+  song: MusicInfo,
+): { artist: string; track: string } | null {
+  const catalogName = song.meta.catalogName?.trim() ?? "";
+  const catalogSinger = song.meta.catalogSinger?.trim() ?? "";
+  const displayName = song.name.trim();
+  const displaySinger = song.singer.trim();
+
+  const track =
+    catalogName || (isPlaceholderTitle(displayName) ? "" : displayName);
+  const singer =
+    catalogSinger || (isPlaceholderArtist(displaySinger) ? "" : displaySinger);
+  if (!track || !singer) return null;
+  return { artist: primaryArtist(singer), track };
+}
+
+/**
+ * Whether the song has an identity worth sending to Last.fm.
  *
  * A local import substitutes "未知歌曲" / "未知歌手" (or the English pair) for
  * missing tags. Those strings are real values as far as Last.fm is concerned, so
- * without this check every untagged local file scrobbles to the same junk artist
- * and title — and they all collapse into ONE entry on the user's profile, which
- * is worse than not scrobbling at all. The same test already gates the online
- * catalog lookup, so a file that cannot be matched is also a file that cannot be
- * meaningfully scrobbled.
+ * without this check every untagged file scrobbles to the same junk artist and
+ * title — and they all collapse into ONE entry on the user's profile, which is
+ * worse than not scrobbling at all. A file that was matched online has a real
+ * catalog identity instead, and passes.
  */
 export function isScrobblableSong(song: MusicInfo): boolean {
-  return (
-    !isPlaceholderArtist(song.singer) && !isPlaceholderTitle(song.name)
-  );
+  return scrobbleIdentity(song) !== null;
 }
 
 /**

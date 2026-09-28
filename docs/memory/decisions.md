@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - What gets sent to Last.fm is decided by identity quality, not by "was it matched"
+
+Decision:
+`scrobbleIdentity(song)` resolves the artist and title **catalog-first** — `meta.catalogName` / `meta.catalogSinger` win when present, otherwise the display name is used if it is not a placeholder — and returns null when either half is missing. Both `reportNowPlaying` and `reportListenEnded` gate on it, and `scrobbleFields` sends what it resolved. The 足迹 log is left completely untouched: it records every play, matched or not.
+
+Reason:
+The proposal was to scrobble local files only when they had been matched online. Measurement showed that is the wrong axis. A local file's DISPLAY name is deliberately not its real song: filename mode keeps the basename, so a matched file was being scrobbled as `01 - 冷冰冰` instead of `冷冰冰`, and a matched file whose tags never parsed was being dropped entirely even though its catalog identity was sitting in meta. Conversely, a well-tagged unmatched file has a perfectly good artist and title — refusing it would silently discard legitimate plays. So the question is not "was it matched" but "do we have a real artist and title", and the catalog identity is simply the best available answer to that. The 足迹 needs no change because it keys songs on `song.id` (three untagged files stay three rows); only its artist ranking collapses them, which is honest — they genuinely share the credit "未知歌手".
+
 ## 2026-09-28 - Placeholder-tagged local files are never sent to Last.fm
 
 Decision:

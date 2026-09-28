@@ -64,6 +64,14 @@ Do not put `leading-none` on a short label next to an icon in a flex row. A line
 
 Do not scrobble or announce a song whose title/artist is still the local-import placeholder ("未知歌曲" / "未知歌手" / "Unknown title" / "Unknown artist"). They are valid strings to Last.fm, so every untagged file collapses into ONE junk entry on the profile. Gate on `isScrobblableSong`, which reuses the catalog-lookup placeholder test rather than defining a second list.
 
+## Gating Last.fm on "was this local file matched online"
+
+Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongId`. That is the wrong axis in both directions: a matched file is often displayed under a filename (so it would scrobble as `01 - 冷冰冰`), and an unmatched file with proper ID3 tags has a perfectly good artist and title (so gating on a match silently discards real plays). Gate on `scrobbleIdentity`, which prefers the catalog identity when it exists and falls back to the display name when that is real.
+
+## Sending a local file's display name to Last.fm
+
+Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
+
 ## Assuming Last.fm can be told to stop showing "now playing"
 
 Do not look for a way to clear the now-playing state. There is no such method, and `track.updateNowPlaying` has no timestamp and must not be retried. The consequence is that the client must be accurate when it ANNOUNCES: an announcement that is never superseded leaves the profile showing a stale track indefinitely. That is why the dedupe key is cleared whenever a listen session ends, not only on pause.
