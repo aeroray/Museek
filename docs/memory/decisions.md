@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - Restoring a playback session never scrobbles
+
+Decision:
+No code change was needed; the behaviour was verified and is now locked down by `scripts/check-lastfm-restore.mjs`. Restoring a session after a restart leaves the player paused, sends no `track.scrobble` and no `track.updateNowPlaying`, and stays silent however long it idles.
+
+Reason:
+A persisted live listen session records `playing: true` from the run that wrote it, and `parseLive` is what turns that into `playing: false` on read — the single guard that stops a restored session counting as an in-progress listen. The player then settles on `paused` and drives `listenSetPlaying(false)`, which takes the `pauseLive` branch and returns before any announce. Only `finish()` scrobbles, and on startup nothing calls it. The check seeds a session deliberately ABOVE the scrobble threshold (150s of a 240s track, against a 120s threshold) and asserts that `shouldScrobble` would accept it, so the observed zeros mean "nothing tried" rather than "it tried and was judged too short". Injecting `listenFinish(false)` into the restore path fails three cases, which is the exact shape of the feared bug.
+
 ## 2026-09-28 - Last.fm stat rows carry a tooltip, not a trailing link icon
 
 Decision:

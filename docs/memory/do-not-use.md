@@ -72,6 +72,14 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Trusting a persisted "playing: true" flag after a restart
+
+Do not let a restored listen session keep `playing: true` from the run that wrote it. `parseLive` forces it false on read, and that single line is what stops a restart from counting as an in-progress listen — which would put the restored track on the user's profile as "now playing" while they have not pressed anything. Any new persisted field describing *live* activity needs the same treatment: the disk remembers what was happening, not what is happening now.
+
+## Assuming a "nothing was sent" assertion is meaningful without a threshold check
+
+Do not assert that no scrobble was sent without also proving the seeded listen WOULD have been scrobbled. Otherwise the assertion passes for the wrong reason — the listen was simply too short — and would keep passing if the guard were removed. Seed clear of the boundary too: 2:00 against a 2:00 threshold only passed because the comparison happens to be `>=`.
+
 ## Rendering a Last.fm stat row outside a TooltipProvider
 
 Do not render `LastfmStatsPanel` (or anything containing a stat row) without a Radix `TooltipProvider` above it. Radix throws "`Tooltip` must be used within `TooltipProvider`", which blanks the whole pane. The app has one in `App.tsx`, but a harness that renders the panel directly does not — and the resulting failure looks like a broken component rather than a missing provider.
