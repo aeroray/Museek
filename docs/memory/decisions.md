@@ -30,6 +30,22 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - Last.fm stat rows carry a tooltip, not a trailing link icon
+
+Decision:
+A Last.fm stat row renders no trailing "open" icon. Instead the whole row is the link and is wrapped in a Radix tooltip reading 在 Last.fm 中打开 / Open on Last.fm. Rows with no URL are returned bare, without the tooltip wrapper.
+
+Reason:
+The entire row already opened on click, so a second affordance beside it was redundant — and it was `opacity-0` until hover anyway, so it only appeared at the same moment as the hover background. Removing it left nothing to tell the user where the click goes, since no text on the row mentions Last.fm, so the tooltip carries that. A disabled button fires no pointer events, so wrapping a URL-less row in a trigger would create a tooltip that can never open.
+
+## 2026-09-28 - The Last.fm view tabs use text-xs, like the search page's scope picker
+
+Decision:
+The 常听歌手/常听歌曲/最近记录 sub-tabs use `text-xs`, matching the 歌曲/歌手/专辑 scope picker on the search page. The page-level tabs stay `text-sm`.
+
+Reason:
+They are a secondary choice *inside* one tab, so at `text-sm` they competed visually with the page-level tabs directly above them rather than reading as subordinate. The search page already establishes this two-level relationship, so copying it keeps the app consistent instead of inventing a third size.
+
 ## 2026-09-28 - Last.fm stats are cached per period on disk and auto-loaded
 
 Decision:

@@ -1,5 +1,9 @@
-import { ExternalLink } from "lucide-react";
 import type { LastfmStats } from "@/stores/lastfmStore";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { openExternal } from "@/components/settings/LastfmSettings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -118,16 +122,16 @@ function StatRow({
   highlight?: boolean;
   url?: string;
 }) {
-  return (
+  const t = useT();
+  const row = (
     <button
       type="button"
       disabled={!url}
       onClick={() => url && void openExternal(url)}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-[background-color,transform] duration-200 ease-out",
+        "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-[background-color,transform] duration-200 ease-out",
         url && "hover:bg-accent/55 active:scale-[0.995]",
       )}
-      title={url ? "Last.fm" : undefined}
     >
       {rank !== undefined && (
         <span className="w-5 shrink-0 text-center text-sm font-medium tabular-nums text-muted-foreground">
@@ -169,12 +173,24 @@ function StatRow({
           {stat}
         </span>
       )}
-      {url && (
-        <ExternalLink
-          size={12}
-          className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-        />
-      )}
     </button>
+  );
+
+  // The whole row is the link, so there is no trailing icon: a second "open"
+  // affordance beside a row that already opens on click was redundant, and it
+  // was invisible until hover anyway. The tooltip is what tells the user where
+  // the click goes — nothing on the row itself says "Last.fm".
+  //
+  // A row with no URL is disabled, and a disabled button fires no pointer
+  // events, so it is returned bare rather than wrapped in a trigger that could
+  // never open.
+  if (!url) return row;
+  return (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>{row}</TooltipTrigger>
+      <TooltipContent side="top" className="text-xs">
+        {t("lastfm.stats.openOnLastfm")}
+      </TooltipContent>
+    </Tooltip>
   );
 }

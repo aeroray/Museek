@@ -309,7 +309,10 @@ export function Listening() {
           </DropdownMenu>
 
           {/* The three Last.fm lists, presented exactly like the page's own
-              tabs so the two halves of the page agree on how a list is chosen. */}
+              tabs so the two halves of the page agree on how a list is chosen.
+              `text-xs` to match the search page's 歌曲/歌手/专辑 scope picker —
+              these are a secondary choice inside one tab, so they sit a step
+              below the page-level tabs rather than competing with them. */}
           <div className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/70 p-1">
             {LASTFM_VIEWS.map((id) => (
               <button
@@ -317,7 +320,7 @@ export function Listening() {
                 type="button"
                 onClick={() => setLastfmView(id)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
                   lastfmView === id
                     ? "bg-background text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",

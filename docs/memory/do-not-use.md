@@ -72,6 +72,14 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Rendering a Last.fm stat row outside a TooltipProvider
+
+Do not render `LastfmStatsPanel` (or anything containing a stat row) without a Radix `TooltipProvider` above it. Radix throws "`Tooltip` must be used within `TooltipProvider`", which blanks the whole pane. The app has one in `App.tsx`, but a harness that renders the panel directly does not — and the resulting failure looks like a broken component rather than a missing provider.
+
+## Adding a trailing "open" icon to a row that is itself a link
+
+Do not add a trailing external-link icon to a row whose whole body already opens on click. It is a second affordance for one action, and if it is revealed on hover it appears at the same moment as the hover background, so it reads as decoration rather than a control. Use a tooltip on the row to say where the click goes.
+
 ## Keeping fetched Last.fm stats in memory only
 
 Do not add a fetched-from-the-network view to the Last.fm store without persisting it. The stats were runtime-only, so every launch showed an empty tab and the user had to press a button again — and a store field is easy to assume is persisted when it is not, because `snapshot()` lists fields explicitly rather than spreading state. If you add a field that survives a restart, add it to `snapshot()` AND to `parsePersisted`, and assert BOTH paths: a check that seeds the file only covers the read path, so dropping the field from `snapshot()` still passes it.
