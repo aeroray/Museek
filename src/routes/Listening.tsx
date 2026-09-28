@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TrackRow } from "@/components/common/TrackRow";
+import { LastfmStatsPanel } from "@/components/listening/LastfmStatsPanel";
 import { useListeningStore } from "@/stores/listeningStore";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -266,6 +267,10 @@ export function Listening() {
 
       {empty ? (
         <div className="flex-1 overflow-y-auto">
+          {/* Shown even with no local history: the Last.fm account may well have
+              plays from other clients, and hiding the section until this device
+              has recorded something would make it look unsupported. */}
+          <LastfmStatsPanel />
           <div className="mx-auto w-full max-w-5xl p-4">
             <div className="flex min-h-[18rem] flex-col items-center justify-center px-4 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
@@ -280,6 +285,7 @@ export function Listening() {
         </div>
       ) : (
         <ScrollArea className="flex-1">
+          <LastfmStatsPanel />
           <div className="px-4 py-2">
             {tab === "songs" ? (
               <SongList

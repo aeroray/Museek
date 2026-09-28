@@ -30,6 +30,7 @@ import { WhatsNewDialog } from "@/components/whatsNew/WhatsNewDialog";
 import { useDownloadStore } from "@/stores/downloadStore";
 import { useLocalMusicStore } from "@/stores/localMusicStore";
 import { useListeningStore } from "@/stores/listeningStore";
+import { useLastfmStore } from "@/stores/lastfmStore";
 import { useUpdateStore } from "@/stores/updateStore";
 import { syncWindowTitle } from "@/lib/i18n";
 import { startOpenLocalFilesListener } from "@/lib/openLocalFiles";
@@ -57,6 +58,7 @@ function AppInit() {
   const { loadFromDisk: loadDownloads } = useDownloadStore();
   const { loadFromDisk: loadLocalMusic } = useLocalMusicStore();
   const { loadFromDisk: loadListening } = useListeningStore();
+  const loadLastfm = useLastfmStore((s) => s.loadFromDisk);
   const { loadFromDisk: loadPlayerPrefs } = usePlayerStore();
 
   // Global hotkeys (play / seek / lyrics / …), registered after settings hydrate.
@@ -78,6 +80,9 @@ function AppInit() {
       loadPlaylists();
       loadHistory();
       void loadListening();
+      // Last.fm credentials + any queued scrobbles, so a queue left by a previous
+      // run can be flushed as soon as the app starts.
+      void loadLastfm();
       const playerReady = loadPlayerPrefs();
       // After settings load, trim the cache in case the limit was lowered.
       // Downloads need downloadDir from settings before unfinished tasks resume.
