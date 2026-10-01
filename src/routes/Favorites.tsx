@@ -12,6 +12,7 @@ import {
   Pencil,
   ArrowDownUp,
   ListFilter,
+  Loader2,
   Search,
   Tags,
   RefreshCw,
@@ -38,7 +39,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { OnlineSource, Quality } from "@/types/music";
+import type { MusicInfo, OnlineSource, Quality } from "@/types/music";
 import {
   categoryNameMap,
   filterByCategoryId,
@@ -134,6 +135,7 @@ export function Favorites() {
   const [resolvingLoved, setResolvingLoved] = useState<string | null>(null);
   const [lovedQuery, setLovedQuery] = useState("");
   const [lovedSort, setLovedSort] = useState<LovedSort>("recent");
+  const [preparingAll, setPreparingAll] = useState(false);
 
   /** The loved list after the tab's own search and sort. */
   const lovedDisplayed = useMemo(() => {
@@ -325,6 +327,61 @@ export function Favorites() {
     void loadLovedTracks();
   }, [isLastfm, canLoadLoved, loadLovedTracks]);
 
+  /**
+   * Queue the whole loved list.
+   *
+   * Every row has to become a playable recording first, which is why this is not
+   * instant: a loved track that is already one of the user's favourites resolves
+   * from the local list with no request at all, and only the rest are searched
+   * for. Those are searched a few at a time rather than strictly one by one, and
+   * anything that cannot be found is reported instead of being dropped in
+   * silence — a "play all" that quietly plays half the list is worse than one
+   * that says so.
+   */
+  const playAllLoved = async () => {
+    if (preparingAll || lovedDisplayed.length === 0) return;
+    setPreparingAll(true);
+    try {
+      const resolved: (MusicInfo | null)[] = lovedDisplayed.map(() => null);
+      const toSearch: number[] = [];
+      lovedDisplayed.forEach((track, index) => {
+        const local = pickLovedMatch(track, favorites);
+        if (local) resolved[index] = local;
+        else toSearch.push(index);
+      });
+
+      const CONCURRENCY = 6;
+      let cursor = 0;
+      await Promise.all(
+        Array.from(
+          { length: Math.min(CONCURRENCY, toSearch.length) },
+          async () => {
+            while (cursor < toSearch.length) {
+              const index = toSearch[cursor++];
+              resolved[index] = await resolveLovedTrack(lovedDisplayed[index]);
+            }
+          },
+        ),
+      );
+
+      const songs = resolved.filter((song): song is MusicInfo => Boolean(song));
+      if (songs.length === 0) {
+        notify({
+          message: t("favorites.lastfm.notFoundAll"),
+          variant: "error",
+        });
+        return;
+      }
+      const missing = resolved.length - songs.length;
+      if (missing > 0) {
+        notify({ message: t("favorites.lastfm.someMissing", { count: missing }) });
+      }
+      await playAll(songs);
+    } finally {
+      setPreparingAll(false);
+    }
+  };
+
   const batchDownload = () => {
     favorites.filter((f) => selected.has(f.id)).forEach((f) => addTask(f));
     exitEdit();
@@ -396,6 +453,27 @@ export function Favorites() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {isLastfm && lovedDisplayed.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8"
+              disabled={preparingAll}
+              onClick={() => void playAllLoved()}
+            >
+              {preparingAll ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : (
+                <Play
+                  size={14}
+                  className="mr-1.5"
+                  fill="currentColor"
+                  strokeWidth={0}
+                />
+              )}
+              {t("favorites.playAll")}
+            </Button>
+          )}
           {isSongs && favorites.length > 0 && !editing && (
             <Button
               variant="secondary"

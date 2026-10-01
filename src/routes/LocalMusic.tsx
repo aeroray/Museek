@@ -624,7 +624,7 @@ export function LocalMusic() {
 
                     <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-muted shadow-[var(--shadow-border)]">
                       {track.song.meta.picUrl ? (
-                        <CoverImage src={track.song.meta.picUrl} />
+                        <CoverImage src={track.song.meta.picUrl} showOutline={false} />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center text-muted-foreground">
                           <Music size={16} />

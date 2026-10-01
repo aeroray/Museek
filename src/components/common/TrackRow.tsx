@@ -107,7 +107,7 @@ export const TrackRow = memo(function TrackRow({
 
       <div className="relative h-10 w-10 shrink-0 rounded-xl overflow-hidden bg-muted shadow-[var(--shadow-border)]">
         {thumb ? (
-          <CoverImage src={thumb} />
+          <CoverImage src={thumb} showOutline={false} />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground">
             <Music size={16} />

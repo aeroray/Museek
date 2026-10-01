@@ -62,7 +62,7 @@ export function LastfmLovedPanel({
           >
             <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-muted shadow-[var(--shadow-border)]">
               {track.image ? (
-                <CoverImage src={track.image} />
+                <CoverImage src={track.image} showOutline={false} />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                   <Music size={16} />

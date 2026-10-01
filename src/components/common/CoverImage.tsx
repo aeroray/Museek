@@ -28,7 +28,16 @@ export function CoverImage({
   alt?: string
   className?: string
   loading?: "lazy" | "eager"
-  /** 1px image outline (default on). Disable for layered hero covers. */
+  /**
+   * 1px image outline (default on).
+   *
+   * Turn it OFF whenever the cover sits inside a frame that already draws a
+   * ring — `rounded-* overflow-hidden` plus `shadow-[var(--shadow-border)]`,
+   * which is the standard cover frame. That ring follows the frame's border
+   * radius, while this one is drawn on the rectangular `<img>` and clipped by
+   * the frame's corners, so together they read as a dark line down all four
+   * edges that is missing at the corners. Disable for layered hero covers too.
+   */
   showOutline?: boolean
   /** Fires when load state flips (false on src change, true once ready). */
   onLoaded?: (loaded: boolean) => void

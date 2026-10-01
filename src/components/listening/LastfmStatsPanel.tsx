@@ -1,9 +1,4 @@
 import type { LastfmStats } from "@/stores/lastfmStore";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { openExternal } from "@/components/settings/LastfmSettings";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -123,11 +118,20 @@ function StatRow({
   url?: string;
 }) {
   const t = useT();
+  // The whole row is the link, so there is no trailing icon: a second "open"
+  // affordance beside a row that already opens on click was redundant, and it
+  // was invisible until hover anyway. What tells the user where the click goes
+  // is the hover hint — and it is a NATIVE `title`, as on TrackRow's actions,
+  // not the styled tooltip this used to use. The styled one anchors to its
+  // trigger, and the trigger is the whole row, so it opened centred above the
+  // song rather than next to the pointer, which reads as belonging to the row
+  // above. A `title` follows the cursor and lands where the user looks.
   const row = (
     <button
       type="button"
       disabled={!url}
       onClick={() => url && void openExternal(url)}
+      title={url ? t("lastfm.stats.openOnLastfm") : undefined}
       className={cn(
         "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-[background-color,transform] duration-200 ease-out",
         url && "hover:bg-accent/55 active:scale-[0.995]",
@@ -176,21 +180,7 @@ function StatRow({
     </button>
   );
 
-  // The whole row is the link, so there is no trailing icon: a second "open"
-  // affordance beside a row that already opens on click was redundant, and it
-  // was invisible until hover anyway. The tooltip is what tells the user where
-  // the click goes — nothing on the row itself says "Last.fm".
-  //
   // A row with no URL is disabled, and a disabled button fires no pointer
-  // events, so it is returned bare rather than wrapped in a trigger that could
-  // never open.
-  if (!url) return row;
-  return (
-    <Tooltip delayDuration={300}>
-      <TooltipTrigger asChild>{row}</TooltipTrigger>
-      <TooltipContent side="top" className="text-xs">
-        {t("lastfm.stats.openOnLastfm")}
-      </TooltipContent>
-    </Tooltip>
-  );
+  // events, so it carries no hint either.
+  return row;
 }

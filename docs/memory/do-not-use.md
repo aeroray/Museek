@@ -72,6 +72,10 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Wrapping a full-width row in a styled tooltip
+
+Do not anchor a styled `Tooltip` to a row that spans the list width. The tooltip is positioned against its trigger, so it opens centred ABOVE the row — for a tall row that puts it over the neighbouring item, and users read it as belonging to the wrong row. Reported exactly that way on the 足迹 rows. Use a native `title` attribute, which follows the cursor and lands beside the pointer; that is also what TrackRow's action buttons already do. Keep the styled tooltip for small triggers (an icon button), where its anchoring is the same place the cursor is.
+
 ## Comparing whole artist strings when matching across services
 
 Do not decide "same artist" by comparing two whole credit strings. Two independent traps live there. The first is spelling: Last.fm's "Aimyon" and QQ Music's 爱缪 share no characters, so the comparison scores 0 and nothing matches — ask the platform for its own spelling instead. The second is that a platform credits everyone ("元、鱼骨妹") while Last.fm stores only the first ("元"), and a short name inside a longer one is deliberately rejected by `textScore`'s ratio guard, which exists to stop "BGM" matching "Epic Battle BGM". Split the credit list and score each artist on its own (`splitArtists`), so the guard keeps working on real titles. Both were reported as "the song won't play" while the platform had it all along.

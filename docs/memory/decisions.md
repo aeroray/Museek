@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - A cover inside a framed box must not draw its own outline
+
+Decision:
+`CoverImage`'s `showOutline` is passed as `false` everywhere the cover sits inside the standard cover frame — `rounded-* overflow-hidden` plus `shadow-[var(--shadow-border)]` — which is TrackRow, LocalMusic, PlaylistCard and the Last.fm loved rows.
+
+Reason:
+Reported as "the cover has a black edge on all four sides". Both rings were being drawn: the frame's `shadow-border` (whose first layer is `0 0 0 1px`) follows the frame's border radius, while `showOutline` puts `outline-1 -outline-offset-1 outline-black/10` on the rectangular `<img>` inside that rounded, `overflow-hidden` frame. The img's outline is clipped at the corners but survives along the straight edges, so the two stack to roughly 15% black down all four sides and vanish at the corners — which is what reads as a wrong black border rather than a 1px edge. The fix removes the duplicate, not the border: the frame keeps its ring, and the check asserts both halves so a future change cannot pass by deleting the wrong one. `showOutline` remains the default for a bare cover with no frame around it (Downloads), where it is the only edge.
+
 ## 2026-09-28 - Loved tracks: mirror favourites out, show the account's list in, resolve strictly
 
 Decision:

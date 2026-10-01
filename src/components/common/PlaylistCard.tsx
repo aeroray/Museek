@@ -68,7 +68,7 @@ export function PlaylistCard({
         >
           {playlist.img ? (
             <div className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-[1.04]">
-              <CoverImage src={playlist.img} />
+              <CoverImage src={playlist.img} showOutline={false} />
             </div>
           ) : (
             <div className="h-full w-full flex items-center justify-center text-muted-foreground">

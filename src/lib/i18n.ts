@@ -326,6 +326,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "favorites.lastfm.notFound": "没找到「{name}」，换个音源试试",
     "favorites.lastfm.open": "在 Last.fm 中打开",
     "favorites.lastfm.play": "播放",
+    "favorites.lastfm.notFoundAll": "这些歌曲都没找到可播放的版本",
+    "favorites.lastfm.someMissing": "有 {count} 首没找到，已跳过",
     "favorites.tabPlaylists": "歌单",
     "favorites.tabAlbums": "专辑",
     "favorites.summary":
@@ -1186,6 +1188,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "favorites.lastfm.notFound": "Could not find \"{name}\" — try another platform",
     "favorites.lastfm.open": "Open on Last.fm",
     "favorites.lastfm.play": "Play",
+    "favorites.lastfm.notFoundAll": "None of these could be found on a platform",
+    "favorites.lastfm.someMissing": "{count} could not be found and were skipped",
     "favorites.tabPlaylists": "Playlists",
     "favorites.tabAlbums": "Albums",
     "favorites.summary":
