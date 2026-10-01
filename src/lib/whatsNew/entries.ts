@@ -17,6 +17,72 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.11.1": {
+    zh: {
+      sections: [
+        {
+          title: "🎧 Last.fm 喜欢",
+          bullets: [
+            "「收藏」页新增 Last.fm 标签，可以看到你在 Last.fm 上喜欢的全部歌曲（包括在网页版或手机 App 里喜欢的）",
+            "支持搜索歌名或歌手，也可以按最近喜欢 / 歌名 / 歌手排序",
+            "可以「播放全部」，把整个列表加入播放队列",
+            "在「收藏」页收藏或取消收藏歌曲时，会同步更新 Last.fm 上的「喜欢」；可以在「设置 → Last.fm」里关闭",
+          ],
+        },
+        {
+          title: "🐛 播放修复",
+          bullets: [
+            "修复：播放某些平台的歌曲时，有时会播出另一首歌（歌曲不再被交给不支持该平台的音源脚本）",
+            "修复：Last.fm 喜欢列表里的歌曲点击播放会提示「找不到」",
+            "修复：Last.fm 的歌手名和平台写法不同（Aimyon / あいみょん / 爱缪），现在会先向平台询问它自己的写法再匹配",
+            "修复：Last.fm 只记录第一个歌手，而平台会列出全部合作者（元 / 元、鱼骨妹），现在会逐个比对",
+            "已经在「收藏」里的歌曲会直接播放收藏里的那一版，不再去搜索",
+          ],
+        },
+        {
+          title: "✨ 界面",
+          bullets: [
+            "修复：歌曲封面四周有一圈多余的黑边（封面和外框各画了一次边框）",
+            "修复：「足迹」页的悬停提示浮在歌曲上方，现在会跟随鼠标显示",
+            "「收藏」页的 Last.fm 标签与「歌曲」标签样式统一：悬停封面出现播放按钮，右侧按钮样式一致，并新增搜索框与排序",
+            "「加载喜欢的歌曲」按钮改为与「足迹」页一致的刷新图标按钮",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎧 Last.fm loves",
+          bullets: [
+            "The Favorites page gains a Last.fm tab showing every track you have loved on Last.fm, including ones loved on the website or in the app",
+            "Search by title or artist, and sort by recently loved / title / artist",
+            "Play all queues the whole list",
+            "Favouriting or un-favouriting a song on the Favorites page also loves or un-loves it on Last.fm; turn this off under Settings → Last.fm",
+          ],
+        },
+        {
+          title: "🐛 Playback fixes",
+          bullets: [
+            "Fix: playing a song from some platforms could play a different song (a song is no longer handed to a source script that does not serve its platform)",
+            "Fix: playing a track from the Last.fm loved list reported \"not found\"",
+            "Fix: Last.fm spells artists differently from the platforms (Aimyon / あいみょん / 爱缪); the platform's own spelling is now asked for before matching",
+            "Fix: Last.fm stores only the first artist while platforms credit everyone (元 / 元、鱼骨妹); each credited artist is now compared",
+            "A song already in your Favorites plays that exact recording instead of being searched for",
+          ],
+        },
+        {
+          title: "✨ Interface",
+          bullets: [
+            "Fix: song covers had a stray black edge on all four sides (the cover and its frame each drew a border)",
+            "Fix: the hover hint on the History page floated above the song; it now follows the pointer",
+            "The Last.fm tab on Favorites now matches the Songs tab: the play button appears on the cover on hover, the trailing actions match, and it gains a search box and sorting",
+            "\"Load loved tracks\" is now the same refresh icon button the History page uses",
+          ],
+        },
+      ],
+    },
+  },
   "3.11.0": {
     zh: {
       sections: [
