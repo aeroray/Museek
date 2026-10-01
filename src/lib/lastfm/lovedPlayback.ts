@@ -1,4 +1,4 @@
-import { pickBestMatch } from "@/lib/lyrics/matchSong";
+import { matchScore, splitArtists } from "@/lib/lyrics/matchSong";
 import { sourceRunner } from "@/lib/sourceRunner";
 import { searchKugou } from "@/lib/search/kg";
 import { searchKuwo } from "@/lib/search/kuwo";
@@ -154,17 +154,63 @@ async function matchOn(
   artist: string,
   name: string,
 ): Promise<MusicInfo | null> {
-  const probe = probeFor(name, artist);
+  const loved = { name, artist };
   for (const query of queriesFor(artist, name)) {
     try {
       const { list } = await searchFns[platform](query, 1, SEARCH_LIMIT);
-      const hit = pickBestMatch(probe, list);
+      const hit = pickLovedMatch(loved, list);
       if (hit) return hit;
     } catch {
       // A platform that is down or rate-limited must not stop the others.
     }
   }
   return null;
+}
+
+/**
+ * Score one hit against a loved track.
+ *
+ * `matchScore` compares the whole artist strings, which fails whenever the
+ * platform credits more artists than Last.fm stored. Reported: the loved track
+ * 冷冰冰 names only 元, NetEase credits 元、鱼骨妹, and `textScore("元",
+ * "元 鱼骨妹")` is 0 — a one-character name inside a longer string is thrown out
+ * by the ratio guard, which exists to stop "BGM" matching "Epic Battle BGM".
+ * The song was therefore reported as not found even though the platform had it,
+ * and even though the user had it in their own favourites.
+ *
+ * Each credited artist is offered to the SAME scorer on its own, so the title
+ * strictness, the duration gate and every other rule are untouched — only the
+ * set of names the artist may match grows, and each still has to clear
+ * `ARTIST_MIN` by itself.
+ */
+export function lovedScore(loved: LovedTrackRef, hit: MusicInfo): number {
+  const probe = probeFor(loved.name, loved.artist);
+  const direct = matchScore(probe, hit);
+  if (direct > 0) return direct;
+  let best = 0;
+  for (const part of splitArtists(hit.singer)) {
+    if (part === hit.singer) continue;
+    const score = matchScore(probe, { ...hit, singer: part });
+    if (score > best) best = score;
+  }
+  return best;
+}
+
+/** The best hit for a loved track out of `list`, or null when none matches. */
+export function pickLovedMatch(
+  loved: LovedTrackRef,
+  list: MusicInfo[],
+): MusicInfo | null {
+  let best: MusicInfo | null = null;
+  let bestScore = 0;
+  for (const hit of list) {
+    const score = lovedScore(loved, hit);
+    if (score > bestScore) {
+      best = hit;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 /**
@@ -208,5 +254,5 @@ export function lovedTrackMatches(
   track: LovedTrackRef,
   hits: MusicInfo[],
 ): MusicInfo | null {
-  return pickBestMatch(probeFor(track.name, track.artist), hits);
+  return pickLovedMatch(track, hits);
 }

@@ -61,8 +61,23 @@ function textScore(left: string, right: string): number {
   return jac >= 0.85 ? jac : 0
 }
 
-function durationScore(left: string, right: string): number {
-  const a = parseLyricDuration(left)
+/**
+ * Split a platform's credit list into individual artists.
+ *
+ * Platforms write collaborations as one field — "元、鱼骨妹", "A feat. B",
+ * "A & B", "A/B" — while other services (Last.fm among them) usually store only
+ * the first artist. The separators are deliberately greedy: splitting a genuine
+ * name that contains "&" only produces parts that then have to match on their
+ * own, which they will not, so the extra parts cannot cause a false match.
+ */
+export function splitArtists(singer: string): string[] {
+  return singer
+    .split(/[、,，/;；]|&|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function durationScore(left: string, right: string): number {  const a = parseLyricDuration(left)
   const b = parseLyricDuration(right)
   if (!a || !b) return 0.5
   const diff = Math.abs(a - b)

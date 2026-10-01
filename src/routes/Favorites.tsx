@@ -14,6 +14,7 @@ import {
   ListFilter,
   Search,
   Tags,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,12 +53,11 @@ import { CategoryNameDialog } from "@/components/songCategories/CategoryNameDial
 import { useCategoryDialog } from "@/components/songCategories/useCategoryDialog";
 import {
   LastfmLovedError,
-  LastfmLovedLoadButton,
   LastfmLovedPanel,
   LastfmLovedSkeleton,
   lovedTrackKey,
 } from "@/components/favorites/LastfmLovedPanel";
-import { resolveLovedTrack } from "@/lib/lastfm/lovedPlayback";
+import { pickLovedMatch, resolveLovedTrack } from "@/lib/lastfm/lovedPlayback";
 import {
   cachedLovedFor,
   useLastfmStore,
@@ -299,7 +299,12 @@ export function Favorites() {
     const key = lovedTrackKey(track);
     setResolvingLoved(key);
     try {
-      const song = await resolveLovedTrack(track);
+      // A song the user already favourited is the exact recording they chose, so
+      // it is played directly instead of being searched for. Reported: a loved
+      // track that WAS in the user's favourites still came back "not found",
+      // because the search was the only path and it could not match.
+      const local = pickLovedMatch(track, favorites);
+      const song = local ?? (await resolveLovedTrack(track));
       if (!song) {
         notify({
           message: t("favorites.lastfm.notFound", { name: track.name }),
@@ -472,11 +477,24 @@ export function Favorites() {
             />
           </div>
 
-          <LastfmLovedLoadButton
-            loading={lovedLoading}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            // Disabled while a fetch is running so a second one cannot overlap,
+            // and when there is nothing to fetch with. Same affordance as the
+            // 足迹 tab's refresh.
             disabled={lovedLoading || !canLoadLoved}
             onClick={() => void loadLovedTracks({ force: true })}
-          />
+            title={
+              loved ? t("favorites.lastfm.reload") : t("favorites.lastfm.load")
+            }
+          >
+            <RefreshCw
+              size={15}
+              className={cn(lovedLoading && "animate-spin")}
+            />
+          </Button>
         </div>
       )}
 

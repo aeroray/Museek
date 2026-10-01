@@ -72,6 +72,10 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Comparing whole artist strings when matching across services
+
+Do not decide "same artist" by comparing two whole credit strings. Two independent traps live there. The first is spelling: Last.fm's "Aimyon" and QQ Music's 爱缪 share no characters, so the comparison scores 0 and nothing matches — ask the platform for its own spelling instead. The second is that a platform credits everyone ("元、鱼骨妹") while Last.fm stores only the first ("元"), and a short name inside a longer one is deliberately rejected by `textScore`'s ratio guard, which exists to stop "BGM" matching "Epic Battle BGM". Split the credit list and score each artist on its own (`splitArtists`), so the guard keeps working on real titles. Both were reported as "the song won't play" while the platform had it all along.
+
 ## Falling back to a title-only match when resolving a Last.fm loved track
 
 Do not "improve" the loved-track lookup by accepting a hit whose title matches when the artist does not. It looks like a harmless recall win, but a title is not an identifier: searching あのね returns rows by several different artists, and the first one is as likely to be someone else's song as the right one. The user then hears a different recording while the player bar shows the one they clicked — the same silent-wrong-song failure as the source-dispatch fallback. Report "not found" instead.
