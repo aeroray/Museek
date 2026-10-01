@@ -388,6 +388,31 @@ successful."* Log failed requests with headers and body.
 **Offline cache:** keep unsubmitted scrobbles in a local cache that **survives client restarts**.
 Send in order, oldest first, in batches of up to 50.
 
+### 3.5 `track.love` / `track.unlove`
+
+Sources: [track.love](https://www.last.fm/api/show/track.love),
+[track.unlove](https://www.last.fm/api/show/track.unlove).
+
+**HTTP:** `POST`, form-urlencoded, parameters in the body. Authentication **required** (signed).
+
+| Param | Required | Meaning |
+|---|---|---|
+| `artist` | **yes** | The artist name |
+| `track` | **yes** | The track name |
+| `api_key` | **yes** | A Last.fm API key |
+| `api_sig` | **yes** | Signature |
+| `sk` | **yes** | Session key |
+
+Two methods rather than one with a flag, and **neither is a toggle**: loving an already-loved track
+and unloving a track that was never loved are both accepted. A retry therefore cannot corrupt the
+account's state, which is what makes these safe to send without reading the current state first.
+There is **no `timestamp`** — a love is a statement about the track, not about a play, so it does not
+appear in the recent-tracks feed or affect charts.
+
+Both answer with an empty body (`<lfm status="ok">`), so the only usable signal is the `error` field
+described in §5.2. Failures are not retried on a backoff the way scrobbles are: the action is
+repeatable and the user's next attempt performs it again.
+
 ---
 
 ## 4. Reading user data
@@ -528,6 +553,39 @@ without a session has no defined subject. Always pass `user` explicitly.
 - **`nowplaying`** is an attribute, not an element, and is **absent** (not `"false"`) on
   non-now-playing tracks. In JSON it appears as the string `"true"` under `@attr`.
 - All JSON scalar values are **strings**, including `playcount`, `uts`, `subscriber`.
+
+### 4.6 `user.getLovedTracks`
+
+Source: [user.getLovedTracks](https://www.last.fm/api/show/user.getLovedTracks).
+
+**HTTP:** `GET`, `api_key`-only — no session and no `api_sig`.
+
+| Param | Required | Meaning |
+|---|---|---|
+| `user` | **yes** | The username |
+| `limit` | no | Number of results per page. Default **50** |
+| `page` | no | The page number |
+
+Same envelope as the other list methods, wrapped in `lovedtracks`:
+
+```xml
+<lovedtracks user="RJ" page="1" perPage="50" totalPages="3" total="120">
+  <track>
+    <artist><name>...</name><mbid>...</mbid><url>...</url></artist>
+    <date uts="1234567890">...</date>
+    <name>...</name>
+    <streamable fulltrack="0">0</streamable>
+    <mbid>...</mbid>
+    <url>...</url>
+    <image size="small">...</image>
+  </track>
+</lovedtracks>
+```
+
+Two shape traps, both shared with the other list methods: `track` is an **object rather than an
+array** when there is exactly one loved track, and every scalar (including `uts` and `total`) arrives
+as a **string**. The list carries **no platform identifier** — an artist and a title is all it is — so
+it cannot be played without first finding the track on a platform.
 
 ---
 

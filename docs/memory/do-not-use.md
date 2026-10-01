@@ -72,6 +72,10 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Falling back to a title-only match when resolving a Last.fm loved track
+
+Do not "improve" the loved-track lookup by accepting a hit whose title matches when the artist does not. It looks like a harmless recall win, but a title is not an identifier: searching あのね returns rows by several different artists, and the first one is as likely to be someone else's song as the right one. The user then hears a different recording while the player bar shows the one they clicked — the same silent-wrong-song failure as the source-dispatch fallback. Report "not found" instead. The title-only QUERY is fine and is still used, because a broader search is what surfaces the right row for the strict comparison to accept.
+
 ## Adding a "try every source anyway" fallback to platform dispatch
 
 Do not restore a fallback that asks every enabled script when none declares the song's platform. It reads as harmless — "better to try than to leave the song unplayable" — but it is the mechanism behind "I played X and heard a different song": a script that does not serve the platform cannot resolve the id, so it looks the track up BY NAME on its own service and answers with another recording of the same title. Playing the wrong audio silently is worse than reporting that no source serves the platform. Scripts that declare no `sources` at all are still asked; that is the only case with nothing to contradict.

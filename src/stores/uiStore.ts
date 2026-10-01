@@ -38,8 +38,10 @@ interface UiState {
   setAlbumSource: (s: OnlineSource) => void
   // Which Favorites tab is active — kept here so leaving (e.g. opening a
   // favorited playlist) and coming back restores the same tab.
-  favoritesTab: "songs" | "playlists" | "albums"
-  setFavoritesTab: (tab: "songs" | "playlists" | "albums") => void
+  // Like `listeningTab`, "lastfm" is in the union unconditionally so the choice
+  // survives toggling the integration off and on.
+  favoritesTab: "lastfm" | "songs" | "playlists" | "albums"
+  setFavoritesTab: (tab: "lastfm" | "songs" | "playlists" | "albums") => void
   // "lastfm" only appears as a tab while the Last.fm integration is switched on,
   // but it is part of the union unconditionally so the selected tab survives
   // toggling the integration off and on again.

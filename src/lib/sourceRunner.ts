@@ -7,7 +7,7 @@ import { looksLikeRealAudio } from "@/lib/audioUrlProbe";
 import { createAsyncCache } from "@/lib/cache";
 import { getWyBuiltinMusicUrl } from "@/lib/playlists/wyUrl";
 import type { SourceScript, SourceRegistry, LxRequestPayload } from "@/types/source";
-import type { LyricInfo, MusicInfo, Quality } from "@/types/music";
+import type { LyricInfo, MusicInfo, OnlineSource, Quality } from "@/types/music";
 
 /** Parallel musicUrl probes per wave — higher so 10–20 sources don't serialize. */
 const MUSIC_URL_WAVE = 12;
@@ -183,6 +183,25 @@ export class SourceRunner {
   /** Enabled, loaded source ids in list order — changes when the user edits sources. */
   layoutKey(): string {
     return this.getOrderedIds().join("|");
+  }
+
+  /**
+   * Platforms the enabled, loaded scripts declare support for.
+   *
+   * Needed when a track carries no platform of its own — a Last.fm loved track
+   * is an artist and a title and nothing else — so there is no `source` to
+   * dispatch on. Searching a platform no script serves would only spend a
+   * request to learn it cannot be played.
+   */
+  servedPlatforms(): OnlineSource[] {
+    const out = new Set<OnlineSource>();
+    for (const script of this.registry.getScripts()) {
+      if (!script.enabled || !this.sessions.has(script.id)) continue;
+      for (const key of Object.keys(script.sources ?? {})) {
+        out.add(key as OnlineSource);
+      }
+    }
+    return [...out];
   }
 
   private buildRequest(

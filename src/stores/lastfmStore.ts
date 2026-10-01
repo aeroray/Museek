@@ -13,8 +13,10 @@ import {
   authorizeUrl,
   fetchSession,
   fetchToken,
+  getLovedTracks,
   lastfmGet,
   scrobble as sendScrobble,
+  setTrackLoved,
   updateNowPlaying,
   TOKEN_UNAUTHORIZED,
   type LastfmCredentials,
@@ -24,6 +26,7 @@ import {
   isScrobblableSong,
   isScrobbleComplete,
   scrobbleFields,
+  scrobbleIdentity,
   shouldScrobble,
   type ScrobbleFields,
 } from "@/lib/lastfm/scrobble";
@@ -38,6 +41,13 @@ import {
   trimPending,
   type PendingScrobble,
 } from "@/lib/lastfm/queue";
+import {
+  asRecord,
+  num,
+  optStr,
+  pickImage,
+  str,
+} from "@/lib/lastfm/shape";
 import type { MusicInfo } from "@/types/music";
 
 /**
@@ -100,8 +110,11 @@ type Persisted = {
   enabled: boolean;
   scrobbleEnabled: boolean;
   nowPlayingEnabled: boolean;
+  /** Mirror Museek favourites onto the account as loved tracks. */
+  loveEnabled: boolean;
   pending: PendingScrobble[];
   statsCache: LastfmStatsCache;
+  lovedCache: LovedTracks | null;
 };
 
 const DEFAULTS: Persisted = {
@@ -112,8 +125,12 @@ const DEFAULTS: Persisted = {
   enabled: false,
   scrobbleEnabled: true,
   nowPlayingEnabled: true,
+  // On by default: the user who connects an account and favourites a song has
+  // already said they want the two kept in step.
+  loveEnabled: true,
   pending: [],
   statsCache: {},
+  lovedCache: null,
 };
 
 const PERIOD_KEYS: LastfmPeriod[] = [
@@ -124,10 +141,10 @@ const PERIOD_KEYS: LastfmPeriod[] = [
   "12month",
 ];
 
-/** Optional string: keeps `undefined` distinct from `""` for `image`. */
-function optStr(v: unknown): string | undefined {
-  return typeof v === "string" && v ? v : undefined;
-}
+/** How many loved tracks are fetched per request (Last.fm's documented default). */
+const LOVED_PAGE_SIZE = 50;
+/** Stop after this many pages, so a huge account cannot stall the tab. */
+const LOVED_MAX_PAGES = 4;
 
 /**
  * Rebuild one cached period, dropping anything malformed.
@@ -216,8 +233,45 @@ export function parsePersisted(raw: unknown): Persisted {
     enabled: bool(r.enabled, DEFAULTS.enabled),
     scrobbleEnabled: bool(r.scrobbleEnabled, DEFAULTS.scrobbleEnabled),
     nowPlayingEnabled: bool(r.nowPlayingEnabled, DEFAULTS.nowPlayingEnabled),
+    loveEnabled: bool(r.loveEnabled, DEFAULTS.loveEnabled),
     pending: dedupePending(trimPending(parsePendingList(r.pending))),
     statsCache: parseStatsCache(r.statsCache),
+    lovedCache: parseLovedCache(r.lovedCache),
+  };
+}
+
+/**
+ * Rebuild the cached loved list, dropping anything malformed.
+ *
+ * Shares a file with the credentials, so it must never throw. A row without a
+ * name is dropped rather than rendered blank, and a cache with no `fetchedAt`
+ * is treated as absent — it could not have come from a real fetch.
+ */
+function parseLovedCache(raw: unknown): LovedTracks | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const fetchedAt = num(r.fetchedAt);
+  if (!fetchedAt) return null;
+  const rows = Array.isArray(r.tracks) ? r.tracks : [];
+  const tracks: LovedTrack[] = [];
+  for (const entry of rows) {
+    const t = asRecord(entry);
+    const name = str(t.name).trim();
+    if (!name) continue;
+    const lovedAt = num(t.lovedAt);
+    tracks.push({
+      name,
+      artist: str(t.artist).trim(),
+      url: str(t.url),
+      image: optStr(t.image),
+      lovedAt: lovedAt > 0 ? lovedAt : undefined,
+    });
+  }
+  return {
+    username: str(r.username),
+    tracks,
+    total: num(r.total) || tracks.length,
+    fetchedAt,
   };
 }
 
@@ -238,6 +292,9 @@ type LastfmState = Persisted & {
   /** True while a stats fetch is in flight. */
   statsLoading: boolean;
   statsError: string | null;
+  /** True while a loved-tracks fetch is in flight. */
+  lovedLoading: boolean;
+  lovedError: string | null;
   /** True while a flush is in flight, so flushes do not overlap. */
   flushing: boolean;
 
@@ -249,6 +306,7 @@ type LastfmState = Persisted & {
   setEnabled: (enabled: boolean) => Promise<void>;
   setScrobbleEnabled: (enabled: boolean) => Promise<void>;
   setNowPlayingEnabled: (enabled: boolean) => Promise<void>;
+  setLoveEnabled: (enabled: boolean) => Promise<void>;
   /** Announce the track that just started. */
   reportNowPlaying: (song: MusicInfo) => void;
   /** A listen session ended; decide whether it counts as a scrobble. */
@@ -268,6 +326,13 @@ type LastfmState = Persisted & {
    */
   loadStatsForTab: (period: LastfmPeriod) => Promise<void>;
   clearStats: () => void;
+  /** Fetch the account's loved tracks, reusing the cache unless forced. */
+  loadLovedTracks: (opts?: { force?: boolean }) => Promise<void>;
+  /**
+   * Mirror a favourite onto the account. Fire-and-forget: a favourite is a local
+   * action and must not fail because Last.fm is unreachable.
+   */
+  setSongLoved: (song: MusicInfo, loved: boolean) => void;
 };
 
 // Module-level, outside React state: the poll timer and the last announced track
@@ -313,8 +378,10 @@ function snapshot(state: LastfmState): Persisted {
     enabled: state.enabled,
     scrobbleEnabled: state.scrobbleEnabled,
     nowPlayingEnabled: state.nowPlayingEnabled,
+    loveEnabled: state.loveEnabled,
     pending: trimPending(state.pending),
     statsCache: state.statsCache,
+    lovedCache: state.lovedCache,
   };
 }
 
@@ -348,6 +415,8 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
   error: null,
   statsLoading: false,
   statsError: null,
+  lovedLoading: false,
+  lovedError: null,
   flushing: false,
 
   async loadFromDisk() {
@@ -372,7 +441,14 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
       apiSecret: trimmedSecret,
       error: null,
       ...(changed
-        ? { sessionKey: "", username: "", statsCache: {}, statsError: null }
+        ? {
+            sessionKey: "",
+            username: "",
+            statsCache: {},
+            statsError: null,
+            lovedCache: null,
+            lovedError: null,
+          }
         : {}),
     });
     persist(get(), true);
@@ -691,6 +767,73 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
     set({ statsCache: {}, statsError: null });
     persist(get(), true);
   },
+
+  async setLoveEnabled(enabled) {
+    set({ loveEnabled: enabled });
+    persist(get(), true);
+  },
+
+  async loadLovedTracks(opts) {
+    const state = get();
+    const apiKey = state.apiKey.trim();
+    const user = state.username.trim();
+    if (!apiKey || !user) {
+      set({ lovedError: t("lastfm.err.notConnected") });
+      return;
+    }
+    // Reuse the cache unless a refresh is asked for: the list only changes when
+    // something is loved, and it can be long.
+    if (state.lovedCache && !opts?.force && state.lovedCache.username === user) {
+      return;
+    }
+    set({ lovedLoading: true, lovedError: null });
+    try {
+      // Paged with the documented page size rather than asking for 200 at once:
+      // a `limit` above the documented maximum is not something the API promises
+      // to accept, and a rejected request would look like a broken feature.
+      // Stops early on a short page, so an account with 30 loved tracks costs
+      // one request.
+      let tracks: LovedTrack[] = [];
+      let total = 0;
+      let fetchedAt = Date.now();
+      for (let page = 1; page <= LOVED_MAX_PAGES; page++) {
+        const built = buildLovedTracks(
+          user,
+          await getLovedTracks(apiKey, user, page, LOVED_PAGE_SIZE),
+        );
+        tracks = [...tracks, ...built.tracks];
+        total = built.total;
+        fetchedAt = built.fetchedAt;
+        if (built.tracks.length < LOVED_PAGE_SIZE) break;
+      }
+      set({
+        lovedCache: { username: user, tracks, total, fetchedAt },
+        lovedLoading: false,
+      });
+      persist(get(), true);
+    } catch (err) {
+      set({ lovedLoading: false, lovedError: lastfmErrorLabel(err) });
+    }
+  },
+
+  setSongLoved(song, loved) {
+    const state = get();
+    if (!state.enabled || !state.loveEnabled || !state.sessionKey) return;
+    // The same catalog-first identity scrobbling uses, so a matched local file is
+    // loved under its real artist and title rather than its filename, and a file
+    // with no real metadata is skipped instead of loving "Unknown artist".
+    const identity = scrobbleIdentity(song);
+    if (!identity) return;
+    void setTrackLoved(credsOf(state), identity, loved).catch((err) => {
+      // Never retried and never surfaced as a play failure: a love is a small
+      // repeatable write, and the user's next favourite performs it again. A dead
+      // session is still acted on, because every later write will fail too.
+      if (err instanceof LastfmError && isAuthError(err.code)) {
+        set({ error: t("lastfm.err.reconnect") });
+        void get().disconnect();
+      }
+    });
+  },
 }));
 
 /**
@@ -713,47 +856,25 @@ export function cachedStatsFor(
   return entry;
 }
 
+/**
+ * The cached loved tracks, or null when there is nothing usable for this account.
+ *
+ * Validated against the CURRENT username for the same reason as the stats cache:
+ * it outlives a disconnect on purpose, so a different account must never see it.
+ */
+export function cachedLovedFor(
+  cache: LovedTracks | null,
+  username: string,
+): LovedTracks | null {
+  if (!cache || !cache.fetchedAt) return null;
+  const user = username.trim();
+  if (user && cache.username && cache.username !== user) return null;
+  return cache;
+}
+
 // ---------------------------------------------------------------------------
 // Response shaping
 // ---------------------------------------------------------------------------
-
-function asRecord(v: unknown): Record<string, unknown> {
-  return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
-}
-
-/** Last.fm returns every scalar as a string, so numbers are parsed explicitly. */
-function num(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function str(v: unknown): string {
-  return typeof v === "string" ? v : "";
-}
-
-/**
- * Pick the best image Last.fm offers.
- *
- * The docs only guarantee `small`/`medium`/`large`; `extralarge` and `mega`
- * appear in real responses but are undocumented, so they are preferred when
- * present and simply skipped when not. An empty `#text` is Last.fm's way of
- * saying "no image", which must not be treated as a URL.
- */
-function pickImage(images: unknown): string | undefined {
-  if (!Array.isArray(images)) return undefined;
-  const bySize = new Map<string, string>();
-  for (const entry of images) {
-    const r = asRecord(entry);
-    const size = str(r.size);
-    const text = str(r["#text"]).trim();
-    if (size && text) bySize.set(size, text);
-  }
-  for (const size of ["mega", "extralarge", "large", "medium", "small"]) {
-    const hit = bySize.get(size);
-    if (hit) return hit;
-  }
-  return undefined;
-}
 
 export function buildStats(
   username: string,
@@ -820,6 +941,77 @@ export function buildStats(
         playedAt: uts > 0 ? uts * 1000 : undefined,
       };
     }),
+    fetchedAt: Date.now(),
+  };
+}
+
+/**
+ * The account's loved tracks.
+ *
+ * Last.fm's loved list is a list of TRACKS, not of platform songs: it carries an
+ * artist and a title and nothing that identifies a playable recording. Resolving
+ * one to something playable is a separate, fallible step, so the two are kept
+ * apart — this type is what the profile says, not what can be played.
+ */
+export type LovedTrack = {
+  name: string;
+  artist: string;
+  url: string;
+  image?: string;
+  /** Seconds since epoch, when Last.fm states it. */
+  lovedAt?: number;
+};
+
+export type LovedTracks = {
+  username: string;
+  tracks: LovedTrack[];
+  /** Total the account has, which may exceed the page that was fetched. */
+  total: number;
+  fetchedAt: number;
+};
+
+/**
+ * Shape `user.getLovedTracks`.
+ *
+ * Like the other list methods the payload is wrapped in `lovedtracks`, whose
+ * `track` is an object rather than an array when there is exactly one entry —
+ * the same trap `buildStats` handles for the other lists. Rows with no name are
+ * dropped rather than rendered blank.
+ */
+export function buildLovedTracks(
+  username: string,
+  raw: unknown,
+): LovedTracks {
+  const payload = asRecord(raw);
+  const loved = asRecord(payload.lovedtracks);
+  const list = Array.isArray(loved.track)
+    ? loved.track
+    : loved.track
+      ? [loved.track]
+      : [];
+
+  const tracks: LovedTrack[] = [];
+  for (const entry of list) {
+    const r = asRecord(entry);
+    const artist = asRecord(r.artist);
+    const name = str(r.name).trim();
+    if (!name) continue;
+    const uts = num(asRecord(r.date).uts);
+    tracks.push({
+      name,
+      // `artist` is an object on loved tracks, but a bare string on some
+      // endpoints; accept both rather than render "[object Object]".
+      artist: str(artist.name).trim() || str(r.artist).trim(),
+      url: str(r.url),
+      image: pickImage(r.image),
+      lovedAt: uts > 0 ? uts * 1000 : undefined,
+    });
+  }
+
+  return {
+    username,
+    tracks,
+    total: num(asRecord(loved["@attr"]).total) || tracks.length,
     fetchedAt: Date.now(),
   };
 }

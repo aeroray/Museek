@@ -220,4 +220,47 @@ export async function scrobble(
   return { accepted, ignored, ignoredCodes };
 }
 
+// ---------------------------------------------------------------------------
+// Loved tracks
+// ---------------------------------------------------------------------------
+
+/**
+ * Love or unlove one track.
+ *
+ * Two methods rather than one with a flag, because that is what Last.fm
+ * exposes: `track.love` and `track.unlove` take the same two parameters
+ * (`artist`, `track`) and both answer with an empty body. Neither is a toggle —
+ * loving an already-loved track and unloving a track that was never loved are
+ * both accepted — so a retry cannot corrupt the account's state, which is what
+ * makes these safe to send without a read-back first.
+ *
+ * `track.love` is a write, so it is signed and session-authenticated. There is
+ * no timestamp: a love is a statement about the track, not about a play.
+ */
+export async function setTrackLoved(
+  creds: LastfmCredentials,
+  fields: { artist: string; track: string },
+  loved: boolean,
+): Promise<void> {
+  await lastfmPost(creds, loved ? "track.love" : "track.unlove", {
+    artist: fields.artist,
+    track: fields.track,
+  });
+}
+
+/**
+ * One page of the account's loved tracks.
+ *
+ * An unsigned read (`api_key` alone), like the other `user.*` methods, so it
+ * works without a session — but still needs a username.
+ */
+export async function getLovedTracks(
+  apiKey: string,
+  user: string,
+  page = 1,
+  limit = 50,
+): Promise<unknown> {
+  return lastfmGet(apiKey, "user.getLovedTracks", { user, page, limit });
+}
+
 export { lastfmErrorLabel };

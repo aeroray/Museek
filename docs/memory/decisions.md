@@ -30,6 +30,18 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - Loved tracks: mirror favourites out, show the account's list in, resolve strictly
+
+Decision:
+Favouriting or un-favouriting a song also sends `track.love` / `track.unlove` (gated by a new `loveEnabled` toggle, default on, and by `enabled` + a session key). The 收藏 page gains a Last.fm tab, shown only while the integration is on and placed FIRST, that lists `user.getLovedTracks` and can play a row. A loved track is resolved to a playable song by searching platforms, NetEase first (it has a built-in URL resolver, so it can play with no script), then whatever the enabled scripts declare.
+
+Reason:
+Two directions, because they are different features: the write keeps Last.fm in step with what the user does in Museek, and the read is the only view of "songs I like" that is not tied to this machine — it includes songs loved on the website or in the Last.fm app. The write is fire-and-forget and never retried on a backoff: `track.love`/`track.unlove` are not toggles (loving an already-loved track and unloving a never-loved one are both accepted), so the action is idempotent and the user's next favourite repeats it. It uses `scrobbleIdentity`, so a matched local file is loved under its real artist rather than its filename, and a file with no real metadata is skipped rather than loving "未知歌曲".
+
+The read is cached in `lastfm.json` and validated against the current username, exactly like the stats cache, and it is fetched with the documented page size of 50 and paged up to 4 times rather than asking for 200 at once — a `limit` above the documented maximum is not something the API promises to accept, and a rejected request would look like a broken feature.
+
+Playback is the risky half and is deliberately strict: Last.fm carries an artist and a title and no platform id, so the song must be FOUND, and a title-only match is exactly the failure that makes a user say "I played X and heard Y" (あのね is a title shared by several artists). Both artist and title must match, and a track that cannot be matched confidently is reported as not found instead of played as the closest thing. A title-only QUERY is still tried, because artists are spelled differently across services ("Aimyon" vs "爱缪") and the broader search is what surfaces the right row for the strict comparison to accept. Verified by `scripts/check-lastfm-loved.mjs` (adding a title-only fallback fails the strictness case; removing the favourite→love wiring fails the write case) and `scripts/check-favorites-lastfm-tab.mjs` (removing the tab fails 9 cases).
+
 ## 2026-09-28 - Source dispatch never falls back to scripts that do not serve the platform
 
 Decision:

@@ -228,11 +228,13 @@ export function LastfmSettings() {
     enabled,
     scrobbleEnabled,
     nowPlayingEnabled,
+    loveEnabled,
     pending,
     disconnect,
     setEnabled,
     setScrobbleEnabled,
     setNowPlayingEnabled,
+    setLoveEnabled,
     flush,
   } = useLastfmStore();
 
@@ -313,6 +315,16 @@ export function LastfmSettings() {
                   <Switch
                     checked={nowPlayingEnabled}
                     onCheckedChange={(v) => void setNowPlayingEnabled(v)}
+                  />
+                }
+              />
+              <SettingRow
+                title={t("lastfm.loveEnabled")}
+                desc={t("lastfm.loveEnabledDesc")}
+                control={
+                  <Switch
+                    checked={loveEnabled}
+                    onCheckedChange={(v) => void setLoveEnabled(v)}
                   />
                 }
               />

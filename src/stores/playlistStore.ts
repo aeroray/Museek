@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { readData, writeData } from "@/lib/db"
 import { normalizeCategoryName } from "@/lib/songCategories"
+import { useLastfmStore } from "@/stores/lastfmStore"
 import type { MusicInfo, Source } from "@/types/music"
 import { playlistKind, type Playlist as SourcePlaylist } from "@/lib/playlists"
 
@@ -146,16 +147,25 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => {
       if (toAdd.length === 0) return 0
       set((s) => ({ favorites: [...toAdd, ...s.favorites] }))
       persist()
+      // Mirror onto Last.fm. Done after the local write so favouriting never
+      // depends on the network, and per song so a batch is not lost when one
+      // track has no usable identity.
+      const lastfm = useLastfmStore.getState()
+      for (const song of toAdd) lastfm.setSongLoved(song, true)
       return toAdd.length
     },
 
     removeFromFavorites(songId) {
+      // Read the song BEFORE dropping it: the love write needs an artist and a
+      // title, and the id alone cannot produce them.
+      const removed = get().favorites.find((f) => f.id === songId)
       const { [songId]: _, ...rest } = get().favoriteSongCategories
       set((s) => ({
         favorites: s.favorites.filter((f) => f.id !== songId),
         favoriteSongCategories: rest,
       }))
       persist()
+      if (removed) useLastfmStore.getState().setSongLoved(removed, false)
     },
 
     isFavorite(songId) {
