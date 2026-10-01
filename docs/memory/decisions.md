@@ -30,6 +30,14 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
+## 2026-09-28 - Source dispatch never falls back to scripts that do not serve the platform
+
+Decision:
+`SourceRunner.getOrderedIds()` returns only scripts whose `sources` map declares the song's platform, plus scripts that declare no `sources` at all. There is no "fall back to every enabled script" when nothing matches. `getMusicUrl` then throws `sources.err.noPlatform`, which names the platform, rather than `sources.err.noEnabled`.
+
+Reason:
+Reported again after the first platform fix: searching あのね (话说…) on QQ Music and playing it still played a different song. The search is not at fault — asking the real API returns that exact row first, and `toLxMusicInfo` passes its `songmid` and `strMediaMid` through correctly — so the substitution happens inside a source script. The first fix filtered by platform but kept a fallback returning the unfiltered list whenever the filter matched nothing, which re-admitted exactly the scripts the filter exists to exclude. A script handed an id it cannot resolve looks the track up by name on its own service, and there are many songs called あのね by different artists, so it answers with another recording. The fallback was justified as "better to try than to leave the song unplayable", but silently playing the wrong song is worse than an honest failure — and search is built in for every platform, so browsing one you have no script for is ordinary. Verified by `scripts/check-source-platform-dispatch.mjs`; removing the filter fails 9 cases. The `sources.err.noPlatform` message also passes through `formatRemotePlayError` unwrapped, or the toast would read "播放失败：没有支持QQ音乐的音源…".
+
 ## 2026-09-28 - A release is a version bump plus a whatsNew entry, then a tag
 
 Decision:

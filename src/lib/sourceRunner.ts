@@ -149,11 +149,18 @@ export class SourceRunner {
   // different recording of the same title. The user hears another artist while
   // the player bar still shows the song they picked.
   //
-  // Scripts declaring no `sources` at all are kept (nothing to check against),
-  // and if the platform filter would leave nothing to ask, the unfiltered list
-  // is returned so a lone under-declaring script keeps working rather than
-  // failing. The fallback deliberately covers only the PLATFORM filter: a script
-  // that claims a platform but omits an action from its list has made a specific
+  // Scripts declaring no `sources` at all are kept: they have made no statement
+  // either way, so there is nothing to contradict.
+  //
+  // There is deliberately NO "fall back to everything" when nothing matches.
+  // That fallback re-admitted precisely the scripts this filter exists to
+  // exclude, so a song whose platform no script serves played a different
+  // recording instead of reporting that nothing can serve it. Search is built
+  // into the app for every platform, so browsing a platform you have no script
+  // for is an ordinary situation and it must fail honestly.
+  //
+  // The action filter is applied on top and never falls back: a script that
+  // claims a platform but omits an action from its list has made a specific
   // statement about that platform, so it is respected instead of overridden.
   private getOrderedIds(
     action?: "musicUrl" | "lyric" | "pic",
@@ -164,14 +171,8 @@ export class SourceRunner {
       .filter((s) => s.enabled && this.sessions.has(s.id));
     if (!action || !platform) return scripts.map((s) => s.id);
 
-    const forPlatform = scripts.filter((s) => {
-      const declared = s.sources;
-      if (!declared) return true;
-      return Boolean(declared[platform]);
-    });
-    if (!forPlatform.length) return scripts.map((s) => s.id);
-
-    return forPlatform
+    return scripts
+      .filter((s) => !s.sources || Boolean(s.sources[platform]))
       .filter((s) => {
         const actions = s.sources?.[platform]?.actions;
         return !actions?.length || actions.includes(action);
@@ -292,7 +293,22 @@ export class SourceRunner {
 
   async getMusicUrl(payload: LxRequestPayload): Promise<string> {
     const ids = this.getOrderedIds("musicUrl", payload.source);
-    if (!ids.length) throw new Error(t("sources.err.noEnabled"));
+    if (!ids.length) {
+      // Distinguish "nothing is enabled" from "nothing serves this platform".
+      // Search is built in for every platform, so browsing one you have no
+      // script for is ordinary; reporting "no enabled sources" would send the
+      // user looking for a problem that is not there.
+      const anyEnabled = this.registry
+        .getScripts()
+        .some((s) => s.enabled && this.sessions.has(s.id));
+      throw new Error(
+        anyEnabled
+          ? t("sources.err.noPlatform", {
+              platform: t(`platform.${payload.source}`),
+            })
+          : t("sources.err.noEnabled"),
+      );
+    }
 
     const quality = (payload.type ?? "128k") as Quality;
     const key = this.musicUrlKey(payload);

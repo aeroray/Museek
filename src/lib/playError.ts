@@ -89,6 +89,17 @@ export function formatRemotePlayError(raw: string, t: Translate): string {
     return raw;
   }
 
+  // Copy that is already user-facing but carries a dynamic value, so it cannot
+  // be compared literally. `sources.err.noPlatform` names the platform; without
+  // this the toast would read "播放失败：没有支持QQ音乐的音源…", prefixing a
+  // complete sentence with a redundant "playback failed".
+  const noPlatform = t("sources.err.noPlatform", { platform: "\u0000" });
+  const marker = "\u0000";
+  if (noPlatform.includes(marker)) {
+    const [head, tail] = noPlatform.split(marker);
+    if (raw.startsWith(head) && raw.endsWith(tail)) return raw;
+  }
+
   // Web Audio fetch failures from `src/lib/audio.ts`, which embed the HTTP
   // status. Without this branch they fell through to `player.failedDetail` and
   // the user saw raw English in a localized UI: "播放失败：Audio request failed

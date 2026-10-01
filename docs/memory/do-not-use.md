@@ -72,6 +72,10 @@ Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongI
 
 Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
 
+## Adding a "try every source anyway" fallback to platform dispatch
+
+Do not restore a fallback that asks every enabled script when none declares the song's platform. It reads as harmless — "better to try than to leave the song unplayable" — but it is the mechanism behind "I played X and heard a different song": a script that does not serve the platform cannot resolve the id, so it looks the track up BY NAME on its own service and answers with another recording of the same title. Playing the wrong audio silently is worse than reporting that no source serves the platform. Scripts that declare no `sources` at all are still asked; that is the only case with nothing to contradict.
+
 ## Concluding a release failed because `gh release view` says "not found"
 
 Do not treat "release not found" as a failed release. tauri-action is configured with `releaseDraft: true`, and the GitHub API hides draft releases from tokens without push access — this repo's token has only `pull`, so a perfectly successful build looks like nothing happened. Read the workflow log for `Creating one` / `Found draft release` and the `Uploading …` lines, then confirm with a HEAD request: a published asset answers 302 and a draft answers 404.
