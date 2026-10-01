@@ -71,6 +71,16 @@ const SORTS = ["added", "name"] as const;
 const LOCAL_FAVORITE_TABS = ["songs", "playlists", "albums"] as const;
 type FavoriteTab = "lastfm" | (typeof LOCAL_FAVORITE_TABS)[number];
 
+/**
+ * How the loved list can be ordered.
+ *
+ * `recent` is the order Last.fm returns and the only one that carries
+ * information the list itself does not already show — the others are for finding
+ * a song you can already name.
+ */
+const LOVED_SORTS = ["recent", "name", "artist"] as const;
+type LovedSort = (typeof LOVED_SORTS)[number];
+
 export function Favorites() {
   const favorites = usePlaylistStore((s) => s.favorites);
   const removeFromFavorites = usePlaylistStore((s) => s.removeFromFavorites);
@@ -122,6 +132,29 @@ export function Favorites() {
   const canLoadLoved = Boolean(lastfmApiKey.trim() && lastfmUsername.trim());
   const loved = cachedLovedFor(lovedCache, lastfmUsername);
   const [resolvingLoved, setResolvingLoved] = useState<string | null>(null);
+  const [lovedQuery, setLovedQuery] = useState("");
+  const [lovedSort, setLovedSort] = useState<LovedSort>("recent");
+
+  /** The loved list after the tab's own search and sort. */
+  const lovedDisplayed = useMemo(() => {
+    const needle = lovedQuery.trim().toLowerCase();
+    const rows = (loved?.tracks ?? []).filter(
+      (track) =>
+        !needle ||
+        track.name.toLowerCase().includes(needle) ||
+        track.artist.toLowerCase().includes(needle),
+    );
+    if (lovedSort === "name") {
+      return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (lovedSort === "artist") {
+      return [...rows].sort(
+        (a, b) => a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name),
+      );
+    }
+    // Most recently loved first, which is the order Last.fm returns.
+    return [...rows].sort((a, b) => (b.lovedAt ?? 0) - (a.lovedAt ?? 0));
+  }, [loved, lovedQuery, lovedSort]);
 
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -374,13 +407,6 @@ export function Favorites() {
               {t("favorites.playAll")}
             </Button>
           )}
-          {isLastfm && (
-            <LastfmLovedLoadButton
-              loading={lovedLoading}
-              disabled={lovedLoading || !canLoadLoved}
-              onClick={() => void loadLovedTracks({ force: true })}
-            />
-          )}
           <div className="inline-flex items-center gap-1 rounded-full bg-muted/70 p-1">
             {tabs.map((id) => (
               <button
@@ -405,6 +431,54 @@ export function Favorites() {
           </div>
         </div>
       </div>
+
+      {/* The loved list is the account's, not this device's, so it gets its own
+          bar: sort, search and refresh, in the same 12-row shape as the local
+          one below so switching tabs does not move the list. */}
+      {isLastfm && (loved || lovedLoading) && (
+        <div className="flex h-12 min-h-12 max-h-12 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 shrink-0 gap-1.5"
+              >
+                <ArrowDownUp size={14} />
+                <span className="hidden sm:inline">
+                  {t(`favorites.lastfm.sort.${lovedSort}`)}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {LOVED_SORTS.map((id) => (
+                <DropdownMenuItem key={id} onSelect={() => setLovedSort(id)}>
+                  {t(`favorites.lastfm.sort.${id}`)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="relative min-w-0 flex-1">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              className="h-8 py-0 pl-9"
+              placeholder={t("favorites.lastfm.searchPlaceholder")}
+              value={lovedQuery}
+              onChange={(e) => setLovedQuery(e.target.value)}
+            />
+          </div>
+
+          <LastfmLovedLoadButton
+            loading={lovedLoading}
+            disabled={lovedLoading || !canLoadLoved}
+            onClick={() => void loadLovedTracks({ force: true })}
+          />
+        </div>
+      )}
 
       {/* The sort / category / search bar filters THIS device's favourites, so it
           does not apply to the Last.fm tab — that list is the account's and is
@@ -604,11 +678,17 @@ export function Favorites() {
       {isLastfm ? (
         <ScrollArea className="flex-1">
           {loved && loved.tracks.length > 0 ? (
-            <LastfmLovedPanel
-              tracks={loved.tracks}
-              resolvingKey={resolvingLoved}
-              onPlay={(track) => void playLoved(track)}
-            />
+            lovedDisplayed.length > 0 ? (
+              <LastfmLovedPanel
+                tracks={lovedDisplayed}
+                resolvingKey={resolvingLoved}
+                onPlay={(track) => void playLoved(track)}
+              />
+            ) : (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                {t("favorites.noMatch")}
+              </p>
+            )
           ) : lovedLoading ? (
             <LastfmLovedSkeleton />
           ) : loved ? (

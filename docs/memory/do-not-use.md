@@ -74,7 +74,9 @@ Do not send `song.name` / `song.singer` directly for a local file. Those are cho
 
 ## Falling back to a title-only match when resolving a Last.fm loved track
 
-Do not "improve" the loved-track lookup by accepting a hit whose title matches when the artist does not. It looks like a harmless recall win, but a title is not an identifier: searching あのね returns rows by several different artists, and the first one is as likely to be someone else's song as the right one. The user then hears a different recording while the player bar shows the one they clicked — the same silent-wrong-song failure as the source-dispatch fallback. Report "not found" instead. The title-only QUERY is fine and is still used, because a broader search is what surfaces the right row for the strict comparison to accept.
+Do not "improve" the loved-track lookup by accepting a hit whose title matches when the artist does not. It looks like a harmless recall win, but a title is not an identifier: searching あのね returns rows by several different artists, and the first one is as likely to be someone else's song as the right one. The user then hears a different recording while the player bar shows the one they clicked — the same silent-wrong-song failure as the source-dispatch fallback. Report "not found" instead.
+
+The artist-name problem that makes this tempting is real and has a correct fix: Last.fm's "Aimyon" and QQ Music's 爱缪 share no characters, so `matchScore` rejects every hit. Do not solve it by dropping the artist check — ask the platform for its own spelling of the artist and compare against that. See the loved-tracks decision in `decisions.md`. The title-only QUERY is fine and is still used, because the artist is enforced by the comparison that follows it.
 
 ## Adding a "try every source anyway" fallback to platform dispatch
 
