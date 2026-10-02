@@ -4,6 +4,31 @@ import { hideToTray, setTrayVisible } from "@/lib/power"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
+/**
+ * Force AppKit to rebuild the main window's shadow.
+ *
+ * Needed whenever the window's style mask changes — the mini-player sets
+ * `decorations: false` on the way in and back on the way out, and on macOS the
+ * shadow layer stops being painted across that change while `hasShadow` stays
+ * true. Reopening from the tray happened to fix it because that path toggles the
+ * shadow; this makes the same toggle explicit.
+ *
+ * It goes through Rust rather than `win.setShadow` because the toggle has to run
+ * on the main thread AFTER the decorations change has been applied — tao applies
+ * a style-mask change asynchronously via `DispatchQueue::main().exec_async`, so
+ * a JS-side toggle issued right after `setDecorations` can run first and be
+ * undone by the mask change landing afterwards.
+ */
+export async function refreshMainWindowShadow(): Promise<void> {
+  if (!isTauri || !isMacOs()) return
+  try {
+    const { invoke } = await import("@tauri-apps/api/core")
+    await invoke("refresh_main_window_shadow")
+  } catch {
+    /* the shadow is cosmetic; never fail a transition over it */
+  }
+}
+
 /** Reveal the main window. Windows waits for first paint; macOS is shown from Rust. */
 export async function showMainWindow(): Promise<void> {
   if (!isTauri) return
@@ -20,12 +45,7 @@ export async function showMainWindow(): Promise<void> {
       await win.setFocus().catch(() => {
         /* ignore */
       })
-      try {
-        await win.setShadow(false)
-        await win.setShadow(true)
-      } catch {
-        /* ignore */
-      }
+      await refreshMainWindowShadow()
       return
     }
 

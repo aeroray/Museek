@@ -6,6 +6,7 @@ import {
   isLyricsFullscreenSession,
 } from "@/lib/lyricsFullscreen";
 import { readData, writeData } from "@/lib/db";
+import { refreshMainWindowShadow } from "@/lib/showWindow";
 import { usePlayerStore } from "@/stores/playerStore";
 
 const isTauri =
@@ -936,6 +937,12 @@ export async function enterMiniPlayer(): Promise<void> {
       } catch {
         /* best-effort */
       }
+      // The mini bar floats above the desktop, so it keeps the native shadow.
+      // `conf` starts with `shadow: false` (Windows needs that), which is why it
+      // is asserted here. This is also why the exit path has to TOGGLE rather
+      // than set true: by then the value is already true, so re-setting it does
+      // nothing and AppKit keeps the layer it stopped painting when the style
+      // mask changed.
       try {
         await win.setShadow(true);
       } catch {
@@ -1083,7 +1090,6 @@ export async function exitMiniPlayer(): Promise<void> {
       try {
         await win.setDecorations(true);
         await win.setTitleBarStyle("overlay");
-        await win.setShadow(true);
       } catch {
         /* best-effort */
       }
@@ -1116,6 +1122,15 @@ export async function exitMiniPlayer(): Promise<void> {
     delete document.documentElement.dataset.miniPeek;
     delete document.documentElement.dataset.miniDock;
     await revealAfterMorph();
+    // Last, once the window is decorated and visible again. Reported: switching
+    // to the mini player and back left the main window with no shadow at all.
+    // The enter path sets the shadow true and the exit path set it true again,
+    // so the value never changed and AppKit never rebuilt the layer it had
+    // stopped painting while the window was borderless. Reopening from the tray
+    // was the known workaround because that path toggles it; this makes the
+    // toggle part of the transition. Must come after `revealAfterMorph` — the
+    // rebuild is what has to survive, so it cannot run while still veiled.
+    await refreshMainWindowShadow();
   } catch {
     setMorphing(false);
   } finally {

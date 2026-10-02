@@ -120,7 +120,11 @@ Do not render `LastfmStatsPanel` (or anything containing a stat row) without a R
 
 ## Adding a trailing "open" icon to a row that is itself a link
 
-Do not add a trailing external-link icon to a row whose whole body already opens on click. It is a second affordance for one action, and if it is revealed on hover it appears at the same moment as the hover background, so it reads as decoration rather than a control. Use a tooltip on the row to say where the click goes.
+Do not add a trailing external-link icon to a row whose whole body already opens on click. It is a second affordance for one action, and if it is revealed on hover it appears at the same moment as the hover background, so it reads as decoration rather than a control. Say where the click goes with a native `title` on the row instead — not a styled tooltip, which anchors to the row and opens above it rather than at the pointer.
+
+## Restoring the macOS window shadow with `set_shadow(true)`
+
+Do not re-assert the main window's shadow by setting it true again. On macOS the mini player sets it true on the way in, so the value is already true on the way out and the call is a no-op — the shadow stays missing. Toggle it false and back (that is what `refreshMainWindowShadow` does, and why reopening from the tray used to fix it), and do it AFTER `setDecorations(true)`: tao applies a style-mask change asynchronously, so a refresh issued before it lands is thrown away by the mask change that follows.
 
 ## Keeping fetched Last.fm stats in memory only
 
