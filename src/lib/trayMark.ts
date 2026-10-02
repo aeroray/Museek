@@ -96,8 +96,8 @@ function renderTrayMarkPng(bgRaw: string, fgRaw: string): Promise<Uint8Array> {
 
 /** Push the current theme mark to the native tray on non-macOS platforms. */
 export function syncTrayMark(): void {
-  // macOS status items use the native light/dark logo selected by Rust from
-  // the system appearance instead of the app's accent-colored mark.
+  // macOS status items use the bundled template logo, which the system inks to
+  // match the menu bar, instead of the app's accent-colored mark.
   if (!isTauri || isMacOS) return;
   const primary = readCssHsl("--primary");
   const foreground = readCssHsl("--primary-foreground");

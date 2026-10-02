@@ -19,8 +19,6 @@ use tauri_plugin_fs::FsExt;
 
 #[cfg(target_os = "macos")]
 mod macos_traffic_lights;
-#[cfg(target_os = "macos")]
-mod macos_tray;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod system_fonts;
 
@@ -942,7 +940,12 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
 
     #[cfg(target_os = "macos")]
     {
-        builder = builder.icon(macos_fallback_tray_icon()?);
+        // A macOS template image is inked from its ALPHA channel alone: the
+        // system paints the opaque area black or white to match the status bar
+        // and lets the wallpaper show through the transparent area. One asset
+        // therefore covers both appearances, so there is no light/dark pair to
+        // swap and nothing to re-sync when the wallpaper changes.
+        builder = builder.icon(macos_tray_icon()?).icon_as_template(true);
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -954,8 +957,6 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
     }
 
     let tray = builder.build(app)?;
-    #[cfg(target_os = "macos")]
-    macos_tray::sync_after_build(app);
     Ok(tray)
 }
 
@@ -973,8 +974,8 @@ fn tray_mark_from_cache(app: &tauri::AppHandle) -> Option<tauri::image::Image<'s
 
 #[tauri::command]
 fn set_tray_mark_icon(app: tauri::AppHandle, png: Vec<u8>) -> Result<(), String> {
-    // macOS uses the bundled light/dark logo selected from the native system
-    // appearance. Do not replace it with the frontend's accent-colored mark.
+    // macOS uses the bundled template logo, which the system inks to match the
+    // menu bar. Do not replace it with the frontend's accent-colored mark.
     #[cfg(target_os = "macos")]
     {
         let _ = (app, png);
@@ -997,9 +998,11 @@ fn set_tray_mark_icon(app: tauri::AppHandle, png: Vec<u8>) -> Result<(), String>
     }
 }
 
+/// The macOS menu-bar mark: a template image whose opaque rounded square is
+/// knocked out by the EQ bars, so it inverts itself for light and dark menu bars.
 #[cfg(target_os = "macos")]
-fn macos_fallback_tray_icon() -> tauri::Result<tauri::image::Image<'static>> {
-    let bytes = include_bytes!("../icons/tray-light@2x.png");
+fn macos_tray_icon() -> tauri::Result<tauri::image::Image<'static>> {
+    let bytes = include_bytes!("../icons/tray-template@2x.png");
     tauri::image::Image::from_bytes(bytes)
 }
 
@@ -1723,9 +1726,6 @@ pub fn run() {
                     app.manage(MediaState(Mutex::new(controls)));
                 }
             }
-
-            #[cfg(target_os = "macos")]
-            macos_tray::observe_appearance(app.handle());
 
             if let Some(window) = app.get_webview_window("lyrics") {
                 let _ = window.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));

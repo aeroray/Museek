@@ -1346,7 +1346,15 @@ it communicates its visual style. Full-window captures make the actual app
 inspectable, while the SaaS structure keeps the page easy to scan and makes
 the source-script and no-content-distribution boundaries explicit.
 
-## 2026-08-21 - Separate app theme from macOS menu-bar wallpaper appearance
+## 2026-10-02 - The macOS tray mark is one template image, not a polled light/dark pair
+
+Decision:
+The macOS menu-bar mark is a single template image (`src-tauri/icons/tray-template@2x.png`), set with `TrayIconBuilder::icon_as_template(true)`. Its opaque rounded square is knocked out by the EQ bars, so macOS inks it to match the status bar. `src-tauri/src/macos_tray.rs` and the four `tray-light`/`tray-dark` PNGs are deleted. `src-tauri/icons/gen-tray-icons.mjs` regenerates the assets beside them.
+
+Reason:
+macOS template images are inked from the ALPHA channel alone, so one asset covers both appearances and the wallpaper shows through the knockout. The polling it replaces was also unreliable: `status_bar_prefers_dark` used `?` on the button and the appearance match, so any `None` made `sync_tray_icon` return early and leave the previous mode's opaque tile on screen. A template image cannot go stale because the system re-inks it. The generator lives in `src-tauri/icons/`, not `/scripts/`, which is gitignored — that is how the previous generator was lost while `tray-mark.svg` still referenced it.
+
+## 2026-08-21 - Separate app theme from macOS menu-bar wallpaper appearance (superseded 2026-10-02)
 
 Decision:
 Keep the app's light/dark theme controlled by the existing theme settings, but
@@ -1359,6 +1367,8 @@ Reason:
 macOS can render the menu bar according to the desktop wallpaper independently
 of the app window. The tray icon must follow that status-bar surface while the
 app UI continues to follow its own theme mode.
+
+Superseded: the invariant holds, but it is now enforced by a template image rather than by polling and swapping assets. See "The macOS tray mark is one template image".
 
 ## 2026-09-28 - Long now-playing text marquees on hover, not always
 

@@ -1,15 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- macOS menu-bar tray mark source (dark-menu variant shown).
-       light: black rounded square + white bars
-       dark:  white rounded square + black bars (matches in-app dark BrandMark)
-       Rasterize with: python scripts/gen-tray-icons.py -->
-  <rect class="mark-bg" width="1024" height="1024" rx="256" fill="#ffffff"/>
-  <g class="eq" fill="#000000" transform="scale(1.185185185) translate(-80 -80)">
-    <rect x="220" y="467" width="64" height="90" rx="32"/>
-    <rect x="324" y="347" width="64" height="330" rx="32"/>
-    <rect x="428" y="242" width="64" height="540" rx="32"/>
-    <rect x="532" y="407" width="64" height="210" rx="32"/>
-    <rect x="636" y="317" width="64" height="390" rx="32"/>
-    <rect x="740" y="467" width="64" height="90" rx="32"/>
-  </g>
+  <!-- macOS menu-bar tray mark source. A TEMPLATE image: only the alpha channel
+       is meaningful, so the opaque rounded square is inked black or white by
+       macOS to match the status bar, and the EQ bars are knocked out to let the
+       wallpaper show through. One asset covers light and dark menu bars.
+       Rasterize with: node scripts/gen-tray-icons.mjs -->
+  <defs>
+    <mask id="tray-knockout">
+      <rect width="1024" height="1024" fill="#ffffff"/>
+      <g fill="#000000" transform="scale(1.185185185) translate(-80 -80)">
+        <rect x="220" y="467" width="64" height="90" rx="32"/>
+        <rect x="324" y="347" width="64" height="330" rx="32"/>
+        <rect x="428" y="242" width="64" height="540" rx="32"/>
+        <rect x="532" y="407" width="64" height="210" rx="32"/>
+        <rect x="636" y="317" width="64" height="390" rx="32"/>
+        <rect x="740" y="467" width="64" height="90" rx="32"/>
+      </g>
+    </mask>
+  </defs>
+  <rect width="1024" height="1024" rx="256" fill="#000000" mask="url(#tray-knockout)"/>
 </svg>
