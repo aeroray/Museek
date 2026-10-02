@@ -17,6 +17,30 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.11.2": {
+    zh: {
+      sections: [
+        {
+          title: "🍎 macOS 修复",
+          bullets: [
+            "修复：从迷你播放切回主窗口后，主窗口的阴影会消失",
+            "修复：菜单栏图标显示成一整块实心方块，现在会随浅色/深色模式自动反色，并与旁边的系统图标一致",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🍎 macOS fixes",
+          bullets: [
+            "Fix: returning from the mini player left the main window with no shadow",
+            "Fix: the menu-bar icon rendered as a solid block; it is now a template image that inverts with light/dark mode and matches the system icons beside it",
+          ],
+        },
+      ],
+    },
+  },
   "3.11.1": {
     zh: {
       sections: [
