@@ -1,5 +1,11 @@
 # Do Not Use
 
+## Vendoring `block` to silence its future-incompat warning
+
+Do not vendor or patch the `block` crate to clear the `block v0.1.6` future-incompat warning in `cargo build`. It is not our code: it arrives through `souvlaki 0.8.3 → cocoa 0.24.1 → block 0.1.6`, and `block 0.1.6` (published 2016) is the newest version, with `cocoa` still requiring `^0.1`. The lint is `static of uninhabited type` on a private `enum Class {}` used only as an opaque pointer type in an `extern` block, so it is a warning about a future compiler, not a defect that affects this build. Patching means carrying a fork of third-party code that has to be re-synced, which costs more than the warning is worth. Leave it; re-check when `souvlaki` or `cocoa` moves off `block`.
+
+Do not confuse it with a real dead-code warning in our own crate — those are ours to fix (e.g. `restore_main_if_obscured` is `#[cfg(not(target_os = "macos"))]` because both call sites are non-macOS).
+
 ## Raw engine error strings as user-facing copy
 
 Do not let an unmapped engine/DOM error reach the user. Anything not matched by `formatRemotePlayError` falls through to `player.failedDetail` and renders raw English inside a localized string (`播放失败：Audio request failed (403)`). Add a branch to `src/lib/playError.ts` for every new error shape you throw, and keep already-localized copy passing through so re-formatting is a no-op.

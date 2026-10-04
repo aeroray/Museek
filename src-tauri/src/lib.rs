@@ -680,6 +680,10 @@ fn show_main(app: &tauri::AppHandle) {
 }
 
 /// Show the main window only if it is hidden or minimized (safe to call often).
+///
+/// Non-macOS only: macOS shows the window from Rust at setup and restores it
+/// through the Dock `Reopen` event, so neither caller exists there.
+#[cfg(not(target_os = "macos"))]
 fn restore_main_if_obscured(app: &tauri::AppHandle) {
     if let Some(mark) = app.try_state::<TrayHideAt>() {
         if let Ok(slot) = mark.0.lock() {
