@@ -28,6 +28,12 @@ Do not use `max-w-*` or intrinsic width for `TrackRow`'s platform chip or `stat`
 
 Do not call `play(song, quality)` to change the quality of the track that is already attached. The same-song short-circuit treats it as redundant and returns without doing anything, and `togglePlay` sets `playPending` first, which that short-circuit also reads as "busy" — so the request is dropped and every retry repeats it. Pass `{ force: true }`, which also skips the CUE seek-in-place branch. This applies to any deliberate reload of the current track, including the expired-URL retry in `play()`'s catch. Do not "fix" this by deleting the `playPending` check: that check is what prevents a double-press from starting two loads.
 
+## Re-setting the macOS shadow without re-asserting the Overlay mask
+
+Do not "fix" a missing macOS window shadow by toggling `set_shadow(false)`/`(true)` alone, and do not issue it synchronously right after `set_decorations`. `set_decorations(true)` rebuilds the style mask without `FullSizeContentView` — which IS `titleBarStyle: "overlay"` — and tao applies that mask via `set_style_mask_async`, so it can land *after* the caller's `setTitleBarStyle("overlay")` and undo it; AppKit then paints no shadow even though `hasShadow` is true. Measured on the real exit path the final mask was nondeterministic (32783 vs 15 across identical rounds), which is why the bug reads as "sometimes no shadow". Re-assert overlay (guarded by `has_overlay_chrome`, because `setStyleMask:` also re-makes the first responder) and do the work on the main GCD queue, twice.
+
+Also do not trust a `hasShadow` or `screencapture -l` padding check as proof this works: `screencapture -l` reports the shadow padding even when no shadow is painted, so that oracle passes on the broken build. Read the style mask instead.
+
 ## Removing focus rings globally
 
 Do not add a global `:focus-visible { outline: none }` or a blanket `outline-none` to suppress the menu focus ring. Focus rings are the only affordance keyboard users get, and the reported annoyance comes from a *modality mismatch*: Radix restores focus to a menu trigger on close, which after a mouse click paints a ring the user did not ask for. Fix it where the modality is known (`DropdownMenuContent`'s `onCloseAutoFocus` plus `src/lib/focusModality.ts`) so keyboard closes keep the ring. Also do not assume `focus({ focusVisible: false })` clears an existing ring — it does not; `focus()` on an already-focused element is a no-op, so blur first.

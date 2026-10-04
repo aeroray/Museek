@@ -5,6 +5,11 @@
 //! the lights walk right. We pin origin-to-origin spacing and reapply on wake.
 //! The config intentionally omits `trafficLightPosition` so Tao does not run
 //! its live-gap re-inset from `drawRect:` after our fixed placement.
+//!
+//! This module also owns the Overlay-chrome check the shadow refresh needs:
+//! `titleBarStyle: "overlay"` IS `NSWindowStyleMaskFullSizeContentView`, so the
+//! same mask that carries the traffic lights also gates whether AppKit paints
+//! the window shadow. See `has_overlay_chrome`.
 
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -39,6 +44,23 @@ pub fn refresh_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         apply(&window);
     }
+}
+
+/// Does the window still carry the Overlay chrome?
+///
+/// `titleBarStyle: "overlay"` is `NSWindowStyleMaskFullSizeContentView`, and
+/// `set_decorations` rebuilds the style mask from scratch without that bit. Tao
+/// applies the rebuilt mask asynchronously, so it can land after the caller's
+/// `setTitleBarStyle("overlay")` and silently drop the chrome — which also stops
+/// AppKit painting the window shadow.
+#[cfg(target_os = "macos")]
+pub fn has_overlay_chrome(window: &WebviewWindow) -> Option<bool> {
+    let ptr = window.ns_window().ok()?;
+    if ptr.is_null() {
+        return None;
+    }
+    let mask = unsafe { (*(ptr as *const NSWindow)).styleMask() };
+    Some(mask.contains(objc2_app_kit::NSWindowStyleMask::FullSizeContentView))
 }
 
 pub fn apply(window: &WebviewWindow) {

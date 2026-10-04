@@ -603,15 +603,54 @@ fn read_start_hidden_to_tray(app: &tauri::AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-/// macOS transparent + Overlay windows often keep `hasShadow` true but never
-/// paint the shadow layer if it was set while the window was still invisible
-/// (conf uses `shadow: false` for Windows). Toggle after `show()` forces AppKit
-/// to rebuild it — same effect as hide-to-tray then reopen.
+/// Rebuild the main window's shadow after its style mask changes.
+///
+/// macOS transparent + Overlay windows keep `hasShadow` true but stop painting
+/// the shadow layer once the mask changes, so the value has to be toggled to
+/// make AppKit rebuild it (conf uses `shadow: false` for Windows, which is why
+/// it is asserted at all).
+///
+/// Two things make the toggle unreliable, and both are handled here:
+///
+/// 1. It only rebuilds the layer when the window still carries the Overlay
+///    chrome (`NSWindowStyleMaskFullSizeContentView`). `set_decorations`
+///    rebuilds the style mask from scratch and drops that bit, and tao applies
+///    the rebuilt mask through `DispatchQueue::main().exec_async` — so it can
+///    land AFTER the exit path's `setTitleBarStyle("overlay")` and silently undo
+///    it. Re-asserting overlay immediately before the toggle is what makes the
+///    rebuilt layer survive.
+/// 2. The rebuild has to happen once the mask change has actually landed and the
+///    window is composited again. Issuing it in the same turn as the change
+///    races tao's queued mask application, so it runs on the main queue (FIFO
+///    with tao's own block) and is repeated shortly after, the way the
+///    cold-start path — the one that reliably works — does it.
+///
+/// Running on the main queue also matters because `macos_traffic_lights::apply`
+/// reads the NSWindow directly, which is not thread-safe; the cold-start path
+/// calls in from a worker thread, so the caller cannot be assumed to be on it.
 #[cfg(target_os = "macos")]
 fn refresh_macos_window_shadow(window: &tauri::WebviewWindow) {
-    let _ = window.set_shadow(false);
-    let _ = window.set_shadow(true);
-    macos_traffic_lights::apply(window);
+    for delay_ms in [0_u64, 140] {
+        let window = window.clone();
+        std::thread::spawn(move || {
+            if delay_ms > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+            }
+            // Queue on the SAME queue tao uses for its style-mask change, so
+            // this runs after it rather than racing it.
+            dispatch2::DispatchQueue::main().exec_async(move || {
+                // Only rewrite the mask when the Overlay bit is actually gone:
+                // `setStyleMask:` also re-makes the first responder, so doing it
+                // unconditionally on every refresh would steal focus for nothing.
+                if macos_traffic_lights::has_overlay_chrome(&window) == Some(false) {
+                    let _ = window.set_title_bar_style(tauri::TitleBarStyle::Overlay);
+                }
+                let _ = window.set_shadow(false);
+                let _ = window.set_shadow(true);
+                macos_traffic_lights::apply(&window);
+            });
+        });
+    }
 }
 
 // Bring the main window back from hidden / minimized and focus it.

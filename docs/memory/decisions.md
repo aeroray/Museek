@@ -30,13 +30,23 @@ Decision:
 Reason:
 The complaint is a combo clash with another application. Disabling releases the combo but KEEPS the binding, so re-enabling needs no re-recording and the row can still show what was released. The in-app handler must honour the switch too: the global map is matched in-app as well (that is what keeps the shortcut working when OS registration is unavailable), so consulting only `activeGlobalShortcuts` for the OS left the combo live with the window focused — users toggled it off and it still fired. In-app use is not lost, because the local column is a separate binding. Clearing on record matters because a stale flag would make a freshly recorded combo look broken. It is device-local because a clash is caused by software installed on *this* machine. Duplicate combos resolve to the earliest action in `SHORTCUT_ACTIONS`, which is the pre-existing registrar behaviour and is now pinned by a test.
 
-## 2026-09-28 - The mini-player exit must TOGGLE the macOS shadow, not re-set it
+## 2026-10-04 - The shadow refresh must re-assert the Overlay mask on the main GCD queue
+
+Decision:
+`refresh_macos_window_shadow` in `src-tauri/src/lib.rs` runs its work through `dispatch2::DispatchQueue::main().exec_async`, twice (immediately and ~140ms later). Inside, it re-asserts `set_title_bar_style(Overlay)` **only when** `macos_traffic_lights::has_overlay_chrome` reports the `FullSizeContentView` bit is missing, then toggles `set_shadow(false)`/`(true)` and reapplies the traffic lights.
+
+Reason:
+`set_decorations(true)` rebuilds the style mask from scratch as `Titled|Closable|Miniaturizable|Resizable`, dropping `FullSizeContentView` — which is what `titleBarStyle: "overlay"` consists of. Tao applies that mask with `set_style_mask_async` while `set_fullsize_content_view` uses `set_style_mask_sync`, so the queued mask can land *after* the exit path's `setTitleBarStyle("overlay")` and silently undo it; AppKit then stops painting the window shadow. Measured on the real exit path, the final mask was **nondeterministic** — 32783 (overlay kept) on some rounds and 15 (overlay lost) on others, which is exactly the flaky "sometimes no shadow" report. Queueing on the same GCD queue makes the refresh FIFO after tao's block, and the 140ms repeat covers the case where the mask lands later still. Verified by replaying the real call order 21 times: 21/21 kept mask 32783, versus 4/6 failures before. The check-then-set matters because `setStyleMask:` also re-makes the first responder, so an unconditional rewrite would steal focus. Running on the main queue is also required for correctness: `macos_traffic_lights::apply` dereferences the NSWindow directly, and the cold-start path calls in from a worker thread.
+
+## 2026-09-28 - The mini-player exit must TOGGLE the macOS shadow, not re-set it (superseded 2026-10-04)
 
 Decision:
 Leaving the mini player calls a new `refresh_main_window_shadow` command, which runs `refresh_macos_window_shadow` (shadow false, then true) — the same toggle `show_main` already performs after a tray reopen. It runs last, after `setDecorations(true)`, the traffic-light reapply and `revealAfterMorph()`. `showMainWindow` now calls the same helper instead of toggling inline, so there is one definition of the refresh.
 
 Reason:
 Reported: switching to the mini player and back left the main window with no shadow on macOS. The enter path sets the shadow true and the exit path set it true again, so the value never changed — and re-setting the same value is what the exit path was relying on. The mini player calls `setDecorations(false)` on the way in and `setDecorations(true)` on the way out, and the shadow layer is not repainted across that style-mask change; the known workaround was to reopen from the tray, which happened to fix it because that path goes through the toggle. Ordering is load-bearing and is the part that would silently regress: tao applies a style-mask change through `DispatchQueue::main().exec_async`, so it is still queued when the Tauri call returns, and a refresh issued before it lands rebuilds the layer against the borderless mask on its way out. Verified by `scripts/check-miniplayer-shadow.mjs`, which drives the real transition with a stub window and records the native call order; reverting the refresh fails 3 cases and moving it before `setDecorations` fails the ordering case.
+
+Superseded: the toggle is necessary but not sufficient — the mask race above also has to be closed. See "The shadow refresh must re-assert the Overlay mask on the main GCD queue".
 
 ## 2026-09-28 - A cover inside a framed box must not draw its own outline
 
