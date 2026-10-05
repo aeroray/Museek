@@ -567,18 +567,16 @@ fn reapply_macos_traffic_lights(_app: tauri::AppHandle) {
 
 /// Re-assert the main window's shadow after the mini-player returns.
 ///
-/// `set_shadow(true)` alone does not restore it, and that is the whole reason
-/// this command exists. The mini-player sets the shadow true on the way in, so
-/// the exit path re-setting true changes nothing — while the known workaround,
-/// reopening from the tray, goes through `refresh_macos_window_shadow`, which
-/// flips the value false and back. That toggle is what makes AppKit rebuild the
-/// layer it stopped painting when the window's style mask changed to Borderless.
+/// Thin wrapper: it looks up the window and defers to
+/// `refresh_macos_window_shadow`, which owns the actual repair — the overlay
+/// re-assert, the shadow toggle and the main-queue ordering. The exit path cannot
+/// call that directly because it is `cfg(target_os = "macos")`, and the frontend
+/// needs one command that exists on every platform.
 ///
-/// The caller must run this AFTER the decorations change and after the window is
-/// visible again. Tao applies a style-mask change through
-/// `DispatchQueue::main().exec_async`, so it is still queued when the Tauri call
-/// returns; toggling the shadow before it lands would rebuild the layer against
-/// the borderless mask that is on its way out.
+/// The caller must request this AFTER issuing the decorations change. Tao applies
+/// a style-mask change through `DispatchQueue::main().exec_async`, so it is still
+/// queued when the Tauri call returns; the repair queues itself on that same GCD
+/// queue and repeats, which is what lets it survive the mask landing late.
 #[tauri::command]
 fn refresh_main_window_shadow(app: tauri::AppHandle) {
     #[cfg(target_os = "macos")]
