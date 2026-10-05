@@ -17,6 +17,30 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.11.4": {
+    zh: {
+      sections: [
+        {
+          title: "📝 歌词",
+          bullets: [
+            "修复：部分歌手的歌曲在其他平台搜不到歌词（例如 QQ 音乐的日语歌切到网易云/酷狗时显示无歌词）",
+            "原因是同一个歌手在不同平台的名字不一样（QQ 音乐叫「爱缪」，网易云叫「あいみょん」），现在会先确认平台上的写法再匹配",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📝 Lyrics",
+          bullets: [
+            "Fix: lyrics could not be found on other platforms for some artists (a Japanese song on QQ Music showed no lyrics when switching to NetEase/KuGou)",
+            "The same artist is named differently per platform (爱缪 on QQ Music, あいみょん on NetEase); the platform's own spelling is now resolved before matching",
+          ],
+        },
+      ],
+    },
+  },
   "3.11.3": {
     zh: {
       sections: [
