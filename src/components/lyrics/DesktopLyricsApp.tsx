@@ -108,6 +108,12 @@ export function DesktopLyricsApp() {
   const [isLyricsHovered, setIsLyricsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   /**
+   * Mirrors `isLyricsHovered` so the 50ms hit-test poll can read the current
+   * value without the effect depending on the state it sets itself. See the poll
+   * effect for why that dependency was harmful.
+   */
+  const isLyricsHoveredRef = useRef(false);
+  /**
    * Shrink factor applied when the active line is wider than the native window.
    * `1` means the line fits as-is. Kept in state rather than a ref because it
    * feeds the rendered font size and padding. Recomputed from the *natural*
@@ -254,6 +260,7 @@ export function DesktopLyricsApp() {
               (event) => {
                 if (!isInteractionMode(event.payload)) return;
                 ignoreCursorEventsRef.current = null;
+                isLyricsHoveredRef.current = false;
                 setIsLyricsHovered(false);
                 setInteractionMode(event.payload);
                 void applyDesktopLyricsInteractionMode(event.payload);
@@ -296,6 +303,21 @@ export function DesktopLyricsApp() {
     let checking = false;
     const lyricsWindow = getCurrentWindow();
 
+    /**
+     * Write the hover state through a ref as well as React.
+     *
+     * The poll reads it to decide whether the toolbar is part of the hit area,
+     * and the effect must NOT list `isLyricsHovered` as a dependency: it sets
+     * that state itself, so depending on it tore the effect down and rebuilt it
+     * on every hover flip — which is precisely when an in-flight poll is most
+     * likely to be left holding a stale cursor sample.
+     */
+    const applyHover = (next: boolean) => {
+      if (isLyricsHoveredRef.current === next) return;
+      isLyricsHoveredRef.current = next;
+      setIsLyricsHovered(next);
+    };
+
     const setCursorPassthrough = async (ignore: boolean) => {
       if (disposed || ignoreCursorEventsRef.current === ignore) return;
       ignoreCursorEventsRef.current = ignore;
@@ -307,7 +329,7 @@ export function DesktopLyricsApp() {
       checking = true;
       try {
         if (interactionMode !== "interactive" || !hasLyricContent) {
-          setIsLyricsHovered(false);
+          applyHover(false);
           await setCursorPassthrough(true);
           return;
         }
@@ -331,6 +353,7 @@ export function DesktopLyricsApp() {
 
         const lyricShell = lyricShellRef.current;
         if (!lyricShell) {
+          applyHover(false);
           await setCursorPassthrough(true);
           return;
         }
@@ -340,17 +363,25 @@ export function DesktopLyricsApp() {
           lyricsWindow.outerPosition(),
           lyricsWindow.scaleFactor(),
         ]);
+        // Everything above is async, so this sample may predate a teardown (the
+        // mode was locked, the lyrics were closed) or simply be older than the
+        // pointer's current position. Writing it anyway is what made the grab
+        // cursor drop out at random: a poll left over from the previous effect
+        // instance would publish `inside: false` while the pointer was sitting
+        // on the lyric, clearing the very attribute the cursor rule keys on.
+        // `setCursorPassthrough` already refuses to act after teardown; the
+        // state write needs the same guard.
+        if (disposed) return;
         const scale = scaleFactor || window.devicePixelRatio || 1;
         let inside = pointInElement(point, lyricShell, position, scale);
-        if (!inside && isLyricsHovered && toolbarRef.current) {
+        if (!inside && isLyricsHoveredRef.current && toolbarRef.current) {
           inside = pointInElement(point, toolbarRef.current, position, scale);
         }
-        setIsLyricsHovered((current) =>
-          current === inside ? current : inside,
-        );
+        applyHover(inside);
         await setCursorPassthrough(!inside);
       } catch {
-        setIsLyricsHovered(false);
+        if (disposed) return;
+        applyHover(false);
         await setCursorPassthrough(true);
       } finally {
         checking = false;
@@ -366,7 +397,7 @@ export function DesktopLyricsApp() {
       disposed = true;
       window.clearInterval(timer);
     };
-  }, [hasLyricContent, interactionMode, isLyricsHovered]);
+  }, [hasLyricContent, interactionMode]);
 
   useEffect(() => {
     const stopDragging = () => {
@@ -531,6 +562,7 @@ export function DesktopLyricsApp() {
   const toggleInteractionMode = () => {
     const next = interactionMode === "interactive" ? "locked" : "interactive";
     ignoreCursorEventsRef.current = null;
+    isLyricsHoveredRef.current = false;
     setIsLyricsHovered(false);
     setInteractionMode(next);
     void applyDesktopLyricsInteractionMode(next);

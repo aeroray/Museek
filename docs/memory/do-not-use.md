@@ -138,6 +138,14 @@ Do not render `LastfmStatsPanel` (or anything containing a stat row) without a R
 
 Do not add a trailing external-link icon to a row whose whole body already opens on click. It is a second affordance for one action, and if it is revealed on hover it appears at the same moment as the hover background, so it reads as decoration rather than a control. Say where the click goes with a native `title` on the row instead — not a styled tooltip, which anchors to the row and opens above it rather than at the pointer.
 
+## Depending on state that the effect itself sets
+
+Do not list a value in an effect's dependency array when that effect also sets it. The lyrics hit-test poll did exactly this with `isLyricsHovered`: every hover flip tore the effect down and rebuilt it, and an in-flight poll from the discarded instance could resolve afterwards and overwrite the fresh state — which is what made the missing grab cursor intermittent. Read the current value through a ref and keep the dependency list to inputs the effect does not write. When a stale async result is possible, also check a `disposed` flag AFTER the awaits, not only before them; the pre-await check cannot cover work that was already in flight when the effect was torn down.
+
+## Asserting the settled value of a self-correcting loop
+
+Do not assert the final DOM state of something that re-polling corrects within a tick. A stale write from a torn-down lyrics poll sets the hover attribute wrongly, but the live poll fixes it ~50ms later, so the settled value is identical on the broken and fixed builds — an end-state assertion passes vacuously. Observe the TRANSITIONS instead (a `MutationObserver` on the attribute) and assert the wrong value never appeared. The same trap applies to `hasShadow` / `screencapture -l` as a shadow oracle: both report success on a window that paints no shadow.
+
 ## Restoring the macOS window shadow with `set_shadow(true)` (superseded 2026-10-04)
 
 Do not re-assert the main window's shadow by setting it true again. On macOS the mini player sets it true on the way in, so the value is already true on the way out and the call is a no-op — the shadow stays missing. Toggle it false and back.

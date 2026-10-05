@@ -698,10 +698,37 @@
   cursor: grab;
 }
 
+/* While a drag is in flight the hand must CLOSE. This rule previously also said
+   `grab`, so it changed nothing — and since the active rule already covered the
+   hover, the closed hand was never shown at any point in the drag. */
 .desktop-lyrics-window:not([data-interaction-mode="locked"])
   .desktop-lyrics-heading-group[data-lyrics-dragging="true"]
   .desktop-lyrics-heading-shell {
+  cursor: grabbing;
+}
+
+/* The toolbar sits above the shell, so it wins the cursor wherever they overlap.
+   Without this the hand flickered back to the default arrow as the pointer
+   crossed the controls. */
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group[data-lyrics-active="true"]
+  .desktop-lyrics-toolbar {
   cursor: grab;
+}
+
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group[data-lyrics-dragging="true"]
+  .desktop-lyrics-toolbar {
+  cursor: grabbing;
+}
+
+/* The controls are buttons, so they keep the pointer cursor the shared button
+   rules already give them. */
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group[data-lyrics-active="true"]
+  .desktop-lyrics-toolbar
+  button {
+  cursor: pointer;
 }
 
 @media (prefers-reduced-motion: reduce) {
