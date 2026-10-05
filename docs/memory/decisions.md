@@ -38,6 +38,16 @@ Decision:
 Reason:
 `set_decorations(true)` rebuilds the style mask from scratch as `Titled|Closable|Miniaturizable|Resizable`, dropping `FullSizeContentView` — which is what `titleBarStyle: "overlay"` consists of. Tao applies that mask with `set_style_mask_async` while `set_fullsize_content_view` uses `set_style_mask_sync`, so the queued mask can land *after* the exit path's `setTitleBarStyle("overlay")` and silently undo it; AppKit then stops painting the window shadow. Measured on the real exit path, the final mask was **nondeterministic** — 32783 (overlay kept) on some rounds and 15 (overlay lost) on others, which is exactly the flaky "sometimes no shadow" report. Queueing on the same GCD queue makes the refresh FIFO after tao's block, and the 140ms repeat covers the case where the mask lands later still. Verified by replaying the real call order 21 times: 21/21 kept mask 32783, versus 4/6 failures before. The check-then-set matters because `setStyleMask:` also re-makes the first responder, so an unconditional rewrite would steal focus. Running on the main queue is also required for correctness: `macos_traffic_lights::apply` dereferences the NSWindow directly, and the cold-start path calls in from a worker thread.
 
+## 2026-10-05 - Cross-platform lyrics need the platform's own artist spelling
+
+Decision:
+`platformArtistName` moved out of `lastfm/lovedPlayback.ts` into `lib/platformArtist.ts` so both features share one definition, and `pickBestMatchAcrossArtists` in `lyrics/matchSong.ts` offers each alternate spelling to the SAME scorer. The lyrics resolver (`lib/lyrics/sources.ts`) resolves the aliases once per platform per song and memoises them per artist for the session.
+
+Reason:
+Reported: every Aimyon song showed "no lyrics" on NetEase/KuGou/KuWo, so a QQ Music Japanese lyric could not be swapped for one with a Chinese translation. This is the SAME defect already fixed for Last.fm loved tracks, and the lyrics path had simply never been given the treatment — the two features were built independently and the second one re-derived the first one's matcher. Measured against the live APIs: the artist is 爱缪 on QQ and あいみょん on NetEase/KuGou, `fold()` cannot relate spellings sharing no characters, and every hit scored exactly 0.000, so `pickBestMatch` returned null and the platform was reported as having no lyrics. It was not missing data — ハルノヒ and あのね were both present and correct. After the fix every platform resolves: BEFORE null, AFTER ハルノヒ — あいみょん (wy, kg) and あのね — あいみょん (wy, kg).
+
+Strictness is untouched: the alternate is only a NAME offered to the same `matchScore`, so the title gate, the duration gate and `ARTIST_MIN` all still apply, and an unrelated alias matches nothing. The alias itself is refused unless the platform answered about one artist — see the loved-tracks decision for why one hit is not evidence. Verified by `scripts/check-lyrics-cross-artist.mjs`, which drives the real matcher; disabling the alias loop fails the reported case.
+
 ## 2026-10-05 - The drag cursor belongs on the whole lyrics window, not just the text
 
 Decision:

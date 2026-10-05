@@ -1,10 +1,6 @@
 import { matchScore, splitArtists } from "@/lib/lyrics/matchSong";
+import { platformArtistName, platformSearchFns } from "@/lib/platformArtist";
 import { sourceRunner } from "@/lib/sourceRunner";
-import { searchKugou } from "@/lib/search/kg";
-import { searchKuwo } from "@/lib/search/kuwo";
-import { searchMigu } from "@/lib/search/mg";
-import { searchTx } from "@/lib/search/tx";
-import { searchWangyi } from "@/lib/search/wy";
 import type { MusicInfo, OnlineSource } from "@/types/music";
 
 /**
@@ -33,30 +29,6 @@ import type { MusicInfo, OnlineSource } from "@/types/music";
  */
 
 const SEARCH_LIMIT = 20;
-/** Hits consulted when reading an artist's local spelling off a platform. */
-const ARTIST_PROBE_LIMIT = 10;
-const ARTIST_PROBE_TAKE = 5;
-/**
- * How many of those hits the winning spelling must account for.
- *
- * One song by a name is not evidence that the platform knows the ARTIST — it can
- * be a single unrelated result — and acting on it would let the resolved name be
- * an arbitrary artist, whose same-titled song would then pass the strict
- * comparison. A real artist answers with several songs, so this is cheap and
- * almost never binding in the case the step exists for.
- */
-const ARTIST_PROBE_MIN_HITS = 2;
-
-const searchFns: Record<
-  OnlineSource,
-  (query: string, page?: number, limit?: number) => Promise<{ list: MusicInfo[] }>
-> = {
-  kw: searchKuwo,
-  kg: searchKugou,
-  tx: searchTx,
-  wy: searchWangyi,
-  mg: searchMigu,
-};
 
 /** The minimum a loved track has to carry to be looked up. */
 export type LovedTrackRef = { name: string; artist: string };
@@ -100,45 +72,8 @@ function probeFor(name: string, artist: string): MusicInfo {
 }
 
 /**
- * The platform's own spelling of an artist.
- *
- * Searching the bare artist name returns that artist's songs, so the singer
- * shared by most of the answers is the name this platform uses. Measured:
- * "Aimyon" resolves to あいみょん on NetEase/KuGou/KuWo and to 爱缪 on QQ,
- * "Kenshi Yonezu" to 米津玄師 everywhere.
- *
- * It can be wrong when the platform does not know the artist at all — KuWo
- * answers "Ado" with 阿杜, a different Chinese singer — which is why the result
- * is only ever used as a NAME to search with and still has to survive the strict
- * comparison in `matchOn`. A bad spelling makes the lookup fail, not succeed
- * with the wrong song.
- *
- * Returns "" when the platform is not confidently answering about one artist, so
- * the caller skips the second attempt rather than searching for an arbitrary
- * name.
+ * Queries to try for one spelling of the artist, most specific first.
  */
-async function platformArtistName(
-  platform: OnlineSource,
-  artist: string,
-): Promise<string> {
-  const { list } = await searchFns[platform](artist, 1, ARTIST_PROBE_LIMIT);
-  const counts = new Map<string, number>();
-  for (const hit of list.slice(0, ARTIST_PROBE_TAKE)) {
-    const singer = (hit.singer ?? "").trim();
-    if (singer) counts.set(singer, (counts.get(singer) ?? 0) + 1);
-  }
-  let best = "";
-  let bestCount = 0;
-  for (const [singer, count] of counts) {
-    if (count > bestCount) {
-      best = singer;
-      bestCount = count;
-    }
-  }
-  return bestCount >= ARTIST_PROBE_MIN_HITS ? best : "";
-}
-
-/** Queries to try for one spelling of the artist, most specific first. */
 function queriesFor(artist: string, name: string): string[] {
   const out: string[] = [];
   if (artist && name) out.push(`${artist} ${name}`);
@@ -157,7 +92,7 @@ async function matchOn(
   const loved = { name, artist };
   for (const query of queriesFor(artist, name)) {
     try {
-      const { list } = await searchFns[platform](query, 1, SEARCH_LIMIT);
+      const { list } = await platformSearchFns[platform](query, 1, SEARCH_LIMIT);
       const hit = pickLovedMatch(loved, list);
       if (hit) return hit;
     } catch {

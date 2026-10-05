@@ -138,6 +138,10 @@ Do not render `LastfmStatsPanel` (or anything containing a stat row) without a R
 
 Do not add a trailing external-link icon to a row whose whole body already opens on click. It is a second affordance for one action, and if it is revealed on hover it appears at the same moment as the hover background, so it reads as decoration rather than a control. Say where the click goes with a native `title` on the row instead — not a styled tooltip, which anchors to the row and opens above it rather than at the pointer.
 
+## Re-deriving a cross-platform artist matcher per feature
+
+Do not write a second cross-service artist comparison when one already exists. Lyrics matching and Last.fm loved-track matching were built independently and the second re-derived the first, so both shipped the same defect: a strict artist gate that can never pass when the spellings share no characters (爱缪 on QQ vs あいみょん on NetEase). The symptom looks like missing data — "this platform has no lyrics for this artist" — which is exactly why it survived. There is now one `platformArtistName` in `lib/platformArtist.ts`; use it, and put any new cross-service matching behind the same helper.
+
 ## Putting a drag cursor only on the visible text
 
 Do not scope a drag cursor to the text element alone when the window is much larger than its content. The lyrics window spans the whole monitor while the shell is `width: max-content`, so during a drag the pointer is usually over the window's transparent gutters — where no rule declares a cursor and the platform default takes over, replacing the closed hand mid-drag. Put the `grabbing` rule on the window root (and mirror the dragging attribute onto it) so every child that does not override it inherits the hand. Keep the hover `grab` rule narrow, though: only the text is a drag handle, and a hand over empty space promises a drag that does nothing.

@@ -4,7 +4,12 @@ import {
   isWordByWordLyric,
   linesFromLyricInfo,
 } from "@/lib/lyrics/timing"
-import { lyricProbeSong, lyricSearchQueries, pickBestMatch } from "@/lib/lyrics/matchSong"
+import {
+  lyricProbeSong,
+  lyricSearchQueries,
+  pickBestMatchAcrossArtists,
+} from "@/lib/lyrics/matchSong"
+import { platformArtistName } from "@/lib/platformArtist"
 import { searchKugou } from "@/lib/search/kg"
 import { searchKuwo } from "@/lib/search/kuwo"
 import { searchMigu } from "@/lib/search/mg"
@@ -81,6 +86,15 @@ const searchFns: Record<
 const picks = new Map<string, OnlineSource>()
 const payloads = new Map<string, Payload>()
 const inflight = new Map<string, Promise<PlatformLyricOption[]>>()
+/**
+ * Artist-name aliases per platform, memoised for the session.
+ *
+ * The mapping is stable (爱缪 is always あいみょん on NetEase) and resolving it
+ * costs an extra search, so it is worth keeping. A failed probe is cached as an
+ * empty list for the same reason — otherwise every song by an artist the
+ * platform does not know would pay for the probe again.
+ */
+const aliasCache = new Map<string, string[]>()
 
 function songKey(song: MusicInfo): string {
   return `${song.source}:${song.meta.songId}`
@@ -127,6 +141,9 @@ async function resolvePlatformSong(
   const probe = lyricProbeSong(song)
   const seen = new Set<string>()
   const hits: MusicInfo[] = []
+  // Resolved once: it is a whole extra search per platform, and every query in
+  // the loop would otherwise repeat it.
+  const aliases = await artistAliases(platform, probe)
   for (const query of lyricSearchQueries(song)) {
     const result = await searchFns[platform](query, 1, SEARCH_LIMIT)
     for (const hit of result.list) {
@@ -134,10 +151,44 @@ async function resolvePlatformSong(
       seen.add(hit.id)
       hits.push(hit)
     }
-    const matched = pickBestMatch(probe, hits)
+    const matched = pickBestMatchAcrossArtists(probe, hits, aliases)
     if (matched) return matched
   }
-  return pickBestMatch(probe, hits)
+  return pickBestMatchAcrossArtists(probe, hits, aliases)
+}
+
+/**
+ * Other spellings of this song's artist, as the target platform writes them.
+ *
+ * Needed because the artist names do not overlap between services: a QQ song is
+ * credited to 爱缪 while NetEase and KuGou credit あいみょん, and `matchScore`
+ * rejects every hit for a pair that shares no characters — measured, every
+ * Aimyon hit scored 0.000, which is what made "no other platform has lyrics for
+ * this artist" look like missing data rather than a matching failure.
+ *
+ * Cached per artist because this is a whole extra search per platform, and the
+ * same artist recurs across every song of theirs the user opens.
+ */
+async function artistAliases(
+  platform: OnlineSource,
+  probe: MusicInfo,
+): Promise<string[]> {
+  const artist = probe.singer.trim()
+  if (!artist) return []
+  const key = `${platform}:${artist}`
+  const cached = aliasCache.get(key)
+  if (cached) return cached
+  try {
+    const resolved = await platformArtistName(platform, artist)
+    const list = resolved && resolved !== artist ? [resolved] : []
+    aliasCache.set(key, list)
+    return list
+  } catch {
+    // A failed probe just means no alternate this time; the direct match above
+    // has already had its chance.
+    aliasCache.set(key, [])
+    return []
+  }
 }
 
 async function probeOne(

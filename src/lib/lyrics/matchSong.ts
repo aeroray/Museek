@@ -154,6 +154,39 @@ export function pickBestMatch(
   return best
 }
 
+/**
+ * Match hits when the platform spells the artist differently.
+ *
+ * The same artist is 爱缪 on QQ Music and あいみょん on NetEase/KuGou. `fold()`
+ * cannot relate spellings that share no characters, so `matchScore` rejects
+ * every hit and the caller sees "no lyrics on this platform" — measured, every
+ * Aimyon hit scored exactly 0.000 across platforms. The platforms know their own
+ * spelling, so each alternate is offered to the SAME scorer on its own: the
+ * title strictness, the duration gate and every other rule are untouched, and
+ * the alternate still has to clear `ARTIST_MIN` by itself.
+ *
+ * The alternates come from `platformArtistName`, which only reports a name the
+ * platform confidently answered about, and a name that does not fit simply fails
+ * to match — it cannot make a wrong song pass.
+ */
+export function pickBestMatchAcrossArtists(
+  song: MusicInfo,
+  list: MusicInfo[],
+  alternateArtists: readonly string[],
+): MusicInfo | null {
+  const direct = pickBestMatch(song, list)
+  if (direct) return direct
+
+  const probe = lyricProbeSong(song)
+  for (const candidate of alternateArtists) {
+    const artist = candidate.trim()
+    if (!artist || artist === probe.singer) continue
+    const matched = pickBestMatch({ ...probe, singer: artist }, list)
+    if (matched) return matched
+  }
+  return null
+}
+
 export function lyricSearchQueries(song: MusicInfo): string[] {
   const probe = lyricProbeSong(song)
   const name = isPlaceholderTitle(probe.name) ? "" : probe.name.trim()
