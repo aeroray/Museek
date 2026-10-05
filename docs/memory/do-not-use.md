@@ -138,6 +138,10 @@ Do not render `LastfmStatsPanel` (or anything containing a stat row) without a R
 
 Do not add a trailing external-link icon to a row whose whole body already opens on click. It is a second affordance for one action, and if it is revealed on hover it appears at the same moment as the hover background, so it reads as decoration rather than a control. Say where the click goes with a native `title` on the row instead — not a styled tooltip, which anchors to the row and opens above it rather than at the pointer.
 
+## Putting a drag cursor only on the visible text
+
+Do not scope a drag cursor to the text element alone when the window is much larger than its content. The lyrics window spans the whole monitor while the shell is `width: max-content`, so during a drag the pointer is usually over the window's transparent gutters — where no rule declares a cursor and the platform default takes over, replacing the closed hand mid-drag. Put the `grabbing` rule on the window root (and mirror the dragging attribute onto it) so every child that does not override it inherits the hand. Keep the hover `grab` rule narrow, though: only the text is a drag handle, and a hand over empty space promises a drag that does nothing.
+
 ## Depending on state that the effect itself sets
 
 Do not list a value in an effect's dependency array when that effect also sets it. The lyrics hit-test poll did exactly this with `isLyricsHovered`: every hover flip tore the effect down and rebuilt it, and an in-flight poll from the discarded instance could resolve afterwards and overwrite the fresh state — which is what made the missing grab cursor intermittent. Read the current value through a ref and keep the dependency list to inputs the effect does not write. When a stale async result is possible, also check a `disposed` flag AFTER the awaits, not only before them; the pre-await check cannot cover work that was already in flight when the effect was torn down.

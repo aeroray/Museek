@@ -731,6 +731,29 @@
   cursor: pointer;
 }
 
+/* While a drag is in flight, the hand must stay closed over the WHOLE window.
+   Reported: "dragging turns the cursor into the default arrow". The native
+   lyrics window spans the entire monitor, while the shell above is only as wide
+   as the lyric text — so as the window follows the pointer, the cursor is
+   frequently over the window's own transparent area, which had no cursor rule
+   and fell back to the default arrow.
+
+   Both the group and the root carry the attribute: the group covers its own box
+   and descendants, and the root covers the transparent gutters around it that
+   the group does not reach. The root is the element the pointer actually lands
+   on out there, so a rule on the group alone cannot cover it.
+
+   Scoped to `dragging` only — hovering the empty area is not a drag handle, and
+   offering a hand there would promise a drag that does nothing. */
+.desktop-lyrics-window:not([data-interaction-mode="locked"])
+  .desktop-lyrics-heading-group[data-lyrics-dragging="true"] {
+  cursor: grabbing;
+}
+
+.desktop-lyrics-window:not([data-interaction-mode="locked"])[data-lyrics-dragging="true"] {
+  cursor: grabbing;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lyric-karaoke-word-sung {
     transition: none;

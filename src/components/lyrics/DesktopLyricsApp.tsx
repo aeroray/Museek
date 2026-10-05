@@ -741,6 +741,12 @@ export function DesktopLyricsApp() {
       data-capsule-visible={capsuleVisible ? "true" : "false"}
       data-interaction-mode={interactionMode}
       data-two-lines={twoLines ? "true" : "false"}
+      // Mirrored on the root as well as the group: the native window spans the
+      // whole monitor while the group is only as wide as its content, so during
+      // a drag the pointer is often over the window's transparent gutters. The
+      // root is what it lands on there, and without the attribute the closed
+      // hand gave way to the default arrow mid-drag.
+      data-lyrics-dragging={isDragging ? "true" : undefined}
       style={lyricColorStyle}
     >
       <main className="desktop-lyrics-body" aria-live="polite">

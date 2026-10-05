@@ -38,6 +38,16 @@ Decision:
 Reason:
 `set_decorations(true)` rebuilds the style mask from scratch as `Titled|Closable|Miniaturizable|Resizable`, dropping `FullSizeContentView` — which is what `titleBarStyle: "overlay"` consists of. Tao applies that mask with `set_style_mask_async` while `set_fullsize_content_view` uses `set_style_mask_sync`, so the queued mask can land *after* the exit path's `setTitleBarStyle("overlay")` and silently undo it; AppKit then stops painting the window shadow. Measured on the real exit path, the final mask was **nondeterministic** — 32783 (overlay kept) on some rounds and 15 (overlay lost) on others, which is exactly the flaky "sometimes no shadow" report. Queueing on the same GCD queue makes the refresh FIFO after tao's block, and the 140ms repeat covers the case where the mask lands later still. Verified by replaying the real call order 21 times: 21/21 kept mask 32783, versus 4/6 failures before. The check-then-set matters because `setStyleMask:` also re-makes the first responder, so an unconditional rewrite would steal focus. Running on the main queue is also required for correctness: `macos_traffic_lights::apply` dereferences the NSWindow directly, and the cold-start path calls in from a worker thread.
 
+## 2026-10-05 - The drag cursor belongs on the whole lyrics window, not just the text
+
+Decision:
+`data-lyrics-dragging` is mirrored onto the `.desktop-lyrics-window` root as well as the heading group, and the `grabbing` rule is written for both. The hover (`grab`) rule stays on the shell and toolbar only.
+
+Reason:
+Follow-up report after the previous cursor fix: the open hand appeared on hover and closed on press, but the moment a drag started the cursor became the default arrow. The native lyrics window spans the entire monitor — `restoreDesktopLyricsGeometry` sets it to `monitor.size.width` — while `.desktop-lyrics-heading-shell` is `width: max-content`, i.e. only as wide as the lyric text. The cursor rules covered only the shell, the toolbar and the group, so as the window followed the pointer the cursor was frequently over the window's own transparent gutters, where nothing declared a cursor and the platform default applied. Measured before the fix: root/body/stage/group all resolved to `auto` while dragging. The root rule covers every child that does not override it, and the toolbar buttons still override with `pointer`.
+
+The hover rule is deliberately NOT extended to the root: the text is the drag handle, so a hand over empty space would promise a drag that does nothing. Verified by `scripts/check-desktop-lyrics-cursor.mjs`, which now asserts the computed cursor on every container during a drag AND that hovering off the text still resolves to `auto`. Non-vacuous: removing the root dragging rule fails 3 cases.
+
 ## 2026-10-05 - The lyrics hover attribute is written only from a live poll
 
 Decision:
