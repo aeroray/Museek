@@ -60,7 +60,9 @@ mod windows_impl {
             let _ = ReleaseDC(None, hdc);
         }
         let mut list: Vec<String> = names.into_iter().collect();
-        list.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        // Case-insensitive, and cached: the key allocates a String, so
+        // caching it avoids re-lowercasing on every comparison.
+        list.sort_by_cached_key(|a| a.to_lowercase());
         list
     }
 }
@@ -77,7 +79,9 @@ mod macos_impl {
         let manager = NSFontManager::sharedFontManager(mtm);
         let families = manager.availableFontFamilies();
         let mut list: Vec<String> = families.iter().map(|name| name.to_string()).collect();
-        list.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        // Case-insensitive, and cached: the key allocates a String, so
+        // caching it avoids re-lowercasing on every comparison.
+        list.sort_by_cached_key(|a| a.to_lowercase());
         list
     }
 }

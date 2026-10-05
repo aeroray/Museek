@@ -1,5 +1,9 @@
 # Do Not Use
 
+## `sort_by_key` when the key allocates
+
+Do not apply clippy's `unnecessary_sort_by` suggestion (`sort_by(|a,b| f(a).cmp(&f(b)))` → `sort_by_key(f)`) when `f` allocates. The lint only sees the shape, but `sort_by_key` calls the closure on *every comparison* — measured at 7158 calls vs 3579 for `sort_by` on a 400-item list — so it doubles the allocations instead of removing them. `sort_by_cached_key` is the fix that actually helps: exactly one call per element (400) and ~9× faster in the same benchmark, and clippy accepts it too. Used in `src-tauri/src/system_fonts.rs`, where the key is `to_lowercase()`.
+
 ## Vendoring `block` to silence its future-incompat warning
 
 Do not vendor or patch the `block` crate to clear the `block v0.1.6` future-incompat warning in `cargo build`. It is not our code: it arrives through `souvlaki 0.8.3 → cocoa 0.24.1 → block 0.1.6`, and `block 0.1.6` (published 2016) is the newest version, with `cocoa` still requiring `^0.1`. The lint is `static of uninhabited type` on a private `enum Class {}` used only as an opaque pointer type in an `extern` block, so it is a warning about a future compiler, not a defect that affects this build. Patching means carrying a fork of third-party code that has to be re-synced, which costs more than the warning is worth. Leave it; re-check when `souvlaki` or `cocoa` moves off `block`.

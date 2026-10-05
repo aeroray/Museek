@@ -358,7 +358,15 @@ fn emit_os_media_event(handle: &tauri::AppHandle, event: MediaControlEvent) {
     }
 }
 
+/// Update the OS "Now Playing" surface (macOS Now Playing, Windows SMTC).
+///
+/// The parameter list is the IPC payload shape: `#[tauri::command]` resolves
+/// each argument by its own top-level key (`tauri-macros`' wrapper derives the
+/// key from the parameter name), so `src/lib/smtc.ts` sends these seven fields
+/// flat. Grouping them into a struct would only add a nesting layer to the wire
+/// format, so the count is load-bearing rather than a design smell.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn media_update(
     app: tauri::AppHandle,
     title: String,
@@ -1022,7 +1030,7 @@ fn set_tray_mark_icon(app: tauri::AppHandle, png: Vec<u8>) -> Result<(), String>
     #[cfg(target_os = "macos")]
     {
         let _ = (app, png);
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -1286,7 +1294,7 @@ async fn capture_audio_clip(mode: String, duration_ms: u64) -> Result<CapturedAu
             .map_err(|error| error.to_string())?;
         }
         let _ = mode;
-        return Err("Native microphone capture is unavailable on macOS".to_string());
+        Err("Native microphone capture is unavailable on macOS".to_string())
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
@@ -1445,7 +1453,8 @@ fn probe_cover(
     for tag in tagged.tags() {
         for pic in tag.pictures() {
             let len = pic.data().len();
-            if len < 64 || len > MAX_EMBEDDED_COVER_BYTES {
+            // Embedded covers below 64 B are placeholders, not artwork.
+            if !(64..=MAX_EMBEDDED_COVER_BYTES).contains(&len) {
                 continue;
             }
             let rank = match pic.pic_type() {
@@ -1571,10 +1580,9 @@ async fn check_paths_exist(paths: Vec<String>) -> Vec<bool> {
     tauri::async_runtime::spawn_blocking(move || {
         paths
             .into_iter()
-            .map(|p| match std::path::Path::new(&p).try_exists() {
-                Ok(exists) => exists,
-                Err(_) => true,
-            })
+            // Treat an unstattable path as present: a permission error must not
+            // read as "missing" and trigger a destructive cleanup.
+            .map(|p| std::path::Path::new(&p).try_exists().unwrap_or(true))
             .collect::<Vec<bool>>()
     })
     .await
