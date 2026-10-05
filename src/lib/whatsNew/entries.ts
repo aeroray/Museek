@@ -17,6 +17,42 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.11.3": {
+    zh: {
+      sections: [
+        {
+          title: "🍎 macOS 修复",
+          bullets: [
+            "修复：主窗口的阴影有时会消失（启动后、以及从迷你播放切回主窗口时），现在会稳定显示",
+          ],
+        },
+        {
+          title: "🎤 桌面歌词",
+          bullets: [
+            "修复：未锁定时悬停歌词，有时不显示「抓手」光标",
+            "修复：拖动歌词时光标会变成普通箭头，现在全程保持「抓紧」的手型",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🍎 macOS fixes",
+          bullets: [
+            "Fix: the main window's shadow could disappear — at launch, and when returning from the mini player; it is now reliable",
+          ],
+        },
+        {
+          title: "🎤 Desktop lyrics",
+          bullets: [
+            "Fix: hovering the lyrics while unlocked sometimes showed no grab cursor",
+            "Fix: dragging the lyrics turned the cursor into the default arrow; the closed hand is now kept for the whole drag",
+          ],
+        },
+      ],
+    },
+  },
   "3.11.2": {
     zh: {
       sections: [
