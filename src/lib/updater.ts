@@ -271,7 +271,11 @@ function apiToHint(
 }
 
 /**
- * Race probes: first fulfilled success wins. Failures are ignored until all lose.
+ * Race probes, asymmetrically: a POSITIVE answer (an update exists) wins the
+ * moment it arrives, but a NEGATIVE answer ("already on latest") only wins
+ * when two independent probes agree — or every probe has finished. A single
+ * stale mirror answering fast with an old manifest must not outvote the
+ * slower sources that know about the new release.
  * `AbortSignal` cancels losing HTTP requests once a winner is chosen.
  */
 function raceProbes(factories: ((signal: AbortSignal) => Promise<ProbeOk>)[]): Promise<ProbeOk> {
@@ -282,19 +286,36 @@ function raceProbes(factories: ((signal: AbortSignal) => Promise<ProbeOk>)[]): P
     let pending = factories.length
     let settled = false
     let lastErr: unknown
+    let negatives = 0
+
+    const settle = (ok: ProbeOk) => {
+      if (settled) return
+      settled = true
+      ctrl.abort()
+      resolve(ok)
+    }
 
     for (const run of factories) {
       void run(ctrl.signal)
         .then((ok) => {
+          pending -= 1
           if (settled) return
-          settled = true
-          ctrl.abort()
-          resolve(ok)
+          if (ok.hint || ok.update) {
+            settle(ok)
+            return
+          }
+          negatives += 1
+          if (negatives >= 2 || pending === 0) settle(ok)
         })
         .catch((e) => {
           lastErr = e
           pending -= 1
-          if (!settled && pending === 0) reject(lastErr ?? new Error("all probes failed"))
+          if (settled) return
+          if (pending === 0) {
+            // Every probe finished: a lone "no update" still beats all-failed.
+            if (negatives > 0) settle({ hint: null })
+            else reject(lastErr ?? new Error("all probes failed"))
+          }
         })
     }
   })

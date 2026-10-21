@@ -23,6 +23,9 @@ mod macos_traffic_lights;
 mod system_fonts;
 
 const MAX_EMBEDDED_COVER_BYTES: usize = 10 * 1024 * 1024;
+/// Hard cap for `embed_download_metadata`: the frontend caps downloads at
+/// 512 MB, but IPC callers must not be able to make Rust decode/clone more.
+const MAX_EMBED_AUDIO_BYTES: usize = 512 * 1024 * 1024;
 
 #[cfg(target_os = "windows")]
 fn set_windows_app_user_model_id() {
@@ -109,6 +112,9 @@ fn decode_base64_chunks(chunks: Vec<String>) -> Result<Vec<u8>, String> {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(trimmed)
             .map_err(|error| error.to_string())?;
+        if audio.len() + bytes.len() > MAX_EMBED_AUDIO_BYTES {
+            return Err("Audio exceeds the embed size limit".to_string());
+        }
         audio.extend_from_slice(&bytes);
     }
     Ok(audio)
@@ -872,7 +878,7 @@ fn queue_open_local_files(app: &tauri::AppHandle, paths: Vec<String>) {
     // fs ACL for each file or exists()/readFile() will deny and surface as a
     // fake "permission" error in the UI.
     for p in &paths {
-        let _ = app.fs_scope().allow_file(std::path::Path::new(p));
+        allow_runtime_path(app, std::path::Path::new(p));
     }
     if let Ok(mut guard) = app.state::<PendingLocalFiles>().0.lock() {
         for p in &paths {
@@ -905,14 +911,34 @@ fn handle_os_open_args(app: &tauri::AppHandle, args: &[String]) {
     queue_unsupported_opens(app, unsupported_open_paths_from_args(args));
 }
 
+/// Grant one user-chosen path to BOTH the fs and the asset-protocol runtime
+/// scopes. Static capability scopes only cover the standard user folders, so
+/// anything the user picks elsewhere (another drive, an external disk) is
+/// admitted explicitly here — per file, or recursively per directory.
+fn allow_runtime_path(app: &tauri::AppHandle, path: &std::path::Path) {
+    if path.is_dir() {
+        let _ = app.fs_scope().allow_directory(path, true);
+        let _ = app.asset_protocol_scope().allow_directory(path, true);
+    } else {
+        let _ = app.fs_scope().allow_file(path);
+        let _ = app.asset_protocol_scope().allow_file(path);
+    }
+}
+
 /// Expand plugin-fs runtime ACL so CUE-referenced audio (and similar) can be read.
+/// Only local-audio files (or directories, for folder scans) are admitted —
+/// this must not become a general "grant any path" primitive.
 #[tauri::command]
 fn allow_local_file_paths(app: tauri::AppHandle, paths: Vec<String>) {
     for p in &paths {
         if p.is_empty() {
             continue;
         }
-        let _ = app.fs_scope().allow_file(std::path::Path::new(p));
+        let path = std::path::Path::new(p);
+        if !path.is_dir() && !is_local_audio_path(path) {
+            continue;
+        }
+        allow_runtime_path(&app, path);
     }
 }
 
@@ -1494,6 +1520,9 @@ fn probe_lyric(tag: &Tag) -> Option<String> {
 fn probe_local_audio_sync(path: &str, include_cover: bool) -> Result<LocalAudioProbe, String> {
     if path.is_empty() {
         return Err("Empty path".to_string());
+    }
+    if !is_local_audio_path(std::path::Path::new(path)) {
+        return Err("Not a local audio path".to_string());
     }
     let file_size = std::fs::metadata(path)
         .map(|m| m.len())

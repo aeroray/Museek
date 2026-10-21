@@ -49,13 +49,12 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' http://localhost:1425; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https: asset:; media-src 'self' blob: http: https: asset:; connect-src 'self' ipc: http://ipc.localhost http://localhost:1425 http: https: ws://localhost:1421 ws://127.0.0.1:1421; font-src 'self' data:; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-src 'none'",
       "assetProtocol": {
         "enable": true,
         "scope": {
           "requireLiteralLeadingDot": false,
           "allow": [
-            "**/*",
             "$HOME/**/*",
             "$DESKTOP/**/*",
             "$DOCUMENT/**/*",
@@ -63,7 +62,17 @@
             "$AUDIO/**/*",
             "$APPDATA/**/*",
             "$APPLOCALDATA/**/*",
-            "$RESOURCE/**/*"
+            "$RESOURCE/**/*",
+            "**/*.mp3",
+            "**/*.flac",
+            "**/*.m4a",
+            "**/*.aac",
+            "**/*.ogg",
+            "**/*.wav",
+            "**/*.jpg",
+            "**/*.jpeg",
+            "**/*.png",
+            "**/*.webp"
           ]
         }
       }

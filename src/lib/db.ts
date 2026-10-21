@@ -50,11 +50,20 @@ export async function writeDataCompact<T>(
   return writeDataWith(filename, data, false)
 }
 
+/**
+ * Per-file write queues. Stores fire-and-forget full snapshots of the same
+ * file from many places; without serialisation two in-flight IPC writes can
+ * land out of order and an older snapshot wins on disk.
+ */
+const writeQueues = new Map<string, Promise<void>>()
+
 async function writeDataWith<T>(
   filename: string,
   data: T,
   pretty: boolean,
 ): Promise<void> {
+  // Serialise NOW, at call time: the snapshot must match this call, not
+  // whatever the object looks like when the queued write finally runs.
   const text = pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data)
   if (!isTauri) {
     try {
@@ -64,8 +73,16 @@ async function writeDataWith<T>(
     }
     return
   }
-  await ensureDir()
-  await writeTextFile(`${BASE}/${filename}`, text, {
-    baseDir: BaseDirectory.AppData,
+  const run = (writeQueues.get(filename) ?? Promise.resolve()).then(async () => {
+    await ensureDir()
+    await writeTextFile(`${BASE}/${filename}`, text, {
+      baseDir: BaseDirectory.AppData,
+    })
   })
+  // Keep the chain alive past a failed write; the caller still sees `run`.
+  writeQueues.set(
+    filename,
+    run.catch(() => {}),
+  )
+  return run
 }

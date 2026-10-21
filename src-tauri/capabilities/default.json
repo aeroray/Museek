@@ -39,54 +39,97 @@
     {
       "identifier": "fs:allow-read-text-file",
       "allow": [
-        { "path": "**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
         { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
-        { "path": "$AUDIO/**" }
+        { "path": "$AUDIO/**" },
+        { "path": "**/*.mp3" },
+        { "path": "**/*.flac" },
+        { "path": "**/*.m4a" },
+        { "path": "**/*.aac" },
+        { "path": "**/*.ogg" },
+        { "path": "**/*.wav" },
+        { "path": "**/*.cue" },
+        { "path": "**/*.lrc" },
+        { "path": "**/*.js" },
+        { "path": "**/*.json" }
       ]
     },
     {
       "identifier": "fs:allow-write-text-file",
       "allow": [
-        { "path": "**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" },
         { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
-        { "path": "$AUDIO/**" }
+        { "path": "$AUDIO/**" },
+        { "path": "**/*.json" }
       ]
     },
     {
       "identifier": "fs:allow-read-file",
       "allow": [
-        { "path": "**" },
-        { "path": "**/*" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
         { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
-        { "path": "$AUDIO/**" }
+        { "path": "$AUDIO/**" },
+        { "path": "**/*.mp3" },
+        { "path": "**/*.flac" },
+        { "path": "**/*.m4a" },
+        { "path": "**/*.aac" },
+        { "path": "**/*.ogg" },
+        { "path": "**/*.wav" },
+        { "path": "**/*.cue" },
+        { "path": "**/*.jpg" },
+        { "path": "**/*.jpeg" },
+        { "path": "**/*.png" },
+        { "path": "**/*.webp" }
       ]
     },
     {
       "identifier": "fs:allow-exists",
       "allow": [
-        { "path": "**" },
-        { "path": "**/*" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" },
         { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
-        { "path": "$AUDIO/**" }
+        { "path": "$AUDIO/**" },
+        { "path": "**/*.mp3" },
+        { "path": "**/*.flac" },
+        { "path": "**/*.m4a" },
+        { "path": "**/*.aac" },
+        { "path": "**/*.ogg" },
+        { "path": "**/*.wav" },
+        { "path": "**/*.cue" },
+        { "path": "**/*.lrc" },
+        { "path": "**/*.json" },
+        { "path": "**/*.jpg" },
+        { "path": "**/*.jpeg" },
+        { "path": "**/*.png" },
+        { "path": "**/*.webp" }
       ]
     },
     {
       "identifier": "fs:allow-read-dir",
       "allow": [
-        { "path": "**" },
-        { "path": "**/*" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
         { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
@@ -94,31 +137,71 @@
         { "path": "$AUDIO/**" }
       ]
     },
-    "fs:allow-mkdir",
     {
       "identifier": "fs:allow-remove",
       "allow": [
-        { "path": "**" },
-        { "path": "**/*" },
-        { "path": "$HOME/**" },
-        { "path": "$TEMP/**" },
-        { "path": "$CACHE/**" },
         { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" },
+        { "path": "$HOME/**" },
         { "path": "$DESKTOP/**" },
         { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
-        { "path": "$AUDIO/**" }
+        { "path": "$AUDIO/**" },
+        { "path": "**/*.mp3" },
+        { "path": "**/*.flac" },
+        { "path": "**/*.m4a" },
+        { "path": "**/*.aac" },
+        { "path": "**/*.ogg" },
+        { "path": "**/*.wav" },
+        { "path": "**/*.json" },
+        { "path": "**/*.jpg" },
+        { "path": "**/*.jpeg" },
+        { "path": "**/*.png" },
+        { "path": "**/*.webp" }
       ]
     },
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
     {
       "identifier": "fs:allow-write-file",
-      "allow": [{ "path": "**" }, { "path": "**/*" }]
+      "allow": [
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" },
+        { "path": "$HOME/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" },
+        { "path": "**/*.mp3" },
+        { "path": "**/*.flac" },
+        { "path": "**/*.m4a" },
+        { "path": "**/*.aac" },
+        { "path": "**/*.ogg" },
+        { "path": "**/*.wav" },
+        { "path": "**/*.json" },
+        { "path": "**/*.jpg" },
+        { "path": "**/*.jpeg" },
+        { "path": "**/*.png" },
+        { "path": "**/*.webp" }
+      ]
     },
     {
       "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "**" }, { "path": "**/*" }]
+      "allow": [
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$CACHE/**" },
+        { "path": "$TEMP/**" },
+        { "path": "$HOME/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$AUDIO/**" }
+      ]
     },
     "dialog:default",
     "dialog:allow-open",

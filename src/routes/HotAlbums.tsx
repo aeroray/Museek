@@ -491,7 +491,7 @@ export function HotAlbums() {
                       fallbackImg={selected?.img}
                       selectable={editing && row.song.source !== "local"}
                       selected={selectedIds.has(row.song.id)}
-                      onToggleSelect={() => toggleOne(row.song.id)}
+                      onToggleSelect={toggleOne}
                     />
                   )}
                 </VirtualList>

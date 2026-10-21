@@ -354,6 +354,16 @@ function normalizeTask(task: DownloadTaskSnapshot): DownloadTask {
 
 let presenceScan: Promise<void> | null = null;
 
+/** Live downloads by task id — removing a task aborts its transfer. */
+const downloadAborts = new Map<string, AbortController>();
+
+/**
+ * Hard cap on one download. The whole file is held in memory (and copied
+ * again when tags are embedded), so an unbounded stream — a huge FLAC or a
+ * lying content-length — could OOM the app.
+ */
+const MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024;
+
 export const useDownloadStore = create<DownloadState>((set, get) => ({
   tasks: [],
 
@@ -389,6 +399,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
   },
 
   removeTask(id) {
+    downloadAborts.get(id)?.abort();
     const task = get().tasks.find((t) => t.id === id);
     void deleteFileIfNeeded(task?.filePath);
     set((s) => {
@@ -401,6 +412,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
   removeTasks(ids) {
     const idSet = new Set(ids);
+    for (const id of idSet) downloadAborts.get(id)?.abort();
     const toDelete = get().tasks.filter((t) => idSet.has(t.id));
     for (const task of toDelete) void deleteFileIfNeeded(task.filePath);
     set((s) => {
@@ -510,12 +522,19 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
     get().updateStatus(id, "downloading");
     get().updateProgress(id, 0);
+    const ac = new AbortController();
+    downloadAborts.set(id, ac);
+    // Cancelled = task removed (removeTask aborts) — then stop quietly: no
+    // file on disk, no "completed" toast for something the user threw away.
+    const cancelled = () =>
+      ac.signal.aborted || !get().tasks.some((t) => t.id === id);
     try {
       // Resolve URL with auto-downgrade; tell the user if the quality stepped down.
       const { url, quality: actual } = await resolveAdaptiveUrl(
         task.song,
         task.quality,
       );
+      if (cancelled()) return;
       if (actual !== task.quality) {
         set((s) => {
           const tasks = s.tasks.map((t) =>
@@ -534,13 +553,18 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       }
 
       const embedPromise = prepareEmbedPayload(task);
+      // A cancel can return before this is awaited — don't leak its rejection.
+      void embedPromise.catch(() => {});
       const res = await tauriFetch(url, {
         method: "GET",
         headers: cdnHeadersForUrl(url),
+        signal: ac.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const contentLength = parseInt(res.headers.get("content-length") || "0");
+      if (contentLength > MAX_DOWNLOAD_BYTES)
+        throw new Error(t("download.tooLarge"));
       const reader = res.body?.getReader();
       if (!reader) throw new Error("No response body");
 
@@ -548,10 +572,19 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       let received = 0;
 
       while (true) {
+        if (cancelled()) {
+          void reader.cancel().catch(() => {});
+          return;
+        }
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value);
         received += value.length;
+        // content-length can lie or be absent — count the actual bytes.
+        if (received > MAX_DOWNLOAD_BYTES) {
+          void reader.cancel().catch(() => {});
+          throw new Error(t("download.tooLarge"));
+        }
         if (contentLength > 0) {
           get().updateProgress(
             id,
@@ -559,6 +592,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
           );
         }
       }
+      if (cancelled()) return;
 
       // Merge chunks
       const total = chunks.reduce((s, c) => s + c.length, 0);
@@ -584,8 +618,20 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
       const { bytes: output, warnings: metadataWarnings } =
         await embedMetadataInMemory(task, audio, payload);
 
+      if (cancelled()) return;
       get().updateProgress(id, 96);
       await writeFile(filePath, output);
+      // Removed while the file was being written/tagged: don't leave an
+      // orphan the task list (and its delete-with-task setting) can't see.
+      // This file was never a completed download, so remove it outright.
+      if (cancelled()) {
+        try {
+          if (await exists(filePath)) await remove(filePath);
+        } catch {
+          /* best effort */
+        }
+        return;
+      }
 
       set((s) => {
         const tasks = s.tasks.map((t) =>
@@ -617,8 +663,10 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
         });
       }
     } catch (err) {
+      if (cancelled()) return;
       get().updateStatus(id, "error", (err as Error).message);
     } finally {
+      if (downloadAborts.get(id) === ac) downloadAborts.delete(id);
       // Free slot → kick off the next queued task.
       get()._pump();
     }

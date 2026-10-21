@@ -2,16 +2,16 @@ import { applyConfig, gatherConfig, isValidConfig, type MuseekConfig } from "@/l
 import { readData, writeData } from "@/lib/db"
 import { useSettingsStore } from "@/stores/settingsStore"
 
-// Folder-based cross-device sync. We write the full app config as a passphrase-
-// encrypted blob into a user-chosen folder; if that folder is one their cloud
-// client already syncs (Baidu Netdisk / OneDrive / iCloud Drive / Dropbox …),
-// the file rides along to their other devices. Everything is end-to-end
-// encrypted with a passphrase the user picks — the cloud provider (and we) only
-// ever see ciphertext. No account, no server, no provider API.
+// Folder-based cross-device sync. We write the full app config as an encrypted
+// blob into a user-chosen folder; if that folder is one their cloud client
+// already syncs (Baidu Netdisk / OneDrive / iCloud Drive / Dropbox …), the file
+// rides along to their other devices. No account, no server, no provider API.
 //
-// To make sync automatic (silent import on launch, silent backup on quit) the
-// passphrase is stored locally; the synced file stays encrypted regardless, so
-// the cloud can't read it — the trade-off is purely local-device security.
+// The key is BUILT IN (see DEFAULT_PASSPHRASE below), so this is obfuscation,
+// not secrecy against anyone who can read the file and the app's source: its
+// real protection is the access control on the user's own cloud folder. Do not
+// describe it as end-to-end encryption. A future user-passphrase flow can swap
+// the key without changing the envelope.
 //
 // Crypto: PBKDF2(SHA-256) → AES-256-GCM via the Web Crypto API (a secure context
 // in the Tauri webview). A wrong passphrase fails GCM auth → WrongPassphraseError.
@@ -20,6 +20,8 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
 export const SYNC_FILE_NAME = "museek-config.enc.json"
 const PBKDF2_ITER = 210000
+/** Envelope iter is file-controlled — never let a crafted file make startup burn CPU. */
+const MAX_PBKDF2_ITER = 1_000_000
 
 // Built-in key so sync needs zero user input — you only pick a folder. The file
 // is encrypted (never plaintext in the cloud), but since the key ships in the app
@@ -104,7 +106,16 @@ export async function decryptConfig(blob: string, passphrase: string): Promise<M
   if (!env || env.app !== "museek-sync" || !env.ct || !env.salt || !env.iv) {
     throw new Error("not-a-sync-file")
   }
-  const key = await deriveKey(passphrase, bytesFromB64(env.salt), env.iter || PBKDF2_ITER)
+  const iter = env.iter || PBKDF2_ITER
+  if (!Number.isInteger(iter) || iter < 1 || iter > MAX_PBKDF2_ITER) {
+    throw new Error("invalid-config")
+  }
+  const salt = bytesFromB64(env.salt)
+  const iv = bytesFromB64(env.iv)
+  if (salt.length < 8 || salt.length > 64 || iv.length < 8 || iv.length > 32) {
+    throw new Error("invalid-config")
+  }
+  const key = await deriveKey(passphrase, salt, iter)
   let ptBuf: ArrayBuffer
   try {
     ptBuf = await crypto.subtle.decrypt(
@@ -156,8 +167,43 @@ async function markSynced(exportedAt: string): Promise<void> {
  *  so every store re-initializes from it. */
 export async function applyConfigAndReload(config: MuseekConfig): Promise<void> {
   await applyConfig(config)
-  await markSynced(config.exportedAt)
+  // Never let a file pin the sync baseline to a future date: every later
+  // legitimate export would compare "older" and silently stop syncing.
+  const t = Date.parse(config.exportedAt)
+  const safeAt =
+    Number.isFinite(t) && t <= Date.now() + 7 * 24 * 3600_000
+      ? config.exportedAt
+      : new Date().toISOString()
+  await markSynced(safeAt)
   location.reload()
+}
+
+/**
+ * Sources a silent auto-import brings that this device does not already run —
+ * new ids, or a known id whose script text changed — arrive DISABLED. Enabled
+ * source scripts execute at startup, so a replaced sync file must not be able
+ * to run new code without the user turning it on in Settings → Sources.
+ * Manual imports keep their state: those go through a confirmation dialog.
+ */
+async function disableUntrustedSources(config: MuseekConfig): Promise<void> {
+  const incoming = config.data["sources.json"]
+  if (!Array.isArray(incoming)) return
+  const current = await readData<Array<{ id?: unknown; rawScript?: unknown }>>(
+    "sources.json",
+    [],
+  )
+  const known = new Map(
+    (Array.isArray(current) ? current : []).map((s) => [s?.id, s?.rawScript]),
+  )
+  config.data["sources.json"] = incoming.map((s) => {
+    if (!s || typeof s !== "object") return s
+    const script = s as { id?: unknown; rawScript?: unknown; enabled?: unknown }
+    const trusted =
+      typeof script.id === "string" &&
+      known.has(script.id) &&
+      known.get(script.id) === script.rawScript
+    return trusted ? s : { ...script, enabled: false }
+  })
 }
 
 /** Encrypt the current config and write it to the sync folder (advancing the
@@ -195,9 +241,15 @@ export async function maybeAutoImport(): Promise<boolean> {
     const blob = await readSyncFile(folder)
     if (!blob) return false
     const config = await decryptConfig(blob, DEFAULT_PASSPHRASE)
+    // A far-future exportedAt would win every comparison forever — reject it
+    // instead of importing (and re-importing on every launch).
+    const exportedMs = Date.parse(config.exportedAt)
+    if (!Number.isFinite(exportedMs) || exportedMs > Date.now() + 7 * 24 * 3600_000)
+      return false
     // Only import when the cloud copy is strictly newer than our last sync — this
     // prevents a reload loop and avoids reverting newer local data.
     if (lastAt && config.exportedAt <= lastAt) return false
+    await disableUntrustedSources(config)
     await applyConfigAndReload(config)
     return true
   } catch {

@@ -53,6 +53,40 @@ function devCorsProxy(): Plugin {
             res.end("missing target");
             return;
           }
+          // Dev-only, but still not an open proxy: http(s) to public hosts
+          // only (no loopback / RFC-1918 / link-local targets).
+          let targetUrl: URL;
+          try {
+            targetUrl = new URL(target);
+          } catch {
+            res.statusCode = 400;
+            res.end("invalid target");
+            return;
+          }
+          const host = targetUrl.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+          const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+          const isPrivate =
+            (targetUrl.protocol !== "http:" && targetUrl.protocol !== "https:") ||
+            host === "localhost" ||
+            host.endsWith(".localhost") ||
+            host === "::1" ||
+            host.startsWith("fe80:") ||
+            host.startsWith("fc") ||
+            host.startsWith("fd") ||
+            (ipv4 !== null &&
+              (Number(ipv4[1]) === 0 ||
+                Number(ipv4[1]) === 10 ||
+                Number(ipv4[1]) === 127 ||
+                (Number(ipv4[1]) === 169 && Number(ipv4[2]) === 254) ||
+                (Number(ipv4[1]) === 192 && Number(ipv4[2]) === 168) ||
+                (Number(ipv4[1]) === 172 &&
+                  Number(ipv4[2]) >= 16 &&
+                  Number(ipv4[2]) <= 31)));
+          if (isPrivate) {
+            res.statusCode = 403;
+            res.end("target not allowed");
+            return;
+          }
           const chunks: Buffer[] = [];
           for await (const c of req) chunks.push(c as Buffer);
           const body = chunks.length ? Buffer.concat(chunks) : undefined;

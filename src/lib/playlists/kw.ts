@@ -167,10 +167,12 @@ export async function getKwHotPlaylists(page = 1, tagId?: string | null): Promis
     if (!res.ok) throw new Error(`KuWo hot playlists failed: ${res.status}`)
 
     const data = (await res.json()) as KwRcmResponse
-    if (!data || String(data.code) !== "200" || !data.data?.data) {
+    if (!data || String(data.code) !== "200" || !Array.isArray(data.data?.data)) {
       throw new Error("KuWo hot playlists failed: bad response")
     }
-    return data.data.data.map(normalizeKwPlaylist)
+    return data.data.data
+      .filter((raw) => raw && raw.id != null && raw.id !== "")
+      .map(normalizeKwPlaylist)
   }
 
   const url =
@@ -188,11 +190,13 @@ export async function getKwHotPlaylists(page = 1, tagId?: string | null): Promis
   if (!res.ok) throw new Error(`KuWo hot playlists failed: ${res.status}`)
 
   const data = (await res.json()) as KwRcmResponse
-  if (!data || String(data.code) !== "200" || !data.data?.data) {
+  if (!data || String(data.code) !== "200" || !Array.isArray(data.data?.data)) {
     throw new Error("KuWo hot playlists failed: bad response")
   }
 
-  return data.data.data.map(normalizeKwPlaylist)
+  return data.data.data
+    .filter((raw) => raw && raw.id != null && raw.id !== "")
+    .map(normalizeKwPlaylist)
 }
 
 // --- detail ---
@@ -240,7 +244,7 @@ function normalizeKwListSong(raw: KwListSongRaw): MusicInfo {
 
 export async function getKwPlaylistDetail(id: string, page = 1): Promise<PlaylistDetail> {
   const url =
-    `http://nplserver.kuwo.cn/pl.svc?op=getlistinfo&pid=${id}&pn=${page - 1}&rn=${LIMIT_SONG}` +
+    `http://nplserver.kuwo.cn/pl.svc?op=getlistinfo&pid=${encodeURIComponent(id)}&pn=${page - 1}&rn=${LIMIT_SONG}` +
     `&encode=utf8&keyset=pl2012&identity=kuwo&pcmp4=1&vipver=MUSIC_9.0.5.0_W1&newver=1`
 
   const res = await tauriFetch(url, {
@@ -254,7 +258,7 @@ export async function getKwPlaylistDetail(id: string, page = 1): Promise<Playlis
   if (!res.ok) throw new Error(`KuWo playlist detail failed: ${res.status}`)
 
   const data = (await res.json()) as KwListDetailResponse
-  if (!data || data.result !== "ok" || !data.musiclist) {
+  if (!data || data.result !== "ok" || !Array.isArray(data.musiclist)) {
     throw new Error("KuWo playlist detail failed: bad response")
   }
 
@@ -264,6 +268,8 @@ export async function getKwPlaylistDetail(id: string, page = 1): Promise<Playlis
       img: data.pic || null,
       author: data.uname,
     },
-    list: data.musiclist.map(normalizeKwListSong),
+    list: data.musiclist
+      .filter((raw) => raw && raw.id != null && raw.id !== "")
+      .map(normalizeKwListSong),
   }
 }

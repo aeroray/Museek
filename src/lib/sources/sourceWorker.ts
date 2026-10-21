@@ -20,22 +20,27 @@ function installNetworkStubs(): void {
   const blocked = (name: string) => () => {
     throw new Error(`${name} ${DISABLED}`)
   }
-  Object.defineProperty(globalThis, "fetch", {
-    value: () => Promise.reject(new Error(`fetch ${DISABLED}`)),
-    configurable: true,
-  })
-  Object.defineProperty(globalThis, "XMLHttpRequest", {
-    value: blocked("XMLHttpRequest"),
-    configurable: true,
-  })
-  Object.defineProperty(globalThis, "WebSocket", {
-    value: blocked("WebSocket"),
-    configurable: true,
-  })
-  Object.defineProperty(globalThis, "importScripts", {
-    value: blocked("importScripts"),
-    configurable: true,
-  })
+  // Non-configurable + non-writable: a script must not be able to delete or
+  // replace these stubs to regain direct network access. All egress has to go
+  // through lx.request, whose URLs the host re-validates hop by hop.
+  const lock = (name: string, value: unknown): void => {
+    try {
+      Object.defineProperty(globalThis, name, {
+        value,
+        configurable: false,
+        writable: false,
+      })
+    } catch {
+      // Global already locked down (e.g. a second init) — leave it as is.
+    }
+  }
+  lock("fetch", () => Promise.reject(new Error(`fetch ${DISABLED}`)))
+  lock("XMLHttpRequest", blocked("XMLHttpRequest"))
+  lock("WebSocket", blocked("WebSocket"))
+  lock("importScripts", blocked("importScripts"))
+  // A nested Worker would start with a fresh, unstubbed global scope.
+  lock("Worker", blocked("Worker"))
+  lock("SharedWorker", blocked("SharedWorker"))
 }
 
 function headersToRecord(headers?: HeadersInit): Record<string, string> {

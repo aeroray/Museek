@@ -40,16 +40,17 @@ function parseNMinfo(nMinfo: string): MusicQuality[] {
   return result.reverse()
 }
 
-function decodeKwName(name: string): string {
+function decodeKwName(name: string | null | undefined): string {
+  if (!name) return ""
   try {
-    return decodeURIComponent(name.replace(/\+/g, " "))
+    return decodeURIComponent(String(name).replace(/\+/g, " "))
   } catch {
-    return name
+    return String(name)
   }
 }
 
 function normalizeKwSong(raw: KwSongRaw): MusicInfo {
-  const songId = raw.MUSICRID.replace("MUSIC_", "")
+  const songId = String(raw.MUSICRID ?? "").replace("MUSIC_", "")
   const qualitys = raw.N_MINFO ? parseNMinfo(raw.N_MINFO) : [{ type: "128k" as Quality, size: null }]
   const _qualitys = indexQualitySizes(qualitys)
 
@@ -108,7 +109,11 @@ export async function searchKuwo(
 
   const data = (await res.json()) as KwSearchResponse
   const total = parseInt(data.TOTAL || "0")
-  const list = (data.abslist || []).map(normalizeKwSong)
+  // Skip malformed entries instead of failing the whole search page.
+  const rows = Array.isArray(data.abslist) ? data.abslist : []
+  const list = rows
+    .filter((raw) => raw && typeof raw.MUSICRID === "string" && raw.MUSICRID)
+    .map(normalizeKwSong)
 
   return {
     list,

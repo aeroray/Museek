@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TrackRow } from "@/components/common/TrackRow";
+import { VirtualList, useScrollAreaViewport } from "@/components/common/VirtualList";
 import {
   PlaylistCardSkeleton,
   TrackRowSkeleton,
@@ -64,6 +65,7 @@ export function Search() {
     clearHistory,
     clearResults,
   } = useSearchStore();
+  const [songScrollRef, songViewportEl] = useScrollAreaViewport([scope]);
   const navSearch = (
     useLocation().state as {
       searchSong?: { platform: OnlineSource; query: string };
@@ -385,7 +387,7 @@ export function Search() {
           </p>
         </div>
       ) : (
-        <ScrollArea key="songs" className="flex-1">
+        <ScrollArea key="songs" ref={songScrollRef} className="flex-1">
           <div className="px-4 py-2">
             {isLoading && results.length === 0 && (
               <div>
@@ -401,9 +403,11 @@ export function Search() {
               </div>
             )}
 
-            {results.map((song) => (
-              <TrackRow key={song.id} song={song} />
-            ))}
+            {results.length > 0 && (
+              <VirtualList items={results} scrollElement={songViewportEl} getKey={(song) => song.id}>
+                {(song) => <TrackRow song={song} />}
+              </VirtualList>
+            )}
 
             {results.length > 0 && page < allPage && (
               <div className="py-4 text-center">

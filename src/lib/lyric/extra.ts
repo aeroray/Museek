@@ -152,6 +152,11 @@ async function getTxNumericSongId(songmid: string): Promise<string | null> {
   })();
 
   txSongIdCache.set(songmid, request);
+  // Successful lookups used to live forever — cap the session cache.
+  while (txSongIdCache.size > 200) {
+    const oldest = txSongIdCache.keys().next().value as string;
+    txSongIdCache.delete(oldest);
+  }
   try {
     return await request;
   } catch {

@@ -1,5 +1,6 @@
 import { isUnlimitedLocalScanDepth, normalizeLocalScanDepth } from "./depth"
 import { LOCAL_AUDIO_EXTS, isLocalImportPath } from "./tags"
+import { allowLocalFilePaths } from "./fsScope"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
@@ -21,7 +22,9 @@ export async function pickLocalAudioFiles(): Promise<string[]> {
   })
   if (!selected) return []
   const paths = Array.isArray(selected) ? selected : [selected]
-  return paths.filter((p) => typeof p === "string" && isLocalImportPath(p)) as string[]
+  const filtered = paths.filter((p) => typeof p === "string" && isLocalImportPath(p)) as string[]
+  await allowLocalFilePaths(filtered)
+  return filtered
 }
 
 /**
@@ -34,6 +37,8 @@ export async function pickLocalAudioFolder(maxDepth: number): Promise<string[]> 
   const { open } = await import("@tauri-apps/plugin-dialog")
   const dir = await open({ directory: true, multiple: false })
   if (typeof dir !== "string" || !dir) return []
+  // Grant before readDir: static fs scopes only cover standard user folders.
+  await allowLocalFilePaths([dir])
   return collectAudioFiles(dir, normalizeLocalScanDepth(maxDepth))
 }
 

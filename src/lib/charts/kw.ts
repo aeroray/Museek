@@ -174,9 +174,11 @@ export async function getKwBoardSongs(boardId: string, page = 1): Promise<MusicI
 
   const encrypted = await res.text()
   const rawData = JSON.parse(aesEcbDecryptToText(encrypted)) as KwBangResponse
-  if (!rawData || String(rawData.code) !== "200" || !rawData.data?.musiclist) {
+  if (!rawData || String(rawData.code) !== "200" || !Array.isArray(rawData.data?.musiclist)) {
     throw new Error("KuWo board failed: bad response")
   }
 
-  return rawData.data.musiclist.map(normalizeKwBangSong)
+  return rawData.data.musiclist
+    .filter((raw) => raw && raw.id != null && raw.id !== "")
+    .map(normalizeKwBangSong)
 }

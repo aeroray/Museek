@@ -339,6 +339,11 @@ type LastfmState = Persisted & {
 // are not render inputs.
 let authPoll: ReturnType<typeof setInterval> | null = null;
 let authTimeout: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Bumped every time the auth wait stops, so a fetchSession that was already
+ * in flight when the user cancelled cannot resurrect the connection.
+ */
+let authGen = 0;
 let lastNowPlayingKey = "";
 let loaded = false;
 /**
@@ -350,6 +355,7 @@ let loaded = false;
 let statsRefreshedThisLaunch = false;
 
 function stopAuthWait() {
+  authGen += 1;
   if (authPoll) {
     clearInterval(authPoll);
     authPoll = null;
@@ -461,15 +467,18 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
       return;
     }
     stopAuthWait();
+    const gen = authGen;
     set({ connecting: true, error: null, authUrl: null });
 
     let token: string;
     try {
       token = await fetchToken({ apiKey, apiSecret });
     } catch (err) {
+      if (gen !== authGen) return; // cancelled while fetching — stay silent
       set({ connecting: false, error: lastfmErrorLabel(err) });
       return;
     }
+    if (gen !== authGen || !get().connecting) return;
 
     const url = authorizeUrl(apiKey, token);
     set({ authUrl: url });
@@ -500,6 +509,9 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
           { apiKey: state.apiKey, apiSecret: state.apiSecret },
           token,
         );
+        // Cancelled/disconnected while this request was in flight: the
+        // success must not write a session the user just threw away.
+        if (gen !== authGen || !get().connecting) return;
         stopAuthWait();
         set({
           connecting: false,
@@ -518,6 +530,7 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
         // now, not after whatever backoff it had accumulated.
         void get().flush({ force: true });
       } catch (err) {
+        if (gen !== authGen || !get().connecting) return;
         const code = err instanceof LastfmError ? err.code : undefined;
         if (code === TOKEN_UNAUTHORIZED) return; // still waiting
         // 15 means the token expired (Last.fm overloads it in the auth flow).

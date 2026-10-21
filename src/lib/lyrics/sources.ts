@@ -83,8 +83,24 @@ const searchFns: Record<
   mg: searchMigu,
 }
 
-const picks = new Map<string, OnlineSource>()
-const payloads = new Map<string, Payload>()
+/** Session cache with a hard size cap: oldest entries are evicted (LRU-ish). */
+class BoundedMap<K, V> extends Map<K, V> {
+  constructor(private readonly max: number) {
+    super()
+  }
+  override set(key: K, value: V): this {
+    if (this.has(key)) this.delete(key)
+    super.set(key, value)
+    while (this.size > this.max) {
+      const oldest = this.keys().next().value as K
+      this.delete(oldest)
+    }
+    return this
+  }
+}
+
+const picks = new BoundedMap<string, OnlineSource>(200)
+const payloads = new BoundedMap<string, Payload>(100)
 const inflight = new Map<string, Promise<PlatformLyricOption[]>>()
 /**
  * Artist-name aliases per platform, memoised for the session.
@@ -94,7 +110,7 @@ const inflight = new Map<string, Promise<PlatformLyricOption[]>>()
  * empty list for the same reason — otherwise every song by an artist the
  * platform does not know would pay for the probe again.
  */
-const aliasCache = new Map<string, string[]>()
+const aliasCache = new BoundedMap<string, string[]>(200)
 
 function songKey(song: MusicInfo): string {
   return `${song.source}:${song.meta.songId}`

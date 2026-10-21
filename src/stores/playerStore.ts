@@ -135,6 +135,8 @@ function invalidateLyricLoad() {
   lyricLoadGen += 1;
 }
 
+let picLoadGen = 0;
+
 /** After a local file starts, apply on-disk tags/lyrics. Do not search online unless already matched. */
 function loadLocalMetaAfterPlay(
   song: MusicInfo,
@@ -730,12 +732,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       const needsReload = get().currentQuality !== target;
       if (needsReload) await get().play(song, target, { force: true });
 
+      // The user may have switched tracks while the reload was in flight —
+      // restoring the OLD song's paused state must not pause the NEW song.
+      if (get().currentSong?.id !== song.id) return;
       if (!wasPlaying && get().isPlaying) {
         audioPlayer.pause();
-        persistPlaybackSession(true);
-      } else {
-        persistPlaybackSession(true);
       }
+      persistPlaybackSession(true);
     },
 
     async playFromQueue(index) {
@@ -1266,6 +1269,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     async _loadPic(song) {
+      // Same guard as _loadLyric: a slow pic lookup for song A must not paint
+      // over song B after a quick skip (the stale URL also reaches SMTC).
+      const songId = song.id;
+      const gen = ++picLoadGen;
+      const stale = () => gen !== picLoadGen || get().currentSong?.id !== songId;
       if (song.meta.picUrl) {
         set({ currentPicUrl: song.meta.picUrl });
         return;
@@ -1274,7 +1282,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (song.source === "local" && song.meta.localCoverRel) {
         const { resolveLocalCoverUrl } = await import("@/lib/localMusic");
         const localUrl = await resolveLocalCoverUrl(song.meta.localCoverRel);
-        if (localUrl) {
+        if (localUrl && !stale()) {
           set({ currentPicUrl: localUrl });
           return;
         }
@@ -1285,7 +1293,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         action: "pic",
         info: song,
       });
-      if (picUrl) set({ currentPicUrl: picUrl });
+      if (picUrl && !stale()) set({ currentPicUrl: picUrl });
     },
   };
 });

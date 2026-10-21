@@ -1,5 +1,17 @@
 packages:
   - "."
 
+# esbuild has a postinstall step (it materialises the platform binary). Newer
+# pnpm blocks dependency build scripts by default, so it has to be allowed
+# explicitly or `pnpm install` fails with ERR_PNPM_IGNORED_BUILDS and leaves the
+# tree without `node_modules/.bin`.
+#
+# Both spellings are kept because the two halves of this project disagree on
+# the pnpm major: CI (pnpm/action-setup) and mise.toml pin pnpm 9, which reads
+# `onlyBuiltDependencies`; the pnpm on this machine's PATH is v11, which only
+# reads `allowBuilds`. Each version ignores the key it does not know.
+allowBuilds:
+  esbuild: true
+
 onlyBuiltDependencies:
   - esbuild

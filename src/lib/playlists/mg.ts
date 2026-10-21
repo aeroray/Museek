@@ -297,8 +297,8 @@ function normalizeMgSong(raw: MgSongRaw): MusicInfo {
 export async function getMgPlaylistDetail(id: string, page = 1): Promise<PlaylistDetail> {
   const songUrl =
     `https://app.c.nf.migu.cn/MIGUM3.0/resource/playlist/song/v2.0` +
-    `?pageNo=${page}&pageSize=${LIMIT_SONG}&playlistId=${id}`
-  const infoUrl = `https://c.musicapp.migu.cn/MIGUM3.0/resource/playlist/v2.0?playlistId=${id}`
+    `?pageNo=${page}&pageSize=${LIMIT_SONG}&playlistId=${encodeURIComponent(id)}`
+  const infoUrl = `https://c.musicapp.migu.cn/MIGUM3.0/resource/playlist/v2.0?playlistId=${encodeURIComponent(id)}`
 
   const [songRes, infoRes] = await Promise.all([
     tauriFetch(songUrl, { method: "GET", headers: DEFAULT_HEADERS }),

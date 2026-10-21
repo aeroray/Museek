@@ -205,6 +205,53 @@ export class SourceWorkerHost {
     }
   }
 
+  /**
+   * Fetch with redirects followed manually, re-validating EVERY hop against
+   * the source URL policy. Validating only the entry URL is not enough: a
+   * public address can 302 to loopback / link-local, and the HTTP plugin
+   * would follow it silently.
+   */
+  private async fetchChecked(
+    msg: { url: string; method: string; headers: Record<string, string>; body?: string },
+    signal: AbortSignal,
+  ): Promise<Response> {
+    const MAX_HOPS = 5
+    let url = msg.url
+    let method = (msg.method || "GET").toUpperCase()
+    let body = msg.body
+    let headers = { ...msg.headers }
+    for (let hop = 0; hop <= MAX_HOPS; hop++) {
+      assertAllowedSourceUrl(url, this.scriptId)
+      const res = await httpFetch(url, {
+        method,
+        headers,
+        body,
+        signal,
+        maxRedirections: 0,
+      })
+      const location = res.headers.get("location")
+      const isRedirect = res.status >= 300 && res.status < 400 && !!location
+      if (!isRedirect) return res
+      if (hop === MAX_HOPS) throw new Error("too many redirects")
+      // 301/302/303 rewrite a non-GET/HEAD request to GET without a body.
+      if (
+        (res.status === 301 || res.status === 302 || res.status === 303) &&
+        method !== "GET" &&
+        method !== "HEAD"
+      ) {
+        method = "GET"
+        body = undefined
+        headers = Object.fromEntries(
+          Object.entries(headers).filter(
+            ([k]) => !/^content-(type|length)$/i.test(k),
+          ),
+        )
+      }
+      url = new URL(location, url).href
+    }
+    throw new Error("too many redirects")
+  }
+
   private async handleHttp(msg: {
     id: string
     url: string
@@ -215,13 +262,7 @@ export class SourceWorkerHost {
     const ac = new AbortController()
     this.httpAborts.set(msg.id, ac)
     try {
-      assertAllowedSourceUrl(msg.url, this.scriptId)
-      const res = await httpFetch(msg.url, {
-        method: msg.method,
-        headers: msg.headers,
-        body: msg.body,
-        signal: ac.signal,
-      })
+      const res = await this.fetchChecked(msg, ac.signal)
       const text = await res.text()
       this.post({
         type: "httpResult",

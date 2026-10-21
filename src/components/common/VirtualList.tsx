@@ -4,6 +4,24 @@ const DEFAULT_ROW = 56
 const OVERSCAN = 10
 
 /**
+ * Bind a Radix ScrollArea's viewport element for VirtualList. Wrap the
+ * ScrollArea in a div with this ref; the viewport is found once mounted
+ * (and re-found when `deps` change, e.g. switching tabs remounts content).
+ */
+export function useScrollAreaViewport(
+  deps: unknown[] = [],
+): [React.RefObject<HTMLDivElement | null>, HTMLElement | null] {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [viewport, setViewport] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    const vp = ref.current?.querySelector("[data-radix-scroll-area-viewport]")
+    setViewport(vp instanceof HTMLElement ? vp : null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+  return [ref, viewport]
+}
+
+/**
  * Windowed list for long song playlists. Only mounts rows near the viewport so
  * hover / paint stay snappy with hundreds of tracks. Expects a fixed-ish row
  * height (TrackRow ≈ 56px).

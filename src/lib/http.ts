@@ -14,7 +14,13 @@ const RELAY = new Set(["user-agent", "referer", "origin", "cookie", "host"])
  * (bypasses CORS). In the browser/preview it routes through the Vite dev proxy
  * (see vite.config.ts) so built-in search / charts / lyric still work there.
  */
-export async function httpFetch(input: string, init?: RequestInit): Promise<Response> {
+/** RequestInit plus the plugin-http extras the Tauri fetch understands. */
+export type HttpFetchInit = RequestInit & {
+  /** 0 = do not follow redirects; the caller re-validates each hop itself. */
+  maxRedirections?: number
+}
+
+export async function httpFetch(input: string, init?: HttpFetchInit): Promise<Response> {
   if (isTauri) {
     return tauriHttpFetch(input, init) as unknown as Promise<Response>
   }
@@ -31,5 +37,7 @@ export async function httpFetch(input: string, init?: RequestInit): Promise<Resp
     headers: relayed,
     body: init?.body as BodyInit | null | undefined,
     signal: init?.signal ?? undefined,
+    // Browser equivalent of the plugin's maxRedirections: 0.
+    redirect: init?.maxRedirections === 0 ? "manual" : init?.redirect,
   })
 }

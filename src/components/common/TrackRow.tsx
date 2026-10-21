@@ -47,7 +47,9 @@ export const TrackRow = memo(function TrackRow({
   fallbackImg?: string | null;
   selectable?: boolean;
   selected?: boolean;
-  onToggleSelect?: () => void;
+  /** Receives the song id so parents can pass ONE stable callback for every
+   *  row — an inline `() => toggle(id)` per row defeats this memo. */
+  onToggleSelect?: (songId: string) => void;
   /** Extra trailing figure (play count, relative time). */
   stat?: string;
   /**
@@ -83,7 +85,7 @@ export const TrackRow = memo(function TrackRow({
         className,
         selectable && selected && "bg-primary/10",
       )}
-      onClick={selectable ? onToggleSelect : undefined}
+      onClick={selectable ? () => onToggleSelect?.(song.id) : undefined}
       onDoubleClick={selectable ? undefined : () => play(song)}
     >
       {selectable && (
