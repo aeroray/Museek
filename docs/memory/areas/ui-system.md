@@ -45,7 +45,7 @@ Evidence:
 - repo:src/lib/db.ts
 
 Decision:
-Writes queue per filename, and the content is snapshotted when the call is made. A single failure must not block the queue.
+Writes queue per filename, snapshotted at call time; a single failure must not block the queue.
 
 Reason:
 Unsynchronized writes let a late stale snapshot overwrite newer data.
@@ -66,7 +66,7 @@ Drop the ring only for pointer-driven menu closes, handled in the shared `Dropdo
 Reason:
 Focus rings are the only keyboard affordance; the annoyance comes from a modality mismatch, not from rings existing.
 
-## MC-DNU-20261021-00000705 — Raising the whole-file memory budget to silence the audit
+## MC-DNU-20261021-00000705 — Silencing project checks instead of fixing them
 
 Status: active
 Scope: area:ui-system
@@ -76,4 +76,4 @@ Evidence:
 - repo:docs/memory/manifest.md
 
 Rejected:
-Raising a budget in the manifest to make `status` pass. The CLI enforces its own limits, so the file still reports over budget; scoped knowledge belongs in a routed area instead.
+Raising a manifest budget to make `status` pass — the CLI enforces its own limits, so the file still reports over budget. Likewise, never offer a bulk action (reorder, clear, disable-all) that runs on incomplete data: a partial ranking reads as an unrequested verdict. Gate the action on complete results, and keep it from flipping per-item state flags so the outcome stays reviewable.

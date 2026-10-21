@@ -29,7 +29,7 @@ Evidence:
 - repo:src/lib/sources/sourceWorkerHost.ts
 
 Decision:
-`fetchChecked` disables automatic redirects and follows up to five hops manually, re-running `assertAllowedSourceUrl` on each.
+`fetchChecked` follows up to five redirect hops by hand, re-running `assertAllowedSourceUrl` on each.
 
 Reason:
 A public URL could otherwise 302 into loopback or a private host, since the allowlist only saw the first request.
@@ -48,7 +48,7 @@ Decision:
 Ask only scripts whose `sources` declares the song's platform and action, plus scripts declaring no `sources` at all. Never fall back to every enabled script.
 
 Reason:
-A script asked about a platform it does not serve resolves the id by name on its own service and answers with a different recording.
+A script asked about a platform it cannot serve resolves the id by name on its own service and returns a different recording.
 
 ## MC-AREA-20261021-00000104 — The main window is narrowly permissioned
 

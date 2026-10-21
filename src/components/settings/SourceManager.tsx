@@ -10,6 +10,7 @@ import {
   Link2,
   FolderOpen,
   AudioLines,
+  ArrowDownWideNarrow,
   CheckCircle2,
   XCircle,
   Info,
@@ -61,6 +62,7 @@ import {
   testablePlatforms,
   type SourceProbeResult,
 } from "@/lib/sources/probe"
+import { allSourcesProbed } from "@/lib/sources/rank"
 import type { SourceScript } from "@/types/source"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -419,10 +421,17 @@ export function SourceManager() {
     setScriptSources,
     setProbeResult,
     probeResults,
+    sortByQuality,
     clearError,
   } = useSourceStore()
   const t = useT()
   const enabledCount = scripts.filter((s) => s.enabled).length
+  // The action only appears once every testable source has a result: a partial
+  // sort would silently rank untested sources below known-bad ones.
+  const canSortByQuality = useMemo(
+    () => allSourcesProbed(scripts, probeResults),
+    [scripts, probeResults],
+  )
   const [importing, setImporting] = useState(false)
   const [getOpen, setGetOpen] = useState(false)
   const [fileDragOver, setFileDragOver] = useState(false)
@@ -674,6 +683,14 @@ export function SourceManager() {
     }
   }
 
+  function handleSortByQuality() {
+    const moved = sortByQuality()
+    useUiStore.getState().notify({
+      message: moved ? t("sources.sortDone") : t("sources.sortNoChange"),
+      variant: moved ? "success" : "info",
+    })
+  }
+
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex shrink-0 flex-col gap-3">
@@ -685,10 +702,23 @@ export function SourceManager() {
                 {t("sources.count", { total: scripts.length, enabled: enabledCount })}
               </span>
             )}
+            {canSortByQuality && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto h-8"
+                onClick={handleSortByQuality}
+                disabled={busy}
+                title={t("sources.sortByQualityHint")}
+              >
+                <ArrowDownWideNarrow size={14} className="mr-1.5" />
+                {t("sources.sortByQuality")}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              className="ml-auto h-8"
+              className={cn("h-8", !canSortByQuality && "ml-auto")}
               onClick={() => void handleTestAll()}
               disabled={busy || scripts.length === 0}
             >

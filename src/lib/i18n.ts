@@ -820,6 +820,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.testDone": "已测完 {total} 个音源",
     "sources.testDisabled": "已关闭 {n} 个全部失败的音源",
     "sources.testNone": "没有可测试的音源",
+    "sources.sortByQuality": "一键排序",
+    "sources.sortByQualityHint": "按测试结果重新排序，可用平台多的音源排在前面",
+    "sources.sortDone": "已按测试结果重新排序",
+    "sources.sortNoChange": "当前顺序已是最优",
     // Errors surfaced by the source store / runner
     "sources.err.notAScript": "不是有效的音源脚本，请检查后重试",
     "sources.err.loadFailed": "音源「{name}」加载失败",
@@ -1726,6 +1730,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.testDone": "Tested {total} source(s)",
     "sources.testDisabled": "Turned off {n} source(s) that failed every platform",
     "sources.testNone": "No sources to test",
+    "sources.sortByQuality": "Sort by quality",
+    "sources.sortByQualityHint":
+      "Reorder by test result, best first — sources that work on more platforms move up",
+    "sources.sortDone": "Sorted by test result",
+    "sources.sortNoChange": "Already in the best order",
     // Errors surfaced by the source store / runner
     "sources.err.notAScript": "This file is not a valid source script",
     "sources.err.loadFailed": 'Failed to load "{name}"',

@@ -10,6 +10,7 @@ import {
 import { t } from "@/lib/i18n";
 import type { SourceScript } from "@/types/source";
 import type { SourceProbeResult } from "@/lib/sources/probe";
+import { rankSources } from "@/lib/sources/rank";
 
 interface SourceState {
   scripts: SourceScript[];
@@ -26,6 +27,8 @@ interface SourceState {
   toggleEnabled: (id: string) => Promise<void>;
   setEnabled: (id: string, enabled: boolean) => Promise<void>;
   reorderScripts: (from: number, to: number) => void;
+  /** Reorder every source best-first by probe result. @returns whether the order changed */
+  sortByQuality: () => boolean;
   setScriptSources: (id: string, sources: unknown) => void;
   setProbeResult: (id: string, result: SourceProbeResult) => void;
   loadFromDisk: () => Promise<void>;
@@ -147,6 +150,19 @@ export const useSourceStore = create<SourceState>((set, get) => ({
       saveSourceScripts(scripts);
       return { scripts };
     });
+  },
+
+  sortByQuality() {
+    const s = get();
+    // Rank from the probe snapshot, never from `enabled`: ordering decides
+    // dispatch priority, and re-ordering must not double as an on/off action.
+    const ranked = rankSources(s.scripts, s.probeResults);
+    const changed = ranked.some((x, i) => x.id !== s.scripts[i].id);
+    if (!changed) return false;
+    set({ scripts: ranked });
+    sourceRunner.setScripts(ranked);
+    saveSourceScripts(ranked);
+    return true;
   },
 
   setScriptSources(id, sources) {

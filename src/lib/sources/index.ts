@@ -9,3 +9,10 @@ export {
 } from "@/lib/sourceRunner";
 export type { SourceRegistry } from "@/types/source";
 export { loadSourceScripts, saveSourceScripts, loadSourceProbeResults, saveSourceProbeResults } from "./persist";
+export {
+  allSourcesProbed,
+  rankSources,
+  rankingChangesOrder,
+  scoreProbe,
+  type ProbeScore,
+} from "./rank";
