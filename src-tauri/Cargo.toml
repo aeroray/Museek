@@ -9,6 +9,15 @@ edition = "2021"
 name = "museek_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# MSVC's `link` always prints the import-library it emits for the `cdylib`
+# ("creating library museek_lib.dll.lib and object museek_lib.dll.exp").
+# Recent rustc surfaces that stdout as `#[warn(linker_messages)]`, which reads as
+# a warning on every dev build even though the link succeeded. Nothing here is
+# actionable, and Tauri needs `cdylib`, so silence just this lint rather than
+# every linker diagnostic from every crate.
+[lints.rust]
+linker_messages = "allow"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
