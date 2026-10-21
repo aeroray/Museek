@@ -11,6 +11,7 @@ import { t } from "@/lib/i18n";
 import type { SourceScript } from "@/types/source";
 import type { SourceProbeResult } from "@/lib/sources/probe";
 import { rankSources } from "@/lib/sources/rank";
+import { type BundledSource } from "@/lib/sources/bundle";
 
 interface SourceState {
   scripts: SourceScript[];
@@ -23,6 +24,15 @@ interface SourceState {
     rawScript: string,
     url?: string,
   ) => Promise<"added" | "updated">;
+  /**
+   * Restore every source in a bundle file in one pass.
+   *
+   * Unlike `importScript` this does not validate by loading: a disabled bundled
+   * source is written back disabled and must not be started just to import it.
+   */
+  importBundle: (
+    sources: BundledSource[],
+  ) => { added: number; updated: number; enabled: number };
   removeScript: (id: string) => void;
   toggleEnabled: (id: string) => Promise<void>;
   setEnabled: (id: string, enabled: boolean) => Promise<void>;
@@ -98,6 +108,74 @@ export const useSourceStore = create<SourceState>((set, get) => ({
       saveSourceProbeResults(probeResults);
       return { scripts, probeResults };
     });
+  },
+
+  importBundle(bundled) {
+    const { scripts: current } = get();
+    const byOrigin = new Map(current.map((s) => [s.url ?? "", s] as const));
+    const byText = new Map(current.map((s) => [s.rawScript, s] as const));
+
+    let added = 0;
+    let updated = 0;
+    let enabled = 0;
+
+    // Bundled order is the exported dispatch priority, so rebuild it in place
+    // rather than appending: the restored list should look like the original.
+    const restored: SourceScript[] = [];
+    for (const item of bundled) {
+      const existing =
+        (item.url ? byOrigin.get(item.url) : undefined) ??
+        byText.get(item.rawScript);
+
+      const script: SourceScript = {
+        id: existing?.id ?? generateId(),
+        name: item.name || existing?.name || "Unknown Source",
+        version: item.version || existing?.version || "0.0.0",
+        author: item.author || existing?.author || "",
+        description: item.description || existing?.description || "",
+        rawScript: item.rawScript,
+        enabled: item.enabled,
+        ...(item.url ? { url: item.url } : {}),
+        ...(item.sources
+          ? { sources: item.sources }
+          : existing?.sources
+            ? { sources: existing.sources }
+            : {}),
+      };
+      if (existing) updated++;
+      else added++;
+      if (script.enabled) enabled++;
+      restored.push(script);
+    }
+
+    // Keep every source that was NOT in the bundle, after the restored ones, so
+    // importing a partial bundle never silently deletes the rest.
+    const restoredIds = new Set(restored.map((s) => s.id));
+    const restoredText = new Set(restored.map((s) => s.rawScript));
+    const untouched = current.filter(
+      (s) => !restoredIds.has(s.id) && !restoredText.has(s.rawScript),
+    );
+    const scripts = [...restored, ...untouched];
+
+    set({ scripts, error: null });
+    sourceRunner.setScripts(scripts);
+    saveSourceScripts(scripts);
+
+    // Start only what the bundle says is enabled. Failures are tolerated: one
+    // broken script must not abort the import of the others.
+    void (async () => {
+      for (const script of restored) {
+        if (!script.enabled) continue;
+        try {
+          const sources = await sourceRunner.loadScript(script);
+          if (sources) get().setScriptSources(script.id, sources);
+        } catch {
+          // leave it listed; the user can test and disable it
+        }
+      }
+    })();
+
+    return { added, updated, enabled };
   },
 
   async setEnabled(id, enabled) {

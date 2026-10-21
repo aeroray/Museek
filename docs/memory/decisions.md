@@ -91,3 +91,17 @@ Sources found by sync auto-import are written with `enabled: false`, including o
 
 Reason:
 The built-in passphrase is only obfuscation, so disabling newly imported sources is what cuts the execution chain.
+## MC-DEC-20261021-00000007 — Source export is a real `.js` file, not renamed JSON
+
+Status: active
+Scope: project
+Subject: MC-SUBJ-20261021-a9a8ce03
+Facet: workflow
+Evidence:
+- repo:src/lib/sources/bundle.ts
+
+Decision:
+Exporting every source writes a `.js` file whose payload is assigned to a global, and import recognises it on the normal source path.
+
+Reason:
+Source import only accepts `.js`, and scripts carry their own block header, so a comment-delimited payload truncates at the first closing delimiter.

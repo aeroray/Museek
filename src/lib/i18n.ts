@@ -824,6 +824,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "sources.sortByQualityHint": "按测试结果重新排序，可用平台多的音源排在前面",
     "sources.sortDone": "已按测试结果重新排序",
     "sources.sortNoChange": "当前顺序已是最优",
+    "sources.exportBundle": "导出音源",
+    "sources.exportHint": "把当前所有音源打包成一个 .js 配置，可像普通音源文件一样重新导入",
+    "sources.bundleExported": "已导出 {n} 个音源",
+    "sources.bundleExportFailed": "导出音源失败：{msg}",
+    "sources.bundleImported": "已从音源包恢复 {total} 个音源（{enabled} 个已启用）",
     // Errors surfaced by the source store / runner
     "sources.err.notAScript": "不是有效的音源脚本，请检查后重试",
     "sources.err.loadFailed": "音源「{name}」加载失败",
@@ -1735,6 +1740,12 @@ const dict: Record<Lang, Record<string, string>> = {
       "Reorder by test result, best first — sources that work on more platforms move up",
     "sources.sortDone": "Sorted by test result",
     "sources.sortNoChange": "Already in the best order",
+    "sources.exportBundle": "Export sources",
+    "sources.exportHint":
+      "Pack every source into one .js config that can be re-imported like a normal source file",
+    "sources.bundleExported": "Exported {n} source(s)",
+    "sources.bundleExportFailed": "Could not export sources: {msg}",
+    "sources.bundleImported": "Restored {total} source(s) from the bundle ({enabled} enabled)",
     // Errors surfaced by the source store / runner
     "sources.err.notAScript": "This file is not a valid source script",
     "sources.err.loadFailed": 'Failed to load "{name}"',

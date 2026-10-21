@@ -16,7 +16,7 @@ Decision:
 Each script runs in a Dedicated Worker with network stubs locked and nested `Worker`/`SharedWorker` banned. `lx.request` is the only network path.
 
 Reason:
-A nested worker is a fresh scope with no stubs, and a writable stub can be deleted by the script it constrains.
+A nested worker is a fresh scope with no stubs, and a writable stub can be deleted by its own script.
 
 ## MC-AREA-20261021-00000102 — Every redirect hop is re-checked
 

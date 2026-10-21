@@ -9,6 +9,7 @@ import {
   FileCode2,
   Link2,
   FolderOpen,
+  Download,
   AudioLines,
   ArrowDownWideNarrow,
   CheckCircle2,
@@ -63,6 +64,12 @@ import {
   type SourceProbeResult,
 } from "@/lib/sources/probe"
 import { allSourcesProbed } from "@/lib/sources/rank"
+import {
+  buildSourceBundle,
+  bundleFileName,
+  parseSourceBundle,
+  looksLikeSourceBundle,
+} from "@/lib/sources/bundle"
 import type { SourceScript } from "@/types/source"
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
@@ -414,6 +421,7 @@ export function SourceManager() {
     isLoading,
     error,
     importScript,
+    importBundle,
     removeScript,
     toggleEnabled,
     setEnabled,
@@ -461,8 +469,23 @@ export function SourceManager() {
       let added = 0
       let updated = 0
       let fail = 0
+      let bundledTotal = 0
+      let bundledEnabled = 0
       for (const file of files) {
         try {
+          // An exported bundle arrives on this same path (it is a .js file), so
+          // unwrap it here and restore every script it carries.
+          const bundled = looksLikeSourceBundle(file.content)
+            ? parseSourceBundle(file.content)
+            : null
+          if (bundled) {
+            const r = importBundle(bundled)
+            added += r.added
+            updated += r.updated
+            bundledTotal += bundled.length
+            bundledEnabled += r.enabled
+            continue
+          }
           if (!looksLikeScript(file.content)) throw new Error(t("sources.err.notAScript"))
           const result = await importScript(file.content, `local:${file.label}`)
           if (result === "added") added++
@@ -470,6 +493,15 @@ export function SourceManager() {
         } catch {
           fail++
         }
+      }
+      if (bundledTotal > 0) {
+        useUiStore.getState().notify({
+          message: t("sources.bundleImported", {
+            total: bundledTotal,
+            enabled: bundledEnabled,
+          }),
+          variant: fail ? "info" : "success",
+        })
       }
       notifyImportResult(added, updated, fail, t)
     } finally {
@@ -691,6 +723,41 @@ export function SourceManager() {
     })
   }
 
+  async function handleExportBundle() {
+    if (!scripts.length) return
+    try {
+      const json = buildSourceBundle(scripts)
+      const name = bundleFileName()
+      if (isTauri) {
+        const { save } = await import("@tauri-apps/plugin-dialog")
+        const path = await save({
+          defaultPath: name,
+          filters: [{ name: "JavaScript", extensions: ["js"] }],
+        })
+        if (!path) return
+        const { writeTextFile } = await import("@tauri-apps/plugin-fs")
+        await writeTextFile(path, json)
+      } else {
+        const blob = new Blob([json], { type: "text/javascript" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = name
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+      useUiStore.getState().notify({
+        message: t("sources.bundleExported", { n: scripts.length }),
+        variant: "success",
+      })
+    } catch (err) {
+      useUiStore.getState().notify({
+        message: t("sources.bundleExportFailed", { msg: String(err) }),
+        variant: "error",
+      })
+    }
+  }
+
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex shrink-0 flex-col gap-3">
@@ -702,11 +769,27 @@ export function SourceManager() {
                 {t("sources.count", { total: scripts.length, enabled: enabledCount })}
               </span>
             )}
+            {/* One spacer owns the right alignment, so adding or removing a
+                button cannot silently shift the group. */}
+            <div className="ml-auto" />
+            {scripts.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => void handleExportBundle()}
+                disabled={busy}
+                title={t("sources.exportHint")}
+              >
+                <Download size={14} className="mr-1.5" />
+                {t("sources.exportBundle")}
+              </Button>
+            )}
             {canSortByQuality && (
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-auto h-8"
+                className="h-8"
                 onClick={handleSortByQuality}
                 disabled={busy}
                 title={t("sources.sortByQualityHint")}
@@ -718,7 +801,7 @@ export function SourceManager() {
             <Button
               variant="outline"
               size="sm"
-              className={cn("h-8", !canSortByQuality && "ml-auto")}
+              className="h-8"
               onClick={() => void handleTestAll()}
               disabled={busy || scripts.length === 0}
             >

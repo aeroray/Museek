@@ -16,3 +16,11 @@ export {
   scoreProbe,
   type ProbeScore,
 } from "./rank";
+export {
+  buildSourceBundle,
+  bundleFileName,
+  looksLikeSourceBundle,
+  parseSourceBundle,
+  type BundledSource,
+  type SourceBundle,
+} from "./bundle";
