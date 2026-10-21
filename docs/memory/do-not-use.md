@@ -1,322 +1,51 @@
-# Do Not Use
+# Do Not Use / Tombstones
 
-## `sort_by_key` when the key allocates
+Tombstones are newest first.
 
-Do not apply clippy's `unnecessary_sort_by` suggestion (`sort_by(|a,b| f(a).cmp(&f(b)))` → `sort_by_key(f)`) when `f` allocates. The lint only sees the shape, but `sort_by_key` calls the closure on *every comparison* — measured at 7158 calls vs 3579 for `sort_by` on a 400-item list — so it doubles the allocations instead of removing them. `sort_by_cached_key` is the fix that actually helps: exactly one call per element (400) and ~9× faster in the same benchmark, and clippy accepts it too. Used in `src-tauri/src/system_fonts.rs`, where the key is `to_lowercase()`.
+## MC-DNU-20261021-00000001 — Letting an unmapped error string reach the user
 
-## Vendoring `block` to silence its future-incompat warning
+Status: active
+Scope: project
+Subject: MC-SUBJ-20261021-96c635c5
+Facet: interface
+Evidence:
+- repo:src/lib/playError.ts
 
-Do not vendor or patch the `block` crate to clear the `block v0.1.6` future-incompat warning in `cargo build`. It is not our code: it arrives through `souvlaki 0.8.3 → cocoa 0.24.1 → block 0.1.6`, and `block 0.1.6` (published 2016) is the newest version, with `cocoa` still requiring `^0.1`. The lint is `static of uninhabited type` on a private `enum Class {}` used only as an opaque pointer type in an `extern` block, so it is a warning about a future compiler, not a defect that affects this build. Patching means carrying a fork of third-party code that has to be re-synced, which costs more than the warning is worth. Leave it; re-check when `souvlaki` or `cocoa` moves off `block`.
+Rejected:
+Letting an unmapped engine or DOM error fall through to `player.failedDetail`, which renders raw English inside localized copy. Add a branch to `playError.ts` for every new error shape.
 
-Do not confuse it with a real dead-code warning in our own crate — those are ours to fix (e.g. `restore_main_if_obscured` is `#[cfg(not(target_os = "macos"))]` because both call sites are non-macOS).
+## MC-DNU-20261021-00000002 — Trusting a persisted "playing: true" after a restart
 
-## Raw engine error strings as user-facing copy
+Status: active
+Scope: project
+Subject: MC-SUBJ-20261021-f445aedf
+Facet: lifecycle
+Evidence:
+- repo:src/stores/listeningStore.ts
 
-Do not let an unmapped engine/DOM error reach the user. Anything not matched by `formatRemotePlayError` falls through to `player.failedDetail` and renders raw English inside a localized string (`播放失败：Audio request failed (403)`). Add a branch to `src/lib/playError.ts` for every new error shape you throw, and keep already-localized copy passing through so re-formatting is a no-op.
+Rejected:
+Keeping `playing: true` from the run that wrote a session. Force it false on read, or a restart counts as an in-progress listen while the user has pressed nothing.
 
-## Reporting one playback failure on two channels
+## MC-DNU-20261021-00000003 — Asserting the settled value of a self-correcting loop
 
-Do not call `onError` from a path that also rejects a promise the caller awaits. `playerStore` treats `onError` as final (it stops playback and closes the listening session), so a double-report kills the retry and logs a false near-zero-length play. The HTML element owns `onError`; the Web Audio path owns its promise rejection.
+Status: active
+Scope: project
+Subject: MC-SUBJ-20261021-74863a9e
+Facet: adoption-policy
+Evidence:
+- repo:scripts/check-desktop-lyrics-hover-race.mjs
 
-## Retaining a rejected load promise
+Rejected:
+Asserting the final DOM state of something a poll corrects within a tick. Observe transitions instead, and confirm a reverted injection still builds, or the check passes vacuously.
 
-Do not cache a rejected `loadPromise`. A retry can reuse a byte-identical URL, and handing back the settled rejection means no request is ever re-issued — the user sees the same error twice. Clear it on failure (guarded by identity) and let `setSource` reload an element that is in an error state.
+## MC-DNU-20261021-00000004 — Raising a memory budget to silence the audit
 
-## Letting desktop lyrics overflow the native window
+Status: active
+Scope: project
+Subject: MC-SUBJ-20261021-74863a9e
+Facet: behavior
+Evidence:
+- repo:docs/memory/manifest.md
 
-Do not rely on a long desktop lyric overflowing the screen edge. The lyrics window is monitor-physical-width while text is laid out in logical px, so at raised display scaling the OS hard-clips the centred capsule and its rounded ends become a rectangle. Keep the fit-to-width shrink (`computeLyricFitScale`) and scale padding with the font so capsule width stays linear in the fit.
-
-## `inset-0` + `m-auto` + `h-fit` for centred dialogs
-
-Do not centre `DialogContent` with `fixed inset-0 m-auto h-fit`. With both insets at 0 the height comes from `height: fit-content` alone; if that does not resolve to the content height the used value falls back to `auto` and the box **stretches to the full containing block** — a dialog as tall as the whole window (observed on macOS, fine on Windows). Use `fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100%-2rem)]` with `height: auto`.
-
-## Variable-width trailing columns in TrackRow
-
-Do not use `max-w-*` or intrinsic width for `TrackRow`'s platform chip or `stat` column. The name column is `flex-1`, so anything after it is right-anchored and a variable width drags its left neighbours out of line between rows. Use the fixed `w-20` platform slot and the `statWidth` prop.
-
-## Re-resolving the current track without `force`
-
-Do not call `play(song, quality)` to change the quality of the track that is already attached. The same-song short-circuit treats it as redundant and returns without doing anything, and `togglePlay` sets `playPending` first, which that short-circuit also reads as "busy" — so the request is dropped and every retry repeats it. Pass `{ force: true }`, which also skips the CUE seek-in-place branch. This applies to any deliberate reload of the current track, including the expired-URL retry in `play()`'s catch. Do not "fix" this by deleting the `playPending` check: that check is what prevents a double-press from starting two loads.
-
-## Re-setting the macOS shadow without re-asserting the Overlay mask
-
-Do not "fix" a missing macOS window shadow by toggling `set_shadow(false)`/`(true)` alone, and do not issue it synchronously right after `set_decorations`. `set_decorations(true)` rebuilds the style mask without `FullSizeContentView` — which IS `titleBarStyle: "overlay"` — and tao applies that mask via `set_style_mask_async`, so it can land *after* the caller's `setTitleBarStyle("overlay")` and undo it; AppKit then paints no shadow even though `hasShadow` is true. Measured on the real exit path the final mask was nondeterministic (32783 vs 15 across identical rounds), which is why the bug reads as "sometimes no shadow". Re-assert overlay (guarded by `has_overlay_chrome`, because `setStyleMask:` also re-makes the first responder) and do the work on the main GCD queue, twice.
-
-Also do not trust a `hasShadow` or `screencapture -l` padding check as proof this works: `screencapture -l` reports the shadow padding even when no shadow is painted, so that oracle passes on the broken build. Read the style mask instead.
-
-## Removing focus rings globally
-
-Do not add a global `:focus-visible { outline: none }` or a blanket `outline-none` to suppress the menu focus ring. Focus rings are the only affordance keyboard users get, and the reported annoyance comes from a *modality mismatch*: Radix restores focus to a menu trigger on close, which after a mouse click paints a ring the user did not ask for. Fix it where the modality is known (`DropdownMenuContent`'s `onCloseAutoFocus` plus `src/lib/focusModality.ts`) so keyboard closes keep the ring. Also do not assume `focus({ focusVisible: false })` clears an existing ring — it does not; `focus()` on an already-focused element is a no-op, so blur first.
-
-## Resetting the cover/lyrics when only the quality changed
-
-Do not clear `currentPicUrl`, `lyricLines` or `duration` when `play()` is re-attaching the source for the track that is already current. Guard those resets behind `sameSongReload` (`force && current?.id === song.id`), and skip the trailing `_loadPic`/`_loadLyric` refetch. A quality switch changes only the audio source; resetting the rest blanked the cover (because `song.meta.picUrl` is usually absent while `currentPicUrl` holds the resolved URL) and made `_loadPic` repaint a different URL — a visible flash. Do not clear the `reloadingCurrentTrack` flag on the success path only; a failed reload must clear it too, or the cover stays undimmed forever. The seek bar has the same trap: `ProgressSlider` must not reset its displayed time to 0 while `reloadingCurrentTrack` is set, because the re-attached element really does report 0:00 before the store seeks back.
-
-## Turning a global shortcut off by clearing its binding
-
-Do not implement "disable this global shortcut" by setting the accelerator to `""`. That destroys the binding, so re-enabling forces the user to re-record the combo, and the settings row can no longer show what was released. Keep the binding and track the action in `disabledGlobalShortcuts` instead. Do not make that list sync across devices: the clash comes from software installed on one machine.
-
-Also do not check the disabled list only where the OS hotkeys are registered. The global map is matched by the in-app keydown handler as well, so a switch consulted in `syncGlobalShortcuts` alone leaves the combo firing whenever the window has focus — the user turns it off and it still works. Both paths must read the same helper (`activeGlobalShortcuts` for the OS, `inAppShortcutBindings` for the window), and the in-app list must keep every local binding ahead of any global one so a combo bound in both slots still resolves to the local action.
-
-
-
-## Letting a manual downgrade be silently re-upgraded
-
-Do not let the resume-time upgrade in `togglePlay` override a quality the user chose deliberately for one song. It reads the global `settings.playQuality`, so a per-song downgrade would be undone on the next pause/resume. A per-song choice must be distinguishable from the global default before that path is touched.
-
-## Letting the disk cache override an explicit quality choice
-
-Do not reuse `findCachedMeetingPreferred` for a user's explicit per-song quality. It walks the ladder from the *best* tier down, so choosing 128K while a FLAC is cached plays the FLAC and shows FLAC on the badge — the switch looks broken. That "cache is a floor, not a ceiling" rule is correct for the global default and wrong for an explicit choice.
-
-## Comparing two buttons by their computed size alone
-
-Do not conclude a "this button looks bigger" report is a bug from `getBoundingClientRect` alone, and do not dismiss it either. The Last.fm Reconnect and Disconnect buttons measure identically (36px, same font, same padding) in both languages, yet the filled `default` variant beside the outlined one reads as larger — the fix is matching visual weight (`secondary`), not changing a size. Conversely, measure before concluding "it's just your eyes": a reported sidebar misalignment measured 0.00px on the line box and only showed up once the *ink* extent was measured with canvas font metrics. Also measure in the reporter's language: a Chinese UI has different glyph metrics, and an assertion matching English label text silently finds nothing and passes vacuously.
-
-## Using `leading-none` on a label that sits beside an icon
-
-Do not put `leading-none` on a short label next to an icon in a flex row. A line-height of 1 makes the line box hug the font's full ascent+descent, so CJK glyphs — which sit high in the em box and have no descender — look pushed up against the icon even though the line box is perfectly centred. `leading-tight` gives the glyphs the leading they need; the settings sidebar rows grew from 27px to 29.5px and now read as centred.
-
-## Sending a local file's placeholder metadata to Last.fm
-
-Do not scrobble or announce a song whose title/artist is still the local-import placeholder ("未知歌曲" / "未知歌手" / "Unknown title" / "Unknown artist"). They are valid strings to Last.fm, so every untagged file collapses into ONE junk entry on the profile. Gate on `isScrobblableSong`, which reuses the catalog-lookup placeholder test rather than defining a second list.
-
-## Gating Last.fm on "was this local file matched online"
-
-Do not decide whether to scrobble by checking `localSongMatched` / `meta.wySongId`. That is the wrong axis in both directions: a matched file is often displayed under a filename (so it would scrobble as `01 - 冷冰冰`), and an unmatched file with proper ID3 tags has a perfectly good artist and title (so gating on a match silently discards real plays). Gate on `scrobbleIdentity`, which prefers the catalog identity when it exists and falls back to the display name when that is real.
-
-## Sending a local file's display name to Last.fm
-
-Do not send `song.name` / `song.singer` directly for a local file. Those are chosen for the LIBRARY, not for Last.fm: filename mode deliberately keeps the basename, and untagged files keep the placeholder. Use `scrobbleIdentity`, which is catalog-first.
-
-## Wrapping a full-width row in a styled tooltip
-
-Do not anchor a styled `Tooltip` to a row that spans the list width. The tooltip is positioned against its trigger, so it opens centred ABOVE the row — for a tall row that puts it over the neighbouring item, and users read it as belonging to the wrong row. Reported exactly that way on the 足迹 rows. Use a native `title` attribute, which follows the cursor and lands beside the pointer; that is also what TrackRow's action buttons already do. Keep the styled tooltip for small triggers (an icon button), where its anchoring is the same place the cursor is.
-
-## Comparing whole artist strings when matching across services
-
-Do not decide "same artist" by comparing two whole credit strings. Two independent traps live there. The first is spelling: Last.fm's "Aimyon" and QQ Music's 爱缪 share no characters, so the comparison scores 0 and nothing matches — ask the platform for its own spelling instead. The second is that a platform credits everyone ("元、鱼骨妹") while Last.fm stores only the first ("元"), and a short name inside a longer one is deliberately rejected by `textScore`'s ratio guard, which exists to stop "BGM" matching "Epic Battle BGM". Split the credit list and score each artist on its own (`splitArtists`), so the guard keeps working on real titles. Both were reported as "the song won't play" while the platform had it all along.
-
-## Falling back to a title-only match when resolving a Last.fm loved track
-
-Do not "improve" the loved-track lookup by accepting a hit whose title matches when the artist does not. It looks like a harmless recall win, but a title is not an identifier: searching あのね returns rows by several different artists, and the first one is as likely to be someone else's song as the right one. The user then hears a different recording while the player bar shows the one they clicked — the same silent-wrong-song failure as the source-dispatch fallback. Report "not found" instead.
-
-The artist-name problem that makes this tempting is real and has a correct fix: Last.fm's "Aimyon" and QQ Music's 爱缪 share no characters, so `matchScore` rejects every hit. Do not solve it by dropping the artist check — ask the platform for its own spelling of the artist and compare against that. See the loved-tracks decision in `decisions.md`. The title-only QUERY is fine and is still used, because the artist is enforced by the comparison that follows it.
-
-## Adding a "try every source anyway" fallback to platform dispatch
-
-Do not restore a fallback that asks every enabled script when none declares the song's platform. It reads as harmless — "better to try than to leave the song unplayable" — but it is the mechanism behind "I played X and heard a different song": a script that does not serve the platform cannot resolve the id, so it looks the track up BY NAME on its own service and answers with another recording of the same title. Playing the wrong audio silently is worse than reporting that no source serves the platform. Scripts that declare no `sources` at all are still asked; that is the only case with nothing to contradict.
-
-## Concluding a release failed because `gh release view` says "not found"
-
-Do not treat "release not found" as a failed release. tauri-action is configured with `releaseDraft: true`, and the GitHub API hides draft releases from tokens without push access — this repo's token has only `pull`, so a perfectly successful build looks like nothing happened. Read the workflow log for `Creating one` / `Found draft release` and the `Uploading …` lines, then confirm with a HEAD request: a published asset answers 302 and a draft answers 404.
-
-## Shipping a version without a whatsNew entry
-
-Do not tag a release before adding the entry to `src/lib/whatsNew/entries.ts`. `check-whatsnew-entry.mjs` defaults to the package.json version and is part of the suite, and the dialog looks up its copy by that exact key — without it the release ships with an empty What's New. Bump `package.json` only: `tauri.conf.json` reads the version from it.
-
-## Persisting a "once per launch" flag
-
-Do not put a once-per-run flag in the persisted payload. `statsRefreshedThisLaunch` is module-level on purpose: on disk it would survive the restart it exists to detect, and the refresh would never happen again. The same applies to any "first time this run" bookkeeping.
-
-## Asserting a loading state against an instantly-resolving stub
-
-Do not assert that a loading skeleton appears while a stubbed fetch resolves synchronously — the window does not exist and the assertion is vacuous. The shim in `check-lastfm-tab.mjs` exposes `window.__httpDelay(ms)` so the in-flight window is real. When reverting a change to prove a check is non-vacuous, confirm the injection APPLIED and the harness still BUILT: a regex that produces invalid JSX makes the run fail with `bundle failed`, which reads as a passing check if you only grep for FAIL.
-
-## Trusting a persisted "playing: true" flag after a restart
-
-Do not let a restored listen session keep `playing: true` from the run that wrote it. `parseLive` forces it false on read, and that single line is what stops a restart from counting as an in-progress listen — which would put the restored track on the user's profile as "now playing" while they have not pressed anything. Any new persisted field describing *live* activity needs the same treatment: the disk remembers what was happening, not what is happening now.
-
-## Assuming a "nothing was sent" assertion is meaningful without a threshold check
-
-Do not assert that no scrobble was sent without also proving the seeded listen WOULD have been scrobbled. Otherwise the assertion passes for the wrong reason — the listen was simply too short — and would keep passing if the guard were removed. Seed clear of the boundary too: 2:00 against a 2:00 threshold only passed because the comparison happens to be `>=`.
-
-## Rendering a Last.fm stat row outside a TooltipProvider
-
-Do not render `LastfmStatsPanel` (or anything containing a stat row) without a Radix `TooltipProvider` above it. Radix throws "`Tooltip` must be used within `TooltipProvider`", which blanks the whole pane. The app has one in `App.tsx`, but a harness that renders the panel directly does not — and the resulting failure looks like a broken component rather than a missing provider.
-
-## Adding a trailing "open" icon to a row that is itself a link
-
-Do not add a trailing external-link icon to a row whose whole body already opens on click. It is a second affordance for one action, and if it is revealed on hover it appears at the same moment as the hover background, so it reads as decoration rather than a control. Say where the click goes with a native `title` on the row instead — not a styled tooltip, which anchors to the row and opens above it rather than at the pointer.
-
-## Re-deriving a cross-platform artist matcher per feature
-
-Do not write a second cross-service artist comparison when one already exists. Lyrics matching and Last.fm loved-track matching were built independently and the second re-derived the first, so both shipped the same defect: a strict artist gate that can never pass when the spellings share no characters (爱缪 on QQ vs あいみょん on NetEase). The symptom looks like missing data — "this platform has no lyrics for this artist" — which is exactly why it survived. There is now one `platformArtistName` in `lib/platformArtist.ts`; use it, and put any new cross-service matching behind the same helper.
-
-## Putting a drag cursor only on the visible text
-
-Do not scope a drag cursor to the text element alone when the window is much larger than its content. The lyrics window spans the whole monitor while the shell is `width: max-content`, so during a drag the pointer is usually over the window's transparent gutters — where no rule declares a cursor and the platform default takes over, replacing the closed hand mid-drag. Put the `grabbing` rule on the window root (and mirror the dragging attribute onto it) so every child that does not override it inherits the hand. Keep the hover `grab` rule narrow, though: only the text is a drag handle, and a hand over empty space promises a drag that does nothing.
-
-## Depending on state that the effect itself sets
-
-Do not list a value in an effect's dependency array when that effect also sets it. The lyrics hit-test poll did exactly this with `isLyricsHovered`: every hover flip tore the effect down and rebuilt it, and an in-flight poll from the discarded instance could resolve afterwards and overwrite the fresh state — which is what made the missing grab cursor intermittent. Read the current value through a ref and keep the dependency list to inputs the effect does not write. When a stale async result is possible, also check a `disposed` flag AFTER the awaits, not only before them; the pre-await check cannot cover work that was already in flight when the effect was torn down.
-
-## Asserting the settled value of a self-correcting loop
-
-Do not assert the final DOM state of something that re-polling corrects within a tick. A stale write from a torn-down lyrics poll sets the hover attribute wrongly, but the live poll fixes it ~50ms later, so the settled value is identical on the broken and fixed builds — an end-state assertion passes vacuously. Observe the TRANSITIONS instead (a `MutationObserver` on the attribute) and assert the wrong value never appeared. The same trap applies to `hasShadow` / `screencapture -l` as a shadow oracle: both report success on a window that paints no shadow.
-
-## Restoring the macOS window shadow with `set_shadow(true)` (superseded 2026-10-04)
-
-Do not re-assert the main window's shadow by setting it true again. On macOS the mini player sets it true on the way in, so the value is already true on the way out and the call is a no-op — the shadow stays missing. Toggle it false and back.
-
-This much is still true, but the toggle ALONE is not the fix and was shipped as one in 3.11.2 before being corrected: the rebuilt layer only survives if the window still carries the Overlay mask, and `set_decorations(true)` drops it asynchronously. See "Re-setting the macOS shadow without re-asserting the Overlay mask" above — that entry supersedes this one.
-
-## Keeping fetched Last.fm stats in memory only
-
-Do not add a fetched-from-the-network view to the Last.fm store without persisting it. The stats were runtime-only, so every launch showed an empty tab and the user had to press a button again — and a store field is easy to assume is persisted when it is not, because `snapshot()` lists fields explicitly rather than spreading state. If you add a field that survives a restart, add it to `snapshot()` AND to `parsePersisted`, and assert BOTH paths: a check that seeds the file only covers the read path, so dropping the field from `snapshot()` still passes it.
-
-## Clearing the Last.fm stats cache on disconnect
-
-Do not clear `statsCache` in `disconnect()`. That function also runs automatically when a background request hits an auth error, so clearing there would throw away the user's fetched data because an unrelated scrobble failed. Validate cached entries against the current username on read instead.
-
-## Assuming Last.fm can be told to stop showing "now playing"
-
-Do not look for a way to clear the now-playing state. There is no such method, and `track.updateNowPlaying` has no timestamp and must not be retried. The consequence is that the client must be accurate when it ANNOUNCES: an announcement that is never superseded leaves the profile showing a stale track indefinitely. That is why the dedupe key is cleared whenever a listen session ends, not only on pause.
-
-## Reading state written by a sibling effect in the same commit
-
-Do not read `useState` written by another effect in the same commit — it still holds the previous render's value. In the Last.fm credentials dialog an "open" effect recorded the stored session key and a "close" effect compared against it, so the close effect saw the initial `""`, judged the session new, and shut the dialog the instant it opened. The dialog stayed in the DOM at `opacity: 0` and every text assertion still passed, because the content was present and correct — only invisible. Use a `useRef` when two effects in one commit must share a value. And when a UI check asserts a dialog or overlay, assert it is actually VISIBLE (`getComputedStyle(...).opacity === "1"`, plus a bounding box on screen), not merely present.
-
-## Hooking scrobbling into the player store
-
-Do not add scrobble calls to `playerStore`. The listening store's `finish()` is the one place a listen session closes for every possible reason, so scrobbling lives there; the player has five separate `listenFinish(false)` call sites and would need the logic duplicated at each, which is how a skipped track ends up never scrobbled. Likewise, do not re-derive listened duration in the player — the session already tracks it.
-
-## Bundling a shared Last.fm API secret
-
-Do not commit an API key/secret for Last.fm into the app, and do not add `lastfm.json` to `configIO`'s `DB_FILES`. The signature scheme needs the secret in the client, so a bundled one is extractable from every install — each user registers their own free API application instead. Keeping the file out of `DB_FILES` is what stops a config export from carrying the user's credentials and a config import from overwriting them.
-
-## Treating every Last.fm error the same
-
-Do not retry an authentication error, and do not log the user out over a transient one. Error 9 (invalid session key) and 26 (suspended key) mean the stored session is dead and must be cleared with a reconnect prompt, keeping the pending queue because those plays really happened. Errors 8, 11, 16 and 29 are transient and must back off and retry. Conflating them either retries forever against a dead session or discards a working connection because of a rate limit. Also: Last.fm reports most failures with HTTP 200 and an `error` field in the body, so the body must be inspected — a status check alone sees success.
-
-## Sorting batch scrobble parameters numerically
-
-Do not sort `track.scrobble` parameters by their parsed index. Last.fm requires the ASCII table order, where `artist[10]` comes BEFORE `artist[1]` ("0" is 0x30, "]" is 0x5D). A numeric sort produces a different `api_sig` and every batch of 11 or more scrobbles fails with error 13. Plain string comparison in JS is already correct for these ASCII names.
-
-## Restarting playback without re-arming the ended latch
-
-Do not add a way to start or restart a track that skips the `endedSent` reset in `AudioPlayer.play()` / `seek()`. `endedSent` suppresses a second `emitEnded` for the same pass, so any restart that does not clear it reports one end and then goes silent. This is easy to miss because most restarts re-attach a source (`setSource` / `setClip` / `startWebPlayback` all clear it) — the two that do not are repeat-one (`seek(0)` + `play()`) and a ONE-SONG queue wrapping in repeat-list/shuffle, where `next()` lands on the same index and only `play()` runs. It also only reproduces on the HTML `<audio>` backend; Web Audio hides it, so testing one backend is not enough.
-
-## Handing a song to every enabled source script
-
-Do not resolve a song's play URL, lyric or cover by asking every enabled script. Filter by the platform the script declares in `sources` (and by the action within that platform). A script asked about a platform it does not serve cannot resolve the id it was given, and some fall back to searching their OWN service by track name — which returns a different recording of the same title, so the player bar shows the chosen song while a different artist plays. A script declaring no `sources` at all must still be asked, and if the platform filter leaves nothing to ask the unfiltered list is used, so a lone under-declaring script keeps working. Keep the platform and action filters separate: a combined filter plus that fallback silently re-admits scripts that explicitly omitted the action.
-
-## Measuring a lyric from a parent layout effect
-
-Do not measure the desktop lyric's width from a parent layout effect keyed on the displayed line. `LyricTransition` mounts the incoming layer from its own layout effect, and React runs layout effects child-first, so the parent's runs while the DOM still holds the OUTGOING line — the fit is then computed from the wrong text, a long line is never shrunk, and the native window clips it into a rectangle. Measure from `onLayerMounted`, which fires once the new layer is committed. Do not key that callback on `transitionKey` either: the effect that calls `setLayers` does not have its update flushed before the rest of the commit's layout effects, so the callback would fire while the old layer is still the only one mounted. Depend on `layers`, and check `isConnected`.
-
-## Storing a per-song quality only on the queue item
-
-Do not treat `QueueItem.qualityOverride` as the storage for a per-song choice. The queue is replaced constantly — "play all" on another playlist, a shuffle, a restart — so a choice kept only there is lost for no reason the user can see. The authoritative copy is `src/lib/songQualityPrefs.ts`; the queue field is a projection re-applied by `hydrateQualityOverrides` at every point a queue is built or restored. For the same reason, do not add the store to `configIO`'s `DB_FILES`: being absent is what keeps it out of sync exports and makes a config import unable to wipe it.
-
-Do not add a user-facing limit for the per-song quality store. An entry is ~113 bytes, so the whole file is ~224 KB even at its 2,000-entry cap — a control for it would be a question the user cannot answer about a file that cannot matter. It is a fixed constant with automatic LRU eviction; the UI shows the count and a clear, nothing more.
-
-## Storing a per-song override that equals the default
-
-Do not persist a per-song quality that happens to equal the current default, and do not defer that comparison to read time. A stored override outlives a later change to the default, so a track set back to 320k would stay pinned to 320k after the user switched their default to FLAC — unlike every other song. Normalise at the moment of the choice (`nextQualityOverride`) so "set it back to the default" means "never touched".
-
-## Outset focus ring on Input
-
-Do not give `Input` an outset focus ring (`focus-visible:ring-offset-2` with a non-inset ring). It overhangs 4px on every side and gets clipped by the fixed-height `overflow-hidden` toolbars that host the search boxes. Use `ring-2 ring-inset`.
-
-## Splitting artists on / or &
-
-Do not add `/` or `&` to the artist separators in `splitArtists`. Real names contain them (AC/DC, Simon & Garfunkel), so splitting would invent artists that do not exist. Only `、;；,，` are separators — `、` is what every platform adapter's `formatSingers` emits.
-
-## Song cover as an artist image
-
-Do not show a song's cover next to an artist in the 足迹 artist ranking. An artist has no artwork of its own, and a borrowed track cover changes with whichever song played last. Use the monogram.
-
-## Pretty-printed listen log
-
-Do not write `listenLog.json` with `writeData` (2-space JSON). Use `writeDataCompact`. The file is machine-only and holds thousands of song snapshots, where indentation roughly doubles the bytes (1.18 MB → 2.18 MB at the current cap; it reached 8.7 MB under the old 8,000-event cap).
-
-## Adjacent-only recents dedupe
-
-Do not dedupe "recently played" by skipping only consecutive repeats. Collapse by song id, keeping the newest play, so an interleaved repeat (A B A B …) does not fill the list with two songs.
-
-## Motion on the window controls
-
-Do not add `icon-button-motion`, a hover scale, or any transition to the minimize / maximize / close buttons in `WindowControls.tsx`. They are OS chrome; motion there reads as the window wobbling. Flat hover color only.
-
-## Hardcoded durations or easings in icon motion
-
-Do not write literal durations or easings into icon buttons (`duration-150`, `cubic-bezier(...)`, `transition: transform 150ms`). Read `--motion-fast` / `--motion-base` / `--motion-slow` and `--ease-spring-*` from `:root`, or the `SPRING_*` / `ICON_SWAP_*` presets in `src/lib/motion.ts`, rather than hand-tuning a bezier. Also do not put `transform` on the same element as a `motion/react` animated `scale` — motion writes an inline transform that beats the CSS animation, so the effect silently never plays; nest instead (`IconBurst`).
-
-## Lyrics rail particles
-
-Do not add canvas sparks, prism streaks, or a theme-color playhead bloom on the lyrics-page progress rail. Use the player-bar ProgressSlider flush to the window bottom. Keep the thumb the same height as the track; do not lift the rail to unclip a larger thumb.
-
-## Play-time implicit local match
-
-Do not search cover, artist, or lyrics online when the user plays an unmatched local file. Match on import and Match online stay explicit. Sidecar `.lrc` and embedded tags may still load from disk.
-
-## Source-script obfuscation scanning
-
-Do not block imports based on obfuscation heuristics. Legitimate lx sources are often packed and trip `JS.Obfuscated`-style rules.
-
-## Source script URL import
-
-Do not add link/URL import for source scripts. Import is file-only (picker and drag-drop).
-
-## Main-window source execution fallback
-
-Do not re-run a failed Worker source with `new Function` on the main WebView.
-
-## Sibling download cover temp files
-
-Do not write `*.museek-cover.tmp` next to downloaded audio, and do not stage covers through frontend `tempDir()` + plugin-fs. Frontend remove may lack scope, and a failed temp write was reported as a tag-write failure. Send cover bytes in the embed command instead.
-
-## MP3/FLAC-only download tag writing
-
-Do not refuse tag embedding just because the file is not MPEG or FLAC. lx-music sources often return M4A (`ftyp`) for 320k and even "FLAC" requests; those files play, but ID3-only writing always fails.
-
-## Lofty work files with a `.tmp` extension
-
-Do not copy audio to `*.tmp` before `lofty::read_from_path`. Probe::open() uses only the path extension, so `.tmp` becomes "failed to parse file" even for a valid MP3. Keep the original audio extension, or call `guess_file_type()` from content.
-
-## Tag a file plugin-fs just wrote
-
-Do not let Rust `std::fs` open or overwrite a file that plugin-fs just wrote — AppData staging failed the same way as Downloads (Windows os error 5; macOS can hit the same lock or TCC race). Tag in a lofty memory cursor and write the user file once with plugin-fs.
-
-## Win/Super as a shortcut modifier
-
-Do not accept Win/Super in user shortcuts. Cross-OS sync only maps Ctrl ↔ Command; Win has no counterpart in the allowed Ctrl/Alt/Shift set.
-
-## Measured traffic-light spacing after sleep
-
-Do not compute macOS Overlay traffic-light gaps from live button frames. After display sleep AppKit can reset only some buttons, and a measured gap walks the cluster to the right. Use a fixed 20pt origin-to-origin spacing.
-
-## Tauri manage() for AppKit observers
-
-Do not store `ProtocolObject<dyn NSObjectProtocol>` in `app.manage()`. It is !Send/!Sync and fails the macOS CI. Keep wake observers alive with `mem::forget`.
-
-## objc2 extern notification statics
-
-Do not read `NSWorkspaceDidWakeNotification` (and similar `extern static`s) from safe Rust. rustc reports E0133. Use `ns_string!("NSWorkspaceDidWakeNotification")` with the Apple constant name.
-
-## Lyric timeline offset controls
-
-Do not add per-song lyric delay/advance (±0.5s) buttons or cache. Switch to another platform’s lyrics from the lyrics-page toolbar instead. Do not put offsets in settings.json.
-
-## Synced UI font families
-
-Do not put UI or desktop-lyrics font family names in settings.json or config sync. Windows and macOS do not share the same family names; keep them in device-local fonts.json.
-
-## Bundled CJK webfonts for UI chrome
-
-Do not ship Noto Serif SC (or similar CJK webfonts) as the default UI face. Follow the system font stack, and let users pick from fonts already installed on the device.
-
-## Category filter manage submenu
-
-Do not hide rename/delete behind a “管理分类” submenu. Put trailing pencil/trash icons on each custom category row in the All Categories dropdown.
-
-## Estimated line-LRC karaoke
-
-Do not invent per-word timings from line-timed lyrics. Karaoke fill is native timestamps only; plain lyrics use the default whole-line treatment.
-
-## Auto-select on category create or rename
-
-Do not switch the All Categories filter (or assign tracks) just because a category was created from that menu, and do not treat rename/delete icon clicks as selecting the row. Pass `openCreate(true)` only from “move to category”. Do not pass `openCreate` itself as an `onClick` handler — the click event is truthy.
-
-
-
+Rejected:
+Raising a budget in the manifest to make `status` pass. The CLI enforces its own limits, so the file still reports over budget; move scoped knowledge into a routed `areas/` file instead.
