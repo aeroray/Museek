@@ -13,10 +13,10 @@ Evidence:
 - repo:src/stores/listeningStore.ts
 
 Decision:
-`reportNowPlaying` and `reportListenEnded` are called from the listening store, never from `playerStore`. `finish()` is the one place a session closes.
+`reportNowPlaying` and `reportListenEnded` live in the listening store, never `playerStore`; `finish()` is the one place a session closes.
 
 Reason:
-The player has five `listenFinish(false)` call sites, so hooking there duplicates the logic and a skipped track never scrobbles.
+The player has five `listenFinish(false)` call sites, so hooking there duplicates the logic.
 
 ## MC-AREA-20261021-00000402 — Identity quality decides what is sent
 
@@ -32,7 +32,7 @@ Decision:
 `scrobbleIdentity` resolves artist and title catalog-first. Never gate on "was this local file matched".
 
 Reason:
-Filename mode keeps the basename, so a matched file scrobbled as `01 - 冷冰冰`, while a well-tagged unmatched file has a good identity.
+Filename mode keeps the basename, so a matched file would scrobble as `01 - 冷冰冰`.
 
 ## MC-AREA-20261021-00000403 — Errors are classified, never lumped together
 
@@ -45,10 +45,10 @@ Evidence:
 - repo:src/lib/lastfm/client.ts
 
 Decision:
-Errors 9 and 26 clear the session and ask to reconnect, keeping the queue; 8, 11, 16 and 29 back off. Inspect the body, since most failures arrive as HTTP 200.
+Errors 9 and 26 clear the session and ask to reconnect, keeping the queue; 8, 11, 16 and 29 back off. Inspect the body, since failures arrive as HTTP 200.
 
 Reason:
-Conflating them retries forever against a dead session or discards a working one over a rate limit.
+Conflating them retries against a dead session or discards a working one over a rate limit.
 
 ## MC-AREA-20261021-00000404 — The session and pending queue are persisted
 
@@ -64,9 +64,9 @@ Decision:
 Queue scrobbles to `lastfm.json` and remove them only once settled. Never add that file to `configIO`'s `DB_FILES`.
 
 Reason:
-A scrobble records something that already happened, and keeping the file out of `DB_FILES` stops an export carrying credentials.
+A scrobble records what already happened, and keeping it out of `DB_FILES` stops an export carrying credentials.
 
-## MC-DNU-20261021-00000405 — Retrying an auth error, or bundling a shared secret
+## MC-DNU-20261021-00000405 — The signing traps: parameter order and the secret
 
 Status: active
 Scope: area:lastfm
@@ -76,4 +76,4 @@ Evidence:
 - repo:src/lib/lastfm/api.ts
 
 Rejected:
-Retrying authentication errors, logging out over a transient one, or committing a shared API secret. The signature needs the secret client-side, so a bundled one is extractable from every install.
+Sorting indexed params by parsed index — Last.fm needs ASCII order, where `artist[10]` precedes `artist[1]`, and a numeric sort breaks every batch of 11+ with error 13. Also never bundle a shared API secret: the signature needs it client-side, so it is extractable from every install. Full protocol details in `src/lib/lastfm/API-REFERENCE.md`.

@@ -56,7 +56,7 @@ Status: active
 Scope: area:ui-system
 Entry-Type: decision
 Subject: MC-SUBJ-20261021-74863a9e
-Facet: security
+Facet: lifecycle
 Evidence:
 - repo:src/lib/focusModality.ts
 

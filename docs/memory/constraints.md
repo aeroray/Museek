@@ -35,3 +35,16 @@ Evidence:
 
 Constraint:
 Windows and macOS (Apple Silicon) are both first-class. A fix verified on one must not regress the other; platform-specific code belongs behind `cfg(...)` or a runtime capability check.
+
+## MC-CON-20261021-00000004 — `docs/` is the published GitHub Pages root
+
+Status: active
+Scope: project
+Subject: MC-SUBJ-20261021-74863a9e
+Facet: security
+Evidence:
+- repo:docs/memory/brief.md
+
+Constraint:
+`docs/` is served publicly at `aeroray.github.io/Museek`, so whatever is committed there is public. It holds site assets (`index.html`, `app-icon.svg`, `screenshots/`, `gzh/`) plus memory only. Landing images live under `docs/`, never `../public/`; engineering notes belong in `src/`.
+
