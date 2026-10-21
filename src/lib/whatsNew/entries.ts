@@ -17,6 +17,76 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.12.0": {
+    zh: {
+      sections: [
+        {
+          title: "📦 音源管理",
+          bullets: [
+            "新增：一键导出全部音源为一个配置文件，之后可以像普通音源文件一样直接拖回来导入，换机备份不用再一个个找原文件",
+            "新增：一键排序，按测试结果把能用的音源排到前面、失效的沉到底部，不用再手动一个个拖动",
+            "一键排序只在所有音源都测过之后才出现，避免把「还没测」的源当成「很差」的源排到后面",
+          ],
+        },
+        {
+          title: "🩺 音源测试",
+          bullets: [
+            "测试结果现在会记录每个平台是否真的拿到了播放链接，排序与状态图标都用这份结果",
+          ],
+        },
+        {
+          title: "🔒 安全",
+          bullets: [
+            "音源脚本的沙箱进一步收紧：禁止创建嵌套 Worker，网络请求只能经过受控通道",
+            "重定向不再自动跟随，最多手动跟随 5 跳，每一跳都重新校验目标地址，避免公网地址跳到本机或内网",
+            "主窗口权限收窄：文件读写范围不再允许任意路径，改为标准用户目录，或带音频/歌词/图片/脚本等扩展名的文件；你手动选择的库目录会单独授权",
+          ],
+        },
+        {
+          title: "🔧 其他",
+          bullets: [
+            "修复：Windows 上开发构建每次都会输出 MSVC 导入库提示，看起来像警告",
+            "修复：从同步文件夹自动导入的音源不再直接启用，避免替换来的脚本在下次启动时静默运行",
+            "修复：同步配置的校验更严格，异常的文件不会被当作有效配置",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📦 Sources",
+          bullets: [
+            "New: export every source as a single config file, which can be dropped back in later just like a normal source file — no more hunting down the original files when switching machines",
+            "New: one-click sort that moves working sources to the top and dead ones to the bottom by test result, instead of dragging each one by hand",
+            "Sort only appears once every source has been tested, so an untested source is never mistaken for a bad one and pushed to the bottom",
+          ],
+        },
+        {
+          title: "🩺 Source testing",
+          bullets: [
+            "Test results now record whether each platform really returned a play URL; both sorting and the status icon use that result",
+          ],
+        },
+        {
+          title: "🔒 Security",
+          bullets: [
+            "Tighter source sandbox: nested Workers are refused and network access can only go through the controlled channel",
+            "Redirects are no longer followed automatically — up to five are followed by hand, each hop re-validated, so a public URL cannot bounce to loopback or a private host",
+            "The main window is narrowly permissioned: filesystem access no longer allows arbitrary paths — only standard user directories, or files with an audio, lyric, image or script extension; a library folder you pick is granted separately",
+          ],
+        },
+        {
+          title: "🔧 Other",
+          bullets: [
+            "Fix: Windows dev builds printed an MSVC import-library note that read like a warning",
+            "Fix: sources auto-imported from a sync folder are no longer enabled straight away, so a replaced script cannot run silently on the next launch",
+            "Fix: stricter validation of a synced config, so a malformed file is not treated as valid",
+          ],
+        },
+      ],
+    },
+  },
   "3.11.4": {
     zh: {
       sections: [
