@@ -1,35 +1,31 @@
 // Verifies the virtual-list windowing maths, which is what produced the
 // reported "large blank areas while scrolling search results".
 //
-// The failure was not in this arithmetic — it was that VirtualList never
+// IMPORTANT — why this imports the component's module:
+//
+// This check used to re-implement the arithmetic locally and only regex-read
+// two constants out of VirtualList.tsx. That made it vacuous: it stayed green
+// when the real computation was replaced with `start = 0`, which IS the reported
+// bug. It could only fail if someone edited DEFAULT_ROW or OVERSCAN.
+//
+// So the maths now lives in `src/components/common/virtualWindow.ts`, the
+// component imports it, and this check imports the same module. A change to the
+// windowing logic is therefore observable here by construction.
+//
+// The failure was never in this arithmetic — it was that VirtualList never
 // received its scrollElement, so `scrollTop` stayed 0 and the window never
-// moved while the container kept growing. But the arithmetic is what decides
-// whether a given scrollTop paints rows over the viewport, so it is worth
-// pinning directly: a wrong window looks exactly like the same bug.
+// moved while the container kept growing. But the arithmetic decides whether a
+// given scrollTop paints rows over the viewport, so it is worth pinning
+// directly: a wrong window looks exactly like the same bug.
 //
 //   node scripts/check-virtual-list-window.mjs
-import { createRequire } from "node:module"
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { pathToFileURL } from "node:url"
+import { createTsLoader } from "./lib/load-ts.mjs"
 
 const root = resolve(import.meta.dirname, "..")
-const require = createRequire(join(root, "package.json"))
-
-function esbuildEntry() {
-  try {
-    return require.resolve("esbuild/lib/main.js", { paths: [root] })
-  } catch {}
-  const dir = readdirSync(join(root, "node_modules", ".pnpm")).find((d) =>
-    d.startsWith("esbuild@"),
-  )
-  if (!dir) throw new Error("esbuild not found")
-  return join(root, "node_modules", ".pnpm", dir, "node_modules", "esbuild", "lib", "main.js")
-}
-
-const work = mkdtempSync(join(tmpdir(), "museek-vlist-"))
-const outFile = join(work, "window.mjs")
+const load = createTsLoader()
+const { virtualWindow } = await load("src/components/common/virtualWindow.ts")
 
 let failures = 0
 const check = (name, cond, extra = "") => {
@@ -40,9 +36,12 @@ const check = (name, cond, extra = "") => {
   }
 }
 
-// Read ROW/OVERSCAN straight out of the component so a change there cannot
-// silently diverge from this check.
-const componentSrc = readFileSync(join(root, "src/components/common/VirtualList.tsx"), "utf8")
+// Read the component's constants so a change there cannot silently diverge from
+// this check. The arithmetic itself is imported, not copied.
+const componentSrc = readFileSync(
+  join(root, "src/components/common/VirtualList.tsx"),
+  "utf8",
+)
 const rowMatch = /const DEFAULT_ROW = (\d+)/.exec(componentSrc)
 const overMatch = /const OVERSCAN = (\d+)/.exec(componentSrc)
 if (!rowMatch || !overMatch) {
@@ -52,17 +51,17 @@ if (!rowMatch || !overMatch) {
 const ROW = Number(rowMatch[1])
 const OVERSCAN = Number(overMatch[1])
 
-function windowFor(scrollTop, viewH, itemCount) {
-  const total = itemCount * ROW
-  const start = Math.max(0, Math.floor(scrollTop / ROW) - OVERSCAN)
-  const visible = Math.ceil((viewH || 600) / ROW) + OVERSCAN * 2
-  const end = Math.min(itemCount, start + visible)
-  const offset = start * ROW
-  return { total, start, end, offset, count: end - start }
-}
+/** Guard: the component must actually call the shared helper. */
+check(
+  "VirtualList imports the shared windowing module",
+  /from "\.\/virtualWindow"/.test(componentSrc),
+)
+
+const windowFor = (scrollTop, viewH, itemCount) =>
+  virtualWindow(scrollTop, viewH, itemCount, ROW, OVERSCAN)
 
 /** Do the painted rows span the viewport? The bug was that they did not. */
-function coversViewport({ start, end }, scrollTop, viewH, itemCount) {
+function coversViewport({ start, end }, scrollTop, viewH) {
   if (end <= start) return false
   const firstTop = start * ROW - scrollTop
   const lastBottom = end * ROW - scrollTop
@@ -81,11 +80,11 @@ let allCover = true
 let prevStart = -1
 for (const scrollTop of [0, 300, 560, 561, 1000, 2000, 2500, 3200]) {
   const w = windowFor(scrollTop, viewH, longList)
-  const covers = coversViewport(w, scrollTop, viewH, longList)
+  const covers = coversViewport(w, scrollTop, viewH)
   const advanced = w.start >= prevStart
   if (!covers || !advanced) {
     allCover = false
-    console.log(`   at scrollTop=${scrollTop}: start=${w.start} count=${w.count} covers=${covers}`)
+    console.log(`   at scrollTop=${scrollTop}: start=${w.start} end=${w.end} covers=${covers}`)
   }
   prevStart = w.start
 }
@@ -98,10 +97,13 @@ console.log("\nthe specific failure that was reported")
   const w = windowFor(2500, viewH, longList)
   check(`window starts well past row 0 (start=${w.start})`, w.start > 0)
   check(`offset equals start*rowHeight (offset=${w.offset})`, w.offset === w.start * ROW)
-  check("rows still cover the viewport", coversViewport(w, 2500, viewH, longList))
+  check("rows still cover the viewport", coversViewport(w, 2500, viewH))
   // What the buggy build did: window pinned at the top.
   const stuck = { start: 0, end: 31 }
-  check("a stuck-at-zero window does NOT cover (so this check can fail)", !coversViewport(stuck, 2500, viewH, longList))
+  check("a stuck-at-zero window does NOT cover (so this check can fail)", !coversViewport(stuck, 2500, viewH))
+  // And the exact mutation that used to slip through: start pinned to 0.
+  const pinned = { ...w, start: 0, end: 31 }
+  check("the `start = 0` mutation would be caught here", !coversViewport(pinned, 2500, viewH))
 }
 
 console.log("\nshort lists and edges")
@@ -109,9 +111,9 @@ console.log("\nshort lists and edges")
   const w = windowFor(0, viewH, 20)
   check("20 rows: start clamps to 0", w.start === 0)
   check("20 rows: end covers the list", w.end === 20)
-  check("20 rows at top covers viewport", coversViewport(w, 0, viewH, 20))
+  check("20 rows at top covers viewport", coversViewport(w, 0, viewH))
   const wEnd = windowFor(533, viewH, 20)
-  check("scrolling to the bottom of a short list still covers", coversViewport(wEnd, 533, viewH, 20))
+  check("scrolling to the bottom of a short list still covers", coversViewport(wEnd, 533, viewH))
 }
 {
   // 70 rows is 3920px, so the furthest a 587px viewport can scroll is 3333 —
@@ -119,14 +121,12 @@ console.log("\nshort lists and edges")
   const maxScroll = 70 * ROW - viewH
   const w = windowFor(maxScroll, viewH, 70)
   check("end never exceeds itemCount", w.end <= 70)
-  check(`last page covers the viewport (scrollTop=${maxScroll})`, coversViewport(w, maxScroll, viewH, 70))
+  check(`last page covers the viewport (scrollTop=${maxScroll})`, coversViewport(w, maxScroll, viewH))
 }
 {
   const w = windowFor(0, 0, 40)
-  check("viewH=0 falls back to 600 (first paint, before measure)", w.count > 0)
+  check("viewH=0 falls back to 600 (first paint, before measure)", w.end - w.start > 0)
 }
-
-rmSync(work, { recursive: true, force: true })
 
 console.log("")
 if (failures) {
