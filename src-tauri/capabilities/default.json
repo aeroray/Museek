@@ -144,22 +144,8 @@
         { "path": "$APPLOCALDATA/**" },
         { "path": "$CACHE/**" },
         { "path": "$TEMP/**" },
-        { "path": "$HOME/**" },
-        { "path": "$DESKTOP/**" },
-        { "path": "$DOCUMENT/**" },
         { "path": "$DOWNLOAD/**" },
-        { "path": "$AUDIO/**" },
-        { "path": "**/*.mp3" },
-        { "path": "**/*.flac" },
-        { "path": "**/*.m4a" },
-        { "path": "**/*.aac" },
-        { "path": "**/*.ogg" },
-        { "path": "**/*.wav" },
-        { "path": "**/*.json" },
-        { "path": "**/*.jpg" },
-        { "path": "**/*.jpeg" },
-        { "path": "**/*.png" },
-        { "path": "**/*.webp" }
+        { "path": "$AUDIO/**" }
       ]
     },
     "fs:allow-appdata-read-recursive",

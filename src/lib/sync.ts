@@ -1,4 +1,10 @@
-import { applyConfig, gatherConfig, isValidConfig, type MuseekConfig } from "@/lib/configIO"
+import {
+  applyConfig,
+  disableUntrustedSources,
+  gatherConfig,
+  isValidConfig,
+  type MuseekConfig,
+} from "@/lib/configIO"
 import { readData, writeData } from "@/lib/db"
 import { useSettingsStore } from "@/stores/settingsStore"
 
@@ -164,8 +170,16 @@ async function markSynced(exportedAt: string): Promise<void> {
 }
 
 /** Apply an imported/restored config, mark it as our synced baseline, then reload
- *  so every store re-initializes from it. */
+ *  so every store re-initializes from it.
+ *
+ *  Every import path funnels through here — the silent sync auto-import and the
+ *  manual "Import config" button alike — so this is the one place that has to
+ *  disable incoming source scripts. Putting the guard here rather than at each
+ *  call site is what makes it impossible to add an import path that forgets it. */
 export async function applyConfigAndReload(config: MuseekConfig): Promise<void> {
+  // Enabled source scripts execute at startup, so an imported config must not be
+  // able to run code this device was not already running.
+  await disableUntrustedSources(config)
   await applyConfig(config)
   // Never let a file pin the sync baseline to a future date: every later
   // legitimate export would compare "older" and silently stop syncing.
@@ -183,28 +197,10 @@ export async function applyConfigAndReload(config: MuseekConfig): Promise<void> 
  * new ids, or a known id whose script text changed — arrive DISABLED. Enabled
  * source scripts execute at startup, so a replaced sync file must not be able
  * to run new code without the user turning it on in Settings → Sources.
- * Manual imports keep their state: those go through a confirmation dialog.
+ *
+ * The guard itself lives in configIO so the manual import path can share it; it
+ * used to be private here, which is exactly why manual import was unguarded.
  */
-async function disableUntrustedSources(config: MuseekConfig): Promise<void> {
-  const incoming = config.data["sources.json"]
-  if (!Array.isArray(incoming)) return
-  const current = await readData<Array<{ id?: unknown; rawScript?: unknown }>>(
-    "sources.json",
-    [],
-  )
-  const known = new Map(
-    (Array.isArray(current) ? current : []).map((s) => [s?.id, s?.rawScript]),
-  )
-  config.data["sources.json"] = incoming.map((s) => {
-    if (!s || typeof s !== "object") return s
-    const script = s as { id?: unknown; rawScript?: unknown; enabled?: unknown }
-    const trusted =
-      typeof script.id === "string" &&
-      known.has(script.id) &&
-      known.get(script.id) === script.rawScript
-    return trusted ? s : { ...script, enabled: false }
-  })
-}
 
 /** Encrypt the current config and write it to the sync folder (advancing the
  *  synced-baseline timestamp). Throws if no sync folder is set. */
@@ -249,7 +245,8 @@ export async function maybeAutoImport(): Promise<boolean> {
     // Only import when the cloud copy is strictly newer than our last sync — this
     // prevents a reload loop and avoids reverting newer local data.
     if (lastAt && config.exportedAt <= lastAt) return false
-    await disableUntrustedSources(config)
+    // `applyConfigAndReload` disables untrusted sources itself, so both import
+    // paths get the guard from the same place.
     await applyConfigAndReload(config)
     return true
   } catch {

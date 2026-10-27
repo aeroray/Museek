@@ -41,6 +41,64 @@ function installNetworkStubs(): void {
   // A nested Worker would start with a fresh, unstubbed global scope.
   lock("Worker", blocked("Worker"))
   lock("SharedWorker", blocked("SharedWorker"))
+  // These are also real worker globals and each one opens a network connection
+  // without going through `lx.request`, which is the only intended egress path.
+  // They were missed, so a script could reach loopback/LAN/metadata endpoints
+  // that `assertAllowedSourceUrl` exists to block.
+  lock("EventSource", blocked("EventSource"))
+  lock("WebTransport", blocked("WebTransport"))
+  lock("WebSocketStream", blocked("WebSocketStream"))
+  lock("BroadcastChannel", blocked("BroadcastChannel"))
+  // WebRTC can open a data channel to a peer without any HTTP egress.
+  // `navigator` itself is left alone: source scripts legitimately read the user
+  // agent, and stubbing it would break real scripts for no security gain (the
+  // network-capable members above are already gone).
+  lock("RTCPeerConnection", blocked("RTCPeerConnection"))
+  lock("webkitRTCPeerConnection", blocked("webkitRTCPeerConnection"))
+}
+
+/**
+ * Globals that must not remain reachable once the stubs are installed.
+ *
+ * Kept as an explicit list so the confinement has a readback assertion rather
+ * than relying on the install list staying complete: a denylist will always lag
+ * the platform, but a missing entry here means "someone removed a stub", which is
+ * worth failing loudly instead of discovering later.
+ */
+const NETWORK_GLOBALS = [
+  "fetch",
+  "XMLHttpRequest",
+  "WebSocket",
+  "importScripts",
+  "Worker",
+  "SharedWorker",
+  "EventSource",
+  "WebTransport",
+  "WebSocketStream",
+  "BroadcastChannel",
+  "RTCPeerConnection",
+] as const
+
+/**
+ * Confirm each network global is present-but-inert, so a partial or failed
+ * lockdown cannot silently leave direct egress available.
+ */
+function assertNetworkStubs(): string[] {
+  const failures: string[] = []
+  for (const name of NETWORK_GLOBALS) {
+    const desc = Object.getOwnPropertyDescriptor(globalThis, name)
+    if (!desc) {
+      // Absent is fine (older WebView): there is nothing to reach.
+      continue
+    }
+    if (desc.configurable || desc.writable) {
+      failures.push(`${name} is writable/configurable`)
+      continue
+    }
+    // `fetch` is stubbed with a rejecting function; the rest throw on construct.
+    if (typeof desc.value !== "function") failures.push(`${name} is not a function stub`)
+  }
+  return failures
 }
 
 function headersToRecord(headers?: HeadersInit): Record<string, string> {
@@ -210,4 +268,17 @@ self.addEventListener("unhandledrejection", (ev: PromiseRejectionEvent) => {
 })
 
 installNetworkStubs()
+{
+  const failures = assertNetworkStubs()
+  if (failures.length) {
+    // Do not report ready with a half-closed sandbox: the host should refuse to
+    // run any script rather than execute one with egress still open.
+    post({
+      type: "initError",
+      error: `source sandbox lockdown incomplete: ${failures.join(", ")}`,
+      needsDom: false,
+    })
+    throw new Error(`source sandbox lockdown incomplete: ${failures.join(", ")}`)
+  }
+}
 post({ type: "ready" })

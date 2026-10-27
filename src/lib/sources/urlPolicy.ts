@@ -18,14 +18,6 @@ function parseIPv4(host: string): [number, number, number, number] | null {
   return parts as [number, number, number, number]
 }
 
-function isPrivateIPv4(p: [number, number, number, number]): boolean {
-  if (p[0] === 0 || p[0] === 127 || p[0] === 10) return true
-  if (p[0] === 169 && p[1] === 254) return true
-  if (p[0] === 192 && p[1] === 168) return true
-  if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true
-  return false
-}
-
 function ipv4FromMappedIPv6(host: string): [number, number, number, number] | null {
   const dotted = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(host)
   if (dotted) return parseIPv4(dotted[1])
@@ -36,10 +28,58 @@ function ipv4FromMappedIPv6(host: string): [number, number, number, number] | nu
   return [(hi >> 8) & 255, hi & 255, (lo >> 8) & 255, lo & 255]
 }
 
+/**
+ * Is this IPv4 address one that must never be reachable from a source script?
+ *
+ * Covers loopback, RFC1918, link-local, and the ranges that are easy to forget
+ * but are just as sensitive: carrier-grade NAT (100.64/10, which on many home
+ * setups reaches the router), benchmarking (198.18/15), IETF protocol
+ * assignments (192.0.0.0/24, where some metadata services live), documentation
+ * ranges, and reserved/broadcast space (240/4).
+ */
+function isPrivateIPv4(p: [number, number, number, number]): boolean {
+  const [a, b, c] = p
+  if (a === 0 || a === 127 || a === 10) return true
+  if (a === 169 && b === 254) return true
+  if (a === 192 && b === 168) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  // Carrier-grade NAT (RFC 6598).
+  if (a === 100 && b >= 64 && b <= 127) return true
+  // Benchmarking (RFC 2544).
+  if (a === 198 && (b === 18 || b === 19)) return true
+  // IETF protocol assignments (RFC 6890) — some cloud metadata agents live here.
+  if (a === 192 && b === 0 && c === 0) return true
+  // Documentation ranges.
+  if (a === 198 && b === 51 && c === 100) return true
+  if (a === 203 && b === 0 && c === 113) return true
+  // Reserved (240/4) and broadcast.
+  if (a >= 240) return true
+  return false
+}
+
+/**
+ * Well-known DNS aliases for loopback / link-local.
+ *
+ * These defeat a purely name-based private-host check, because they are ordinary
+ * DNS names: `127.0.0.1.nip.io` and `localtest.me` both resolve to 127.0.0.1.
+ * A name list can never be complete — a fully correct control must resolve the
+ * host and inspect the address, which is what the Rust asset-protocol grant does.
+ * Here it removes the trivial bypasses and keeps the fast path cheap.
+ */
+const LOOPBACK_ALIAS_RE =
+  /(?:^|\.)(?:localtest\.me|localhost\.localdomain|lvh\.me|vcap\.me|sslip\.io|nip\.io|xip\.io|traefik\.me|localtest)$/i
+
+/** Well-known cloud metadata endpoints. */
+const METADATA_HOST_RE = /^(?:metadata|metadata\.google\.internal|instance-data)$/i
+
 function isPrivateOrLoopbackHost(hostname: string): boolean {
   const host = normalizeHost(hostname)
   if (!host) return true
   if (host === "localhost" || host.endsWith(".localhost")) return true
+  if (METADATA_HOST_RE.test(host) || host.endsWith(".metadata.google.internal")) {
+    return true
+  }
+  if (LOOPBACK_ALIAS_RE.test(host)) return true
 
   const v4 = parseIPv4(host) ?? ipv4FromMappedIPv6(host)
   if (v4) return isPrivateIPv4(v4)

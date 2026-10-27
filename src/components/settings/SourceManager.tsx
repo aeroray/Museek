@@ -76,8 +76,37 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
 type ScriptOrigin = "url" | "file" | "unknown"
 
+/**
+ * Is this text plausibly an lx-music source script before we store it?
+ *
+ * This is the only gate between a foreign file and something that will be
+ * executed with `new Function` at startup, so it should reject obvious
+ * non-scripts rather than just "non-empty and not HTML".
+ *
+ * It is deliberately a *shape* check, not a security control: the real defence is
+ * that imported scripts arrive disabled and the sandbox has no network or IPC
+ * beyond `lx.request`. What this buys is that picking a JSON file, a .txt, or a
+ * saved web page by mistake produces a clear error instead of a stored script
+ * that fails at startup with a confusing sandbox error.
+ *
+ * The registration forms in the wild are all covered:
+ *   lx.on("request", …)                    — direct
+ *   globalThis.lx.on("request", …)         — fully qualified
+ *   const { on } = globalThis.lx; on(…)    — destructured (the common modern shape)
+ * so the check looks for an lx reference OR a destructuring of an lx hook.
+ */
 function looksLikeScript(raw: string): boolean {
-  return Boolean(raw.trim()) && !/^\s*</.test(raw)
+  const text = raw.trim()
+  if (!text) return false
+  // HTML/XML (a saved web page) and JSON (a config or API dump) are the common
+  // mis-picks, and neither can be a source script.
+  if (/^[<{[]/.test(text)) return false
+  // An lx hook call, optionally namespaced by `globalThis.`/`window.`.
+  if (/\blx\s*\.\s*(on|request|send)\s*\(/.test(text)) return true
+  // A destructuring of the hooks off `lx` (then called bare below).
+  if (/=\s*(?:globalThis|window)\s*\.\s*lx\b/.test(text)) return true
+  if (/\{[^}]*\b(on|send|request)\b[^}]*\}\s*=\s*lx\b/.test(text)) return true
+  return false
 }
 
 function scriptOrigin(script: SourceScript): ScriptOrigin {

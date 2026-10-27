@@ -925,6 +925,37 @@ fn allow_runtime_path(app: &tauri::AppHandle, path: &std::path::Path) {
     }
 }
 
+/// Maximum path components a granted directory may have.
+///
+/// The frontend passes these strings, so a single call with `/` or `C:\` used to
+/// hand the whole filesystem to `readTextFile`, `readFile` and the asset protocol
+/// (recursively). Requiring a real, non-root path keeps the grant at the scale of
+/// "the folder the user picked".
+const MIN_GRANT_DEPTH: usize = 2;
+
+/// True when `path` is something we are willing to hand to the runtime ACL.
+///
+/// Refuses filesystem roots and shallow paths, and refuses anything containing a
+/// parent-directory hop (which would widen a grant beyond what was chosen).
+fn is_grantable_path(path: &std::path::Path) -> bool {
+    if path.as_os_str().is_empty() || path.is_absolute() == false {
+        return false;
+    }
+    // `components()` collapses `.` but keeps `..`; reject any parent hop outright.
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return false;
+    }
+    // Depth: a bare root (`/`, `C:\`) has one component, so `a/b` is the floor.
+    let depth = path
+        .components()
+        .filter(|c| matches!(c, std::path::Component::Normal(_)))
+        .count();
+    depth >= MIN_GRANT_DEPTH
+}
+
 /// Expand plugin-fs runtime ACL so CUE-referenced audio (and similar) can be read.
 /// Only local-audio files (or directories, for folder scans) are admitted —
 /// this must not become a general "grant any path" primitive.
@@ -935,6 +966,9 @@ fn allow_local_file_paths(app: tauri::AppHandle, paths: Vec<String>) {
             continue;
         }
         let path = std::path::Path::new(p);
+        if !is_grantable_path(path) {
+            continue;
+        }
         if !path.is_dir() && !is_local_audio_path(path) {
             continue;
         }

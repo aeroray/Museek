@@ -761,7 +761,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "data.invalid": "无效的配置文件",
     "data.failed": "操作失败：{msg}",
     "data.importConfirmTitle": "导入配置？",
-    "data.importConfirmDesc": "将用文件内容覆盖当前设置，并重新加载应用。",
+    "data.importConfirmDesc":
+      "将用文件内容覆盖当前设置，并重新加载应用。新增或已更改的音源脚本将以停用状态导入——请到「设置 → 音源」手动启用。",
     "data.importConfirm": "导入并重载",
     "data.clearListeningTitle": "足迹记录",
     "data.clearListeningDesc": "清除本机保存的听歌时长、排行和最近播放，不影响收藏。",
@@ -1672,7 +1673,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "data.failed": "Operation failed: {msg}",
     "data.importConfirmTitle": "Import config?",
     "data.importConfirmDesc":
-      "Overwrites current settings and reloads the app.",
+      "Overwrites current settings and reloads the app. New or changed source scripts are imported disabled — enable them in Settings → Sources.",
     "data.importConfirm": "Import & reload",
     "data.clearListeningTitle": "Listening history",
     "data.clearListeningDesc":

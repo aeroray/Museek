@@ -126,6 +126,44 @@ export async function applyConfig(config: MuseekConfig): Promise<void> {
   }
 }
 
+/**
+ * Sources an import brings that this device does not already run — new ids, or a
+ * known id whose script text changed — are forced to arrive DISABLED.
+ *
+ * Enabled source scripts execute at startup. So any path that writes a config
+ * from an untrusted file is a code-execution path unless it comes through here.
+ * The sync path always did this; the *manual* import path did not, which meant a
+ * config file received from a friend or a forum ran attacker `rawScript` on the
+ * next launch behind a dialog that only said "Overwrites current settings".
+ *
+ * Manual imports get the same treatment as automatic ones: the difference between
+ * them is how much the user was told, not how much the file is trusted, and a
+ * confirmation dialog is not a substitute for reviewing script source. Anything
+ * new lands disabled and the user turns it on in Settings → Sources.
+ */
+export async function disableUntrustedSources(
+  config: MuseekConfig,
+): Promise<void> {
+  const incoming = config.data["sources.json"];
+  if (!Array.isArray(incoming)) return;
+  const current = await readData<Array<{ id?: unknown; rawScript?: unknown }>>(
+    "sources.json",
+    [],
+  );
+  const known = new Map(
+    (Array.isArray(current) ? current : []).map((s) => [s?.id, s?.rawScript]),
+  );
+  config.data["sources.json"] = incoming.map((s) => {
+    if (!s || typeof s !== "object") return s;
+    const script = s as { id?: unknown; rawScript?: unknown; enabled?: unknown };
+    const trusted =
+      typeof script.id === "string" &&
+      known.has(script.id) &&
+      known.get(script.id) === script.rawScript;
+    return trusted ? s : { ...script, enabled: false };
+  });
+}
+
 const FILE_NAME = "museek-config.json";
 
 // Save the config JSON to a user-chosen location (Tauri dialog) or trigger a
