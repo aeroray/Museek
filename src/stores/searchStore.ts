@@ -36,15 +36,27 @@ const searchFns: Record<OnlineSource, SearchFn> = {
 // result instead of re-hitting the API (and de-dupes rapid identical calls).
 const searchCache = createAsyncCache<SearchResult>(3 * 60_000);
 
-function mergeSongsById(prev: MusicInfo[], next: MusicInfo[]): MusicInfo[] {
+/**
+ * Dedupe songs by id across pages, reporting how many rows were actually new.
+ *
+ * The `added` count is what tells the caller whether another page can exist: a
+ * later page that contributes nothing means the source has run dry, or is
+ * ignoring `page` and replaying the same rows. Same contract as `mergePlaylists`.
+ */
+function mergeSongsById(
+  prev: MusicInfo[],
+  next: MusicInfo[],
+): { list: MusicInfo[]; added: number } {
   const seen = new Set(prev.map((s) => s.id));
-  const out = [...prev];
+  const list = [...prev];
+  let added = 0;
   for (const song of next) {
     if (seen.has(song.id)) continue;
     seen.add(song.id);
-    out.push(song);
+    list.push(song);
+    added++;
   }
-  return out;
+  return { list, added };
 }
 
 interface SearchState {
@@ -179,14 +191,35 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         get().platform !== platform
       )
         return;
-      set((s) => ({
-        results:
-          page === 1 ? result.list : mergeSongsById(s.results, result.list),
-        total: result.total,
-        page: result.page,
-        allPage: result.allPage,
-        isLoading: false,
-      }));
+      set((s) => {
+        // Page 1 replaces (a new query); later pages append.
+        const { list: merged, added } = mergeSongsById(
+          page === 1 ? [] : s.results,
+          result.list,
+        );
+        // Same rule the playlist/album branches use: from page 2 on a page must
+        // also have contributed something new, otherwise a platform that ignores
+        // `page` replays the same rows forever.
+        //
+        // This used to trust the source's `allPage` verbatim, which broke song
+        // search after page 2 on every source that only reports a total on the
+        // first page. NetEase is one: `wy.ts` sends `total: page === 1`, so page
+        // 2 comes back with totalCount 0 → allPage 0 → `hasMore` false, and
+        // infinite scroll dead-ended at 60 of 300 results.
+        const full = result.list.length >= result.limit;
+        const more = page === 1 ? full : full && added > 0;
+        return {
+          results: merged,
+          // Keep a total learned on page 1: later pages legitimately omit it.
+          total: result.total > 0 ? result.total : s.total,
+          page,
+          // Never let a later page's missing total erase a known page count, and
+          // fall back to the "there is at least one more" rule when the source
+          // reports none. `page` means "stop here"; `page + 1` means "ask again".
+          allPage: Math.max(result.allPage, more ? page + 1 : page),
+          isLoading: false,
+        };
+      });
       get().addToHistory(q);
     } catch (err) {
       if (

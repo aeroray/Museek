@@ -3,7 +3,27 @@ import type { MusicInfo, Quality } from "@/types/music";
 import type { PlayMode, QueueItem } from "@/types/player";
 
 const SESSION_FILE = "playbackSession.json";
-const QUALITIES: Quality[] = ["128k", "320k", "flac", "flac24bit"];
+/**
+ * Every tier that can legitimately appear in a saved session.
+ *
+ * This must stay in sync with the `Quality` union in `types/music.ts`. It used
+ * to omit `192k`/`256k`, which are real: `localMusic/tags.ts` snaps a measured
+ * local bitrate to them, and `playerStore` writes `meta.qualitys[0].type` into
+ * both `currentQuality` and the queue item's `playedQuality`. So for a library of
+ * ordinary 192/256 kbps files, `isQueueItem` rejected the playing track and every
+ * sibling of the same tier, `currentQuality` fell back to "128k", and the
+ * restored session lost its queue and now-playing.
+ *
+ * `satisfies` keeps the next tier added to the union from being forgotten here.
+ */
+const QUALITIES = [
+  "128k",
+  "192k",
+  "256k",
+  "320k",
+  "flac",
+  "flac24bit",
+] as const satisfies readonly Quality[];
 const PLAY_MODES: PlayMode[] = [
   "sequence",
   "shuffle",
