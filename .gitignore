@@ -36,8 +36,16 @@ src-tauri/target/
 !*.key.pub
 .tauri/
 
-# Local development scripts and one-off investigation tools. Not part of the app:
-# nothing in src/, src-tauri/, package.json or CI imports them, and they are not
-# bundled. Kept out of version control deliberately. The leading slash anchors
-# this to the repo root so a nested `scripts/` directory is not swept up too.
+# One-off investigation tools live in scripts/ and stay out of version control:
+# they are throwaway probes against live platform APIs whose findings already
+# live in the code and in docs/memory/.
 /scripts/
+# ...except the regression checks. These are the project's only automated tests:
+# pure-logic or headless-browser harnesses that pin bugs we have actually shipped,
+# so they belong in the repo and stay runnable by anyone (and by CI).
+!/scripts/
+/scripts/*
+!/scripts/check-*.mjs
+!/scripts/run-checks.mjs
+!/scripts/lib/
+!/scripts/lib/**

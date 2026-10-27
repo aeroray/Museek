@@ -66,6 +66,12 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      # Fail the release before it builds if a regression check fails. These are
+      # the project's only automated tests; they pin bugs that shipped once.
+      # Headless-browser checks need a browser, which the runners already have.
+      - name: Run regression checks
+        run: pnpm test
+
       - name: Build app & publish release
         uses: tauri-apps/tauri-action@v0
         env:
