@@ -32,7 +32,7 @@ const SBOXES = [
   ],
   [
     [15, 1, 8, 14, 6, 11, 3, 4, 9, 7, 2, 13, 12, 0, 5, 10],
-    [3, 13, 4, 7, 15, 2, 8, 15, 12, 0, 1, 10, 6, 9, 11, 5],
+    [3, 13, 4, 7, 15, 2, 8, 14, 12, 0, 1, 10, 6, 9, 11, 5],
     [0, 14, 7, 11, 10, 4, 13, 1, 5, 8, 12, 6, 9, 3, 2, 15],
     [13, 8, 10, 1, 3, 15, 4, 2, 11, 6, 7, 12, 0, 5, 14, 9],
   ],
@@ -46,7 +46,7 @@ const SBOXES = [
     [7, 13, 14, 3, 0, 6, 9, 10, 1, 2, 8, 5, 11, 12, 4, 15],
     [13, 8, 11, 5, 6, 15, 0, 3, 4, 7, 2, 12, 1, 10, 14, 9],
     [10, 6, 9, 0, 12, 11, 7, 13, 15, 1, 3, 14, 5, 2, 8, 4],
-    [3, 15, 0, 6, 10, 10, 13, 8, 9, 4, 5, 11, 12, 7, 2, 14],
+    [3, 15, 0, 6, 10, 1, 13, 8, 9, 4, 5, 11, 12, 7, 2, 14],
   ],
   [
     [2, 12, 4, 1, 7, 10, 11, 6, 8, 5, 3, 15, 13, 0, 14, 9],
@@ -119,9 +119,11 @@ function createSubkeys(key: Uint8Array): Uint8Array[] {
         PC2[bit] - 1,
         7 - (bit % 8),
       );
+      // PC2 is 1-based over the 56-bit C‖D register, so D bits 29..56 index
+      // `right` as PC2[n] - 29 (- 1 for 0-based, - 28 for the C half).
       schedule[target][Math.floor((bit + 24) / 8)] |= bitnumIntr(
         right,
-        PC2[bit + 24] - 28,
+        PC2[bit + 24] - 29,
         7 - (bit % 8),
       );
     }
@@ -235,7 +237,19 @@ function desF(state: number, key: Uint8Array): number {
   return result >>> 0;
 }
 
-function desBlock(
+/**
+ * One DES block operation.
+ *
+ * Exported so a regression check can run FIPS 46-3 known-answer vectors against
+ * the real tables. Two S-box cells were wrong (duplicated values, so not a
+ * permutation of 0..15) and the D-half of `createSubkeys` indexed one bit high
+ * for a long time; every QQ word-by-word lyric silently degraded to line-timed
+ * LRC as a result. A 3-line KAT would have caught all three.
+ *
+ * Note the byte order: callers pass bytes already in the reference bit order
+ * this module uses internally, which is why the check converts first.
+ */
+export function desBlock(
   block: Uint8Array,
   key: Uint8Array,
   decrypt: boolean,

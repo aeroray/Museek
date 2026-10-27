@@ -135,16 +135,33 @@ function kwDecodeLyric(buf: Uint8Array, lyricx = false): string {
     }
   }
 
-  // gb18030 -> text (Chromium/WebView2 supports it). Fall back to gbk, then
-  // utf-8, so a missing-encoding environment still yields something.
+  // Pick an encoding for the inflated payload.
+  //
+  // `TextDecoder` is NOT strict by default: it substitutes U+FFFD instead of
+  // throwing, so the old `for (enc) { try { return decode } catch {} }` chain
+  // always returned on the FIRST encoding and its fallbacks were unreachable.
+  //
+  // `{ fatal: true }` makes a wrong guess throw, so the chain actually works.
+  //
+  // GB18030 is tried FIRST, not UTF-8. This is KuWo, whose plain lyric body is
+  // documented as GB18030 (see above), and UTF-8 is not a safe discriminator in
+  // this direction: the GB bytes for 夜 are D2 B9, which is *valid* UTF-8
+  // ("ҹ"), so a UTF-8-first order would silently mis-decode ordinary Chinese
+  // lyrics rather than falling through.
   for (const enc of ["gb18030", "gbk", "utf-8"]) {
     try {
-      return new TextDecoder(enc).decode(inflated);
+      return new TextDecoder(enc, { fatal: true }).decode(inflated);
     } catch {
-      // try next encoding
+      // Not this encoding; try the next.
     }
   }
-  return "";
+  // Nothing was strict-valid: fall back to the platform default rather than a
+  // blank lyric panel.
+  try {
+    return new TextDecoder("gb18030").decode(inflated);
+  } catch {
+    return "";
+  }
 }
 
 // Split parsed LRC lines into lyric + translation. Mirrors kw/lyric.js

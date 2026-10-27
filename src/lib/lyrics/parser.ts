@@ -1,6 +1,10 @@
 import type { LyricInfo, LyricLine, LyricWord } from "@/types/music";
 
-const timeRx = /^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]/;
+// Minutes are `\d{1,3}`: a two-digit cap silently dropped every stamp past
+// 100 minutes, which erased the whole back half of long files (DJ sets,
+// audiobooks, live recordings).
+/** Every leading `[mm:ss.xx]` on a line, so a multi-stamp line yields each one. */
+const leadingTimeRx = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/g;
 const wordTimeRx =
   /<(-?\d+),(-?\d+)(?:,-?\d+)?\>|\((-?\d+),(-?\d+)(?:,-?\d+)?\)/g;
 const absoluteWordTimeRx = /\((\d+),(\d+)(?:,\d+)?\)/g;
@@ -267,16 +271,31 @@ export function parseLrc(
   const result: LyricLine[] = [];
 
   for (const line of lines) {
-    const match = timeRx.exec(line);
-    if (!match) continue;
-    const minutes = parseInt(match[1]);
-    const seconds = parseInt(match[2]);
-    const millis = match[3] ? parseInt(match[3].padEnd(3, "0")) : 0;
-    const time = minutes * 60 + seconds + millis / 1000;
-    const body = line.replace(timeRx, "");
-    const timed = parseWordTimedBody(body, time);
+    // A line may carry several stamps — `[00:12.00][01:20.00]chorus` is the
+    // standard encoding for a repeated chorus. Only the first was consumed
+    // before, and the remaining stamps were then rendered as literal sung text.
+    leadingTimeRx.lastIndex = 0;
+    const stamps: number[] = [];
+    let consumed = 0;
+    let stamp: RegExpExecArray | null;
+    while ((stamp = leadingTimeRx.exec(line)) !== null) {
+      // Stamps must be contiguous from the start of the line.
+      if (stamp.index !== consumed) break;
+      const minutes = parseInt(stamp[1]);
+      const seconds = parseInt(stamp[2]);
+      const millis = stamp[3] ? parseInt(stamp[3].padEnd(3, "0")) : 0;
+      stamps.push(minutes * 60 + seconds + millis / 1000);
+      consumed = leadingTimeRx.lastIndex;
+    }
+    if (!stamps.length) continue;
+
+    // Everything after the final leading stamp is the body.
+    const body = line.slice(consumed);
+    const timed = parseWordTimedBody(body, stamps[0]);
     const text = (timed?.text ?? body).trim();
-    if (text) {
+    if (!text) continue;
+
+    for (const time of stamps) {
       result.push({
         time,
         text,

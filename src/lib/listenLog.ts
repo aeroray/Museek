@@ -166,6 +166,12 @@ export function songDurationMs(song: MusicInfo): number {
  * names (AC/DC, Simon & Garfunkel), and splitting them would invent artists that
  * do not exist. The cost of missing an occasional collab is a slightly split
  * stat; the cost of over-splitting is wrong data that cannot be undone.
+ *
+ * This is the CREDITING contract, and it is also what `primaryArtist` in
+ * `@/lib/lastfm/scrobble` uses to pick the one artist a scrobble carries — so
+ * the listen log's artist ranking and Last.fm agree on who performed a collab.
+ * Do not confuse it with `splitArtists` in `@/lib/lyrics/matchSong`, which is
+ * deliberately more aggressive because it only widens lyric-search probes.
  */
 export function splitArtists(singer: string | undefined | null): string[] {
   if (!singer) return [];

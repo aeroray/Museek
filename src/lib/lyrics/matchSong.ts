@@ -62,13 +62,19 @@ function textScore(left: string, right: string): number {
 }
 
 /**
- * Split a platform's credit list into individual artists.
+ * Split a platform's credit list into individual artists, for MATCHING.
  *
- * Platforms write collaborations as one field — "元、鱼骨妹", "A feat. B",
- * "A & B", "A/B" — while other services (Last.fm among them) usually store only
- * the first artist. The separators are deliberately greedy: splitting a genuine
- * name that contains "&" only produces parts that then have to match on their
- * own, which they will not, so the extra parts cannot cause a false match.
+ * Greedy on purpose. Platforms write collaborations as one field — "元、鱼骨妹",
+ * "A feat. B", "A & B", "A/B" — while other services (Last.fm among them) usually
+ * store only the first artist. Here a wrong split is harmless: the extra parts
+ * are only tried as additional probe names, and each still has to clear the
+ * artist threshold on its own, so over-splitting cannot create a false match.
+ *
+ * Note this is NOT the same contract as `splitArtists` in `@/lib/listenLog`,
+ * which decides how a play is *credited* and therefore refuses to split on `/`
+ * or `&` (AC/DC, Simon & Garfunkel) because over-splitting there invents artists
+ * that do not exist and permanently corrupts listening stats. Keep the two
+ * separate; do not "unify" them into one behaviour.
  */
 export function splitArtists(singer: string): string[] {
   return singer
@@ -77,7 +83,8 @@ export function splitArtists(singer: string): string[] {
     .filter(Boolean);
 }
 
-function durationScore(left: string, right: string): number {  const a = parseLyricDuration(left)
+function durationScore(left: string, right: string): number {
+  const a = parseLyricDuration(left)
   const b = parseLyricDuration(right)
   if (!a || !b) return 0.5
   const diff = Math.abs(a - b)
