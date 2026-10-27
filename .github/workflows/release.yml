@@ -35,10 +35,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # No `version:` here — pnpm/action-setup reads it from package.json's
+      # `packageManager` (pnpm@9.15.9). Passing both makes the action fail with
+      # "Multiple versions of pnpm specified".
       - name: Install pnpm
         uses: pnpm/action-setup@v6
-        with:
-          version: 9
 
       - name: Setup Node
         uses: actions/setup-node@v5

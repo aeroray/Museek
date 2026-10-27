@@ -19,10 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # No `version:` here — it must come from package.json's `packageManager`
+      # (pnpm@9.15.9). Specifying both makes pnpm/action-setup fail with
+      # "Multiple versions of pnpm specified".
       - name: Install pnpm
         uses: pnpm/action-setup@v6
-        with:
-          version: 9
 
       - name: Setup Node
         uses: actions/setup-node@v5
