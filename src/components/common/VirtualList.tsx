@@ -5,8 +5,19 @@ const OVERSCAN = 10
 
 /**
  * Bind a Radix ScrollArea's viewport element for VirtualList. Wrap the
- * ScrollArea in a div with this ref; the viewport is found once mounted
- * (and re-found when `deps` change, e.g. switching tabs remounts content).
+ * ScrollArea in a div with this ref; the viewport is found once mounted.
+ *
+ * The ScrollArea is not necessarily present when this effect first runs — the
+ * search page only renders it after a query (before that it shows the hot-search
+ * cloud), and Radix itself mounts its viewport in a child effect. A single
+ * bounded retry is not enough: it gives up while the node is still missing, and
+ * since `deps` may never change again the caller is left holding `null` forever
+ * — which silently disables virtualization and leaves the list blank on scroll.
+ *
+ * So keep watching for as long as the ref is mounted: first a cheap frame-based
+ * poll (covers the common one-or-two-frame case), then a MutationObserver so a
+ * node that appears much later — after a search, a tab switch, a route change —
+ * is still picked up.
  */
 export function useScrollAreaViewport(
   deps: unknown[] = [],
@@ -15,30 +26,50 @@ export function useScrollAreaViewport(
   const [viewport, setViewport] = useState<HTMLElement | null>(null)
   useEffect(() => {
     let cancelled = false
+    let raf = 0
     let tries = 0
+    let observer: MutationObserver | null = null
 
-    // Radix's ScrollArea renders its viewport in a child effect, so the node is
-    // not always present on this effect's first pass — a single query would then
-    // store `null` and, because `deps` never change again, never recover. Retry
-    // on the next frames until it appears (bounded, so a genuinely missing
-    // viewport does not poll forever).
-    const find = () => {
-      if (cancelled) return
+    const find = (): HTMLElement | null => {
       const vp = ref.current?.querySelector("[data-radix-scroll-area-viewport]")
-      if (vp instanceof HTMLElement) {
-        setViewport(vp)
-        return
-      }
-      if (++tries >= 10) {
-        setViewport(null)
-        return
-      }
-      requestAnimationFrame(find)
+      return vp instanceof HTMLElement ? vp : null
     }
-    find()
+
+    const settle = () => {
+      if (cancelled) return
+      const vp = find()
+      if (vp) {
+        setViewport(vp)
+        observer?.disconnect()
+        observer = null
+        return
+      }
+      if (++tries < 10) {
+        raf = requestAnimationFrame(settle)
+        return
+      }
+      // Not here yet: stop polling frames, but keep a cheap observer so a later
+      // mount is still noticed.
+      observer?.disconnect()
+      observer = new MutationObserver(() => {
+        if (cancelled) return
+        const found = find()
+        if (!found) return
+        setViewport(found)
+        observer?.disconnect()
+        observer = null
+      })
+      if (ref.current) {
+        observer.observe(ref.current, { childList: true, subtree: true })
+      }
+    }
+
+    settle()
 
     return () => {
       cancelled = true
+      cancelAnimationFrame(raf)
+      observer?.disconnect()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)

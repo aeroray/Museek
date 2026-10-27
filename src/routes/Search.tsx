@@ -65,7 +65,12 @@ export function Search() {
     clearHistory,
     clearResults,
   } = useSearchStore();
-  const [songScrollRef, songViewportEl] = useScrollAreaViewport([scope]);
+  // Re-resolve when the scope changes OR when the results area first appears:
+  // before a query the page shows the hot-search cloud and renders no ScrollArea
+  // at all, so the viewport has to be looked for again once results land.
+  const hasAnyResults =
+    results.length > 0 || playlistResults.length > 0 || albumResults.length > 0;
+  const [songScrollRef, songViewportEl] = useScrollAreaViewport([scope, hasAnyResults]);
   const navSearch = (
     useLocation().state as {
       searchSong?: { platform: OnlineSource; query: string };
