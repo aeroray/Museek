@@ -128,6 +128,7 @@ const dict: Record<Lang, Record<string, string>> = {
 
     "hotAlbums.title": "专辑",
     "hotAlbums.empty": "暂无专辑",
+    "hotAlbums.loadingMore": "正在加载更多…",
     "hotAlbums.failed": "专辑加载失败：{msg}",
     "hotAlbums.searchInList": "在专辑内搜索",
     "hotAlbums.noMatch": "没有匹配的歌曲",
@@ -980,6 +981,7 @@ const dict: Record<Lang, Record<string, string>> = {
 
     "hotAlbums.title": "Albums",
     "hotAlbums.empty": "No albums yet",
+    "hotAlbums.loadingMore": "Loading more…",
     "hotAlbums.failed": "Failed to load albums: {msg}",
     "hotAlbums.searchInList": "Search in album",
     "hotAlbums.noMatch": "No matching songs",

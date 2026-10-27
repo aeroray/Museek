@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Search as SearchIcon, X } from "lucide-react";
+import { Search as SearchIcon, X, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TrackRow } from "@/components/common/TrackRow";
 import { VirtualList, useScrollAreaViewport } from "@/components/common/VirtualList";
@@ -18,6 +17,7 @@ import { playAlbum } from "@/lib/albums/play";
 import { useSearchStore, type SearchScope } from "@/stores/searchStore";
 import { usePlaylistStore } from "@/stores/playlistStore";
 import { useT } from "@/lib/i18n";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { cn } from "@/lib/utils";
 import type { Album } from "@/lib/albums";
 import { playlistKind, type Playlist } from "@/lib/playlists";
@@ -145,6 +145,33 @@ export function Search() {
         ? albumResults.length === 0
         : playlistResults.length === 0;
   const showHotCloud = nothingSearched && !isLoading && !error && listEmpty;
+
+  // Which list the current scope is showing, so one auto-loader serves all three.
+  const shownCount =
+    scope === "song"
+      ? results.length
+      : scope === "album"
+        ? albumResults.length
+        : playlistResults.length;
+  const hasMore = page < allPage;
+
+  /**
+   * Fetch the next page of whatever scope is active.
+   *
+   * All three scopes share `page`/`allPage` in the store, and `search()` already
+   * appends rather than replaces for page > 1, so one handler covers them.
+   */
+  const loadMore = useCallback(() => {
+    if (isLoading || !hasMore) return;
+    void search(useSearchStore.getState().query, page + 1);
+  }, [isLoading, hasMore, page, search]);
+
+  useInfiniteScroll({
+    scrollElement: songViewportEl,
+    hasMore,
+    isLoading,
+    onLoadMore: loadMore,
+  });
 
   // Only NetEase resolves an exact nickname to that user's playlists.
   const playlistSupportsUser = platform === "wy";
@@ -324,7 +351,7 @@ export function Search() {
             </p>
           </div>
         ) : (
-          <ScrollArea key={`collections-${scope}`} className="flex-1">
+          <ScrollArea key={`collections-${scope}`} ref={songScrollRef} className="flex-1">
             <div className="p-4">
               {isLoading && listEmpty ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 items-start">
@@ -373,23 +400,14 @@ export function Search() {
                   ))}
                 </div>
               )}
-              {/* Playlist results paginate like song results: the store keeps
-                  `page`/`allPage`, and a short final page stops the offer. */}
-              {scope === "playlist" &&
-                playlistResults.length > 0 &&
-                page < allPage && (
-                  <div className="py-4 text-center">
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        search(useSearchStore.getState().query, page + 1)
-                      }
-                      disabled={isLoading}
-                    >
-                      {isLoading ? t("search.loading") : t("search.loadMore")}
-                    </Button>
-                  </div>
-                )}
+              {/* Shared auto-load footer for all three scopes: the scroll
+                  handler drives the fetch, this just makes the wait visible. */}
+              {shownCount > 0 && hasMore && isLoading && (
+                <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+                  <Loader2 size={14} className="animate-spin" />
+                  {t("search.loading")}
+                </div>
+              )}
             </div>
           </ScrollArea>
         )
@@ -404,7 +422,7 @@ export function Search() {
           </p>
         </div>
       ) : (
-        <ScrollArea key="songs" ref={songScrollRef} className="flex-1">
+        <ScrollArea key={`songs-${scope}`} ref={songScrollRef} className="flex-1">
           <div className="px-4 py-2">
             {isLoading && results.length === 0 && (
               <div>
@@ -424,20 +442,6 @@ export function Search() {
               <VirtualList items={results} scrollElement={songViewportEl} getKey={(song) => song.id}>
                 {(song) => <TrackRow song={song} />}
               </VirtualList>
-            )}
-
-            {results.length > 0 && page < allPage && (
-              <div className="py-4 text-center">
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    search(useSearchStore.getState().query, page + 1)
-                  }
-                  disabled={isLoading}
-                >
-                  {isLoading ? t("search.loading") : t("search.loadMore")}
-                </Button>
-              </div>
             )}
           </div>
         </ScrollArea>

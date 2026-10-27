@@ -14,8 +14,32 @@ export function useScrollAreaViewport(
   const ref = useRef<HTMLDivElement | null>(null)
   const [viewport, setViewport] = useState<HTMLElement | null>(null)
   useEffect(() => {
-    const vp = ref.current?.querySelector("[data-radix-scroll-area-viewport]")
-    setViewport(vp instanceof HTMLElement ? vp : null)
+    let cancelled = false
+    let tries = 0
+
+    // Radix's ScrollArea renders its viewport in a child effect, so the node is
+    // not always present on this effect's first pass — a single query would then
+    // store `null` and, because `deps` never change again, never recover. Retry
+    // on the next frames until it appears (bounded, so a genuinely missing
+    // viewport does not poll forever).
+    const find = () => {
+      if (cancelled) return
+      const vp = ref.current?.querySelector("[data-radix-scroll-area-viewport]")
+      if (vp instanceof HTMLElement) {
+        setViewport(vp)
+        return
+      }
+      if (++tries >= 10) {
+        setViewport(null)
+        return
+      }
+      requestAnimationFrame(find)
+    }
+    find()
+
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
   return [ref, viewport]

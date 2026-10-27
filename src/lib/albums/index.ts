@@ -129,3 +129,39 @@ export function getHotAlbums(
 export function getAlbumTags(source: OnlineSource): Promise<AlbumTag[]> {
   return tagsCache(`v2:${source}`, () => fetchAlbumTags(source))
 }
+
+/**
+ * Page size for album search, exported so callers can tell "this page was full,
+ * so there is probably another" from "this was the last page" — the platform
+ * responses carry no total.
+ */
+export const ALBUM_SEARCH_LIMIT = 30
+
+/** Stable identity for one album row. */
+export function albumRowKey(a: Pick<Album, "source" | "id">): string {
+  return `${a.source}:${a.id}`
+}
+
+/**
+ * Append a fetched page of albums, dropping repeats.
+ *
+ * Same contract as `mergePlaylists`: the `added` count is what tells the caller
+ * whether more pages can still exist, so a source that ignores `page` and
+ * replays the same rows terminates instead of being asked forever.
+ */
+export function mergeAlbums(
+  existing: Album[],
+  incoming: Album[]
+): { list: Album[]; added: number } {
+  const seen = new Set(existing.map(albumRowKey))
+  const list = [...existing]
+  let added = 0
+  for (const a of incoming) {
+    const key = albumRowKey(a)
+    if (seen.has(key)) continue
+    seen.add(key)
+    list.push(a)
+    added++
+  }
+  return { list, added }
+}

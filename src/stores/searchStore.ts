@@ -9,6 +9,7 @@ import { createAsyncCache } from "@/lib/cache";
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs";
 import { searchPlaylists, PLAYLIST_SEARCH_LIMIT } from "@/lib/playlists/search";
 import { searchAlbums } from "@/lib/albums";
+import { ALBUM_SEARCH_LIMIT, mergeAlbums } from "@/lib/albums";
 import type { Album } from "@/lib/albums";
 import type { Playlist } from "@/lib/playlists";
 import { mergePlaylists } from "@/lib/playlists";
@@ -143,19 +144,28 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         return;
       }
       if (scope === "album") {
-        const list = await searchAlbums(platform, q, page);
+        const list = await searchAlbums(platform, q, page, ALBUM_SEARCH_LIMIT);
         if (
           get().searchGeneration !== generation ||
           get().scope !== scope ||
           get().platform !== platform
         )
           return;
-        set({
-          albumResults: list,
-          playlistResults: [],
-          isLoading: false,
-          page,
-          allPage: 1,
+        set((s) => {
+          // Page 1 replaces (a new query); later pages append.
+          const { list: merged, added } = mergeAlbums(
+            page === 1 ? [] : s.albumResults,
+            list,
+          );
+          const full = list.length >= ALBUM_SEARCH_LIMIT;
+          const more = page === 1 ? full : full && added > 0;
+          return {
+            albumResults: merged,
+            playlistResults: [],
+            isLoading: false,
+            page,
+            allPage: more ? page + 1 : page,
+          };
         });
         get().addToHistory(q);
         return;

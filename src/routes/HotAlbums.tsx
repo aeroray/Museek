@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { Disc3, Play, ChevronLeft, RotateCw, Heart, Search, X, Pencil, CheckCheck, Download } from "lucide-react"
+import { Disc3, Play, ChevronLeft, RotateCw, Heart, Search, X, Pencil, CheckCheck, Download, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -18,6 +18,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 import { cn } from "@/lib/utils"
 import type { MusicInfo } from "@/types/music"
 
@@ -71,6 +72,10 @@ export function HotAlbums() {
       : [],
   )
   const [listLoading, setListLoading] = useState(false)
+  // Grid pagination, mirroring the hot-playlist grid.
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
   const [detailLoading, setDetailLoading] = useState(() => {
     if (!openAlbumFromNav) return false
@@ -97,6 +102,9 @@ export function HotAlbums() {
   const tagScrollRef = useRef<HTMLDivElement>(null)
   const [tagCanScrollRight, setTagCanScrollRight] = useState(false)
   const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
+  // Same node as `viewportEl`, held as a ref for the infinite-scroll hook (which
+  // must read it after mount; see useInfiniteScroll).
+  const viewportRef = useRef<HTMLElement | null>(null)
   const [filter, setFilter] = useState("")
   const [editing, setEditing] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -104,7 +112,9 @@ export function HotAlbums() {
 
   useEffect(() => {
     const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    setViewportEl(vp instanceof HTMLElement ? vp : null)
+    const el = vp instanceof HTMLElement ? vp : null
+    viewportRef.current = el
+    setViewportEl(el)
   }, [selected, detailLoading])
 
   useEffect(() => {
@@ -151,8 +161,15 @@ export function HotAlbums() {
     setListError(null)
     setSelected(null)
     setSongs([])
+    setPage(1)
+    setHasMore(false)
     getHotAlbums(source, 1, tagId)
-      .then(setAlbums)
+      .then((list) => {
+        setAlbums(list)
+        // An empty plaza (or one that only has a single fixed page) must not
+        // advertise "more" that will never arrive.
+        setHasMore(list.length > 0)
+      })
       .catch((e) => setListError((e as Error).message))
       .finally(() => setListLoading(false))
   }, [source, tagId])
@@ -160,6 +177,37 @@ export function HotAlbums() {
   useEffect(() => {
     loadList()
   }, [loadList])
+
+  /**
+   * Append the next page of the album plaza.
+   *
+   * Stops when a page contributes no new album, which is how sources that
+   * ignore `page` (they replay the same fixed list) terminate.
+   */
+  const loadMore = useCallback(() => {
+    if (loadingMore || listLoading || !hasMore) return
+    const next = page + 1
+    setLoadingMore(true)
+    getHotAlbums(source, next, tagId)
+      .then((list) => {
+        setAlbums((prev) => {
+          const seen = new Set(prev.map((a) => `${a.source}:${a.id}`))
+          const fresh = list.filter((a) => !seen.has(`${a.source}:${a.id}`))
+          setHasMore(fresh.length > 0)
+          return fresh.length ? [...prev, ...fresh] : prev
+        })
+        setPage(next)
+      })
+      .catch(() => setHasMore(false))
+      .finally(() => setLoadingMore(false))
+  }, [page, hasMore, loadingMore, listLoading, source, tagId])
+
+  useInfiniteScroll({
+    scrollRef: viewportRef,
+    hasMore: !selected && hasMore,
+    isLoading: loadingMore || listLoading,
+    onLoadMore: loadMore,
+  })
 
   const openAlbum = (album: Album) => {
     const pl = albumToPlaylist(album)
@@ -534,6 +582,14 @@ export function HotAlbums() {
                 />
               )
             })}
+          </div>
+        )}
+        {/* Pagination footer: the scroll handler drives the fetch, this just
+            makes the wait visible instead of a silent stall. */}
+        {!selected && !listLoading && !listError && hasMore && (
+          <div className="flex items-center justify-center gap-2 px-4 pb-6 pt-1 text-xs text-muted-foreground">
+            <Loader2 size={14} className="animate-spin" />
+            {t("hotAlbums.loadingMore")}
           </div>
         )}
       </ScrollArea>
