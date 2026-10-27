@@ -33,7 +33,7 @@ Scope: project
 Subject: MC-SUBJ-20261021-74863a9e
 Facet: adoption-policy
 Evidence:
-- repo:scripts/check-desktop-lyrics-hover-race.mjs
+- repo:scripts/check-infinite-scroll.mjs
 
 Rejected:
 Asserting the final DOM state of something a poll corrects within a tick. Observe transitions instead, and confirm a reverted injection still builds, or the check passes vacuously.

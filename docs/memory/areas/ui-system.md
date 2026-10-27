@@ -76,4 +76,4 @@ Evidence:
 - repo:docs/memory/manifest.md
 
 Rejected:
-Raising a manifest budget to make `status` pass — the CLI enforces its own limits, so the file still reports over budget. Likewise, never offer a bulk action (reorder, clear, disable-all) that runs on incomplete data: a partial ranking reads as an unrequested verdict. Gate the action on complete results, and keep it from flipping per-item state flags so the outcome stays reviewable.
+Raising a manifest budget to make `status` pass — the CLI enforces its own limits. Likewise, never offer a bulk action (reorder, clear, disable-all) on incomplete data: a partial ranking reads as an unrequested verdict, so gate it on complete results and keep it from flipping state flags.
