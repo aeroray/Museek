@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { AlbumDetail } from "./index"
 import type { Album, AlbumTag } from "./index"
 import { formatAlbumDate } from "./date"
@@ -122,7 +122,7 @@ function normalizeMgAlbumSong(raw: MgSongRaw): MusicInfo | null {
     interval = RegExp.$1
   }
 
-  const songId = String(raw.songId)
+  const songId = remoteId(raw.songId)
   return {
     id: `mg_${songId}`,
     name: raw.songName ?? raw.name ?? "",

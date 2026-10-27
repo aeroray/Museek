@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import { eapi } from "@/lib/platforms/wy/eapi"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/wy/songList.js
@@ -61,7 +61,7 @@ interface WyListResponse {
 function normalizeWyPlaylist(raw: WyPlaylistRaw): Playlist {
   const playCount = Number(raw.playCount)
   return {
-    id: String(raw.id),
+    id: remoteId(raw.id),
     name: raw.name ?? "",
     img: raw.coverImgUrl ?? null,
     playCount: isNaN(playCount) || playCount === 0 ? undefined : formatPlayCount(playCount),
@@ -229,7 +229,7 @@ function normalizeWyTrack(item: WyTrackRaw): MusicInfo {
 
   const _qualitys = indexQualitySizes(ordered)
 
-  const songId = String(item.id)
+  const songId = remoteId(item.id)
 
   return {
     id: `wy_${songId}`,
@@ -312,5 +312,5 @@ export async function getWyPlaylistDetail(id: string, _page = 1): Promise<Playli
     }
   }
 
-  return { info, list: tracks.map(normalizeWyTrack) }
+  return { info, list: tracks.map(normalizeWyTrack).filter((s) => s.meta.songId && s.name) }
 }

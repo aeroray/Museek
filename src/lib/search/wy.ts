@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import { eapi } from "@/lib/platforms/wy/eapi"
 import type { MusicInfo, MusicQuality, Quality, SearchResult } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/wy/musicSearch.js
 // NetEase Cloud Music. Uses the "eapi" request signing (AES-128-ECB + MD5),
@@ -105,7 +105,7 @@ function normalizeWySong(item: WySimpleSongRaw): MusicInfo {
 
   const _qualitys = indexQualitySizes(ordered)
 
-  const songId = String(item.id)
+  const songId = remoteId(item.id)
 
   return {
     id: `wy_${songId}`,

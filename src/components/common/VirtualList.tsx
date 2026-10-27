@@ -1,23 +1,36 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { virtualWindow } from "./virtualWindow"
 
 const DEFAULT_ROW = 56
 const OVERSCAN = 10
 
 /**
- * Bind a Radix ScrollArea's viewport element for VirtualList. Wrap the
- * ScrollArea in a div with this ref; the viewport is found once mounted.
+ * Bind a Radix ScrollArea's viewport element for VirtualList.
+ *
+ * Attach the returned ref to a wrapper element that is mounted for as long as
+ * the list should be virtualized — NOT to the ScrollArea itself when the
+ * ScrollArea is conditionally rendered. The lookup searches the wrapper's
+ * subtree, so the wrapper must outlive the ScrollArea for the observer to help.
  *
  * The ScrollArea is not necessarily present when this effect first runs — the
  * search page only renders it after a query (before that it shows the hot-search
- * cloud), and Radix itself mounts its viewport in a child effect. A single
- * bounded retry is not enough: it gives up while the node is still missing, and
- * since `deps` may never change again the caller is left holding `null` forever
- * — which silently disables virtualization and leaves the list blank on scroll.
+ * cloud). A single bounded retry is not enough: it gives up while the node is
+ * still missing, and since `deps` may never change again the caller is left
+ * holding `null` forever — which silently disables virtualization and leaves the
+ * list blank on scroll.
  *
- * So keep watching for as long as the ref is mounted: first a cheap frame-based
- * poll (covers the common one-or-two-frame case), then a MutationObserver so a
- * node that appears much later — after a search, a tab switch, a route change —
- * is still picked up.
+ * So: poll a few frames (covers the common case, where Radix has already
+ * rendered the viewport in the same commit), then fall back to a MutationObserver
+ * that notices a node appearing much later.
+ *
+ * Two things this hook has to get right, both of which it previously did not:
+ *
+ * 1. The observer must be attachable *before* the ScrollArea exists. It used to
+ *    be created only when `ref.current` was already non-null, which is precisely
+ *    not the case in the scenario it was written for — so the safety net was
+ *    dead code.
+ * 2. When the subtree goes away, the caller must not keep pointing at a detached
+ *    node: the viewport is cleared so consumers stop binding listeners to it.
  */
 export function useScrollAreaViewport(
   deps: unknown[] = [],
@@ -35,6 +48,23 @@ export function useScrollAreaViewport(
       return vp instanceof HTMLElement ? vp : null
     }
 
+    const attachObserver = () => {
+      if (observer || cancelled) return
+      const root = ref.current
+      if (!root) return
+      observer = new MutationObserver(() => {
+        if (cancelled) return
+        const found = find()
+        if (!found) return
+        setViewport(found)
+        observer?.disconnect()
+        observer = null
+      })
+      // `subtree` + `childList` catches the ScrollArea (and Radix's viewport)
+      // mounting anywhere under the wrapper, not just as a direct child.
+      observer.observe(root, { childList: true, subtree: true })
+    }
+
     const settle = () => {
       if (cancelled) return
       const vp = find()
@@ -50,26 +80,23 @@ export function useScrollAreaViewport(
       }
       // Not here yet: stop polling frames, but keep a cheap observer so a later
       // mount is still noticed.
-      observer?.disconnect()
-      observer = new MutationObserver(() => {
-        if (cancelled) return
-        const found = find()
-        if (!found) return
-        setViewport(found)
-        observer?.disconnect()
-        observer = null
-      })
-      if (ref.current) {
-        observer.observe(ref.current, { childList: true, subtree: true })
-      }
+      attachObserver()
     }
 
+    // Attach up front too: if the ScrollArea arrives after the frame poll gives
+    // up, this is what catches it. `ref.current` is set by the time effects run
+    // for a wrapper that was part of the first render.
+    attachObserver()
     settle()
 
     return () => {
       cancelled = true
       cancelAnimationFrame(raf)
       observer?.disconnect()
+      // Do not leave consumers holding a node that is about to be unmounted.
+      // Setting state in cleanup is deliberate here: the alternative is a
+      // listener bound to a detached element, which silently never fires.
+      setViewport((current) => (current ? null : current))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
@@ -124,11 +151,15 @@ export function VirtualList<T>({
     }
   }, [scrollElement])
 
-  const total = items.length * rowHeight
-  const start = Math.max(0, Math.floor(scrollTop / rowHeight) - OVERSCAN)
-  const visible = Math.ceil((viewH || 600) / rowHeight) + OVERSCAN * 2
-  const end = Math.min(items.length, start + visible)
-  const offset = start * rowHeight
+  // Pure maths lives in ./virtualWindow so scripts/check-virtual-list-window.mjs
+  // can import the shipping code instead of re-implementing it.
+  const { total, start, end, offset } = virtualWindow(
+    scrollTop,
+    viewH,
+    items.length,
+    rowHeight,
+    OVERSCAN,
+  )
   const slice = useMemo(() => items.slice(start, end), [items, start, end])
 
   return (

@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import { eapi } from "@/lib/platforms/wy/eapi"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { AlbumDetail } from "./index"
 import type { Album, AlbumTag } from "./index"
 import { formatAlbumDate, parseSongCount } from "./date"
@@ -115,7 +115,7 @@ function normalizeWyTrack(item: WyTrackRaw): MusicInfo {
     .reverse()
 
   const _qualitys = indexQualitySizes(ordered)
-  const songId = String(item.id)
+  const songId = remoteId(item.id)
 
   return {
     id: `wy_${songId}`,
@@ -188,7 +188,7 @@ export async function getWyAlbumDetail(id: string, _page = 1): Promise<AlbumDeta
     author: albumAuthor(album),
   }
 
-  const list = (data.songs ?? []).map(normalizeWyTrack)
+  const list = (data.songs ?? []).map(normalizeWyTrack).filter((s) => s.meta.songId && s.name)
   return { info, list }
 }
 
@@ -239,7 +239,7 @@ export async function getWyHotAlbums(page = 1, tagId?: string | null): Promise<A
   }
   return (data.albums ?? []).map(
     (a): Album => ({
-      id: String(a.id),
+      id: remoteId(a.id),
       name: a.name ?? "",
       img: wyAlbumCover(a.picUrl ?? a.blurPicUrl),
       author: albumAuthor(a),

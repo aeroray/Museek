@@ -123,6 +123,14 @@ export function SpecularFrame({
   const rootRef = useRef<HTMLDivElement>(null);
   const fxRef = useRef<HTMLSpanElement>(null);
   const propsRef = useRef<ShaderProps>({} as ShaderProps);
+  /**
+   * Restarts the render loop without rebuilding the GL context.
+   *
+   * Set by the setup effect and cleared on teardown; `null` means "no loop
+   * available" (not mounted, or already running). Declared here rather than
+   * inside the effect so the `paused` effect can reach it.
+   */
+  const restartLoopRef = useRef<(() => void) | null>(null);
 
   propsRef.current = {
     radius,
@@ -235,28 +243,8 @@ export function SpecularFrame({
     const lineC = new Color();
     const baseC = new Color();
 
-    const update = (now: number) => {
-      raf = requestAnimationFrame(update);
-      const dt = Math.min((now - last) / 1000, 0.05);
-      last = now;
-      const p = propsRef.current;
-
-      if (!p.paused) {
-        if (!reduceMotion) {
-          idleAngle += p.speed * dt;
-        }
-        const steer =
-          p.followMouse &&
-          pointerAngle != null &&
-          (!p.autoAnimate || proximityT > 0);
-        const target = steer ? pointerAngle! : idleAngle;
-        const diff = ((target - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-        angle += diff * (1 - Math.exp(-dt * 7));
-
-        const brightTarget = p.autoAnimate ? 1 : proximityT;
-        bright += (brightTarget - bright) * (1 - Math.exp(-dt * 8));
-      }
-
+    /** Push current state to the shader and draw one frame. */
+    const paint = (p: typeof propsRef.current) => {
       lineC.set(p.lineColor);
       baseC.set(p.baseColor);
       program.uniforms.uAngle.value = angle;
@@ -270,16 +258,68 @@ export function SpecularFrame({
       program.uniforms.uThickness.value = p.thickness * dpr;
       renderer.render({ scene: mesh });
     };
+
+    const update = (now: number) => {
+      raf = 0;
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      const p = propsRef.current;
+
+      if (p.paused) {
+        // Nothing changes while paused: the angle only advances from `speed`, and
+        // the uniforms are all derived from props that need a re-render to change.
+        // Previously the loop kept rescheduling and re-rendering at ~60fps
+        // regardless, so a paused track with the lyrics panel open burned GPU
+        // continuously. Draw one final frame and stop. `paused` is deliberately
+        // read through the ref and NOT an effect dep: tearing down and rebuilding
+        // the GL context on every play/pause would be far more expensive than the
+        // frames being saved. A separate effect below restarts the loop instead.
+        paint(p);
+        return;
+      }
+
+      if (!reduceMotion) {
+        idleAngle += p.speed * dt;
+      }
+      const steer =
+        p.followMouse &&
+        pointerAngle != null &&
+        (!p.autoAnimate || proximityT > 0);
+      const target = steer ? pointerAngle! : idleAngle;
+      const diff = ((target - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      angle += diff * (1 - Math.exp(-dt * 7));
+
+      const brightTarget = p.autoAnimate ? 1 : proximityT;
+      bright += (brightTarget - bright) * (1 - Math.exp(-dt * 8));
+
+      paint(p);
+      raf = requestAnimationFrame(update);
+    };
     raf = requestAnimationFrame(update);
+    // Hand the running loop out so the `paused` effect below can restart it
+    // without rebuilding the GL context.
+    restartLoopRef.current = () => {
+      if (raf) return;
+      last = performance.now();
+      raf = requestAnimationFrame(update);
+    };
 
     return () => {
-      cancelAnimationFrame(raf);
+      restartLoopRef.current = null;
+      if (raf) cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener("pointermove", onPointerMove);
       if (gl.canvas.parentNode === fx) fx.removeChild(gl.canvas);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, []);
+
+  // Resuming playback has to restart the loop the paused branch stops. This is a
+  // separate effect so `paused` changes do not re-run the (expensive) GL setup
+  // above, which owns a context, a program and a canvas.
+  useEffect(() => {
+    if (!paused) restartLoopRef.current?.();
+  }, [paused]);
 
   return (
     <div

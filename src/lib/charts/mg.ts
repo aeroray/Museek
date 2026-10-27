@@ -1,6 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
+import { remoteId } from "@/lib/utils"
 import type { ChartBoard } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/mg/leaderboard.js
@@ -107,7 +108,7 @@ function normalizeMgObjectInfo(raw: MgObjectInfoRaw): MusicInfo {
 
   const img = raw.albumImgs?.length ? raw.albumImgs[0].img ?? null : null
 
-  const songId = String(raw.songId)
+  const songId = remoteId(raw.songId)
 
   return {
     id: `mg_${songId}`,

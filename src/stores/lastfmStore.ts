@@ -661,6 +661,9 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
 
     set({ flushing: true });
     const ids = batch.map((e) => e.id);
+    // Set when a partially-settled batch left more entries due. The re-flush has
+    // to happen after `flushing` is cleared, so it is deferred to the end.
+    let needsAnotherPass = false;
     try {
       const fields: ScrobbleFields[] = batch.map((e) => ({
         artist: e.artist,
@@ -687,9 +690,13 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
       });
       persist(get(), true);
       // Anything still pending and already due (e.g. a partially settled batch)
-      // gets another pass.
-      if (!done.length) return;
-      if (dueBatch(get().pending).length) void get().flush();
+      // gets another pass. This cannot run inline: `flushing` is still true here
+      // (it is cleared in `finally`), so the recursive call would hit the guard
+      // at the top of `flush` and return without doing anything. Defer past the
+      // finally so the next pass actually runs.
+      if (done.length && dueBatch(get().pending).length) {
+        needsAnotherPass = true;
+      }
     } catch (err) {
       const code = err instanceof LastfmError ? err.code : undefined;
       if (isAuthError(code)) {
@@ -721,6 +728,10 @@ export const useLastfmStore = create<LastfmState>((set, get) => ({
       }
     } finally {
       set({ flushing: false });
+      // Now that the guard is released, give the leftover entries their pass.
+      // `queueMicrotask` keeps this out of the current stack so the caller's
+      // `await flush()` resolves first.
+      if (needsAnotherPass) queueMicrotask(() => void get().flush());
     }
   },
 

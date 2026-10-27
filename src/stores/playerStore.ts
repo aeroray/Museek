@@ -80,6 +80,39 @@ function persistPlayerPrefs(volume: number, muted: boolean) {
   writeData(PLAYER_PREFS_FILE, { volume, muted } satisfies PlayerPrefs);
 }
 
+/**
+ * Debounced volume/mute write.
+ *
+ * Dragging the volume slider fires `setVolume` on every pointer event. Writing
+ * `player.json` each time is a full JSON serialize plus an IPC round trip per
+ * frame for a value that only matters when the drag stops, so the write is
+ * coalesced and the last value always wins. Mute is not debounced by callers that
+ * need it immediate (see `setMuted`), because it is a discrete action.
+ */
+let prefsWriteTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingPrefs: PlayerPrefs | null = null;
+
+function flushPlayerPrefs(): void {
+  if (prefsWriteTimer) {
+    clearTimeout(prefsWriteTimer);
+    prefsWriteTimer = null;
+  }
+  if (!pendingPrefs) return;
+  void writeData(PLAYER_PREFS_FILE, pendingPrefs);
+  pendingPrefs = null;
+}
+
+function schedulePlayerPrefs(prefs: PlayerPrefs): void {
+  pendingPrefs = prefs;
+  if (prefsWriteTimer) clearTimeout(prefsWriteTimer);
+  prefsWriteTimer = setTimeout(() => {
+    prefsWriteTimer = null;
+    if (!pendingPrefs) return;
+    void writeData(PLAYER_PREFS_FILE, pendingPrefs);
+    pendingPrefs = null;
+  }, 400);
+}
+
 function snapshotPlaybackSession(): PlaybackSession {
   const s = usePlayerStore.getState();
   return {
@@ -558,7 +591,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
               audioCache: settings.audioCache,
               maxCacheMB: settings.maxCacheMB,
             });
-            if (!isPlayGenerationCurrent(gen)) return;
+            if (!isPlayGenerationCurrent(gen)) {
+              // A newer play superseded this one while the download/cache step
+              // was in flight. `resolvePlayableSrc` may have handed back a fresh
+              // object URL for the decoded bytes; nothing will apply it now, so
+              // revoke it here or an entire track's worth of Blob stays alive for
+              // the window's lifetime. Skipping tracks quickly on a slow source
+              // leaks one per skip.
+              if (src.startsWith("blob:")) URL.revokeObjectURL(src);
+              return;
+            }
           } catch (err) {
             if (!lower) throw err;
             rememberQualityUpgradeMiss(song, preferred);
@@ -767,8 +809,41 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     },
 
     clearQueue() {
-      set({ queue: [], queueIndex: -1 });
+      // Clearing the queue has to stop playback too. Previously it only emptied
+      // the arrays, so the audio kept playing from a queue that no longer existed
+      // — and in repeat-one mode the ended handler would "advance" to the same
+      // song forever. The empty-state UI also disables the queue button, so there
+      // was no way back into the queue view.
+      const { currentSong } = get();
+      beginPlayGeneration();
+      audioPlayer.stop();
+      revokeCurrentObjectUrl();
+      lastMediaPlaying = false;
+      if (currentSong) {
+        updateMediaControls(
+          currentSong.name,
+          currentSong.singer,
+          currentSong.albumName ?? "",
+          get().currentPicUrl ?? currentSong.meta.picUrl ?? null,
+          false,
+        );
+      }
+      set({
+        queue: [],
+        queueIndex: -1,
+        currentSong: null,
+        isPlaying: false,
+        status: "idle",
+        error: null,
+        duration: 0,
+        lyricLines: [],
+        lyricsLoading: false,
+        currentPicUrl: null,
+        showLyrics: false,
+        sourceReady: false,
+      });
       persistPlaybackSession(true);
+      listenFinish(false);
     },
 
     removeFromQueue(index) {
@@ -929,19 +1004,33 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     seek(time) {
       audioPlayer.seek(time);
-      persistPlaybackSession(true);
+      // Debounced on purpose. Dragging the progress bar calls this on every
+      // pointermove, and the immediate form writes the WHOLE queue as
+      // pretty-printed JSON plus one IPC round trip per event — a single drag
+      // could produce hundreds of multi-KB writes. The debounced writer still
+      // guarantees the last position lands: it flushes on the trailing edge and
+      // `flushPlaybackSessionWrite` covers app close.
+      persistPlaybackSession();
     },
 
     setVolume(v) {
       const volume = clampVolume(v);
       audioPlayer.setVolume(volume);
       set({ volume });
-      persistPlayerPrefs(volume, get().muted);
+      // Coalesced: a slider drag would otherwise write player.json per frame.
+      schedulePlayerPrefs({ volume, muted: get().muted });
     },
 
     setMuted(m) {
       audioPlayer.setMuted(m);
       set({ muted: m });
+      // Discrete action: drop any queued volume write and write through at once,
+      // so a mute can never be lost or later overwritten by a stale volume tick.
+      if (prefsWriteTimer) {
+        clearTimeout(prefsWriteTimer);
+        prefsWriteTimer = null;
+      }
+      pendingPrefs = null;
       persistPlayerPrefs(get().volume, m);
     },
 
@@ -967,6 +1056,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
         if (document.visibilityState === "hidden") {
           persistPlaybackSession(true);
           flushPlaybackSessionWrite();
+          // A volume drag interrupted by the app hiding would otherwise lose its
+          // last value, since the debounced write never fired.
+          flushPlayerPrefs();
         }
       });
 

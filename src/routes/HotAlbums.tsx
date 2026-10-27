@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TrackRow } from "@/components/common/TrackRow"
 import { PlaylistCardSkeleton, TrackRowSkeleton } from "@/components/common/ListSkeletons"
-import { VirtualList } from "@/components/common/VirtualList"
+import { VirtualList, useScrollAreaViewport } from "@/components/common/VirtualList"
 import { getHotAlbums, getAlbumTags, type Album, type AlbumTag } from "@/lib/albums"
 import { playAlbum } from "@/lib/albums/play"
 import { playlistKind, type Playlist } from "@/lib/playlists"
@@ -98,24 +98,21 @@ export function HotAlbums() {
     setTagId(null)
     setTags([])
   }
-  const scrollRef = useRef<HTMLDivElement>(null)
   const tagScrollRef = useRef<HTMLDivElement>(null)
   const [tagCanScrollRight, setTagCanScrollRight] = useState(false)
-  const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
+  // The ScrollArea is conditionally rendered (list vs. detail), so the viewport
+  // has to be re-resolved on the transitions that mount a new one. The shared hook
+  // retries, observes, and clears the viewport when the subtree goes away — a
+  // one-shot querySelector in an effect leaves a detached node behind.
+  const [scrollRef, viewportEl] = useScrollAreaViewport([selected, detailLoading])
   // Same node as `viewportEl`, held as a ref for the infinite-scroll hook (which
   // must read it after mount; see useInfiniteScroll).
   const viewportRef = useRef<HTMLElement | null>(null)
+  viewportRef.current = viewportEl
   const [filter, setFilter] = useState("")
   const [editing, setEditing] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const detailSeq = useRef(0)
-
-  useEffect(() => {
-    const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    const el = vp instanceof HTMLElement ? vp : null
-    viewportRef.current = el
-    setViewportEl(el)
-  }, [selected, detailLoading])
 
   useEffect(() => {
     const el = tagScrollRef.current

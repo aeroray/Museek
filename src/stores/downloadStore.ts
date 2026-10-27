@@ -34,6 +34,18 @@ export interface DownloadTask {
 
 interface DownloadState {
   tasks: DownloadTask[];
+  /**
+   * Live progress, keyed by task id, kept OUT of `tasks`.
+   *
+   * Progress ticks arrive once per streamed chunk (potentially many per second
+   * per concurrent download). Folding them into `tasks` forced every consumer
+   * that selects `tasks` to re-render for every chunk of every download — the
+   * Downloads page rebuilt its whole list each time. Kept separate, a row can
+   * subscribe to just its own value.
+   *
+   * Not persisted: a restarted download restarts its progress anyway.
+   */
+  progressById: Record<string, number>;
   addTask: (song: MusicInfo, quality?: Quality) => void;
   removeTask: (id: string) => void;
   removeTasks: (ids: string[]) => void;
@@ -364,8 +376,36 @@ const downloadAborts = new Map<string, AbortController>();
  */
 const MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024;
 
+/**
+ * Return a copy of `map` without the given keys.
+ *
+ * `progressById` is keyed by task id and read with `?? task.progress`, so a stale
+ * entry cannot affect rendering — but without this it would grow for the lifetime
+ * of the window as downloads are removed, and the store diff would keep copying
+ * the whole record on every chunk.
+ */
+function withoutKeys(
+  map: Record<string, number>,
+  keys: string[],
+): Record<string, number> {
+  if (!keys.length) return map;
+  const drop = new Set(keys);
+  const next: Record<string, number> = {};
+  let changed = false;
+  for (const [k, v] of Object.entries(map)) {
+    if (drop.has(k)) {
+      changed = true;
+      continue;
+    }
+    next[k] = v;
+  }
+  // Preserve identity when nothing was removed, so subscribers do not re-render.
+  return changed ? next : map;
+}
+
 export const useDownloadStore = create<DownloadState>((set, get) => ({
   tasks: [],
+  progressById: {},
 
   addTask(song, quality) {
     // No download location set yet → prompt the user (with a shortcut to Settings)
@@ -405,7 +445,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     set((s) => {
       const tasks = s.tasks.filter((t) => t.id !== id);
       persist(tasks);
-      return { tasks };
+      return { tasks, progressById: withoutKeys(s.progressById, [id]) };
     });
     get()._pump();
   },
@@ -418,7 +458,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     set((s) => {
       const tasks = s.tasks.filter((t) => !idSet.has(t.id));
       persist(tasks);
-      return { tasks };
+      return { tasks, progressById: withoutKeys(s.progressById, ids) };
     });
     get()._pump();
   },
@@ -429,14 +469,22 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
     set((s) => {
       const tasks = s.tasks.filter((t) => t.status !== "completed");
       persist(tasks);
-      return { tasks };
+      return {
+        tasks,
+        progressById: withoutKeys(
+          s.progressById,
+          done.map((t) => t.id),
+        ),
+      };
     });
   },
 
   updateProgress(id, progress) {
-    // Progress ticks are frequent — keep them in memory only; status changes persist.
+    // Progress ticks are frequent — keep them in memory only; status changes
+    // persist. They also live in their own map so `tasks` keeps its identity and
+    // consumers selecting `tasks` do not re-render on every chunk.
     set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === id ? { ...t, progress } : t)),
+      progressById: { ...s.progressById, [id]: progress },
     }));
   },
 

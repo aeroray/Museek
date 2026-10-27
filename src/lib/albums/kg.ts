@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { AlbumDetail } from "./index"
 import type { Album, AlbumTag } from "./index"
 import { formatAlbumDate, parseSongCount } from "./date"
@@ -102,7 +102,7 @@ function normalizeKgGatewaySong(raw: KgGatewaySong): MusicInfo | null {
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
 
   const _qualitys = indexQualitySizes(qualitys)
-  const songId = String(audio.audio_id)
+  const songId = remoteId(audio.audio_id)
   const duration = parseInt(String(audio.timelength ?? "0"))
 
   return {
@@ -349,7 +349,7 @@ export async function getKgHotAlbums(page = 1, tagId?: string | null): Promise<A
   return list
     .map(
       (item): Album => ({
-        id: String(item.albumid ?? ""),
+        id: remoteId(item.albumid),
         name: item.albumname ?? "",
         img: item.img ? String(item.img).replace("{size}", "240") : null,
         author: item.singername || undefined,

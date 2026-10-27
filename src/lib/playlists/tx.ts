@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/tx/songList.js
@@ -53,7 +53,7 @@ interface TxListResponse {
 function normalizeTxPlaylist(raw: TxPlaylistRaw): Playlist {
   const access = Number(raw.access_num)
   return {
-    id: String(raw.tid),
+    id: remoteId(raw.tid),
     name: raw.title ?? "",
     img: raw.cover_url_medium || null,
     playCount: isNaN(access) || access === 0 ? undefined : formatPlayCount(access),
@@ -156,7 +156,7 @@ function normalizeTxCategoryBasic(basic: {
   if (!basic || basic.tid == null) return null
   const play = Number(basic.play_cnt)
   return {
-    id: String(basic.tid),
+    id: remoteId(basic.tid),
     name: basic.title ?? "",
     img: basic.cover?.medium_url || basic.cover?.default_url || null,
     playCount: isNaN(play) || play === 0 ? undefined : formatPlayCount(play),

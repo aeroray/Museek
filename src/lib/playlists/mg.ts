@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { Playlist, PlaylistDetail, PlaylistDetailInfo, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/mg/songList.js
@@ -274,7 +274,7 @@ function normalizeMgSong(raw: MgSongRaw): MusicInfo {
   let img = raw.img3 || raw.img2 || raw.img1 || null
   if (img && !/^https?:/.test(img)) img = "http://d.musicapp.migu.cn" + img
 
-  const songId = String(raw.songId)
+  const songId = remoteId(raw.songId)
 
   return {
     id: `mg_${songId}`,

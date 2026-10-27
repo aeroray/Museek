@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { TrackRow } from "@/components/common/TrackRow"
 import { PlaylistCardSkeleton, TrackRowSkeleton } from "@/components/common/ListSkeletons"
-import { VirtualList } from "@/components/common/VirtualList"
+import { VirtualList, useScrollAreaViewport } from "@/components/common/VirtualList"
 import {
   getHotPlaylists,
   getPlaylistTags,
@@ -145,10 +145,8 @@ export function HotPlaylists() {
     setTagId(null)
     setTags([])
   }
-  const scrollRef = useRef<HTMLDivElement>(null)
   const tagScrollRef = useRef<HTMLDivElement>(null)
   const [tagCanScrollRight, setTagCanScrollRight] = useState(false)
-  const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
   // Same node as `viewportEl`, held as a ref for the infinite-scroll hook (which
   // must read it after mount; see useInfiniteScroll).
   const viewportRef = useRef<HTMLElement | null>(null)
@@ -164,12 +162,10 @@ export function HotPlaylists() {
   const detailSeq = useRef(0)
 
   // Bind the Radix viewport once mounted (needed for virtualization + scroll reset).
-  useEffect(() => {
-    const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    const el = vp instanceof HTMLElement ? vp : null
-    viewportRef.current = el
-    setViewportEl(el)
-  }, [selected, detailLoading])
+  // The ScrollArea is conditional (list vs. detail), so re-resolve on the
+  // transitions that mount a new one; the shared hook also clears a detached node.
+  const [scrollRef, viewportEl] = useScrollAreaViewport([selected, detailLoading])
+  viewportRef.current = viewportEl
 
   // Category chips: vertical wheel → horizontal scroll; fade when more tags exist to the right.
   useEffect(() => {

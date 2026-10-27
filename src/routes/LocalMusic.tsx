@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   HardDrive,
   FolderOpen,
@@ -33,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CoverImage } from "@/components/common/CoverImage";
-import { VirtualList } from "@/components/common/VirtualList";
+import { VirtualList, useScrollAreaViewport } from "@/components/common/VirtualList";
 import { PlatformBadge, QualityBadge } from "@/components/common/MetaBadges";
 import { bestQuality } from "@/lib/quality";
 import { revealLocalFile } from "@/lib/localMusic";
@@ -87,19 +87,15 @@ export function LocalMusic() {
   const setLocalSort = useSettingsStore((s) => s.setLocalSort);
   const notify = useUiStore((s) => s.notify);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null);
+  // The library ScrollArea only exists once there is at least one track (see the
+  // `tracks.length === 0` branch below), so a one-shot querySelector in an effect
+  // keyed on `tracks.length` could store null permanently. The shared hook retries
+  // and observes, and clears the viewport when the subtree goes away.
+  const [scrollRef, viewportEl] = useScrollAreaViewport([tracks.length > 0]);
 
   useEffect(() => {
     void useLocalMusicStore.getState().syncFilePresence();
   }, []);
-
-  useEffect(() => {
-    const vp = scrollRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]",
-    );
-    setViewportEl(vp instanceof HTMLElement ? vp : null);
-  }, [tracks.length]);
 
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());

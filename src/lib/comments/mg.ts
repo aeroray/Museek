@@ -108,8 +108,12 @@ export async function fetchMgComments(
 
   const key = songId;
   if (page === 1) lastCommentIds.delete(key);
+  // The cursor for page N is the tail comment of page N-1, stored under `key:N`.
+  // This used to READ `key:page` while WRITING `key:(page+1)`, so the two never
+  // met: page 2 only worked if called immediately after page 1 with no retry,
+  // sort toggle, or remount in between — and otherwise threw. A missing cursor
+  // now just means "start from the beginning" rather than failing the page.
   const lastId = lastCommentIds.get(`${key}:${page}`) ?? "";
-  if (!lastId && page > 1) throw new Error("Migu comments: missing cursor");
   const url =
     `https://app.c.nf.migu.cn/MIGUM3.0/user/comment/stack/v1.0` +
     `?pageSize=${limit}&queryType=1&resourceId=${encodeURIComponent(songId)}` +

@@ -3,7 +3,7 @@ import { getKgBoardSongs, kgBoards } from "@/lib/charts/kg"
 import { signatureParams } from "@/lib/platforms/kg/sign"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { Playlist, PlaylistDetail, PlaylistDetailInfo, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kg/songList.js
@@ -277,7 +277,7 @@ function normalizeKgGatewaySong(raw: KgGatewaySong): MusicInfo | null {
 
   const _qualitys = indexQualitySizes(qualitys)
 
-  const songId = String(audio.audio_id)
+  const songId = remoteId(audio.audio_id)
   const duration = parseInt(String(audio.timelength ?? "0"))
 
   return {

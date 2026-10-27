@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { Playlist, PlaylistDetail, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kw/songList.js
@@ -79,7 +79,7 @@ interface KwRcmResponse {
 function normalizeKwPlaylist(raw: KwRcmPlaylistRaw): Playlist {
   const listencnt = Number(raw.listencnt)
   return {
-    id: String(raw.id),
+    id: remoteId(raw.id),
     name: raw.name,
     img: raw.img || null,
     playCount: isNaN(listencnt) || listencnt === 0 ? undefined : formatPlayCount(listencnt),
@@ -219,7 +219,7 @@ interface KwListDetailResponse {
 }
 
 function normalizeKwListSong(raw: KwListSongRaw): MusicInfo {
-  const songId = String(raw.id)
+  const songId = remoteId(raw.id)
   const qualitys = raw.N_MINFO ? parseNMinfo(raw.N_MINFO) : []
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
   const _qualitys = indexQualitySizes(qualitys)

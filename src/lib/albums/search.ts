@@ -4,6 +4,7 @@ import { eapiParams } from "@/lib/platforms/wy/eapi"
 import type { OnlineSource } from "@/types/music"
 import type { Album } from "./index"
 import { formatAlbumDate, parseSongCount } from "./date"
+import { remoteId } from "@/lib/utils"
 
 // Album keyword search per platform — mirrors src/lib/playlists/search.ts.
 // Soft-fail: every platform path yields [] on network / format errors.
@@ -64,7 +65,7 @@ async function searchWy(query: string, page: number, limit: number): Promise<Alb
         }
       }
       return {
-        id: String(a.id),
+        id: remoteId(a.id),
         name: a.name ?? "",
         img,
         author: wyAlbumAuthor(a),
@@ -173,7 +174,7 @@ async function searchKg(query: string, page: number, limit: number): Promise<Alb
   if (data?.errcode != null && data.errcode !== 0) return []
   return (data.data?.info ?? []).map(
     (item: any): Album => ({
-      id: String(item.albumid ?? item.album_id ?? ""),
+      id: remoteId(item.albumid ?? item.album_id),
       name: item.albumname ?? item.album_name ?? "",
       img: item.imgurl ? String(item.imgurl).replace("{size}", "240") : null,
       author: item.singer ?? item.singername ?? undefined,

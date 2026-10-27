@@ -7,7 +7,7 @@ import type {
   SearchResult,
 } from "@/types/music";
 import { indexQualitySizes } from "@/lib/quality";
-import { formatDuration } from "@/lib/utils";
+import { formatDuration, parseDurationSeconds } from "@/lib/utils";
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/mg/musicSearch.js
 // Prefer the signed jadeite v3 searchAll endpoint, then fall back to Migu's
@@ -136,7 +136,7 @@ function normalizeMgSong(raw: MgSongRaw): MusicInfo {
     name: raw.name ?? "",
     singer: formatSingers(raw.singerList ?? raw.singers),
     source: "mg",
-    interval: formatDuration(Number(raw.duration ?? 0)),
+    interval: formatDuration(parseDurationSeconds(raw.duration)),
     albumName: raw.album ?? album?.name ?? "",
     meta: {
       songId,

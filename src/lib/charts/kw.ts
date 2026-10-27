@@ -3,7 +3,7 @@ import * as aesjs from "aes-js"
 import * as md5Lib from "js-md5"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { ChartBoard } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kw/leaderboard.js
@@ -125,7 +125,7 @@ interface KwBangResponse {
 }
 
 function normalizeKwBangSong(raw: KwBangSongRaw): MusicInfo {
-  const songId = String(raw.id)
+  const songId = remoteId(raw.id)
   const qualitys = raw.n_minfo ? parseNMinfo(raw.n_minfo) : []
   if (qualitys.length === 0) qualitys.push({ type: "128k", size: null })
   const _qualitys = indexQualitySizes(qualitys)

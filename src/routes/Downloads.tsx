@@ -130,7 +130,14 @@ async function openDownloadFolder(downloadDir: string | null) {
 }
 
 export function Downloads() {
-  const { tasks, removeTask, removeTasks, clearCompleted } = useDownloadStore();
+  const tasks = useDownloadStore((s) => s.tasks);
+  // Live progress lives in its own map so a chunk tick does not rebuild `tasks`
+  // and re-render every row. `task.progress` remains as the persisted snapshot
+  // (e.g. 100 when completed); the map holds the in-flight value.
+  const progressById = useDownloadStore((s) => s.progressById);
+  const removeTask = useDownloadStore((s) => s.removeTask);
+  const removeTasks = useDownloadStore((s) => s.removeTasks);
+  const clearCompleted = useDownloadStore((s) => s.clearCompleted);
   const downloadDir = useSettingsStore((s) => s.downloadDir);
   const localTracks = useLocalMusicStore((s) => s.tracks);
   const importing = useLocalMusicStore((s) => s.importing);
@@ -477,7 +484,7 @@ export function Downloads() {
                       </div>
                       {task.status === "downloading" && (
                         <Progress
-                          value={task.progress}
+                          value={progressById[task.id] ?? task.progress}
                           className="h-1 mt-0.5"
                         />
                       )}
@@ -501,9 +508,9 @@ export function Downloads() {
                       )}
                     >
                       {task.status === "downloading"
-                        ? task.progress >= 86
+                        ? (progressById[task.id] ?? task.progress) >= 86
                           ? t("download.writingTags")
-                          : `${task.progress}%`
+                          : `${progressById[task.id] ?? task.progress}%`
                         : fileGone
                           ? t("local.fileMissingBadge")
                           : t(`downloads.status.${task.status}`)}

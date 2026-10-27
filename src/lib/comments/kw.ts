@@ -22,8 +22,27 @@ interface KwCommentResponse {
   hot_comments?: KwCommentRaw[];
 }
 
+/**
+ * Decode a KuWo image path, tolerating malformed escapes.
+ *
+ * `decodeURIComponent` throws `URIError` on a lone `%` or an invalid sequence,
+ * and KuWo's `mpic` field is remote data. A single bad path in one comment used
+ * to abort the whole page's mapping, so the user saw "comments failed to load"
+ * because of one broken avatar/attachment URL. One unusable image should cost one
+ * image, not the page.
+ */
+function decodeImageUrl(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    // Already-encoded or malformed: the raw value is still the best guess.
+    return raw || null;
+  }
+}
+
 function mapComment(item: KwCommentRaw): SongComment {
   const time = asTimeMs(item.time);
+  const image = item.mpic ? decodeImageUrl(item.mpic) : null;
   return {
     id: String(item.id ?? ""),
     text: item.msg ?? "",
@@ -33,7 +52,7 @@ function mapComment(item: KwCommentRaw): SongComment {
     avatar: item.u_pic ?? null,
     userId: String(item.u_id ?? ""),
     likedCount: item.like_num != null ? Number(item.like_num) : null,
-    images: item.mpic ? [decodeURIComponent(item.mpic)] : [],
+    images: image ? [image] : [],
     reply: (item.child_comments ?? []).map(mapComment),
   };
 }

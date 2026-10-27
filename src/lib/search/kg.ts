@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality, SearchResult } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kg/musicSearch.js
 // KuGou public song_search_v2 endpoint. No signing required.
@@ -83,7 +83,7 @@ function normalizeKgSong(raw: KgSongRaw): MusicInfo {
   // songId stays Audioid (lx-music songmid). Play scripts read hash + albumId.
   // MixSongID is the per-album mix id; do not use it as MusicInfo.id (would
   // split existing favorites / cache keys).
-  const songId = String(raw.Audioid)
+  const songId = remoteId(raw.Audioid)
 
   return {
     id: `kg_${songId}`,

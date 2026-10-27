@@ -2,6 +2,7 @@ import { httpFetch } from "@/lib/http"
 import * as md5Lib from "js-md5"
 import { eapiParams } from "@/lib/platforms/wy/eapi"
 import { createAsyncCache } from "@/lib/cache"
+import { remoteId } from "@/lib/utils"
 import type { OnlineSource } from "@/types/music"
 import type { Playlist } from "./index"
 
@@ -42,7 +43,7 @@ async function eapiPost(path: string, payload: Record<string, unknown>): Promise
 
 function mapWyPlaylist(p: any): Playlist {
   return {
-    id: String(p.id),
+    id: remoteId(p.id),
     name: p.name ?? "",
     img: p.coverImgUrl ?? null,
     playCount: formatPlayCount(p.playCount),
@@ -69,7 +70,7 @@ async function searchWyUsers(query: string, limit: number): Promise<{ userId: st
   const data = await eapiPost("/api/cloudsearch/pc", { s: query, type: 1002, limit, offset: 0, total: true })
   if (data?.code !== 200) return []
   return (data.result?.userprofiles ?? []).map((u: any) => ({
-    userId: String(u.userId),
+    userId: remoteId(u.userId),
     nickname: String(u.nickname ?? ""),
   }))
 }
@@ -123,7 +124,7 @@ async function searchTx(query: string, page: number, limit: number): Promise<Pla
     const body = (data.body ?? {}) as { songlist?: { list?: any[] } }
     return (body.songlist?.list ?? []).map(
       (item: any): Playlist => ({
-        id: String(item.dissid),
+        id: remoteId(item.dissid),
         name: item.dissname ?? "",
         img: item.imgurl ?? null,
         playCount: formatPlayCount(item.listennum),
@@ -170,7 +171,7 @@ async function searchKw(query: string, page: number, limit: number): Promise<Pla
   }
   return (data.abslist ?? []).map(
     (item: any): Playlist => ({
-      id: String(item.playlistid),
+      id: remoteId(item.playlistid),
       name: decode(item.name),
       img: item.pic || null,
       playCount: formatPlayCount(parseInt(item.playcnt)),
@@ -247,7 +248,7 @@ async function searchMg(query: string, page: number, limit: number): Promise<Pla
   if (!Array.isArray(result)) return []
   return result.map(
     (item: any): Playlist => ({
-      id: String(item.musicListId ?? item.id),
+      id: remoteId(item.musicListId ?? item.id),
       name: item.title ?? item.name ?? "",
       img: item.imgItem?.img || item.img || null,
       playCount: formatPlayCount(parseInt(item.playNum)),

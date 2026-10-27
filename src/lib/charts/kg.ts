@@ -1,7 +1,7 @@
 import { httpFetch as tauriFetch } from "@/lib/http"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { ChartBoard } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kg/leaderboard.js
@@ -95,7 +95,7 @@ function normalizeKgBangSong(raw: KgBangSongRaw): MusicInfo {
   const _qualitys = indexQualitySizes(qualitys)
 
   // songId is the album_audio_id (audio_id); hash is the standard FileHash.
-  const songId = String(raw.audio_id)
+  const songId = remoteId(raw.audio_id)
 
   return {
     id: `kg_${songId}`,

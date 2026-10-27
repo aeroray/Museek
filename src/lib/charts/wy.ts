@@ -2,7 +2,7 @@ import { httpFetch as tauriFetch } from "@/lib/http"
 import { eapi } from "@/lib/platforms/wy/eapi"
 import type { MusicInfo, MusicQuality, Quality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, remoteId } from "@/lib/utils"
 import type { ChartBoard } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/wy/leaderboard.js
@@ -122,7 +122,7 @@ function normalizeWyTrack(item: WyTrackRaw): MusicInfo {
 
   const _qualitys = indexQualitySizes(ordered)
 
-  const songId = String(item.id)
+  const songId = remoteId(item.id)
 
   return {
     id: `wy_${songId}`,
@@ -174,5 +174,5 @@ export async function getWyBoardSongs(boardId: string, _page = 1): Promise<Music
     throw new Error("NetEase board failed: bad response")
   }
 
-  return data.playlist.tracks.map(normalizeWyTrack)
+  return data.playlist.tracks.map(normalizeWyTrack).filter((s) => s.meta.songId && s.name)
 }
