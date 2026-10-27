@@ -257,8 +257,28 @@ check("second click: order stable", await evaluate("window.__order()"), ["best",
 ws.close()
 chrome.kill()
 await sleep(300)
-rmSync(work, { recursive: true, force: true })
-rmSync(profile, { recursive: true, force: true })
+
+// Cleanup must never turn a passing check into a failing one.
+//
+// On Windows the Crashpad handler and the JIT debugger keep handles open inside
+// the Chrome profile for a moment after the browser exits, so a plain `rmSync`
+// races them and throws EBUSY. That surfaced as the whole check failing on
+// windows-latest even though every assertion above had printed OK - the release
+// job died on the unlink, not on a regression. Both directories are temporary and
+// port-keyed, so leaving one behind is harmless; retrying briefly and then giving
+// up silently is the right trade.
+async function bestEffortRemove(dir) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      rmSync(dir, { recursive: true, force: true })
+      return
+    } catch {
+      await sleep(200)
+    }
+  }
+}
+await bestEffortRemove(work)
+await bestEffortRemove(profile)
 
 console.log("")
 if (failed) {
