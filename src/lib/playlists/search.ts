@@ -269,11 +269,18 @@ const fns: Record<OnlineSource, (q: string, page: number, limit: number) => Prom
 
 const cache = createAsyncCache<Playlist[]>(3 * 60_000)
 
+/**
+ * Page size for playlist search. Exported because callers need it to tell
+ * "this page was full, so there is probably another one" from "this was the
+ * last page" — the platform responses carry no total count.
+ */
+export const PLAYLIST_SEARCH_LIMIT = 30
+
 export async function searchPlaylists(
   source: OnlineSource,
   query: string,
   page = 1,
-  limit = 30
+  limit = PLAYLIST_SEARCH_LIMIT
 ): Promise<Playlist[]> {
   const q = query.trim()
   if (!q) return []

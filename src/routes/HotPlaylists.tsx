@@ -18,6 +18,7 @@ import { VirtualList } from "@/components/common/VirtualList"
 import {
   getHotPlaylists,
   getPlaylistTags,
+  mergePlaylists,
   playlistKind,
   type Playlist,
   type PlaylistTag,
@@ -33,6 +34,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useUiStore } from "@/stores/uiStore"
 import { useT } from "@/lib/i18n"
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 import { cn } from "@/lib/utils"
 import type { MusicInfo, OnlineSource } from "@/types/music"
 
@@ -105,6 +107,12 @@ export function HotPlaylists() {
   // blank "empty" flash when opening a favorited playlist).
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
+  // Grid pagination. `page` is the last page merged into `playlists`; `hasMore`
+  // is optimistic until a page comes back with nothing new. Hot endpoints that
+  // ignore `page` therefore stop after one extra request instead of looping.
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [detailLoading, setDetailLoading] = useState(() => {
     if (!openFromNav && !openAlbumFromNav) return false
     const store = usePlaylistStore.getState()
@@ -141,6 +149,9 @@ export function HotPlaylists() {
   const tagScrollRef = useRef<HTMLDivElement>(null)
   const [tagCanScrollRight, setTagCanScrollRight] = useState(false)
   const [viewportEl, setViewportEl] = useState<HTMLElement | null>(null)
+  // Same node as `viewportEl`, held as a ref for the infinite-scroll hook (which
+  // must read it after mount; see useInfiniteScroll).
+  const viewportRef = useRef<HTMLElement | null>(null)
   const [filter, setFilter] = useState("")
   const [openDialog, setOpenDialog] = useState(false)
   // Dialog platform is local so switching tabs here doesn't reload the page grid.
@@ -155,7 +166,9 @@ export function HotPlaylists() {
   // Bind the Radix viewport once mounted (needed for virtualization + scroll reset).
   useEffect(() => {
     const vp = scrollRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    setViewportEl(vp instanceof HTMLElement ? vp : null)
+    const el = vp instanceof HTMLElement ? vp : null
+    viewportRef.current = el
+    setViewportEl(el)
   }, [selected, detailLoading])
 
   // Category chips: vertical wheel → horizontal scroll; fade when more tags exist to the right.
@@ -222,8 +235,16 @@ export function HotPlaylists() {
     setListError(null)
     setSelected(null)
     setSongs([])
+    setPage(1)
+    setHasMore(false)
     getHotPlaylists(source, 1, tagId)
-      .then(setPlaylists)
+      .then((list) => {
+        setPlaylists(list)
+        // Only offer another page when the first one actually returned rows;
+        // an empty platform (or one that only has a single fixed page) must not
+        // advertise "more" that will never arrive.
+        setHasMore(list.length > 0)
+      })
       .catch((e) => setListError((e as Error).message))
       .finally(() => setListLoading(false))
   }, [source, tagId])
@@ -231,6 +252,41 @@ export function HotPlaylists() {
   useEffect(() => {
     loadList()
   }, [loadList])
+
+  /**
+   * Append the next page of the hot grid.
+   *
+   * Stops as soon as a page contributes no new playlist, which is how the
+   * platforms whose hot endpoint ignores `page` (they return the same fixed
+   * list every time) terminate instead of being fetched forever.
+   */
+  const loadMore = useCallback(() => {
+    if (loadingMore || listLoading || !hasMore) return
+    const next = page + 1
+    setLoadingMore(true)
+    getHotPlaylists(source, next, tagId)
+      .then((list) => {
+        setPlaylists((prev) => {
+          const { list: merged, added } = mergePlaylists(prev, list)
+          setHasMore(added > 0)
+          return merged
+        })
+        setPage(next)
+      })
+      .catch(() => {
+        // A failed page must not clear what is already on screen; retry is the
+        // user's next scroll.
+        setHasMore(false)
+      })
+      .finally(() => setLoadingMore(false))
+  }, [page, hasMore, loadingMore, listLoading, source, tagId])
+
+  useInfiniteScroll({
+    scrollRef: viewportRef,
+    hasMore: !selected && hasMore,
+    isLoading: loadingMore || listLoading,
+    onLoadMore: loadMore,
+  })
 
   const openPlaylist = (pl: Playlist) => {
     const entry = { ...pl, kind: "playlist" as const }
@@ -710,6 +766,14 @@ export function HotPlaylists() {
                 favorited={isPlFav(pl)}
               />
             ))}
+          </div>
+        )}
+        {/* Pagination footer: the auto-loader keyed off this viewport also drives
+            the spinners, so a slow page is visible rather than a silent stall. */}
+        {!selected && !listLoading && !listError && hasMore && (
+          <div className="flex items-center justify-center gap-2 px-4 pb-6 pt-1 text-xs text-muted-foreground">
+            <Loader2 size={14} className="animate-spin" />
+            {t("hotPlaylists.loadingMore")}
           </div>
         )}
       </ScrollArea>

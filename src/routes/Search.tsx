@@ -373,6 +373,23 @@ export function Search() {
                   ))}
                 </div>
               )}
+              {/* Playlist results paginate like song results: the store keeps
+                  `page`/`allPage`, and a short final page stops the offer. */}
+              {scope === "playlist" &&
+                playlistResults.length > 0 &&
+                page < allPage && (
+                  <div className="py-4 text-center">
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        search(useSearchStore.getState().query, page + 1)
+                      }
+                      disabled={isLoading}
+                    >
+                      {isLoading ? t("search.loading") : t("search.loadMore")}
+                    </Button>
+                  </div>
+                )}
             </div>
           </ScrollArea>
         )

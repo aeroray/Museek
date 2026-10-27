@@ -2,7 +2,7 @@
 
 Memory here applies only when touched files or task scope match this area.
 
-## MC-AREA-20261021-00000501 — A platform adapter parses defensively
+## MC-AREA-20261021-00000501 — A platform page is parsed defensively
 
 Status: active
 Scope: area:platforms
@@ -11,12 +11,13 @@ Subject: MC-SUBJ-20261021-8c94f54c
 Facet: behavior
 Evidence:
 - repo:src/lib/search/kuwo.ts
+- repo:src/lib/playlists/index.ts
 
 Decision:
-Guard array fields with `Array.isArray` and skip individual malformed rows instead of throwing for the page. Tolerate null in decode helpers.
+Guard array fields with `Array.isArray`; skip malformed rows rather than failing the page. End pagination when a page adds nothing new.
 
 Reason:
-One item missing an id or `MUSICRID` used to abort the whole page, so the platform looked empty rather than partially broken.
+A malformed row used to blank the page; these endpoints give no total and some ignore `page`.
 
 ## MC-AREA-20261021-00000502 — QQ external playlists fall back to Dissinfo
 
@@ -61,10 +62,10 @@ Evidence:
 - repo:src/lib/recognition/neteaseProvider.ts
 
 Decision:
-Generate `shazam_v2` fingerprints from overlapping three-second 8 kHz windows and stop at the first candidate. NetEase is the only recognition provider.
+Generate `shazam_v2` fingerprints from overlapping three-second 8 kHz windows; stop at the first candidate. NetEase is the only provider.
 
 Reason:
-The endpoint accepts the short fingerprint protocol, and a sliding window lets the matching segment sit anywhere in the capture.
+The endpoint accepts the short fingerprint protocol, and a sliding window lets the match sit anywhere in the capture.
 
 ## MC-DNU-20261021-00000505 — Adding a second recognition provider or scraping comments via scripts
 

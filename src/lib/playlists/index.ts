@@ -38,6 +38,38 @@ export function playlistFavKey(pl: Pick<Playlist, "source" | "id" | "kind">): st
   return `${pl.source}:${playlistKind(pl)}:${pl.id}`
 }
 
+/** Stable identity for one row of a playlist grid / result list. */
+export function playlistRowKey(pl: Pick<Playlist, "source" | "id">): string {
+  return `${pl.source}:${pl.id}`
+}
+
+/**
+ * Append a fetched page to what is already shown, dropping repeats.
+ *
+ * Paging here is best-effort: the platform endpoints return a bare array with no
+ * total, and several of them can hand back the same playlist on two different
+ * pages. Deduping keeps the grid free of duplicate cards, and the `added` count
+ * is what tells the caller whether more pages can still exist — a page that adds
+ * nothing means the source has run dry (or ignores `page` entirely), so the
+ * loader must stop rather than ask for the page after it forever.
+ */
+export function mergePlaylists(
+  existing: Playlist[],
+  incoming: Playlist[]
+): { list: Playlist[]; added: number } {
+  const seen = new Set(existing.map(playlistRowKey))
+  const list = [...existing]
+  let added = 0
+  for (const pl of incoming) {
+    const key = playlistRowKey(pl)
+    if (seen.has(key)) continue
+    seen.add(key)
+    list.push(pl)
+    added++
+  }
+  return { list, added }
+}
+
 /** Category / tag chip for filtering the hot-playlist grid. */
 export interface PlaylistTag {
   id: string

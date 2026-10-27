@@ -7,10 +7,11 @@ import { searchMigu } from "@/lib/search/mg";
 import { readData, writeData } from "@/lib/db";
 import { createAsyncCache } from "@/lib/cache";
 import { PLATFORM_ORDER } from "@/components/common/PlatformTabs";
-import { searchPlaylists } from "@/lib/playlists/search";
+import { searchPlaylists, PLAYLIST_SEARCH_LIMIT } from "@/lib/playlists/search";
 import { searchAlbums } from "@/lib/albums";
 import type { Album } from "@/lib/albums";
 import type { Playlist } from "@/lib/playlists";
+import { mergePlaylists } from "@/lib/playlists";
 import type { MusicInfo, OnlineSource, SearchResult } from "@/types/music";
 
 export type SearchScope = "song" | "album" | "playlist";
@@ -106,19 +107,37 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     }));
     try {
       if (scope === "playlist") {
-        const list = await searchPlaylists(platform, q, page);
+        const list = await searchPlaylists(
+          platform,
+          q,
+          page,
+          PLAYLIST_SEARCH_LIMIT,
+        );
         if (
           get().searchGeneration !== generation ||
           get().scope !== scope ||
           get().platform !== platform
         )
           return;
-        set({
-          playlistResults: list,
-          albumResults: [],
-          isLoading: false,
-          page,
-          allPage: 1,
+        set((s) => {
+          // Page 1 replaces (a new query); later pages append.
+          const { list: merged, added } = mergePlaylists(
+            page === 1 ? [] : s.playlistResults,
+            list,
+          );
+          // A full page implies there may be another. From page 2 on it must
+          // also have contributed something new: a platform that ignores `page`
+          // replays the same rows, and offering "load more" there would be a
+          // button that never changes anything.
+          const full = list.length >= PLAYLIST_SEARCH_LIMIT;
+          const more = page === 1 ? full : full && added > 0;
+          return {
+            playlistResults: merged,
+            albumResults: [],
+            isLoading: false,
+            page,
+            allPage: more ? page + 1 : page,
+          };
         });
         get().addToHistory(q);
         return;
