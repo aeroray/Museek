@@ -17,6 +17,94 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.13.0": {
+    zh: {
+      sections: [
+        {
+          title: "🎵 歌词",
+          bullets: [
+            "修复：QQ 音乐的逐字歌词一直没有生效，会退回成普通逐行歌词",
+            "修复：副歌重复的歌词会显示出时间戳，重复段落也不会跟着跳",
+            "修复：超过 100 分钟的歌词后半段会丢失（DJ 串烧、有声书、现场）",
+          ],
+        },
+        {
+          title: "📜 列表与翻页",
+          bullets: [
+            "修复：搜索歌曲只能看到前 2 页，后面的翻不出来",
+            "修复：搜索歌词结果往下滚动时出现大片空白",
+            "搜索、热门专辑、热门歌单现在滚到底自动加载，不用再点按钮",
+          ],
+        },
+        {
+          title: "🎧 播放",
+          bullets: [
+            "修复：本地音乐如果是 192/256 kbps，重启后会丢失播放队列",
+            "修复：清空播放队列后音乐还在播，单曲循环会卡住",
+            "修复：快速切歌时内存占用持续升高",
+          ],
+        },
+        {
+          title: "🔒 安全",
+          bullets: [
+            "音源脚本的运行限制更严格，异常时会拒绝运行而不是带病运行",
+            "导入配置文件时，新增或改动过的音源会以「停用」状态导入，需要你手动启用",
+          ],
+        },
+        {
+          title: "⚡ 体验",
+          bullets: [
+            "拖动进度条和音量条不再频繁写磁盘",
+            "下载页在多个任务同时下载时更流畅",
+            "暂停播放时，歌词页的特效不再继续耗电",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎵 Lyrics",
+          bullets: [
+            "Fix: QQ Music's word-by-word lyrics never took effect and fell back to plain line-timed lyrics",
+            "Fix: repeated choruses showed timestamps on screen and did not follow along",
+            "Fix: lyrics past 100 minutes were lost (DJ sets, audiobooks, live recordings)",
+          ],
+        },
+        {
+          title: "📜 Lists & pagination",
+          bullets: [
+            "Fix: song search only showed the first 2 pages; the rest could not be loaded",
+            "Fix: large blank areas appeared while scrolling search results",
+            "Search, hot albums and hot playlists now load as you scroll — no button needed",
+          ],
+        },
+        {
+          title: "🎧 Playback",
+          bullets: [
+            "Fix: local music at 192/256 kbps lost the playback queue after a restart",
+            "Fix: clearing the queue left the audio playing, and repeat-one could get stuck",
+            "Fix: skipping tracks quickly kept increasing memory use",
+          ],
+        },
+        {
+          title: "🔒 Security",
+          bullets: [
+            "Tighter limits on source scripts; if something is wrong they refuse to run instead of running in an unsafe state",
+            "Importing a config file now lands new or changed sources as disabled, so you enable them yourself",
+          ],
+        },
+        {
+          title: "⚡ Experience",
+          bullets: [
+            "Dragging the seek and volume sliders no longer writes to disk constantly",
+            "The downloads page is smoother with several downloads at once",
+            "The lyrics panel's effect no longer drains power while playback is paused",
+          ],
+        },
+      ],
+    },
+  },
   "3.12.0": {
     zh: {
       sections: [
