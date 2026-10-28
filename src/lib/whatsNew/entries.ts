@@ -17,6 +17,72 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.14.0": {
+    zh: {
+      sections: [
+        {
+          title: "🎧 迷你播放器",
+          bullets: [
+            "修复：播放列表放完后，迷你模式无法用快捷键退出，只能去找那个还原按钮",
+            "修复：退出迷你模式时如果出错，会卡在 400×72 的无边框小窗里，只能重启",
+            "修复：从全屏进入迷你模式再退出，窗口标题栏会被压在菜单栏下面",
+            "修复：播放队列面板的单曲高度算错，哪怕只有一首歌也会出现滚动条，第 4 行还会被切掉",
+            "修复：关闭队列面板后，贴边的唱片封面再也不会自动收起",
+          ],
+        },
+        {
+          title: "🎤 歌词与桌面歌词",
+          bullets: [
+            "修复：普通歌词在桌面歌词上显示成逐字卡拉OK效果，和歌词页、顶栏不一致",
+            "修复：桌面歌词无法拖到第二块显示器",
+            "修复：拔掉外接显示器后，桌面歌词会消失且再也调不出来",
+            "修复：关闭桌面歌词后它仍在后台持续运行，长时间开着会白白耗电",
+            "歌词源菜单不再每次打开都重新查询，第二次打开直接显示上次的结果",
+          ],
+        },
+        {
+          title: "⚡ 体验",
+          bullets: [
+            "修复：更新日志弹窗里鼠标移入内容区会出现多余的滚动条",
+            "修复：播放按钮从「播放」变成「暂停」时图标会轻微偏移",
+            "音质菜单去掉了顶部的「这首歌的播放音质」标题，打开就是音质列表",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🎧 Mini player",
+          bullets: [
+            "Fix: with the queue finished, the mini player could not be closed by shortcut — only the small restore button worked",
+            "Fix: if exiting the mini player hit an error, the app was stuck in a 400×72 borderless window and needed a restart",
+            "Fix: entering the mini player from fullscreen left the restored title bar tucked under the menu bar",
+            "Fix: the mini queue panel was sized 1.5px short per row, so even a one-song queue grew a scrollbar and the fourth row was clipped",
+            "Fix: after closing the queue panel, the docked cover no longer collapsed back on its own",
+          ],
+        },
+        {
+          title: "🎤 Lyrics & desktop lyrics",
+          bullets: [
+            "Fix: plain line-timed lyrics were shown with a word-by-word karaoke sweep on the desktop lyric, unlike the lyrics panel and top bar",
+            "Fix: the desktop lyric could not be dragged to a second monitor",
+            "Fix: unplugging an external display made the desktop lyric vanish with no way to bring it back",
+            "Fix: after closing the desktop lyric it kept running in the background, draining power",
+            "The lyric-source menu no longer re-runs the whole search every time — reopening it shows the previous result instantly",
+          ],
+        },
+        {
+          title: "⚡ Experience",
+          bullets: [
+            "Fix: hovering the changelog content showed a stray extra scrollbar",
+            "Fix: the play icon shifted slightly when it changed to pause",
+            "The per-song quality menu drops its heading and opens straight to the quality list",
+          ],
+        },
+      ],
+    },
+  },
   "3.13.0": {
     zh: {
       sections: [
