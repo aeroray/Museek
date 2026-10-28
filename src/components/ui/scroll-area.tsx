@@ -13,8 +13,14 @@ const ScrollArea = React.forwardRef<
   >
     {/* Radix wraps content in a `display:table` div which lets children grow to
         their content width, breaking `truncate`. Force it to block so children
-        respect the viewport width (we never need horizontal scroll). */}
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
+        respect the viewport width (we never need horizontal scroll).
+
+        `w-full min-w-0` on that wrapper matters for more than truncation: the
+        app-wide `::-webkit-scrollbar` rules in index.css apply to every
+        overflowing element, while Radix only hides the native bar on the
+        viewport itself. If the wrapper is allowed to size to its content it can
+        exceed the viewport and a second, native scrollbar appears on hover. */}
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0">
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />

@@ -92,8 +92,17 @@ export function WhatsNewDialog() {
           <DialogTitle>{t("whatsNew.title")}</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[min(28rem,55vh)] pr-3">
-          <div className="space-y-6">
+        {/*
+          The scrollbar gutter is created on the CONTENT, not with `pr-*` on the
+          ScrollArea root. Padding on the root shrinks the root box while the
+          inner table/block wrapper still sizes to its content, so the content
+          overflows the viewport horizontally and the app-wide
+          `::-webkit-scrollbar` rules draw a second native bar on hover.
+          Padding inside the scrolling content keeps the same visual gutter and
+          cannot overflow.
+        */}
+        <ScrollArea className="max-h-[min(28rem,55vh)]">
+          <div className="space-y-6 pr-3">
             <section className="space-y-3">
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold tracking-tight">
