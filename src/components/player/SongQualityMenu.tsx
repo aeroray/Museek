@@ -3,7 +3,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -62,10 +61,11 @@ export function SongQualityMenu() {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-52">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          {t("player.qualityMenuTitle")}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+        {/* No heading here on purpose: the list is four items and the trigger
+            already carries the name (title + aria-label), so a "playback quality
+            for this song" label plus a separator just pushed the options down.
+            The explanatory hint stays at the bottom, where it reads as a
+            footnote rather than as a header. */}
         {QUALITY_LADDER.map((q: Quality) => {
           // What is checked is the track's effective target, not what happened
           // to be delivered — a source may have downgraded it.
