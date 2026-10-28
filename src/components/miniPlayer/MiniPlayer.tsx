@@ -78,6 +78,13 @@ export function MiniPlayer() {
   const [queueOpen, setQueueOpen] = useState(false);
   const queueScrollTopRef = useRef(0);
   const queuePanelRef = useRef<HTMLDivElement>(null);
+  /**
+   * Guards the collapse path, which has two independent triggers (`window.blur`
+   * and Tauri `onFocusChanged`) and used to run its side effects from inside a
+   * `setState` updater — so React.StrictMode's double invocation, or the two
+   * triggers, each drove a window resize.
+   */
+  const closingQueueRef = useRef(false);
 
   const loading = status === "loading";
   const playBusy = loading || playPending;
@@ -94,12 +101,18 @@ export function MiniPlayer() {
     if (vp) queueScrollTopRef.current = vp.scrollTop;
   };
 
+  /**
+   * Collapse the queue panel. Kept out of the `setState` updater on purpose: an
+   * updater must be pure, and this one drives module state, a store write and
+   * three native window calls.
+   */
   const closeQueue = () => {
-    setQueueOpen((open) => {
-      if (!open) return open;
-      saveQueueScroll();
-      void setMiniQueueExpanded(false);
-      return false;
+    if (!queueOpen || closingQueueRef.current) return;
+    closingQueueRef.current = true;
+    saveQueueScroll();
+    setQueueOpen(false);
+    void setMiniQueueExpanded(false).finally(() => {
+      closingQueueRef.current = false;
     });
   };
 

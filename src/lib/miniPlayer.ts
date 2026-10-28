@@ -23,34 +23,24 @@ type MiniPosPrefs = {
   y: number;
 };
 
-/** Horizontal mini bar — compact width for cover + transport + actions. */
-export const MINI_WIDTH = 400;
-export const MINI_HEIGHT = 72;
-/** Max visible rows in the mini queue panel before scrolling. */
-export const MINI_QUEUE_MAX_ROWS = 4;
-/**
- * One queue row: py-1.5 + title (text-xs) + singer (10px) + leading-tight.
- * Tuned so 4 rows ≈ the old fixed 168px panel.
- */
-const MINI_QUEUE_ROW = 38;
-const MINI_QUEUE_GAP = 2;
-const MINI_QUEUE_PAD = 12;
-/** Empty-queue placeholder height. */
-const MINI_QUEUE_EMPTY = 40;
-
-/** Compact queue panel height for `trackCount` songs (capped at 4). */
-export function miniQueuePanelHeight(trackCount: number): number {
-  if (trackCount <= 0) return MINI_QUEUE_EMPTY;
-  const n = Math.min(trackCount, MINI_QUEUE_MAX_ROWS);
-  return (
-    MINI_QUEUE_PAD + n * MINI_QUEUE_ROW + Math.max(0, n - 1) * MINI_QUEUE_GAP
-  );
-}
-
-/** @deprecated Prefer miniQueuePanelHeight — kept as the 4-row max for callers. */
-export const MINI_QUEUE_HEIGHT = miniQueuePanelHeight(MINI_QUEUE_MAX_ROWS);
-/** Cover-only peek when docked to a screen edge. */
-export const MINI_PEEK_SIZE = 64;
+// Window geometry lives in a dependency-free module so the numbers that the
+// native window is sized to can be pinned by a plain-node check.
+export {
+  MINI_WIDTH,
+  MINI_HEIGHT,
+  MINI_QUEUE_MAX_ROWS,
+  MINI_QUEUE_HEIGHT,
+  MINI_PEEK_SIZE,
+  miniQueuePanelHeight,
+} from "@/lib/miniPlayerGeometry";
+import {
+  MINI_WIDTH,
+  MINI_HEIGHT,
+  MINI_PEEK_SIZE,
+  miniQueuePanelHeight,
+  clampOriginToWorkArea,
+} from "@/lib/miniPlayerGeometry";
+import { miniToggleDirection } from "@/lib/miniPlayerSession";
 
 /**
  * Uniform inset from work-area edges for corner place, magnetic snap,
@@ -79,6 +69,8 @@ const VEIL_IN_FULL_MS = 120;
 /** Matches tauri.conf.json main window mins — restored on exit. */
 const MAIN_MIN_WIDTH = 1200;
 const MAIN_MIN_HEIGHT = 786;
+/** How long to wait for an animated fullscreen exit to settle before sampling. */
+const FULLSCREEN_EXIT_TIMEOUT_MS = 900;
 
 type SavedChrome = {
   size: PhysicalSize;
@@ -324,17 +316,22 @@ async function miniTargetPhysical(win: Window): Promise<PhysRect> {
     if (monitor) {
       const wa = monitor.workArea;
       const pad = Math.round(EDGE_INSET * scale);
-      const x = wa.position.x + wa.size.width - w - pad;
-      const y = wa.position.y + Math.round((wa.size.height - h) / 2);
-      return {
-        x: Math.max(wa.position.x, x),
-        y: Math.min(
-          Math.max(y, wa.position.y + pad),
-          wa.position.y + wa.size.height - h - pad,
-        ),
+      const right = wa.position.x + wa.size.width - w - pad;
+      const centreY = wa.position.y + Math.round((wa.size.height - h) / 2);
+      const { x, y } = clampOriginToWorkArea(
+        right,
+        centreY,
         w,
         h,
-      };
+        {
+          x: wa.position.x,
+          y: wa.position.y,
+          width: wa.size.width,
+          height: wa.size.height,
+        },
+        pad,
+      );
+      return { x, y, w, h };
     }
   } catch {
     /* fall through */
@@ -372,6 +369,16 @@ function persistMiniPos(x: number, y: number): void {
 /** Save current bar top-left (skip while in cover peek). */
 async function persistCurrentMiniBarPos(win: Window): Promise<void> {
   if (usePlayerStore.getState().miniPeek) return;
+  await persistWindowPos(win);
+}
+
+/**
+ * Save the window's current top-left regardless of peek state.
+ *
+ * The peek disc is draggable, and while peeking the window origin *is* the disc
+ * origin, so it is what the next enter should restore.
+ */
+async function persistWindowPos(win: Window): Promise<void> {
   try {
     const r = await readRect(win);
     persistMiniPos(r.x, r.y);
@@ -396,17 +403,53 @@ async function resolveMiniEnterTarget(win: Window): Promise<PhysRect> {
     if (monitor) {
       const wa = monitor.workArea;
       const pad = Math.round(EDGE_INSET * scale);
-      const minX = wa.position.x + pad;
-      const minY = wa.position.y + pad;
-      const maxX = wa.position.x + wa.size.width - w - pad;
-      const maxY = wa.position.y + wa.size.height - h - pad;
-      x = Math.round(Math.min(Math.max(x, minX), Math.max(minX, maxX)));
-      y = Math.round(Math.min(Math.max(y, minY), Math.max(minY, maxY)));
+      ({ x, y } = clampOriginToWorkArea(
+        x,
+        y,
+        w,
+        h,
+        {
+          x: wa.position.x,
+          y: wa.position.y,
+          width: wa.size.width,
+          height: wa.size.height,
+        },
+        pad,
+      ));
     }
   } catch {
     /* keep saved */
   }
   return { x, y, w, h };
+}
+
+/**
+ * Move the window without letting our own `Moved` echo re-enter the pipeline.
+ *
+ * `clamping` has to be cleared on the failure path too. It used to be set
+ * outside the `try` and reset only in a `queueMicrotask` on the success path, so
+ * one rejected `setPosition` (which every caller then swallowed) left it `true`
+ * for the rest of the process — and the `onMoved` handler returns on it. From
+ * then on there was no dock hint, no settle handling, no on-screen clamp, no
+ * magnetic snap and no position persistence, until a restart.
+ *
+ * The reset is deferred by a timer rather than a microtask because the OS
+ * delivers the `Moved` echo asynchronously; a microtask ran before it arrived.
+ */
+async function moveWindow(
+  win: Window,
+  position: PhysicalPosition,
+): Promise<void> {
+  clamping = true;
+  try {
+    await win.setPosition(position);
+  } catch {
+    /* a rejected move must not latch the guard */
+  } finally {
+    setTimeout(() => {
+      clamping = false;
+    }, 80);
+  }
 }
 
 /**
@@ -423,23 +466,21 @@ async function clampFullyVisible(win: Window): Promise<PhysRect> {
     const scale = monitor.scaleFactor || (await win.scaleFactor()) || 1;
     const pad = Math.round(EDGE_INSET * scale);
     const wa = monitor.workArea;
-    const minX = wa.position.x + pad;
-    const minY = wa.position.y + pad;
-    const maxX = wa.position.x + wa.size.width - rect.w - pad;
-    const maxY = wa.position.y + wa.size.height - rect.h - pad;
-    const x = Math.round(
-      Math.min(Math.max(rect.x, minX), Math.max(minX, maxX)),
-    );
-    const y = Math.round(
-      Math.min(Math.max(rect.y, minY), Math.max(minY, maxY)),
+    const { x, y } = clampOriginToWorkArea(
+      rect.x,
+      rect.y,
+      rect.w,
+      rect.h,
+      {
+        x: wa.position.x,
+        y: wa.position.y,
+        width: wa.size.width,
+        height: wa.size.height,
+      },
+      pad,
     );
     if (Math.abs(x - rect.x) > 1 || Math.abs(y - rect.y) > 1) {
-      clamping = true;
-      await win.setPosition(new PhysicalPosition(x, y));
-      // Ignore the echo onMoved from our own clamp.
-      queueMicrotask(() => {
-        clamping = false;
-      });
+      await moveWindow(win, new PhysicalPosition(x, y));
       return { ...rect, x, y };
     }
   } catch {
@@ -484,19 +525,24 @@ async function magneticSnapToEdge(win: Window, edge: DockEdge): Promise<void> {
     }
 
     // Keep the orthogonal axis fully on-screen too.
-    const minX = wa.position.x + pad;
-    const minY = wa.position.y + pad;
-    const maxX = wa.position.x + wa.size.width - rect.w - pad;
-    const maxY = wa.position.y + wa.size.height - rect.h - pad;
-    x = Math.round(Math.min(Math.max(x, minX), Math.max(minX, maxX)));
-    y = Math.round(Math.min(Math.max(y, minY), Math.max(minY, maxY)));
+    const clamped = clampOriginToWorkArea(
+      x,
+      y,
+      rect.w,
+      rect.h,
+      {
+        x: wa.position.x,
+        y: wa.position.y,
+        width: wa.size.width,
+        height: wa.size.height,
+      },
+      pad,
+    );
+    x = clamped.x;
+    y = clamped.y;
 
     if (Math.abs(x - rect.x) > 1 || Math.abs(y - rect.y) > 1) {
-      clamping = true;
-      await win.setPosition(new PhysicalPosition(x, y));
-      queueMicrotask(() => {
-        clamping = false;
-      });
+      await moveWindow(win, new PhysicalPosition(x, y));
     }
   } catch {
     /* ignore */
@@ -560,23 +606,34 @@ async function peekTarget(win: Window, edge: DockEdge): Promise<PhysRect> {
         x = maxX;
         if (distT <= corner) y = minY;
         else if (distB <= corner) y = maxY;
-        else y = Math.min(Math.max(cur.y, minY), maxY);
       } else if (edge === "left") {
         x = minX;
         if (distT <= corner) y = minY;
         else if (distB <= corner) y = maxY;
-        else y = Math.min(Math.max(cur.y, minY), maxY);
       } else if (edge === "top") {
         y = minY;
         if (distL <= corner) x = minX;
         else if (distR <= corner) x = maxX;
-        else x = Math.min(Math.max(cur.x, minX), maxX);
       } else {
         y = maxY;
         if (distL <= corner) x = minX;
         else if (distR <= corner) x = maxX;
-        else x = Math.min(Math.max(cur.x, minX), maxX);
       }
+      // One clamp at the end covers both axes, including the orthogonal
+      // "keep where it was" case and the work-area-smaller-than-the-window case.
+      ({ x, y } = clampOriginToWorkArea(
+        x,
+        y,
+        size,
+        size,
+        {
+          x: wa.position.x,
+          y: wa.position.y,
+          width: wa.size.width,
+          height: wa.size.height,
+        },
+        pad,
+      ));
       return { x, y, w: size, h: size };
     }
   } catch {
@@ -614,14 +671,19 @@ async function expandedTargetFromPeek(
     if (monitor) {
       const wa = monitor.workArea;
       const pad = Math.round(EDGE_INSET * scale);
-      x = Math.min(
-        Math.max(x, wa.position.x + pad),
-        wa.position.x + wa.size.width - w - pad,
-      );
-      y = Math.min(
-        Math.max(y, wa.position.y + pad),
-        wa.position.y + wa.size.height - h - pad,
-      );
+      ({ x, y } = clampOriginToWorkArea(
+        x,
+        y,
+        w,
+        h,
+        {
+          x: wa.position.x,
+          y: wa.position.y,
+          width: wa.size.width,
+          height: wa.size.height,
+        },
+        pad,
+      ));
     }
   } catch {
     /* ignore */
@@ -678,7 +740,12 @@ export async function setMiniPeek(peek: boolean): Promise<void> {
       await animateWindowRect(win, target, PEEK_MS, "peek");
       await lockLogicalSize(win, MINI_PEEK_SIZE, MINI_PEEK_SIZE);
     } else {
-      const edge = dockEdge ?? (await detectDockEdge(win)) ?? "right";
+      // Re-detect rather than trusting the remembered edge: the vinyl disc is
+      // draggable (it carries `data-tauri-drag-region`), and the move pipeline
+      // ignores peek moves, so `dockEdge` can be stale by the time the user
+      // hovers. Trusting it expanded the bar on the edge the disc used to be
+      // docked to, which made it jump across the screen.
+      const edge = (await detectDockEdge(win)) ?? dockEdge ?? "right";
       dockEdge = edge;
       const target = await expandedTargetFromPeek(win, edge);
       // Keep vinyl through the expand, then reveal the bar chrome.
@@ -708,6 +775,39 @@ export async function setMiniPeek(peek: boolean): Promise<void> {
   }
 }
 
+/**
+ * Reset the hover gate.
+ *
+ * `pointerInside` is only ever written by React mouse enter/leave, and a missed
+ * `mouseleave` disables the dock peek for the rest of the process: the window can
+ * shrink out from under the pointer (closing the queue panel, or a blur-driven
+ * close) so the pointer ends up over the desktop without a leave event ever
+ * firing, and `scheduleMiniPeekCollapse` then returns early forever.
+ */
+function resetMiniPointerInside(): void {
+  pointerInside = false;
+  clearCollapseTimer();
+}
+
+/**
+ * Ask the OS where the cursor actually is, instead of trusting the last mouse
+ * event. Falls back to the tracked flag if the query fails.
+ */
+async function pointerReallyInside(win: Window): Promise<boolean> {
+  try {
+    const { cursorPosition } = await import("@tauri-apps/api/window");
+    const [point, rect] = await Promise.all([cursorPosition(), readRect(win)]);
+    return (
+      point.x >= rect.x &&
+      point.x < rect.x + rect.w &&
+      point.y >= rect.y &&
+      point.y < rect.y + rect.h
+    );
+  } catch {
+    return pointerInside;
+  }
+}
+
 /** Schedule auto-collapse when docked and the pointer is outside. */
 export function scheduleMiniPeekCollapse(delayMs = COLLAPSE_DELAY_MS): void {
   clearCollapseTimer();
@@ -718,10 +818,11 @@ export function scheduleMiniPeekCollapse(delayMs = COLLAPSE_DELAY_MS): void {
   collapseTimer = setTimeout(() => {
     collapseTimer = null;
     void (async () => {
-      if (!sessionActive || queueExpanded || pointerInside || transitioning)
-        return;
+      if (!sessionActive || queueExpanded || transitioning) return;
       const win = await getWin();
       if (!win) return;
+      // Re-check against the real cursor: the flag can be stale.
+      if (await pointerReallyInside(win)) return;
       const edge = await detectDockEdge(win);
       if (!edge) {
         dockEdge = null;
@@ -751,7 +852,18 @@ async function bindMovedListener(win: Window): Promise<void> {
   movedUnlisten?.();
   movedUnlisten = await win.onMoved(() => {
     if (!sessionActive || transitioning || clamping || peekBusy) return;
-    if (usePlayerStore.getState().miniPeek) return;
+    if (usePlayerStore.getState().miniPeek) {
+      // The vinyl disc is draggable too. The live pipeline cannot run while
+      // peeking (it would fight the peek's own geometry), but the position still
+      // has to be remembered, otherwise the next enter snaps the bar back to a
+      // place the user moved the disc away from.
+      clearSettleTimer();
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
+        void persistWindowPos(win);
+      }, MOVE_SETTLE_MS);
+      return;
+    }
     if (moveRaf) cancelAnimationFrame(moveRaf);
     moveRaf = requestAnimationFrame(() => {
       moveRaf = 0;
@@ -828,7 +940,15 @@ export async function setMiniQueueExpanded(expanded: boolean): Promise<void> {
 
   await applyMiniBarSize();
 
-  if (!expanded) scheduleMiniPeekCollapse(500);
+  if (!expanded) {
+    // Collapsing shrinks the window out from under a pointer that may be over
+    // the panel we just removed. That pointer is now over the desktop, where no
+    // `mouseleave` will ever fire, so the tracked flag would stay `true` and
+    // suppress the dock peek for good. Drop it; the collapse timer re-checks the
+    // real cursor position anyway.
+    resetMiniPointerInside();
+    scheduleMiniPeekCollapse(500);
+  }
 }
 
 /** Re-apply window size while the queue panel is open (e.g. songs added/removed). */
@@ -861,12 +981,16 @@ export function isMiniPlayerSession(): boolean {
 /** Same shortcut for enter / exit. Enter needs a current song. */
 export async function toggleMiniPlayer(): Promise<void> {
   if (transitioning || peekBusy) return;
-  if (sessionActive || usePlayerStore.getState().miniMode) {
+  const direction = miniToggleDirection({
+    hasSong: Boolean(usePlayerStore.getState().currentSong),
+    miniMode: usePlayerStore.getState().miniMode,
+    sessionActive,
+  });
+  if (direction === "exit") {
     await exitMiniPlayer();
     return;
   }
-  if (!usePlayerStore.getState().currentSong) return;
-  await enterMiniPlayer();
+  if (direction === "enter") await enterMiniPlayer();
 }
 
 /**
@@ -914,10 +1038,24 @@ export async function enterMiniPlayer(): Promise<void> {
       return;
     }
 
-    const maximized = await win.isMaximized();
+    // Leave fullscreen *and wait for it* before sampling the geometry we will
+    // restore on exit. `setFullscreen(false)` is animated and asynchronous on
+    // macOS, so sampling right after it records the screen-sized rect with
+    // `maximized: false` — the exit then animates to a screen-sized window with
+    // its title bar behind the menu bar. The lyrics path already waits the same
+    // way (see lyricsFullscreen.ts); this mirrors it.
     if (await win.isFullscreen()) {
       await win.setFullscreen(false);
+      const deadline = Date.now() + FULLSCREEN_EXIT_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        if (!(await win.isFullscreen())) break;
+        await sleep(30);
+      }
+      await sleep(48);
     }
+    // Re-read after leaving fullscreen: some platforms report maximized only
+    // once the fullscreen flag has actually dropped.
+    const maximized = await win.isMaximized();
     if (maximized) {
       await win.unmaximize();
       await sleep(24);
@@ -979,10 +1117,116 @@ export async function enterMiniPlayer(): Promise<void> {
     // Only auto-peek when restored/snapped near an edge — free-floating stays as the bar.
     if (edge) scheduleMiniPeekCollapse(320);
   } catch {
+    // Never leave a half-entered shell behind. `saved` may already hold the
+    // pre-mini geometry, so use it to get back to a normal main window; without
+    // one, at least drop the mini chrome and store flags so the app is not stuck
+    // rendering the bar with no way out.
+    const snapshot = saved;
+    saved = null;
+    await forceRestoreMainWindow(await getWin().catch(() => null), snapshot).catch(
+      () => {},
+    );
     setMorphing(false);
   } finally {
     transitioning = false;
   }
+}
+
+/**
+ * Force every mini-player trace out of the DOM and the store.
+ *
+ * Used by the failure paths, where leaving any of `sessionActive`, `data-mini`,
+ * `miniMode` or the peek/dock attributes set strands the app in a half-mini
+ * shell that the user cannot leave with a second press of the same button.
+ */
+function resetMiniUi(): void {
+  sessionActive = false;
+  queueExpanded = false;
+  dockEdge = null;
+  pointerInside = false;
+  applyMiniCss(false);
+  usePlayerStore.setState({
+    miniMode: false,
+    miniMorphing: false,
+    miniPeek: false,
+    miniDockHint: null,
+  });
+  delete document.documentElement.dataset.miniMorphing;
+  delete document.documentElement.dataset.miniMorphSoft;
+  delete document.documentElement.dataset.miniPeek;
+  delete document.documentElement.dataset.miniDock;
+}
+
+/**
+ * Best-effort restore of the main window when the normal exit path failed.
+ *
+ * The important part is that it *always* ends in a usable window: the app must
+ * never be left as a 400×72 borderless shell rendering the full UI, which is
+ * what happened when the restore threw after `saved` had already been cleared.
+ */
+async function forceRestoreMainWindow(
+  win: Window | null,
+  snapshot: SavedChrome | null,
+): Promise<void> {
+  if (win && snapshot) {
+    try {
+      await win.setAlwaysOnTop(false);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await win.setSkipTaskbar(false);
+    } catch {
+      /* ignore */
+    }
+    const { LogicalSize } = await import("@tauri-apps/api/dpi");
+    try {
+      await win.setMaxSize(null);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await win.setMinSize(new LogicalSize(MAIN_MIN_WIDTH, MAIN_MIN_HEIGHT));
+    } catch {
+      /* ignore */
+    }
+    try {
+      await win.setSize(snapshot.size);
+      await win.setPosition(snapshot.position);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await win.setResizable(snapshot.resizable);
+    } catch {
+      /* ignore */
+    }
+    if (isMacOs()) {
+      try {
+        await win.setDecorations(true);
+        await win.setTitleBarStyle("overlay");
+      } catch {
+        /* best-effort */
+      }
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("reapply_macos_traffic_lights");
+      } catch {
+        /* overlay inset is best-effort */
+      }
+    }
+    if (snapshot.maximized) {
+      try {
+        await win.maximize();
+      } catch {
+        /* ignore */
+      }
+    }
+    document.documentElement.dataset.maximized = snapshot.maximized
+      ? "true"
+      : "false";
+  }
+  resetMiniUi();
 }
 
 /**
@@ -992,17 +1236,7 @@ export async function enterMiniPlayer(): Promise<void> {
 export async function exitMiniPlayer(): Promise<void> {
   if (transitioning || peekBusy) return;
   if (!sessionActive && !usePlayerStore.getState().miniMode && !saved) {
-    applyMiniCss(false);
-    usePlayerStore.setState({
-      miniMode: false,
-      miniMorphing: false,
-      miniPeek: false,
-      miniDockHint: null,
-    });
-    delete document.documentElement.dataset.miniMorphing;
-    delete document.documentElement.dataset.miniMorphSoft;
-    delete document.documentElement.dataset.miniPeek;
-    delete document.documentElement.dataset.miniDock;
+    resetMiniUi();
     return;
   }
 
@@ -1011,14 +1245,17 @@ export async function exitMiniPlayer(): Promise<void> {
   unbindMovedListener();
   setMorphing(true);
   setDockHint(null);
-  const win = await getWin();
   const snapshot = saved;
-  saved = null;
   queueExpanded = false;
+  pointerInside = false;
   const wasPeek = usePlayerStore.getState().miniPeek;
   dockEdge = null;
 
+  let win: Window | null = null;
+  let restored = false;
+
   try {
+    win = await getWin();
     if (!win) {
       sessionActive = false;
       applyMiniCss(false);
@@ -1030,6 +1267,7 @@ export async function exitMiniPlayer(): Promise<void> {
       delete document.documentElement.dataset.miniPeek;
       delete document.documentElement.dataset.miniDock;
       await revealAfterMorph();
+      restored = true;
       return;
     }
 
@@ -1038,8 +1276,7 @@ export async function exitMiniPlayer(): Promise<void> {
 
     if (wasPeek) {
       // Remember disc position; stay on vinyl chrome through the single expand.
-      const cur = await readRect(win);
-      persistMiniPos(cur.x, cur.y);
+      await persistWindowPos(win);
     } else {
       await persistCurrentMiniBarPos(win);
     }
@@ -1131,9 +1368,18 @@ export async function exitMiniPlayer(): Promise<void> {
     // toggle part of the transition. Must come after `revealAfterMorph` — the
     // rebuild is what has to survive, so it cannot run while still veiled.
     await refreshMainWindowShadow();
+    restored = true;
   } catch {
+    // A restore step threw. Leaving the app in the mini shell would strand it:
+    // the mini window is 400×72 and frameless, and a retry now has no snapshot
+    // (or a stale one), so it would render the full UI inside that shell.
+    // Land in a usable main window instead, and keep the snapshot for a retry.
+    await forceRestoreMainWindow(win, snapshot).catch(() => {});
     setMorphing(false);
   } finally {
+    // Only drop the snapshot once the restore actually completed, so a failed
+    // exit can still be retried with the real geometry.
+    if (restored) saved = null;
     transitioning = false;
   }
 }

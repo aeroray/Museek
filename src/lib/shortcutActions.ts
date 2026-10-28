@@ -1,7 +1,8 @@
 import { usePlayerStore } from "@/stores/playerStore";
 import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { getPlaybackTime } from "@/lib/playback/clock";
-import { toggleMiniPlayer } from "@/lib/miniPlayer";
+import { isMiniPlayerSession, toggleMiniPlayer } from "@/lib/miniPlayer";
+import { canToggleMini } from "@/lib/miniPlayerSession";
 import { canToggleDesktopLyrics } from "@/lib/desktopLyrics";
 import type { ShortcutAction } from "@/lib/shortcutKeys";
 
@@ -96,7 +97,20 @@ export function runShortcutAction(action: ShortcutAction): boolean {
       toggleDesktopLyricsInteraction();
       return true;
     case "mini":
-      if (!p.currentSong) return false;
+      // Leaving needs no song — only entering does. Gating both on `currentSong`
+      // trapped the user: a finished queue, a cleared queue, removing the playing
+      // row from the mini queue, or a local-file play error all null it out, and
+      // the mini shell has no window controls, so the shortcut is the only way
+      // out for a keyboard user.
+      if (
+        !canToggleMini({
+          hasSong: Boolean(p.currentSong),
+          miniMode: p.miniMode,
+          sessionActive: isMiniPlayerSession(),
+        })
+      ) {
+        return false;
+      }
       void toggleMiniPlayer();
       return true;
   }

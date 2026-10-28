@@ -150,9 +150,27 @@ export function DesktopLyricsApp() {
   const lyricShellRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const ignoreCursorEventsRef = useRef<boolean | null>(null);
+  /**
+   * Invalidates the hit-test poll's cached window geometry. Set by the poll
+   * effect, called from the move / scale listeners so the cache cannot go stale.
+   */
+  const invalidateHitTestGeometryRef = useRef<(() => void) | null>(null);
   const isDraggingRef = useRef(false);
   const dragRef = useRef<DesktopLyricsDragState | null>(null);
   const twoLinesRef = useRef<boolean | null>(null);
+  /**
+   * True once the main window's first appearance snapshot has supplied the real
+   * `twoLines` value.
+   *
+   * `twoLines` starts as `false`, so the mount effect below spends its
+   * "previous === null" guard before the real value arrives; the first snapshot
+   * then looked like a user toggle and nudged the window taller. But
+   * `restoreDesktopLyricsGeometry` has already restored the height the previous
+   * two-line session saved, so the sub-line got counted twice — and the result
+   * was persisted, ratcheting the window ~25px taller on every launch until
+   * `MAX_HEIGHT`.
+   */
+  const twoLinesHydratedRef = useRef(false);
   const hasLyricContent = Boolean(snapshot.song && snapshot.lines.length > 0);
 
   useEffect(() => {
@@ -180,6 +198,15 @@ export function DesktopLyricsApp() {
     if (drag.frameId !== null) {
       window.cancelAnimationFrame(drag.frameId);
       drag.frameId = null;
+    }
+    if (!drag.ready) {
+      // Released before the drag could even start (a fast flick, or the first
+      // drag after the window opens while the window APIs are still cold). The
+      // setup path owns the final write from here: it is the only place that
+      // knows the start position, and returning early used to drop the gesture
+      // entirely — the lyric simply did not move.
+      drag.pendingFinish = true;
+      return;
     }
     const finalize = async () => {
       const point = await cursorPosition().catch(() => null);
@@ -245,7 +272,16 @@ export function DesktopLyricsApp() {
                   applyFontStacks(event.payload.fontUi, event.payload.fontLyrics);
                 }
                 setCapsuleVisible(event.payload.capsuleVisible !== false);
-                setTwoLines(event.payload.twoLines === true);
+                // The first snapshot supplies the real value; the mount-time
+                // `false` was only a placeholder, not a user toggle. Adopt it
+                // into the ref so the nudge effect below sees no change — the
+                // restored height already accounts for the mode it was saved in.
+                const nextTwoLines = event.payload.twoLines === true;
+                if (!twoLinesHydratedRef.current) {
+                  twoLinesHydratedRef.current = true;
+                  twoLinesRef.current = nextTwoLines;
+                }
+                setTwoLines(nextTwoLines);
                 setLyricColor(event.payload.lyricColor ?? null);
                 if (event.payload.lockShortcut) {
                   setLockShortcut(event.payload.lockShortcut);
@@ -298,30 +334,49 @@ export function DesktopLyricsApp() {
     };
   }, []);
 
+  /**
+   * Single writer for the hover state.
+   *
+   * `isLyricsHovered` (React) and `isLyricsHoveredRef` are both written here and
+   * nowhere else. They used to be written independently — the pointer handlers
+   * touched only the state, `applyHover` touched both and deduped on the ref — so
+   * the two could disagree, and the ref is what decides whether the toolbar is
+   * part of the hit area.
+   */
+  const setHovered = useCallback((next: boolean) => {
+    isLyricsHoveredRef.current = next;
+    // React bails out on an identical value, so this is safe to call often.
+    setIsLyricsHovered(next);
+  }, []);
+
   useEffect(() => {
     let disposed = false;
     let checking = false;
+    let timer: number | undefined;
     const lyricsWindow = getCurrentWindow();
-
     /**
-     * Write the hover state through a ref as well as React.
-     *
-     * The poll reads it to decide whether the toolbar is part of the hit area,
-     * and the effect must NOT list `isLyricsHovered` as a dependency: it sets
-     * that state itself, so depending on it tore the effect down and rebuilt it
-     * on every hover flip — which is precisely when an in-flight poll is most
-     * likely to be left holding a stale cursor sample.
+     * Window position and scale factor are constant between a move and a scale
+     * change, and the window spans a whole monitor, so re-reading them 20 times a
+     * second was two thirds of this poll's IPC traffic. They are cached and
+     * invalidated by the `onMoved` / `onScaleChanged` listeners below.
      */
-    const applyHover = (next: boolean) => {
-      if (isLyricsHoveredRef.current === next) return;
-      isLyricsHoveredRef.current = next;
-      setIsLyricsHovered(next);
-    };
+    let geometry: {
+      position: { x: number; y: number };
+      scale: number;
+    } | null = null;
+
+    const applyHover = setHovered;
 
     const setCursorPassthrough = async (ignore: boolean) => {
       if (disposed || ignoreCursorEventsRef.current === ignore) return;
       ignoreCursorEventsRef.current = ignore;
-      await lyricsWindow.setIgnoreCursorEvents(ignore).catch(() => {});
+      await lyricsWindow.setIgnoreCursorEvents(ignore).catch(() => {
+        // The write failed, so the native window does not have this state.
+        // Clear the dedupe so the next poll retries instead of believing it.
+        if (ignoreCursorEventsRef.current === ignore) {
+          ignoreCursorEventsRef.current = null;
+        }
+      });
     };
 
     const syncCursorHitArea = async () => {
@@ -358,11 +413,11 @@ export function DesktopLyricsApp() {
           return;
         }
 
-        const [point, position, scaleFactor] = await Promise.all([
-          cursorPosition(),
-          lyricsWindow.outerPosition(),
-          lyricsWindow.scaleFactor(),
-        ]);
+        geometry ??= {
+          position: await lyricsWindow.outerPosition(),
+          scale: (await lyricsWindow.scaleFactor()) || window.devicePixelRatio || 1,
+        };
+        const point = await cursorPosition();
         // Everything above is async, so this sample may predate a teardown (the
         // mode was locked, the lyrics were closed) or simply be older than the
         // pointer's current position. Writing it anyway is what made the grab
@@ -372,7 +427,7 @@ export function DesktopLyricsApp() {
         // `setCursorPassthrough` already refuses to act after teardown; the
         // state write needs the same guard.
         if (disposed) return;
-        const scale = scaleFactor || window.devicePixelRatio || 1;
+        const { position, scale } = geometry;
         let inside = pointInElement(point, lyricShell, position, scale);
         if (!inside && isLyricsHoveredRef.current && toolbarRef.current) {
           inside = pointInElement(point, toolbarRef.current, position, scale);
@@ -388,16 +443,53 @@ export function DesktopLyricsApp() {
       }
     };
 
-    void syncCursorHitArea();
-    const timer = window.setInterval(() => {
+    const start = () => {
+      if (disposed || timer !== undefined) return;
+      timer = window.setInterval(() => {
+        void syncCursorHitArea();
+      }, 50);
       void syncCursorHitArea();
-    }, 50);
+    };
+    const stop = () => {
+      if (timer === undefined) return;
+      window.clearInterval(timer);
+      timer = undefined;
+    };
+
+    /**
+     * Stop polling while the window is hidden.
+     *
+     * Closing the desktop lyric only hides its window; the React app keeps
+     * running, so this interval used to keep issuing ~60 IPC round trips a second
+     * for the rest of the session, driving `setIgnoreCursorEvents` on a window
+     * nobody can see.
+     */
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        stop();
+        applyHover(false);
+        void setCursorPassthrough(true);
+      } else {
+        geometry = null;
+        start();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (document.visibilityState !== "hidden") start();
+
+    // Exposed for the geometry listeners registered elsewhere in this file.
+    invalidateHitTestGeometryRef.current = () => {
+      geometry = null;
+    };
 
     return () => {
       disposed = true;
-      window.clearInterval(timer);
+      stop();
+      invalidateHitTestGeometryRef.current = null;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [hasLyricContent, interactionMode]);
+  }, [hasLyricContent, interactionMode, setHovered]);
 
   useEffect(() => {
     const stopDragging = () => {
@@ -423,6 +515,8 @@ export function DesktopLyricsApp() {
       if (disposed) return;
 
       const schedulePersist = () => {
+        // The hit-test poll caches the window position, so a move must drop it.
+        invalidateHitTestGeometryRef.current?.();
         if (saveTimer !== undefined) window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(() => {
           saveTimer = undefined;
@@ -432,6 +526,8 @@ export function DesktopLyricsApp() {
       };
       const restoreLogicalSizeAfterScaleChange = () => {
         if (disposed) return;
+        // The scale factor changed, so the cached one is wrong.
+        invalidateHitTestGeometryRef.current?.();
         void restoreDesktopLyricsGeometry()
           .then(async () => {
             if (disposed) return;
@@ -562,8 +658,7 @@ export function DesktopLyricsApp() {
   const toggleInteractionMode = () => {
     const next = interactionMode === "interactive" ? "locked" : "interactive";
     ignoreCursorEventsRef.current = null;
-    isLyricsHoveredRef.current = false;
-    setIsLyricsHovered(false);
+    setHovered(false);
     setInteractionMode(next);
     void applyDesktopLyricsInteractionMode(next);
     void emitTo("main", DESKTOP_LYRICS_SET_INTERACTION_EVENT, next).catch(
@@ -614,6 +709,7 @@ export function DesktopLyricsApp() {
       latestCursorY: event.screenY,
       ready: false,
       finished: false,
+      pendingFinish: false,
       frameId: null,
       positionPromise: Promise.resolve(),
     };
@@ -629,7 +725,10 @@ export function DesktopLyricsApp() {
       currentWindow.scaleFactor(),
     ])
       .then(([position, size, monitors, point, scaleFactor]) => {
-        if (dragRef.current !== drag || drag.finished) return;
+        // A drag that was already released before these queries resolved still
+        // needs its final position applied — that is what `pendingFinish` marks.
+        if (dragRef.current !== drag || (drag.finished && !drag.pendingFinish))
+          return;
         drag.startCursorX = point.x;
         drag.startCursorY = point.y;
         drag.startPosition = { x: position.x, y: position.y };
@@ -658,9 +757,20 @@ export function DesktopLyricsApp() {
           ) ??
           null;
         drag.ready = true;
+        if (drag.pendingFinish) {
+          // The pointer is already up. Re-enter the normal release path now that
+          // the drag is usable, so the position is written and persisted.
+          drag.finished = false;
+          drag.pendingFinish = false;
+          finishDragging(event.pointerId);
+          return;
+        }
         scheduleDesktopLyricsDragPosition(drag, () => dragRef.current === drag);
       })
-      .catch(() => finishDragging(event.pointerId));
+      .catch(() => {
+        drag.pendingFinish = false;
+        finishDragging(event.pointerId);
+      });
   };
 
   const actionTabIndex = interactionMode === "interactive" ? 0 : -1;
@@ -770,7 +880,7 @@ export function DesktopLyricsApp() {
               onPointerUp={(event) => finishDragging(event.pointerId)}
               onPointerCancel={() => finishDragging()}
               onLostPointerCapture={() => finishDragging()}
-              onPointerLeave={() => setIsLyricsHovered(false)}
+              onPointerLeave={() => setHovered(false)}
             >
               <div
                 ref={toolbarRef}
@@ -841,7 +951,7 @@ export function DesktopLyricsApp() {
                       until={lineUntil}
                       className="desktop-lyrics-heading"
                       style={{ fontSize: `${LYRIC_FONT_SIZE * effectiveFontScale}px` }}
-                      onPointerEnter={() => setIsLyricsHovered(true)}
+                      onPointerEnter={() => setHovered(true)}
                     />
                     {twoLines ? (
                       <span

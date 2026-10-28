@@ -10,6 +10,7 @@ import { useDesktopLyricsStore } from "@/stores/desktopLyricsStore";
 import { currentFontStacks, useFontStore } from "@/stores/fontStore";
 import { findActiveLyricIndex } from "@/lib/lyrics";
 import { getLyricTime } from "@/lib/playback/clock";
+import { snapshotKey as payloadKey } from "@/lib/desktopLyricsSync";
 import {
   loadDesktopLyricsInteractionMode,
   saveDesktopLyricsInteractionMode,
@@ -79,22 +80,12 @@ function createSnapshot(state: PlayerSnapshotState): DesktopLyricsSnapshot {
   };
 }
 
+/**
+ * Identity of a lyric *payload*, not of the clock — see `desktopLyricsSync.ts`
+ * for why the distinction is load-bearing.
+ */
 function snapshotKey(state: PlayerSnapshotState): string {
-  const currentTime =
-    state.status === "loading" || state.status === "idle"
-      ? 0
-      : getLyricTime();
-  const currentLyricIndex = findActiveLyricIndex(state.lyricLines, currentTime);
-  return [
-    state.currentSong?.id ?? "",
-    Math.round(currentTime * 1000),
-    currentLyricIndex,
-    state.isPlaying,
-    state.status,
-    state.lyricsLoading,
-    state.lyricLines.length,
-    state.currentPicUrl ?? state.currentSong?.meta.picUrl ?? "",
-  ].join("|");
+  return payloadKey(state);
 }
 
 function createAppearanceSnapshot(): DesktopLyricsAppearanceSnapshot {
@@ -142,12 +133,18 @@ async function publishSnapshot(force = false): Promise<void> {
   const state = usePlayerStore.getState();
   const key = snapshotKey(state);
   if (!force && key === lastSnapshotKey) return;
-  lastSnapshotKey = key;
-  await emitTo(
+  // Record the key only once the send succeeded. Committing it first meant one
+  // rejected `emitTo` (window closing, transient IPC failure) suppressed that
+  // snapshot permanently: the next publish computed the same key and returned,
+  // so a paused player never recovered until something else changed the store.
+  const sent = await emitTo(
     DESKTOP_LYRICS_LABEL,
     DESKTOP_LYRICS_STATE_EVENT,
     createSnapshot(state),
-  ).catch(() => {});
+  )
+    .then(() => true)
+    .catch(() => false);
+  if (sent) lastSnapshotKey = key;
 }
 
 async function publishAppearance(force = false): Promise<void> {
@@ -155,24 +152,29 @@ async function publishAppearance(force = false): Promise<void> {
   const snapshot = createAppearanceSnapshot();
   const key = appearanceKey(snapshot);
   if (!force && key === lastAppearanceKey) return;
-  lastAppearanceKey = key;
-  await emitTo(
+  // Same ordering rule as publishSnapshot: only remember the key once it landed.
+  const sent = await emitTo(
     DESKTOP_LYRICS_LABEL,
     DESKTOP_LYRICS_APPEARANCE_EVENT,
     snapshot,
-  ).catch(() => {});
+  )
+    .then(() => true)
+    .catch(() => false);
+  if (sent) lastAppearanceKey = key;
 }
 
 async function publishInteraction(force = false): Promise<void> {
   if (!isTauri) return;
   const interactionMode = useDesktopLyricsStore.getState().interactionMode;
   if (!force && interactionMode === lastInteractionMode) return;
-  lastInteractionMode = interactionMode;
-  await emitTo(
+  const sent = await emitTo(
     DESKTOP_LYRICS_LABEL,
     DESKTOP_LYRICS_INTERACTION_EVENT,
     interactionMode,
-  ).catch(() => {});
+  )
+    .then(() => true)
+    .catch(() => false);
+  if (sent) lastInteractionMode = interactionMode;
 }
 
 export async function setDesktopLyricsInteractionMode(
@@ -191,9 +193,14 @@ export async function setDesktopLyricsInteractionMode(
 export async function openDesktopLyrics(): Promise<void> {
   if (!isTauri) return;
   if (!usePlayerStore.getState().currentSong) return;
+  // Restore the persisted lock state unless auto-lock is on. The mode is saved to
+  // disk (`desktopLyrics.json`) and hydrated into the store precisely so a lock
+  // choice survives a close/reopen; forcing "interactive" here overwrote it, so
+  // the setting could only ever mean "force locked" or "force unlocked".
+  await ensureInteractionModeLoaded();
   const interactionMode = useSettingsStore.getState().autoLockDesktopLyrics
     ? "locked"
-    : "interactive";
+    : useDesktopLyricsStore.getState().interactionMode;
   await setDesktopLyricsInteractionMode(interactionMode);
   try {
     await invoke("show_lyrics_window", {

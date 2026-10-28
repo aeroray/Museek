@@ -47,6 +47,12 @@ export interface DesktopLyricsDragState {
   latestCursorY: number;
   ready: boolean;
   finished: boolean;
+  /**
+   * Set when the pointer was released before `ready` — the five window/monitor
+   * queries are still in flight. The setup path then applies the release position
+   * itself, instead of the release being dropped on the floor.
+   */
+  pendingFinish: boolean;
   frameId: number | null;
   positionPromise: Promise<void>;
 }
@@ -173,17 +179,40 @@ export function pointInElement(
   );
 }
 
-export async function restoreDesktopLyricsGeometry(): Promise<void> {
-  const window = getCurrentWindow();
-  const saved = await loadDesktopLyricsGeometry();
-  const monitors = await availableMonitors().catch(() => [] as Monitor[]);
-  const activeMonitor = await currentMonitor().catch(() => null);
-  const monitor = saved
-    ? (monitorForRect(saved, monitors) ?? activeMonitor ?? monitors[0])
-    : (activeMonitor ?? monitors[0]);
-  if (!monitor) return;
+/**
+ * Where the lyrics window should be placed when it is shown again.
+ *
+ * Pure so it can be pinned without a Tauri bridge — see
+ * `scripts/check-desktop-lyrics-geometry.mjs`. Two defects lived here:
+ *
+ * 1. `saved` mixes units. `persistDesktopLyricsGeometry` stores x/y as
+ *    **physical** and width/height as **logical**, so intersecting the saved rect
+ *    with a monitor's physical bounds picked the wrong monitor near a seam. The
+ *    saved *point* is the only trustworthy field, so that is what selects the
+ *    monitor; a nearest-monitor fallback covers a point in a gap.
+ * 2. The saved origin was applied verbatim. Unplug the display the lyric was
+ *    parked on and the window was placed at coordinates that no longer exist —
+ *    and the caller then re-persisted them, making it sticky. A monitor-wide,
+ *    click-through, `skipTaskbar` window at a dead coordinate is effectively
+ *    unrecoverable.
+ */
+export function computeRestoredGeometry(opts: {
+  saved: DesktopLyricsGeometry | null;
+  monitors: Monitor[];
+  activeMonitor: Monitor | null;
+  /** Fallback scale factor when the chosen monitor does not report one. */
+  fallbackScale: number;
+}): { x: number; y: number; width: number; height: number } | null {
+  const { saved, monitors, activeMonitor, fallbackScale } = opts;
 
-  const scale = monitor.scaleFactor || (await window.scaleFactor()) || 1;
+  const savedMonitor = saved
+    ? (monitors.find((m) => pointInMonitor(saved.x, saved.y, m)) ??
+      monitorForRect({ x: saved.x, y: saved.y, width: 1, height: 1 }, monitors))
+    : undefined;
+  const monitor = savedMonitor ?? activeMonitor ?? monitors[0];
+  if (!monitor) return null;
+
+  const scale = monitor.scaleFactor || fallbackScale || 1;
   const bottomInset = Math.round(DEFAULT_BOTTOM_GAP * scale);
   const maxPhysicalHeight = Math.max(1, monitor.size.height);
   const savedHeight = saved
@@ -201,15 +230,44 @@ export async function restoreDesktopLyricsGeometry(): Promise<void> {
     new LogicalSize(1, logicalHeight).toPhysical(scale).height,
     maxPhysicalHeight,
   );
-  const initialX = saved?.x ?? monitor.position.x;
   const defaultY =
     monitor.position.y + monitor.size.height - height - bottomInset;
 
-  await window.setSize(new PhysicalSize(width, height)).catch(() => {});
+  return {
+    x: clamp(
+      Math.round(saved?.x ?? monitor.position.x),
+      monitor.position.x,
+      monitor.position.x + monitor.size.width - width,
+    ),
+    y: clamp(
+      Math.round(saved?.y ?? defaultY),
+      monitor.position.y,
+      monitor.position.y + monitor.size.height - height,
+    ),
+    width,
+    height,
+  };
+}
+
+export async function restoreDesktopLyricsGeometry(): Promise<void> {
+  const window = getCurrentWindow();
+  const saved = await loadDesktopLyricsGeometry();
+  const monitors = await availableMonitors().catch(() => [] as Monitor[]);
+  const activeMonitor = await currentMonitor().catch(() => null);
+  const fallbackScale = (await window.scaleFactor().catch(() => 1)) || 1;
+  const target = computeRestoredGeometry({
+    saved,
+    monitors,
+    activeMonitor,
+    fallbackScale,
+  });
+  if (!target) return;
+
   await window
-    .setPosition(
-      new PhysicalPosition(initialX, Math.round(saved?.y ?? defaultY)),
-    )
+    .setSize(new PhysicalSize(target.width, target.height))
+    .catch(() => {});
+  await window
+    .setPosition(new PhysicalPosition(target.x, target.y))
     .catch(() => {});
   await persistDesktopLyricsGeometry();
 }
@@ -391,17 +449,18 @@ export function getDesktopLyricsDragTarget(
   const y = Math.round(
     drag.startPosition.y + drag.latestCursorY - drag.startCursorY,
   );
+  // Resolve the monitor from the *current* target rect, not from the one the
+  // drag started on. `drag.monitor` is the monitor under the pointer at
+  // press-time and is never refreshed, so trusting it first pinned the window to
+  // the starting monitor: dragging toward a second display stopped dead at the
+  // seam while the pointer kept going.
   const monitor =
-    drag.monitor ??
     monitorForRect(
-      {
-        x,
-        y,
-        width: drag.width,
-        height: drag.height,
-      },
+      { x, y, width: drag.width, height: drag.height },
       drag.monitors,
-    );
+    ) ??
+    drag.monitor ??
+    undefined;
   return {
     x: clampWindowXToVisualBounds(
       x,
@@ -426,7 +485,11 @@ export function queueDesktopLyricsDragPosition(
   drag.positionPromise = drag.positionPromise
     .catch(() => {})
     .then(async () => {
-      if (!force && (drag.finished || !isCurrent())) return;
+      // Ownership is never negotiable: a superseded drag must not write, however
+      // forcefully its final position was requested. `force` only means "ignore
+      // the finished flag", so the release-time write still lands.
+      if (!isCurrent()) return;
+      if (!force && drag.finished) return;
       const target = getDesktopLyricsDragTarget(drag);
       if (!target) return;
       await getCurrentWindow()
