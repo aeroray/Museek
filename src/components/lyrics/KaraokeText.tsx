@@ -8,8 +8,6 @@ type KaraokeLine = Pick<LyricLine, "text" | "time" | "words" | "karaoke">;
 export interface KaraokeTextProps {
   line: KaraokeLine;
   currentTime: number;
-  /** End of this line; used for whole-line theme fill when there is no native karaoke. */
-  until?: number;
   className?: string;
   style?: CSSProperties;
   onPointerEnter?: PointerEventHandler<HTMLSpanElement>;
@@ -34,69 +32,28 @@ export function hasKaraokeTiming(line: KaraokeLine): boolean {
   );
 }
 
-function lineFillProgress(
-  lineTime: number,
-  until: number | undefined,
-  currentTime: number,
-): number | null {
-  if (
-    until == null ||
-    !Number.isFinite(until) ||
-    !Number.isFinite(lineTime) ||
-    until <= lineTime + 0.05
-  ) {
-    return null;
-  }
-  return clamp((currentTime - lineTime) / (until - lineTime), 0, 1);
-}
-
-function KaraokeFill({
-  text,
-  progress,
-}: {
-  text: string;
-  progress: number;
-}) {
-  const reveal = `${(1 - progress) * 100}%`;
-  return (
-    <span className="lyric-karaoke-words">
-      <span className="lyric-karaoke-word">
-        <span className="lyric-karaoke-word-text">{text}</span>
-        <span
-          className="lyric-karaoke-word-sung"
-          aria-hidden="true"
-          style={{
-            // Keep inset non-negative — negative clip-path values have
-            // crashed / blanked WKWebView on some macOS builds.
-            clipPath: `inset(0 ${reveal} 0 0)`,
-          }}
-        >
-          {text}
-        </span>
-      </span>
-    </span>
-  );
-}
-
+/**
+ * Renders one lyric line.
+ *
+ * Word-by-word fill is used ONLY when the payload carries validated native word
+ * timings. A plain line-timed LRC renders as plain text, exactly like the lyrics
+ * panel and the top bar — there used to be a `until` prop here that swept a
+ * whole-line fill across plain lines, which only the desktop lyric passed, so the
+ * same song looked karaoke-styled in one surface and plain in the other two.
+ * See `docs/memory/areas/lyrics.md` (native word timing only).
+ */
 export function KaraokeText({
   line,
   currentTime,
-  until,
   className,
   style,
   onPointerEnter,
 }: KaraokeTextProps) {
   const words = hasKaraokeTiming(line) ? (line.words ?? []) : null;
-  const lineProgress = words
-    ? null
-    : lineFillProgress(line.time, until, currentTime);
 
   return (
     <span
-      className={cn(
-        className,
-        words || lineProgress != null ? "lyric-has-fill" : "lyric-plain",
-      )}
+      className={cn(className, words ? "lyric-has-fill" : "lyric-plain")}
       onPointerEnter={onPointerEnter}
       style={style}
     >
@@ -128,8 +85,6 @@ export function KaraokeText({
             );
           })}
         </span>
-      ) : lineProgress != null ? (
-        <KaraokeFill text={line.text} progress={lineProgress} />
       ) : (
         line.text
       )}

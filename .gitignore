@@ -49,3 +49,5 @@ src-tauri/target/
 !/scripts/run-checks.mjs
 !/scripts/lib/
 !/scripts/lib/**
+# Transient commit-message file (PowerShell heredocs are not supported here)
+.git-commit-msg.txt

@@ -16,15 +16,17 @@ import { searchMigu } from "@/lib/search/mg"
 import { searchTx } from "@/lib/search/tx"
 import { searchWangyi } from "@/lib/search/wy"
 import { sourceRunner } from "@/lib/sourceRunner"
+import {
+  BoundedMap,
+  createOptionLister,
+  type PlatformLyricOption as BasePlatformLyricOption,
+  type PlatformLyricStatus,
+} from "@/lib/lyrics/optionCache"
 import type { LyricInfo, MusicInfo, OnlineSource } from "@/types/music"
 
-export type PlatformLyricStatus = "ok" | "empty" | "error" | "pending"
+export type { PlatformLyricStatus }
 
-export type PlatformLyricOption = {
-  source: OnlineSource
-  status: PlatformLyricStatus
-  wordByWord: boolean
-}
+export type PlatformLyricOption = BasePlatformLyricOption<OnlineSource>
 
 function hasLyricPayload(
   info: LyricInfo | null | undefined,
@@ -83,25 +85,8 @@ const searchFns: Record<
   mg: searchMigu,
 }
 
-/** Session cache with a hard size cap: oldest entries are evicted (LRU-ish). */
-class BoundedMap<K, V> extends Map<K, V> {
-  constructor(private readonly max: number) {
-    super()
-  }
-  override set(key: K, value: V): this {
-    if (this.has(key)) this.delete(key)
-    super.set(key, value)
-    while (this.size > this.max) {
-      const oldest = this.keys().next().value as K
-      this.delete(oldest)
-    }
-    return this
-  }
-}
-
 const picks = new BoundedMap<string, OnlineSource>(200)
 const payloads = new BoundedMap<string, Payload>(100)
-const inflight = new Map<string, Promise<PlatformLyricOption[]>>()
 /**
  * Artist-name aliases per platform, memoised for the session.
  *
@@ -246,42 +231,50 @@ async function probeOne(
   }
 }
 
+/**
+ * Per-platform lyric availability for `song`.
+ *
+ * Cached for `OPTIONS_TTL_MS`: opening the source menu a second time for the same
+ * song returns instantly instead of re-running the whole cross-platform probe,
+ * and the stored list never contains `error` or `pending` rows — a transient
+ * failure is retried on the next open rather than cached as "no lyric".
+ */
+const optionLister = createOptionLister<MusicInfo, OnlineSource>({
+  keyOf: probeIdentityKey,
+  platforms: PLATFORM_ORDER,
+  probe: async (song, onUpdate) => {
+    const options: PlatformLyricOption[] = PLATFORM_ORDER.map((source) => ({
+      source,
+      status: "pending",
+      wordByWord: false,
+    }));
+    await Promise.all(
+      PLATFORM_ORDER.map(async (platform, index) => {
+        options[index] = await probeOne(song, platform);
+        onUpdate([...options]);
+      }),
+    );
+    return [...options];
+  },
+});
+
+/**
+ * The already-known availability list for `song`, if one was computed recently.
+ *
+ * Lets the source menu paint real results on its first frame instead of flashing
+ * a full "searching" pass for an answer it already has.
+ */
+export function knownLyricOptions(
+  song: MusicInfo,
+): PlatformLyricOption[] | null {
+  return optionLister.known(song);
+}
+
 export async function listPlatformLyrics(
   song: MusicInfo,
   onUpdate?: (options: PlatformLyricOption[]) => void,
 ): Promise<PlatformLyricOption[]> {
-  const key = probeIdentityKey(song)
-  const pending = inflight.get(key)
-  if (pending) return pending
-
-  const options: PlatformLyricOption[] = PLATFORM_ORDER.map((source) => ({
-    source,
-    status: "pending",
-    wordByWord: false,
-  }))
-  onUpdate?.([...options])
-
-  const request = (async () => {
-    await Promise.all(
-      PLATFORM_ORDER.map(async (platform, index) => {
-        options[index] = await probeOne(song, platform)
-        onUpdate?.([...options])
-      }),
-    )
-    inflight.delete(key)
-    return [...options]
-  })()
-  inflight.set(key, request)
-  try {
-    return await request
-  } catch {
-    inflight.delete(key)
-    return PLATFORM_ORDER.map((source) => ({
-      source,
-      status: "error" as const,
-      wordByWord: false,
-    }))
-  }
+  return optionLister.list(song, onUpdate);
 }
 
 async function lyricFromPlatform(
@@ -417,8 +410,15 @@ export async function loadPlatformLyric(
     picks.set(songKey(song), platform)
     return existing.info
   }
+  // `listPlatformLyrics` fills `payloads` as a side effect, but it may serve the
+  // whole option list from its own cache without probing anything — and the
+  // payload cache is smaller (keyed per song+platform) so it can have been
+  // evicted in the meantime. Falling back to a direct fetch keeps a click on a
+  // row that says "ok" from silently doing nothing.
   await listPlatformLyrics(song)
-  const payload = payloads.get(payloadKey(song, platform))
+  const payload =
+    payloads.get(payloadKey(song, platform)) ??
+    (await lyricFromPlatform(song, platform))
   if (!payload) return null
   picks.set(songKey(song), platform)
   return payload.info

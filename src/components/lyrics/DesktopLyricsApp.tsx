@@ -778,13 +778,6 @@ export function DesktopLyricsApp() {
   const activeLyricIndex = findActiveLyricIndex(snapshot.lines, currentTime);
   const displayedLyricIndex = activeLyricIndex >= 0 ? activeLyricIndex : 0;
   const activeLine = snapshot.lines[displayedLyricIndex] ?? null;
-  const nextLine = snapshot.lines[displayedLyricIndex + 1];
-  const lineUntil =
-    nextLine && nextLine.time > (activeLine?.time ?? 0)
-      ? nextLine.time
-      : snapshot.duration > (activeLine?.time ?? 0)
-        ? snapshot.duration
-        : undefined;
   const secondaryText = twoLines
     ? desktopLyricSecondaryText(snapshot.lines, displayedLyricIndex)
     : null;
@@ -948,7 +941,6 @@ export function DesktopLyricsApp() {
                     <KaraokeText
                       line={activeLine}
                       currentTime={currentTime}
-                      until={lineUntil}
                       className="desktop-lyrics-heading"
                       style={{ fontSize: `${LYRIC_FONT_SIZE * effectiveFontScale}px` }}
                       onPointerEnter={() => setHovered(true)}

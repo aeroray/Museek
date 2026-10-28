@@ -8,9 +8,9 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { PLATFORM_ORDER } from "@/components/common/PlatformTabs"
 import { applyLyricInfo } from "@/lib/lyric/loadLyric"
 import {
+  knownLyricOptions,
   listPlatformLyrics,
   loadPlatformLyric,
   selectedLyricSource,
@@ -45,13 +45,10 @@ export function LyricSourceMenu({ song, onOpenChange }: Props) {
   useEffect(() => {
     if (!open || !song) return
     let cancelled = false
-    setOptions(
-      PLATFORM_ORDER.map((source) => ({
-        source,
-        status: "pending" as const,
-        wordByWord: false,
-      })),
-    )
+    // Start from whatever is already known so a warm cache paints the real list
+    // on the first frame instead of a full "searching…" pass. On a cold open
+    // `listPlatformLyrics` calls back synchronously with the pending rows anyway.
+    setOptions(knownLyricOptions(song) ?? [])
     void listPlatformLyrics(song, (next) => {
       if (!cancelled) setOptions(next)
     })
