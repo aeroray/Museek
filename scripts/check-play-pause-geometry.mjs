@@ -1,25 +1,30 @@
-// Pins the play/pause glyph geometry.
+// Pins the play/pause button's glyph geometry.
 //
-// The button morphs one <path> between two `d` strings. If their bounding boxes
-// do not share a centre, the glyph visibly jumps sideways on every toggle. That
-// is exactly what shipped: the play path started at x=6 and ran to x=19, giving
-// it a centre of (12.5, 12) against the pause path's (12, 12) — a half-pixel
-// shift, small enough to read as "the icon wiggles" rather than as a bug.
+// History: this button used to morph a single <path> between a triangle and two
+// bars. The paths were tuned until their bounding boxes shared the geometric
+// centre (12, 12), and measuring the interpolation confirmed the box centre
+// really does stay at x=12 for every t — yet it still looked like the icon
+// slid sideways on press. Two shapes with matching bounding boxes can still have
+// different optical centres (a triangle's mass sits toward its flat edge, two
+// bars are symmetric), and a morph asserts "this is one object becoming another",
+// which is exactly the claim those two glyphs cannot support.
 //
-// The paths are intentionally different SIZES (a triangle reads larger than two
-// bars, so the play triangle is 13x14.8 against the bars' 12x14), so this cannot
-// assert equal boxes. It asserts the invariant that actually matters: both are
-// centred on the viewBox centre, and neither exceeds it.
+// So the button now cross-fades two optically-balanced lucide glyphs. The
+// invariant that matters is different, and this checks it:
+//
+//   1. no animated path `d` (no morph)
+//   2. both glyphs render into one fixed-size box, so nothing resizes
+//   3. both layers are absolutely positioned, so the outgoing and incoming
+//      glyphs occupy identical geometry throughout the transition
+//   4. the icon has no horizontal hover pose (the rule in check-icon-pose-jump)
 //
 //   node scripts/check-play-pause-geometry.mjs
 import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 const root = resolve(import.meta.dirname, "..")
-const src = readFileSync(
-  join(root, "src/components/player/PlayPauseButton.tsx"),
-  "utf8",
-)
+const path = join(root, "src/components/player/PlayPauseButton.tsx")
+const src = readFileSync(path, "utf8")
 
 let failures = 0
 const check = (name, cond, extra = "") => {
@@ -30,96 +35,56 @@ const check = (name, cond, extra = "") => {
   }
 }
 
-/** Pull a `const NAME = "M ..."` path literal out of the component source. */
-function pathLiteral(name) {
-  const m = new RegExp(`const ${name} =\\s*\\n?\\s*"([^"]+)"`).exec(src)
-  return m?.[1] ?? null
-}
+console.log("no path morph")
+check(
+  "does not animate a path `d`",
+  !/animate=\{\{\s*d:/.test(src),
+  "an animated `d` means the two glyphs are being interpolated as one shape",
+)
+check(
+  "does not declare hand-drawn PLAY_PATH / PAUSE_PATH literals",
+  !/const\s+(PLAY|PAUSE)_PATH\s*=/.test(src),
+)
+check(
+  "uses the lucide Play and Pause glyphs",
+  /\bPlay\b/.test(src) && /\bPause\b/.test(src),
+)
 
-const VIEWBOX = 24
-const CENTER = VIEWBOX / 2
+console.log("\none fixed-size box for both glyphs")
+check(
+  "the glyph wrapper is sized from `iconSize`",
+  /style=\{\{\s*width:\s*iconSize,\s*height:\s*iconSize\s*\}\}/.test(src),
+)
+check(
+  "the wrapper is a positioned box (anchors the absolute layers)",
+  /className="relative inline-flex items-center justify-center"/.test(src),
+)
+check(
+  "glyph layers are absolutely positioned inside it",
+  /className="absolute inset-0 inline-flex items-center justify-center"/.test(src),
+)
+check(
+  "the keyed layer is keyed by glyph identity, not by a boolean",
+  /key=\{glyphKey\}/.test(src) && /glyphKey\s*=\s*loading\s*\?/.test(src),
+)
 
-function bbox(d) {
-  const nums = d.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? []
-  const xs = []
-  const ys = []
-  for (let i = 0; i + 1 < nums.length; i += 2) {
-    xs.push(nums[i])
-    ys.push(nums[i + 1])
-  }
-  return {
-    minX: Math.min(...xs),
-    maxX: Math.max(...xs),
-    minY: Math.min(...ys),
-    maxY: Math.max(...ys),
-  }
-}
+console.log("\nthe swap respects reduced motion")
+check(
+  "variants are applied behind a reduced-motion guard",
+  /\{\.\.\.\(reduceMotion \? \{\} : ICON_SWAP_VARIANTS\)\}/.test(src),
+)
 
-const play = pathLiteral("PLAY_PATH")
-const pause = pathLiteral("PAUSE_PATH")
+console.log("\nno horizontal pose on the button")
+check(
+  "no icon-hover-* class that could translate the glyph",
+  !/icon-hover-/.test(src),
+)
 
-check("PLAY_PATH is declared", Boolean(play))
-check("PAUSE_PATH is declared", Boolean(pause))
-
-if (play && pause) {
-  const bp = bbox(play)
-  const bq = bbox(pause)
-  const cp = { x: (bp.minX + bp.maxX) / 2, y: (bp.minY + bp.maxY) / 2 }
-  const cq = { x: (bq.minX + bq.maxX) / 2, y: (bq.minY + bq.maxY) / 2 }
-
-  console.log(`  play  centre (${cp.x}, ${cp.y})  box ${bp.maxX - bp.minX}x${bp.maxY - bp.minY}`)
-  console.log(`  pause centre (${cq.x}, ${cq.y})  box ${bq.maxX - bq.minX}x${bq.maxY - bq.minY}`)
-
-  check(
-    "play is horizontally centred on the viewBox",
-    cp.x === CENTER,
-    `centre x = ${cp.x}, want ${CENTER}`,
-  )
-  check(
-    "play is vertically centred on the viewBox",
-    cp.y === CENTER,
-    `centre y = ${cp.y}, want ${CENTER}`,
-  )
-  check(
-    "pause is horizontally centred on the viewBox",
-    cq.x === CENTER,
-    `centre x = ${cq.x}, want ${CENTER}`,
-  )
-  check(
-    "pause is vertically centred on the viewBox",
-    cq.y === CENTER,
-    `centre y = ${cq.y}, want ${CENTER}`,
-  )
-  check(
-    "the two glyphs share a centre (no jump on toggle)",
-    cp.x === cq.x && cp.y === cq.y,
-    `play (${cp.x}, ${cp.y}) vs pause (${cq.x}, ${cq.y})`,
-  )
-
-  // Each path stays inside the viewBox, so nothing is clipped by the 24x24 box.
-  for (const [name, b] of [
-    ["play", bp],
-    ["pause", bq],
-  ]) {
-    check(
-      `${name} stays inside the viewBox`,
-      b.minX >= 0 && b.minY >= 0 && b.maxX <= VIEWBOX && b.maxY <= VIEWBOX,
-      `x=[${b.minX},${b.maxX}] y=[${b.minY},${b.maxY}]`,
-    )
-  }
-
-  // Both must be well-formed SVG path data (the morph animation needs this).
-  for (const [name, d] of [
-    ["play", play],
-    ["pause", pause],
-  ]) {
-    check(
-      `${name} uses only absolute move/line/close commands`,
-      /^M[\s\d.,]+L/.test(d) && !/[a-df-zA-DF-Z]/.test(d.replace(/[MLZ]/g, "")),
-      d.slice(0, 40) + "...",
-    )
-  }
-}
+console.log("\nloading state still wins over play/pause")
+check(
+  "loading is checked before isPlaying",
+  /loading\s*\?\s*"loading"\s*:\s*isPlaying\s*\?\s*"pause"\s*:\s*"play"/.test(src),
+)
 
 console.log("")
 if (failures) {

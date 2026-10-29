@@ -40,12 +40,10 @@ function ModeGlyph({ playMode, size }: { playMode: string; size: number }) {
   return <ListOrdered size={size} />
 }
 
-function modeHoverClass(playMode: string) {
-  if (playMode === "shuffle") return "icon-hover-shuffle"
-  if (playMode === "repeat-one" || playMode === "repeat-list")
-    return "icon-hover-repeat"
-  return "icon-hover-list"
-}
+// One fixed pose, never one chosen by the current mode. See Controls.tsx for
+// why: a pose selected from state swaps class mid-click, and any difference in
+// translateX shows up as the glyph sliding sideways as the user presses it.
+const MODE_HOVER_CLASS = "icon-hover-repeat";
 
 /**
  * Compact always-on-top mini bar. Docked to a screen edge it peeks as cover-only;
@@ -317,7 +315,7 @@ export function MiniPlayer() {
             size="icon"
             className={cn(
               "h-7 w-7 text-muted-foreground",
-              modeHoverClass(playMode),
+              MODE_HOVER_CLASS,
             )}
             title={t(`playMode.${playMode}`)}
             onClick={cyclePlayMode}

@@ -1095,10 +1095,27 @@ html[data-mini-peek="true"] .app-shell > * {
    incoming glyph. Respect reduced-motion at every layer. */
 
 /* ── 1. Poses ──────────────────────────────────────────────────────
-   Each pose is a direction that means something for that action: skip
-   travels the way it skips, download travels down, maximize opens out,
-   pip tucks in. Declared on the *active* state rather than only :hover so
-   a pressed control also takes the pose. */
+   Each pose is a direction that means something for that action: download
+   travels down, maximize opens out, pip tucks in. Declared on the *active*
+   state rather than only :hover so a pressed control also takes the pose.
+
+   NO POSE MAY MOVE THE GLYPH HORIZONTALLY. This is a hard rule, not a
+   preference. Two reasons, both user-visible:
+
+   1. `skip-prev` / `skip-next` / `arrow-left` / `arrow-right` / `panel` used to
+      translateX. A row of those buttons then shifts the glyph sideways on
+      hover, which reads as the whole control moving.
+   2. Worse, several controls pick their pose class FROM THEIR OWN STATE —
+      the play-mode button swaps `icon-hover-list` <-> `icon-hover-shuffle` on
+      click, and the theme switcher swaps `icon-hover-sun` <-> `icon-hover-moon`.
+      The pointer is necessarily over the button when it is clicked, so the pose
+      is live at the moment the class changes; if the two poses differ in
+      translateX the glyph slides sideways during the click. That was reported
+      as "the icon jumps left when I press it".
+
+   Directionality is therefore expressed with scale, rotation and a *vertical*
+   nudge only. A horizontal component is never allowed, because a state-driven
+   class swap can turn any horizontal pose into a visible jump. */
 
 @media (prefers-reduced-motion: no-preference) {
   .icon-hover-search svg,
@@ -1134,7 +1151,7 @@ html[data-mini-peek="true"] .app-shell > * {
      so a keyboard or touch press gets the same tactile nudge. */
   .icon-hover-search:hover svg,
   .icon-hover-search:active svg {
-    transform: translate(1px, -1.5px) scale(1.06);
+    transform: translateY(-1.5px) scale(1.06);
   }
   .icon-hover-list:hover svg,
   .icon-hover-list:active svg {
@@ -1142,7 +1159,7 @@ html[data-mini-peek="true"] .app-shell > * {
   }
   .icon-hover-trend:hover svg,
   .icon-hover-trend:active svg {
-    transform: translate(1px, -1.5px) scale(1.06);
+    transform: translateY(-1.5px) scale(1.06);
   }
   .icon-hover-heart:hover svg,
   .icon-hover-heart:active svg {
@@ -1156,17 +1173,19 @@ html[data-mini-peek="true"] .app-shell > * {
   .icon-hover-settings:active svg {
     transform: rotate(30deg) scale(1.06);
   }
+  /* The skip pair points the way it skips using rotation about the centre, which
+     reads as "nudge left/right" without any translation. */
   .icon-hover-skip-prev:hover svg,
   .icon-hover-skip-prev:active svg {
-    transform: translateX(-2px) scale(1.06);
+    transform: rotate(-8deg) scale(1.06);
   }
   .icon-hover-skip-next:hover svg,
   .icon-hover-skip-next:active svg {
-    transform: translateX(2px) scale(1.06);
+    transform: rotate(8deg) scale(1.06);
   }
   .icon-hover-shuffle:hover svg,
   .icon-hover-shuffle:active svg {
-    transform: translate(1px, -1.5px) scale(1.06);
+    transform: translateY(-1.5px) scale(1.06);
   }
   .icon-hover-repeat:hover svg,
   .icon-hover-repeat:active svg {
@@ -1192,15 +1211,15 @@ html[data-mini-peek="true"] .app-shell > * {
   }
   .icon-hover-panel:hover svg,
   .icon-hover-panel:active svg {
-    transform: translateX(-2px);
+    transform: scale(0.94);
   }
   .icon-hover-arrow-left:hover svg,
   .icon-hover-arrow-left:active svg {
-    transform: translateX(-2px);
+    transform: rotate(-10deg) scale(1.06);
   }
   .icon-hover-arrow-right:hover svg,
   .icon-hover-arrow-right:active svg {
-    transform: translateX(2px);
+    transform: rotate(10deg) scale(1.06);
   }
   .icon-hover-maximize:hover svg,
   .icon-hover-maximize:active svg {

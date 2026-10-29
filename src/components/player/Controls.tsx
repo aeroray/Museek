@@ -20,11 +20,20 @@ const MODE_ICON = {
   "repeat-one": Repeat1,
 } as const
 
-function modeHoverClass(playMode: string) {
-  if (playMode === "shuffle") return "icon-hover-shuffle"
-  if (playMode === "repeat-one" || playMode === "repeat-list") return "icon-hover-repeat"
-  return "icon-hover-list"
-}
+/*
+ * One fixed pose for the play-mode button, never one chosen by the current mode.
+ *
+ * It used to map mode -> pose (`icon-hover-list` / `icon-hover-shuffle` /
+ * `icon-hover-repeat`), which meant a click swapped the class while the pointer
+ * was still over the button. The poses differed in translateX, so the glyph slid
+ * sideways mid-click — reported as "the icon jumps left when I press it".
+ *
+ * A pose that describes the *current state* is always a trap for a control whose
+ * state changes on click: the hover pose is live at the exact moment the state
+ * flips. Poses describe what the control *does* (it cycles), so one fixed pose is
+ * also the more honest choice.
+ */
+const MODE_HOVER_CLASS = "icon-hover-repeat"
 
 export function Controls() {
   const { isPlaying, playMode, status, playPending, currentSong, togglePlay, next, prev, setPlayMode } = usePlayerStore()
@@ -55,7 +64,7 @@ export function Controls() {
       <Button
         variant="ghost"
         size="icon"
-        className={cn("h-9 w-9 text-muted-foreground", modeHoverClass(playMode))}
+        className={cn("h-9 w-9 text-muted-foreground", MODE_HOVER_CLASS)}
         onClick={cyclePlayMode}
         title={t(`playMode.${playMode}`)}
       >

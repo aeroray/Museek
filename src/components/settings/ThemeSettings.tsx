@@ -49,9 +49,13 @@ export function ThemeSettings() {
                     variant={mode === m.id ? "default" : "outline"}
                     size="sm"
                     onClick={() => setMode(m.id)}
-                    className={
-                      m.id === "light" ? "icon-hover-sun" : m.id === "dark" ? "icon-hover-moon" : "icon-hover-settings"
-                    }
+                    // A fixed pose, not one chosen by this button's own mode.
+                    // The pose used to be `icon-hover-sun` / `icon-hover-moon`
+                    // per row, which is fine while the row is just sitting
+                    // there — but the class is re-evaluated on every render, so
+                    // selecting a mode could swap the pose under the pointer
+                    // and slide the glyph. See the rule in src/index.css.
+                    className="icon-hover-settings"
                   >
                     <Icon size={15} className="mr-2" />
                     {t(m.labelKey)}
