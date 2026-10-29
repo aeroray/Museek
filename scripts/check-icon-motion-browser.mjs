@@ -36,6 +36,7 @@ writeFileSync(
   `import { createRoot } from "react-dom/client"
 import { Heart, ListMusic, Maximize, Pause, Play, Repeat, Search, Settings, SkipBack, SkipForward, Volume2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PlayPauseButton } from "@/components/player/PlayPauseButton"
 
 // Every control kind the app has, all through the same Button component.
 function Harness() {
@@ -50,7 +51,7 @@ function Harness() {
       <Button id="g" variant="ghost" size="icon" className="h-9 w-9"><Maximize size={16} /></Button>
       <Button id="h" variant="ghost" size="icon" className="h-9 w-9"><ListMusic size={16} /></Button>
       <Button id="i" variant="ghost" size="icon" className="h-9 w-9"><Volume2 size={16} /></Button>
-      <Button id="j" variant="default" size="icon" className="size-11 rounded-full"><Play size={19} fill="currentColor" /></Button>
+      <PlayPauseButton id="j" variant="default" size="icon" className="size-11" isPlaying={false} aria-label="play" />
     </div>
   )
 }
@@ -248,13 +249,13 @@ const compiled = css + "\n" + appCss
     glyphRule ? "" : "no `.icon-motion:hover ... svg` rule",
   )
   check(
-    "it lifts the glyph 1.5px",
-    /translateY\(-1\.5px\)/.test(glyphRule?.body ?? ""),
+    "it lifts the glyph 1px",
+    /translateY\(-1px\)/.test(glyphRule?.body ?? ""),
     glyphRule?.body.trim() ?? "none",
   )
   check(
-    "it also scales the glyph by 1.06",
-    /scale\(1\.06\)/.test(glyphRule?.body ?? ""),
+    "it also scales the glyph by 1.04",
+    /scale\(1\.04\)/.test(glyphRule?.body ?? ""),
     glyphRule?.body.trim() ?? "none",
   )
   check(
@@ -284,9 +285,18 @@ const compiled = css + "\n" + appCss
     return out
   })()`)
   const missing = coverage.filter((c) => !c.has)
+  // The play button opts out on purpose (it changes its own glyph), so it is
+  // excluded here and asserted separately below.
+  const optOut = coverage.filter((c) => c.id === "j")
+  const missingExcludingOptOut = missing.filter((m) => m.id !== "j")
   check(
-    `all ${coverage.length} icon buttons share the class`,
-    missing.length === 0,
+    `all ${coverage.length - optOut.length} animated icon buttons share the class`,
+    missingExcludingOptOut.length === 0,
+    missingExcludingOptOut.map((m) => m.id).join(", "),
+  )
+  check(
+    "the play button is the only opt-out",
+    missing.length === optOut.length && optOut.length === 1,
     missing.map((m) => m.id).join(", "),
   )
 

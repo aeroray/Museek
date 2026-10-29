@@ -93,7 +93,7 @@ console.log("the single mechanism exists and is the only one")
     /\.icon-motion:active[^{]*\{\s*scale:\s*0\.96/.test(css),
   )
   // Scan EVERY hover rule: a second one that scales the box would compound with
-  // the glyph's 1.06 and make this control larger than its neighbours.
+  // the glyph's 1.04 and make this control larger than its neighbours.
   const hoverRules = [...css.matchAll(/(\.icon-motion:hover[^{]*)\{([^}]*)\}/g)]
   const boxScale = hoverRules
     .filter((m) => !/\bsvg\s*$/.test(m[1].trim()))
@@ -103,6 +103,21 @@ console.log("the single mechanism exists and is the only one")
     "no hover rule scales the box itself",
     boxScale.length === 0,
     boxScale.length ? `found scale ${boxScale.join(", ")}` : "",
+  )
+
+  // The exact travel. These were tuned down from 1.5px/6%, which read as the
+  // control moving rather than responding; pin the agreed values so a later
+  // "make it more noticeable" edit has to be deliberate.
+  const glyphBody = hoverRules.find((m) => /\bsvg\s*$/.test(m[1].trim()))?.[2] ?? ""
+  check(
+    "the lift is exactly 1px",
+    /translateY\(-1px\)/.test(glyphBody),
+    /translateY\([^)]+\)/.exec(glyphBody)?.[0] ?? "none",
+  )
+  check(
+    "the growth is exactly 4%",
+    /scale\(1\.04\)/.test(glyphBody),
+    /scale\([^)]+\)/.exec(glyphBody)?.[0] ?? "none",
   )
 }
 
@@ -120,6 +135,28 @@ console.log("\nno pose moves a glyph horizontally")
     if (Math.abs(dx) > 0.01) bad.push(t)
   }
   check("no horizontal translate in .icon-motion", bad.length === 0, bad.join(" | "))
+}
+
+// ---------------------------------------------------------------------------
+console.log("\nthe play/pause button switches its glyph without moving")
+{
+  const src = readFileSync(
+    join(root, "src/components/player/PlayPauseButton.tsx"),
+    "utf8",
+  )
+  check(
+    "it opts out of the shared motion",
+    /\bstatic\b/.test(src),
+  )
+  check(
+    "it does not re-add icon-motion",
+    !/icon-motion/.test(stripComments(src)),
+    "the button changes its own glyph; a lift on top reads as wobbling",
+  )
+  check(
+    "the glyph still cross-fades",
+    /AnimatePresence/.test(src) && /ICON_SWAP_VARIANTS/.test(src),
+  )
 }
 
 // ---------------------------------------------------------------------------

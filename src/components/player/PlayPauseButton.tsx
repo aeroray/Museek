@@ -48,16 +48,21 @@ export function PlayPauseButton({
   return (
     <Button
       {...props}
-      // `static` suppresses the shared hover/press motion here and the class
-      // below re-adds the *same* mechanism: the outer button must not scale, or
-      // the shadow ring and the circular fill would visibly change size. Only
-      // the glyph lifts, exactly like every other icon control in the app.
+      // This button deliberately opts out of the shared icon motion. It is the
+      // largest, most prominent control on screen and it changes its own glyph
+      // on every click, so a hover lift plus a press shrink on top of that reads
+      // as the button wobbling while it switches. The glyph cross-fade below is
+      // the feedback; nothing else moves.
+      //
+      // `static` suppresses the class that the Button component would otherwise
+      // add, and no `icon-motion` is re-added here. The hover ring is a colour
+      // change only, so the control still reads as interactive.
       static
       aria-label={ariaLabel}
       aria-pressed={isPlaying}
       disabled={disabled}
       className={cn(
-        "icon-motion relative overflow-hidden rounded-full shadow-[var(--shadow-elevated)]",
+        "relative overflow-hidden rounded-full shadow-[var(--shadow-elevated)]",
         "after:pointer-events-none after:absolute after:inset-px after:rounded-full after:ring-1 after:ring-primary-foreground/0 after:transition-colors after:duration-150",
         "hover:after:ring-primary-foreground/20",
         className,

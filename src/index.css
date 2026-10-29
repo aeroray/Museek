@@ -10,7 +10,7 @@
      Two orthogonal dimensions, deliberately kept on different elements so they
      cannot compound:
 
-       hover  -> the <svg> glyph lifts 1.5px and grows 6%
+       hover  -> the <svg> glyph lifts 1px and grows 4%
        press  -> the button box shrinks to 96%
 
      Before this there were five mechanisms (a per-action `icon-hover-*` pose
@@ -59,10 +59,14 @@
 
 /* Hover lifts the glyph; press shrinks the box. Both live behind a
    reduced-motion guard: the static cues (color, background, the glyph itself)
-   still change, only the travel is removed. */
+   still change, only the travel is removed.
+ *
+ * Travel is deliberately small: 1px and 4%. At 1.5px/6% the lift read as the
+ * control moving rather than responding, which is the same complaint the
+ * horizontal poses caused. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .icon-motion:hover:not(:disabled) svg {
-    transform: translateY(-1.5px) scale(1.06);
+    transform: translateY(-1px) scale(1.04);
   }
 }
 
@@ -71,7 +75,7 @@
      pointer-only. `:active` also sets the box scale, matching the old press
      pose but without the container growing on hover. */
   .icon-motion:active:not(:disabled) svg {
-    transform: translateY(-1.5px) scale(1.06);
+    transform: translateY(-1px) scale(1.04);
   }
   .icon-motion:active:not(:disabled) {
     scale: 0.96;
