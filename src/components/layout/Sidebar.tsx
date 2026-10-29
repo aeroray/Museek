@@ -81,9 +81,14 @@ const navLinkClass =
   (collapsed: boolean) =>
   ({ isActive }: { isActive: boolean }) =>
     cn(
+      // `icon-motion` supplies the shared press-shrink (scale: 0.96 on the box)
+      // and the glyph lift. Nothing else here may scale: this link used to carry
+      // `active:scale-[0.98]` as well, and because Tailwind's scale utilities
+      // write `transform: scaleX() scaleY()` while `.icon-motion` writes the CSS
+      // `scale` property, the two are different properties and multiply —
+      // 0.96 x 0.98 = 0.94, so the sidebar shrank noticeably harder than any
+      // icon button. Keep the press feedback in one place only.
       "relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium icon-motion",
-      "transition-[color,background-color,transform] duration-200 ease-out",
-      "active:scale-[0.98]",
       collapsed && "justify-center px-0",
       isActive
         ? "bg-primary/10 text-foreground"

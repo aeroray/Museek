@@ -138,6 +138,34 @@ console.log("\nno pose moves a glyph horizontally")
 }
 
 // ---------------------------------------------------------------------------
+console.log("\nnothing compounds with the shared press scale")
+{
+  // `.icon-motion` writes the CSS `scale` property; Tailwind's `scale-*`
+  // utilities write `transform: scaleX() scaleY()`. Because they are different
+  // properties they MULTIPLY. The sidebar had `active:scale-[0.98]` alongside
+  // `icon-motion`, so it rendered 0.96 * 0.98 = 0.94 and shrank visibly harder
+  // than every icon button. Any co-located scale utility is a bug.
+  const offenders = []
+  for (const file of sources) {
+    if (!file.endsWith(".tsx")) continue
+    const rel = relative(root, file).replace(/\\/g, "/")
+    const lines = stripComments(readFileSync(file, "utf8")).split("\n")
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i].includes("icon-motion")) continue
+      // className strings can span lines; inspect a small window around the hit.
+      const window = lines.slice(Math.max(0, i - 2), i + 6).join(" ")
+      const m = /(?:^|[\s"'])((?:active|group-active):scale-[\d.[\]-]+)/.exec(window)
+      if (m) offenders.push(`${rel}:${i + 1} ${m[1]}`)
+    }
+  }
+  check(
+    "no element applies icon-motion and its own scale",
+    offenders.length === 0,
+    offenders.slice(0, 4).join("; "),
+  )
+}
+
+// ---------------------------------------------------------------------------
 console.log("\nthe play/pause button switches its glyph without moving")
 {
   const src = readFileSync(

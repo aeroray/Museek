@@ -53,9 +53,12 @@ function ExternalLinkRow({
       type="button"
       onClick={() => void openExternal(href)}
       className={cn(
+        // `icon-motion` owns the press feedback. A second `active:scale-[0.99]`
+        // here would multiply with it (Tailwind's scale utilities write
+        // `transform`, `.icon-motion` writes the CSS `scale` property), so this
+        // card would shrink harder than every icon button.
         "icon-motion group flex w-full items-center gap-3.5 p-4 text-left",
-        "transition-[background-color,transform] duration-200 ease-out",
-        "hover:bg-muted/45 active:scale-[0.99]",
+        "hover:bg-muted/45",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
       )}
     >
