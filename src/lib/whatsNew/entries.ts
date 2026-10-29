@@ -17,6 +17,28 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.14.1": {
+    zh: {
+      sections: [
+        {
+          title: "📜 外部歌单",
+          bullets: [
+            "修复：打开酷狗的外部歌单只显示「暂无数据」，歌名和封面正常但一首歌都没有",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "📜 External playlists",
+          bullets: [
+            "Fix: opening a KuGou external playlist showed \"no data\" — the title and cover loaded, but no songs did",
+          ],
+        },
+      ],
+    },
+  },
   "3.14.0": {
     zh: {
       sections: [
