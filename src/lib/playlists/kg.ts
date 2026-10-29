@@ -4,6 +4,13 @@ import { signatureParams } from "@/lib/platforms/kg/sign"
 import type { MusicInfo, MusicQuality } from "@/types/music"
 import { indexQualitySizes } from "@/lib/quality"
 import { formatDuration, remoteId } from "@/lib/utils"
+import {
+  KG_SONG_LIST_APPID,
+  KG_SONG_LIST_PAGE_SIZE,
+  kgSongPageItems,
+  kgSongPageNumbers,
+  kgSongPageTotal,
+} from "@/lib/playlists/kgSongList"
 import type { Playlist, PlaylistDetail, PlaylistDetailInfo, PlaylistTag } from "./index"
 
 // Ported from lx-music-desktop: src/renderer/utils/musicSdk/kg/songList.js
@@ -444,41 +451,76 @@ async function fetchGlobalInfo(globalId: string): Promise<{
   }
 }
 
+/**
+ * Page size and appid for `special/song_v2` live in `kgSongList.ts` so the
+ * response rules — in particular "an error envelope is not an empty list" — can
+ * be pinned by a plain-node check.
+ */
+const GLOBAL_SONGS_PAGE_SIZE = KG_SONG_LIST_PAGE_SIZE
+
+interface KgGlobalSongPage {
+  errcode?: number
+  status?: number
+  error?: string
+  data?: { total?: number; info?: KgSpecialSongRaw[] }
+}
+
+/**
+ * One page of a shared collection. Returns `null` when the response is an error
+ * envelope, so the caller can distinguish "no songs" from "request rejected" —
+ * the bug this fixes was exactly that distinction being lost.
+ */
+async function fetchGlobalSongsPage(
+  globalId: string,
+  page: number,
+  pagesize: number,
+): Promise<KgGlobalSongPage | null> {
+  const params =
+    `appid=${KG_SONG_LIST_APPID}&global_specialid=${globalId}&specialid=0&plat=0&version=8000` +
+    `&page=${page}&pagesize=${pagesize}&srcappid=2919&clientver=20000` +
+    `&clienttime=1586163263991&mid=1586163263991&uuid=1586163263991&dfid=-`
+  const url =
+    `https://mobiles.kugou.com/api/v5/special/song_v2?${params}` +
+    `&signature=${signatureParams(params, "web")}`
+
+  const res = await tauriFetch(url, {
+    method: "GET",
+    headers: {
+      mid: "1586163263991",
+      Referer: "https://m3ws.kugou.com/share/index.php",
+      "User-Agent": KG_MOBILE_UA,
+      dfid: "-",
+      clienttime: "1586163263991",
+    },
+  })
+  if (!res.ok) return null
+  const json = (await res.json()) as KgGlobalSongPage
+  return kgSongPageItems(json) === null ? null : json
+}
+
 async function fetchGlobalSongs(globalId: string, songcount: number): Promise<KgSpecialSongRaw[]> {
-  const total = Math.max(songcount || 0, 1)
-  const tasks: Promise<KgSpecialSongRaw[]>[] = []
-  let remaining = total
-  let page = 0
-  while (remaining > 0) {
-    const limit = remaining > 300 ? 300 : remaining
-    remaining -= limit
-    page += 1
-    const params =
-      `appid=1058&global_specialid=${globalId}&specialid=0&plat=0&version=8000` +
-      `&page=${page}&pagesize=${limit}&srcappid=2919&clientver=20000` +
-      `&clienttime=1586163263991&mid=1586163263991&uuid=1586163263991&dfid=-`
-    const url =
-      `https://mobiles.kugou.com/api/v5/special/song_v2?${params}` +
-      `&signature=${signatureParams(params, "web")}`
-    tasks.push(
-      tauriFetch(url, {
-        method: "GET",
-        headers: {
-          mid: "1586163263991",
-          Referer: "https://m3ws.kugou.com/share/index.php",
-          "User-Agent": KG_MOBILE_UA,
-          dfid: "-",
-          clienttime: "1586163263991",
-        },
-      }).then(async (res) => {
-        if (!res.ok) return []
-        const json = (await res.json()) as KgSpecialSongResponse
-        return json.data?.info ?? []
-      }),
-    )
-  }
-  const pages = await Promise.all(tasks)
-  return pages.flat()
+  // Ask for the first page first: it carries the real `total`, which is more
+  // trustworthy than the info endpoint's `songcount` (the reported playlist says
+  // 1136 there but 1122 here, and the difference is unavailable tracks).
+  const first = await fetchGlobalSongsPage(globalId, 1, GLOBAL_SONGS_PAGE_SIZE)
+  if (!first) throw new Error("KuGou playlist detail failed: song list rejected")
+  const firstInfo = first.data?.info ?? []
+  if (firstInfo.length === 0) return []
+
+  const pageNumbers = kgSongPageNumbers(
+    kgSongPageTotal(first),
+    songcount,
+    firstInfo.length,
+    GLOBAL_SONGS_PAGE_SIZE,
+  )
+  const rest = await Promise.all(
+    pageNumbers.map((page) =>
+      fetchGlobalSongsPage(globalId, page, GLOBAL_SONGS_PAGE_SIZE),
+    ),
+  )
+  const out = [...firstInfo]
+  for (const result of rest) out.push(...(result?.data?.info ?? []))
+  return out
 }
 
 /** User / shared collection via signed mobiles APIs. */
