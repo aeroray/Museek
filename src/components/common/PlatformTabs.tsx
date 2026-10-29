@@ -49,7 +49,7 @@ export function PlatformTabs({
             className={cn(
               "flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium",
               "transition-[color,background-color,box-shadow,transform] duration-200 ease-out",
-              "active:scale-[0.97]",
+              "row-motion",
               active
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-background/40"

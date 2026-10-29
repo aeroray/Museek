@@ -138,6 +138,44 @@ console.log("\nno pose moves a glyph horizontally")
 }
 
 // ---------------------------------------------------------------------------
+console.log("\nrow and chip presses use the shared row-motion")
+{
+  check("index.css defines .row-motion", /\.row-motion\s*\{/.test(css))
+  check(
+    "row-motion shrinks to 0.99 (milder than an icon button)",
+    /\.row-motion:active[^{]*\{\s*scale:\s*0\.99/.test(css),
+  )
+  check(
+    "row-motion sets no glyph transform (rows have no icon)",
+    !/\.row-motion[^{]*svg[^{]*\{/.test(css),
+  )
+
+  // No element may invent its own press scale. The two sanctioned mechanisms are
+  // `icon-motion` (icon buttons) and `row-motion` (rows and chips); a bare
+  // `active:scale-*` is a third one.
+  //
+  // Exempt: the hot-keyword cloud, whose resting size is a visual tier and whose
+  // hover grows the word — its press feedback necessarily rides `transform` next
+  // to that hover scale, so a `scale` property would multiply instead of replace.
+  const ROW_SCALE_EXEMPT = new Set(["src/components/search/HotSearchCloud.tsx"])
+  const rogue = []
+  for (const file of sources) {
+    if (!file.endsWith(".tsx")) continue
+    const rel = relative(root, file).replace(/\\/g, "/")
+    if (ROW_SCALE_EXEMPT.has(rel)) continue
+    const text = stripComments(readFileSync(file, "utf8"))
+    for (const m of text.matchAll(/\bactive:scale-[^\s"'`]+/g)) {
+      rogue.push(`${rel}: ${m[0]}`)
+    }
+  }
+  check(
+    "no element declares its own press scale",
+    rogue.length === 0,
+    rogue.slice(0, 4).join("; "),
+  )
+}
+
+// ---------------------------------------------------------------------------
 console.log("\nnothing compounds with the shared press scale")
 {
   // `.icon-motion` writes the CSS `scale` property; Tailwind's `scale-*`

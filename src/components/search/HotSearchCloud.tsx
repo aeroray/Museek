@@ -114,6 +114,14 @@ export function HotSearchCloud({
                     animationDelay: `${Math.min(index, 20) * 28}ms`,
                   }}
                   className={cn(
+                    // Deliberately not `.row-motion`. A hot keyword is the one
+                    // control whose *resting* state is a size tier: the whole
+                    // cloud is built from scaled words, and hovering grows them
+                    // further as the primary affordance. Its press feedback
+                    // therefore travels on `transform` alongside that hover
+                    // scale, which `.row-motion` (a `scale` property) would
+                    // multiply with rather than replace. Kept self-consistent
+                    // and exempt; see check-icon-motion.mjs for the allowlist.
                     "hot-cloud-word leading-none tracking-tight will-change-transform transform-gpu",
                     "transition-[transform,filter,opacity] duration-200 ease-out",
                     "hover:scale-110 hover:brightness-110 hover:opacity-100",

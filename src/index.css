@@ -49,6 +49,16 @@
     transition: transform var(--motion-base) var(--ease-spring-soft);
   }
 
+  /* Row press feedback. Same shape as .icon-motion but without the glyph pose:
+     rows have no icon to lift, and their colour transitions are declared by each
+     call site. Only `scale` is owned here. */
+  .row-motion {
+    scale: 1;
+    transition-property: scale;
+    transition-duration: var(--motion-base);
+    transition-timing-function: var(--ease-spring-soft);
+  }
+
   .duration-drawer-swipe {
     transition-duration: calc(var(--drawer-swipe-strength, 1) * 400ms);
   }
@@ -86,6 +96,22 @@
     transition-timing-function:
       ease-out, ease-out, ease-out, ease-out, ease-out,
       var(--ease-spring-snappy), var(--ease-spring-snappy);
+  }
+}
+
+/* ── Row press: the second and last motion ───────────────────────────
+   For whole rows and chips — a track in a list, a saved-loved row, a platform
+   tab, a hot keyword. They are much larger than an icon button, so the same 4%
+   travels several times further and reads as the row wobbling. This is a milder
+   1% with the same curve and the same property, so there is still exactly one
+   press mechanism per size class and no element carries both.
+
+   Anything clickable that is neither an icon button nor a row should pick one of
+   these two; it must not invent a third value. */
+@media (prefers-reduced-motion: no-preference) {
+  .row-motion:active:not(:disabled) {
+    scale: 0.99;
+    transition-timing-function: var(--ease-spring-snappy);
   }
 }
 

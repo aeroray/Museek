@@ -598,7 +598,7 @@ function ArtistList({
           key={row.singer}
           type="button"
           onClick={() => onOpen(row.singer)}
-          className="flex w-full items-center gap-3 px-3 py-2 rounded-xl text-left transition-[background-color,transform] duration-200 ease-out hover:bg-accent/55 active:scale-[0.995]"
+          className="row-motion flex w-full items-center gap-3 px-3 py-2 rounded-xl text-left transition-[background-color] duration-200 ease-out hover:bg-accent/55"
         >
           <span className="w-6 text-center text-sm text-muted-foreground tabular-nums shrink-0 font-medium">
             {i + 1}
