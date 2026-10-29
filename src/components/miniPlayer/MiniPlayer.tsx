@@ -40,10 +40,9 @@ function ModeGlyph({ playMode, size }: { playMode: string; size: number }) {
   return <ListOrdered size={size} />
 }
 
-// One fixed pose, never one chosen by the current mode. See Controls.tsx for
-// why: a pose selected from state swaps class mid-click, and any difference in
-// translateX shows up as the glyph sliding sideways as the user presses it.
-const MODE_HOVER_CLASS = "icon-hover-repeat";
+// The play-mode button used to pick its pose from the current mode, which swapped
+// the class mid-click and slid the glyph sideways. There is now one pose for the
+// whole app, applied by the Button component, so no pose class is needed here.
 
 /**
  * Compact always-on-top mini bar. Docked to a screen edge it peeks as cover-only;
@@ -313,10 +312,7 @@ export function MiniPlayer() {
             type="button"
             variant="ghost"
             size="icon"
-            className={cn(
-              "h-7 w-7 text-muted-foreground",
-              MODE_HOVER_CLASS,
-            )}
+            className="h-7 w-7 text-muted-foreground"
             title={t(`playMode.${playMode}`)}
             onClick={cyclePlayMode}
           >
@@ -330,7 +326,7 @@ export function MiniPlayer() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground icon-hover-skip-prev"
+              className="h-8 w-8 text-muted-foreground"
               disabled={!canPlay || playBusy}
               onClick={() => void prev()}
             >
@@ -359,7 +355,7 @@ export function MiniPlayer() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground icon-hover-skip-next"
+              className="h-8 w-8 text-muted-foreground"
               disabled={!canPlay || playBusy}
               onClick={() => void next()}
             >
@@ -371,7 +367,7 @@ export function MiniPlayer() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-7 w-7 icon-hover-heart",
+              "h-7 w-7",
               fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground",
             )}
             onClick={toggleFav}
@@ -394,7 +390,7 @@ export function MiniPlayer() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-7 w-7 icon-hover-list",
+              "h-7 w-7",
               queueOpen ? "text-primary" : "text-muted-foreground",
             )}
             title={t("player.queue")}
@@ -408,7 +404,7 @@ export function MiniPlayer() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground icon-hover-maximize"
+              className="h-7 w-7 text-muted-foreground"
               onClick={() => void exitMiniPlayer()}
             >
               <Expand size={14} />

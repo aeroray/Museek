@@ -21,19 +21,18 @@ const MODE_ICON = {
 } as const
 
 /*
- * One fixed pose for the play-mode button, never one chosen by the current mode.
+ * There used to be a `modeHoverClass(playMode)` here, mapping the current mode to
+ * a pose class (`icon-hover-list` / `icon-hover-shuffle` / `icon-hover-repeat`).
+ * That meant a click swapped the class while the pointer was still over the
+ * button, and because the poses differed in translateX the glyph slid sideways
+ * mid-click — reported as "the icon jumps left when I press it".
  *
- * It used to map mode -> pose (`icon-hover-list` / `icon-hover-shuffle` /
- * `icon-hover-repeat`), which meant a click swapped the class while the pointer
- * was still over the button. The poses differed in translateX, so the glyph slid
- * sideways mid-click — reported as "the icon jumps left when I press it".
+ * A pose chosen by the control's own state is always a trap for a control whose
+ * state changes on click: the hover pose is live at the exact moment it flips.
  *
- * A pose that describes the *current state* is always a trap for a control whose
- * state changes on click: the hover pose is live at the exact moment the state
- * flips. Poses describe what the control *does* (it cycles), so one fixed pose is
- * also the more honest choice.
+ * There is now one pose for the entire app, applied by the Button component, so
+ * this control needs no pose class of its own.
  */
-const MODE_HOVER_CLASS = "icon-hover-repeat"
 
 export function Controls() {
   const { isPlaying, playMode, status, playPending, currentSong, togglePlay, next, prev, setPlayMode } = usePlayerStore()
@@ -64,7 +63,7 @@ export function Controls() {
       <Button
         variant="ghost"
         size="icon"
-        className={cn("h-9 w-9 text-muted-foreground", MODE_HOVER_CLASS)}
+        className="h-9 w-9 text-muted-foreground"
         onClick={cyclePlayMode}
         title={t(`playMode.${playMode}`)}
       >
@@ -81,7 +80,7 @@ export function Controls() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 icon-hover-skip-prev"
+          className="h-9 w-9"
           onClick={prev}
           disabled={!canPlay || loading}
         >
@@ -109,7 +108,7 @@ export function Controls() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 icon-hover-skip-next"
+          className="h-9 w-9"
           onClick={next}
           disabled={!canPlay || loading}
         >
@@ -120,7 +119,7 @@ export function Controls() {
       <Button
         variant="ghost"
         size="icon"
-        className={cn("h-9 w-9 icon-hover-heart", fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground")}
+        className={cn("h-9 w-9", fav ? "text-red-500 hover:text-red-500" : "text-muted-foreground")}
         onClick={toggleFav}
         disabled={!currentSong || isLocal}
         title={isLocal ? t("local.favoriteDisabled") : t("common.favorite")}

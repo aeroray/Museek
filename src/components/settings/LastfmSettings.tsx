@@ -143,7 +143,7 @@ export function LastfmCredentialsDialog({
             <button
               type="button"
               onClick={() => void openExternal(LASTFM_API_ACCOUNTS)}
-              className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              className="icon-motion inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
             >
               <ExternalLink size={12} />
               {t("lastfm.createApiLink")}

@@ -219,7 +219,7 @@ export function MatchOnlineDialog({
                         disabled={busy}
                         onClick={() => setSelectedId(hit.id)}
                         className={cn(
-                          "flex min-w-0 w-full items-center gap-3 overflow-hidden rounded-xl px-2.5 py-2 text-left transition-colors",
+                          "icon-motion flex min-w-0 w-full items-center gap-3 overflow-hidden rounded-xl px-2.5 py-2 text-left transition-colors",
                           isSel
                             ? "bg-primary/10 ring-1 ring-primary/30"
                             : "hover:bg-accent/60",

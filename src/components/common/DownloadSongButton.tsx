@@ -41,7 +41,7 @@ export function DownloadSongButton({
         <Button
           variant="ghost"
           size="icon"
-          className={cn("shrink-0 icon-hover-download", className)}
+          className={cn("shrink-0", className)}
           title={t("common.download")}
           disabled={!song}
         >

@@ -76,7 +76,7 @@ export function LastfmLovedPanel({
                   onPlay(track);
                 }}
                 title={t("favorites.lastfm.play")}
-                className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 focus-visible:opacity-100"
+                className="icon-motion absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 focus-visible:opacity-100"
               >
                 {busy ? (
                   <Loader2 size={16} className="animate-spin text-white" />

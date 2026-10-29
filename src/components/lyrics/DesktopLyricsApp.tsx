@@ -892,7 +892,7 @@ export function DesktopLyricsApp() {
                 >
                   <button
                     type="button"
-                    className="desktop-lyrics-mode icon-button-motion"
+                    className="desktop-lyrics-mode icon-motion"
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={toggleInteractionMode}
                     aria-pressed={interactionMode === "locked"}
@@ -912,7 +912,7 @@ export function DesktopLyricsApp() {
                 >
                   <button
                     type="button"
-                    className="desktop-lyrics-close icon-button-motion"
+                    className="desktop-lyrics-close icon-motion"
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={close}
                     tabIndex={actionTabIndex}

@@ -638,7 +638,7 @@ export function LocalMusic() {
                             e.stopPropagation();
                             void play(track.song);
                           }}
-                          className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                          className="icon-motion absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                         >
                           <Play
                             size={16}
@@ -696,7 +696,7 @@ export function LocalMusic() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-hover-plus"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 icon-motion"
                             onClick={(e) => {
                               e.stopPropagation();
                               addToQueue([track.song]);

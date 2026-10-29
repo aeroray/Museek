@@ -55,7 +55,7 @@ export function ThemeSettings() {
                     // there — but the class is re-evaluated on every render, so
                     // selecting a mode could swap the pose under the pointer
                     // and slide the glyph. See the rule in src/index.css.
-                    className="icon-hover-settings"
+                    className="icon-motion"
                   >
                     <Icon size={15} className="mr-2" />
                     {t(m.labelKey)}
@@ -89,7 +89,7 @@ export function ThemeSettings() {
                   <button
                     key={p.id}
                     onClick={() => setPalette(p.id)}
-                    className="flex flex-col items-center gap-1.5 group"
+                    className="icon-motion flex flex-col items-center gap-1.5 group"
                     title={t(`palette.${p.id}`)}
                   >
                     <span

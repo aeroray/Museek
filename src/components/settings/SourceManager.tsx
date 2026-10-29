@@ -288,7 +288,7 @@ function ProbeStatusIcon({ result }: { result: SourceProbeResult }) {
         <button
           type="button"
           className={cn(
-            "icon-button-motion inline-flex size-5 shrink-0 items-center justify-center",
+            "icon-motion inline-flex size-5 shrink-0 items-center justify-center",
             allOk
               ? "text-emerald-600 dark:text-emerald-400"
               : allFail
@@ -906,7 +906,7 @@ export function SourceManager() {
             type="button"
             onClick={clearError}
             title={t("window.close")}
-            className="icon-button-motion shrink-0 text-destructive/70 hover:text-destructive"
+            className="icon-motion shrink-0 text-destructive/70 hover:text-destructive"
           >
             <X size={14} />
           </button>

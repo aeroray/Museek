@@ -103,7 +103,11 @@ export function PlayerBar() {
               // usable while the source is reloaded.
               disabled={showCoverLoading || !hasLyrics}
               // Inner clips overlay so it never paints past rounded corners.
-              className="group relative h-12 w-12 shrink-0 transition-transform duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none"
+              // `icon-motion` gives it the same press-shrink as every other
+              // control. It has no glyph of its own to lift — the cover image is
+              // a thumbnail — so only the box reacts, which is correct for a
+              // surface that opens another view.
+              className="icon-motion group relative h-12 w-12 shrink-0 disabled:pointer-events-none"
             >
               <span className="absolute inset-0 overflow-hidden rounded-xl shadow-[var(--shadow-border)]">
                 <img
@@ -119,7 +123,7 @@ export function PlayerBar() {
                     <Loader2 size={18} className="animate-spin text-white" />
                   </span>
                 ) : (
-                  <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 icon-hover-maximize">
+                  <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 icon-motion">
                     <Maximize2 size={15} className="text-white" />
                   </span>
                 )}
@@ -178,7 +182,7 @@ export function PlayerBar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 icon-hover-search"
+                className="h-9 w-9 shrink-0"
                 disabled={!currentSong}
                 title={t("player.searchOther")}
               >
@@ -207,7 +211,7 @@ export function PlayerBar() {
               variant="ghost"
               size="icon"
               className={cn(
-                "h-9 w-9 shrink-0 icon-hover-mic",
+                "h-9 w-9 shrink-0",
                 showLyrics && "text-primary",
               )}
               onClick={() => setShowLyrics(!showLyrics)}
@@ -228,7 +232,7 @@ export function PlayerBar() {
               variant="ghost"
               size="icon"
               className={cn(
-                "h-9 w-9 shrink-0 icon-hover-captions",
+                "h-9 w-9 shrink-0",
                 desktopLyricsVisible && "text-primary",
               )}
               onClick={() =>
@@ -249,7 +253,7 @@ export function PlayerBar() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-9 w-9 shrink-0 icon-hover-list",
+              "h-9 w-9 shrink-0",
               showQueue && "text-primary",
             )}
             onClick={() => setShowQueue(!showQueue)}
@@ -262,7 +266,7 @@ export function PlayerBar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 icon-hover-pip"
+              className="h-9 w-9 shrink-0"
               onClick={() => void enterMiniPlayer()}
               disabled={!currentSong}
             >

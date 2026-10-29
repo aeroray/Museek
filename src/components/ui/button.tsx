@@ -3,10 +3,8 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
-const tapScale = "active:not-disabled:scale-[0.96]"
-
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-[color,background-color,border-color,transform,opacity,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 motion-reduce:active:scale-100",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-[color,background-color,border-color,opacity,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -47,8 +45,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(
           buttonVariants({ variant, size }),
-          !isStatic && variant !== "link" && size !== "icon" && tapScale,
-          !isStatic && size === "icon" && "icon-button-motion",
+          // One motion rule for every button, whatever its size or variant.
+          // `link` is the only exclusion: it renders as inline text, where a
+          // lift or a press-shrink would move the sentence around it.
+          // `static` opts out for OS chrome (see WindowControls) and for buttons
+          // whose movement would misread (dialog confirm/cancel).
+          !isStatic && variant !== "link" && "icon-motion",
           className,
         )}
         ref={ref}

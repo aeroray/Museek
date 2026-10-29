@@ -122,7 +122,7 @@ export const TrackRow = memo(function TrackRow({
               e.stopPropagation();
               play(song);
             }}
-            className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 focus-visible:opacity-100"
+            className="icon-motion absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 focus-visible:opacity-100"
           >
             <Play
               size={16}
@@ -189,7 +189,7 @@ export const TrackRow = memo(function TrackRow({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 icon-hover-plus"
+            className="h-8 w-8 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               addToQueue([song]);
@@ -206,7 +206,7 @@ export const TrackRow = memo(function TrackRow({
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "h-8 w-8 icon-hover-heart",
+                  "h-8 w-8",
                   fav
                     ? "text-red-500 opacity-100 hover:text-red-500"
                     : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
@@ -234,7 +234,7 @@ export const TrackRow = memo(function TrackRow({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 icon-hover-download"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
                     onClick={(e) => e.stopPropagation()}
                     title={t("common.download")}
                   >

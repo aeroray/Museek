@@ -523,7 +523,7 @@ export function LyricsPanel() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/70 hover:text-white icon-hover-download"
+                className="h-9 w-9 rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/70 hover:text-white"
                 disabled={savingCover}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -620,7 +620,7 @@ export function LyricsPanel() {
           variant="ghost"
           size="icon"
           className={cn(
-            "h-9 w-9 icon-hover-captions",
+            "h-9 w-9",
             lyricsOnly
               ? "text-primary"
               : "text-muted-foreground/55 hover:text-muted-foreground",
@@ -636,7 +636,7 @@ export function LyricsPanel() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-maximize"
+            className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
             onClick={() => void toggleImmersive()}
             title={t(immersive ? "lyrics.exitFullscreen" : "lyrics.fullscreen")}
           >
@@ -659,7 +659,7 @@ export function LyricsPanel() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-9 w-9 icon-hover-comments",
+              "h-9 w-9",
               commentsOpen
                 ? "text-primary"
                 : "text-muted-foreground/55 hover:text-muted-foreground",
@@ -684,7 +684,7 @@ export function LyricsPanel() {
             variant="ghost"
             size="icon"
             className={cn(
-              "h-9 w-9 icon-hover-captions",
+              "h-9 w-9",
               desktopLyricsVisible
                 ? "text-primary"
                 : "text-muted-foreground/55 hover:text-muted-foreground",

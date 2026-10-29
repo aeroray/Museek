@@ -90,7 +90,7 @@ export function LyricSourceMenu({ song, onOpenChange }: Props) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground icon-hover-lyric-source"
+          className="h-9 w-9 text-muted-foreground/55 hover:text-muted-foreground"
           disabled={!song}
           title={t("lyrics.chooseSource")}
           aria-label={t("lyrics.chooseSource")}

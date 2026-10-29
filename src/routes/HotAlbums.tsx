@@ -450,7 +450,7 @@ export function HotAlbums() {
                     <button
                       onClick={() => setFilter("")}
                       title={t("search.clear")}
-                      className="icon-button-motion absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="icon-motion absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       <X size={14} />
                     </button>

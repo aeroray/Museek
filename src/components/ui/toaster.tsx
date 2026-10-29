@@ -55,7 +55,7 @@ export function Toaster() {
         )}
         <button
           onClick={clearToast}
-          className="icon-button-motion relative flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+          className="icon-motion relative flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
           aria-label="close"
         >
           <X size={15} />

@@ -24,7 +24,6 @@ type NavItem = {
   to: string;
   icon: LucideIcon;
   labelKey: string;
-  iconHover: string;
 };
 
 const discoverItems: NavItem[] = [
@@ -32,31 +31,26 @@ const discoverItems: NavItem[] = [
     to: "/search",
     icon: Search,
     labelKey: "nav.search",
-    iconHover: "icon-hover-search",
   },
   {
     to: "/library",
     icon: TrendingUp,
     labelKey: "nav.library",
-    iconHover: "icon-hover-trend",
   },
   {
     to: "/hot-playlists",
     icon: ListMusic,
     labelKey: "nav.playlists",
-    iconHover: "icon-hover-list",
   },
   {
     to: "/hot-albums",
     icon: Disc3,
     labelKey: "nav.albums",
-    iconHover: "icon-hover-list",
   },
   {
     to: "/recognize",
     icon: Fingerprint,
     labelKey: "nav.recognize",
-    iconHover: "icon-hover-search",
   },
 ];
 
@@ -65,25 +59,21 @@ const mineItems: NavItem[] = [
     to: "/favorites",
     icon: Heart,
     labelKey: "nav.favorites",
-    iconHover: "icon-hover-heart",
   },
   {
     to: "/listening",
     icon: Footprints,
     labelKey: "nav.listening",
-    iconHover: "icon-hover-list",
   },
   {
     to: "/local",
     icon: HardDrive,
     labelKey: "nav.local",
-    iconHover: "icon-hover-list",
   },
   {
     to: "/downloads",
     icon: Download,
     labelKey: "nav.downloads",
-    iconHover: "icon-hover-download",
   },
 ];
 
@@ -91,7 +81,7 @@ const navLinkClass =
   (collapsed: boolean) =>
   ({ isActive }: { isActive: boolean }) =>
     cn(
-      "relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium",
+      "relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium icon-motion",
       "transition-[color,background-color,transform] duration-200 ease-out",
       "active:scale-[0.98]",
       collapsed && "justify-center px-0",
@@ -108,14 +98,12 @@ function SidebarNavLink({
   collapsed: boolean;
 }) {
   const t = useT();
-  const { to, icon: Icon, labelKey, iconHover } = item;
+  const { to, icon: Icon, labelKey } = item;
   return (
     <NavLink
       to={to}
       title={collapsed ? t(labelKey) : undefined}
-      className={({ isActive }) =>
-        cn(navLinkClass(collapsed)({ isActive }), iconHover)
-      }
+      className={({ isActive }) => navLinkClass(collapsed)({ isActive })}
     >
       {({ isActive }) => (
         <>
@@ -236,7 +224,7 @@ export function Sidebar() {
           to="/settings"
           title={collapsed ? t("nav.settings") : undefined}
           className={({ isActive }) =>
-            cn(navLinkClass(collapsed)({ isActive }), "icon-hover-settings")
+            navLinkClass(collapsed)({ isActive })
           }
         >
           {({ isActive }) => (

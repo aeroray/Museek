@@ -78,8 +78,7 @@ function TopBarLyrics() {
     >
       <button
         type="button"
-        className={cn(
-          "inline-flex max-w-full min-w-0 items-center rounded-md px-2 py-0.5",
+        className={cn("icon-motion ", "inline-flex max-w-full min-w-0 items-center rounded-md px-2 py-0.5",
           "text-center",
           lyricLines.length > 0
             ? "cursor-pointer transition-[background-color,color] duration-200 ease-out hover:bg-accent/60"
@@ -129,7 +128,7 @@ export function TopBar() {
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground icon-hover-panel"
+        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
         onClick={toggleSidebar}
         title={sidebarCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
       >
@@ -143,7 +142,7 @@ export function TopBar() {
       <Button
         variant="ghost"
         size="icon"
-        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground icon-hover-captions"
+        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
         onClick={toggleTopBarLyrics}
         title={topBarLyrics ? t("topBar.lyricsHide") : t("topBar.lyricsShow")}
       >
@@ -161,7 +160,7 @@ export function TopBar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground icon-hover-arrow-left"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={() => navigate(-1)}
             title={t("nav.back")}
           >
@@ -170,7 +169,7 @@ export function TopBar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground icon-hover-arrow-right"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={() => navigate(1)}
             title={t("nav.forward")}
           >

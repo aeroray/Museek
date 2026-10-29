@@ -53,7 +53,7 @@ function ExternalLinkRow({
       type="button"
       onClick={() => void openExternal(href)}
       className={cn(
-        "group flex w-full items-center gap-3.5 p-4 text-left",
+        "icon-motion group flex w-full items-center gap-3.5 p-4 text-left",
         "transition-[background-color,transform] duration-200 ease-out",
         "hover:bg-muted/45 active:scale-[0.99]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",

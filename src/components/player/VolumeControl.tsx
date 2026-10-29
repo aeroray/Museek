@@ -73,7 +73,7 @@ export function VolumeControl() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 icon-hover-volume"
+          className="h-9 w-9"
           onClick={() => setMuted(!muted)}
         >
           <MorphingVolumeIcon level={level} />

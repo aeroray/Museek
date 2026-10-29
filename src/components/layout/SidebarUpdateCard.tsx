@@ -151,7 +151,7 @@ export function SidebarUpdateCard() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="group flex w-full items-center justify-center rounded-xl outline-none active:scale-[0.96]"
+              className="icon-motion group flex w-full items-center justify-center rounded-xl outline-none"
               aria-label={t("update.cardTitle", { version: available!.version })}
             >
               <CollapsedUpdateTrigger
@@ -227,7 +227,7 @@ export function SidebarUpdateCard() {
           type="button"
           onClick={dismiss}
           className={cn(
-            "icon-button-motion absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-md",
+            "icon-motion absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-md",
             "text-muted-foreground/70 transition-colors",
             "hover:bg-muted hover:text-foreground",
           )}

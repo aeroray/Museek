@@ -874,7 +874,7 @@ export function Favorites() {
                       {!editing && (
                         <button
                           onClick={() => play(song)}
-                          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100"
+                          className="icon-motion absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100"
                         >
                           <Play
                             size={16}
@@ -912,7 +912,7 @@ export function Favorites() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100 icon-hover-plus"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 icon-motion"
                           onClick={(e) => {
                             e.stopPropagation();
                             addToQueue([song]);

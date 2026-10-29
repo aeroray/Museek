@@ -243,7 +243,7 @@ export function Search() {
                 setFocused(false);
               }}
               title={t("search.clear")}
-              className="icon-button-motion absolute right-2.5 top-1/2 -translate-y-1/2 z-10 text-muted-foreground hover:text-foreground"
+              className="icon-motion absolute right-2.5 top-1/2 -translate-y-1/2 z-10 text-muted-foreground hover:text-foreground"
             >
               <X size={15} />
             </button>
@@ -284,7 +284,7 @@ export function Search() {
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => removeHistoryItem(h)}
                       title={t("search.removeHistory")}
-                      className="icon-button-motion pr-2 pl-0.5 py-1 text-muted-foreground/50 hover:text-destructive"
+                      className="icon-motion pr-2 pl-0.5 py-1 text-muted-foreground/50 hover:text-destructive"
                     >
                       <X size={12} />
                     </button>
