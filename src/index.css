@@ -89,13 +89,23 @@
   }
   .icon-motion:active:not(:disabled) {
     scale: 0.96;
-    /* Press-in is `snappy` and the release springs back on `soft`: the hand
-       wants an immediate answer on the way down, and a calmer settle on the way
-       up. The two rules overlap only while the button is held, so whichever
-       state is active supplies the curve for that direction of travel. */
+    /* Press must land immediately, not ease in over a fifth of a second.
+       The complaint was "the longer I hold, the smaller it gets" — which is
+       exactly what a 240ms eased transition looks like if you watch it: the size
+       is still travelling toward its target while the pointer is down, so the
+       control appears to keep shrinking. A press should read as an instant
+       answer, so it gets a short duration and a monotonic curve.
+
+       An overshooting spring was also wrong here: it dips *past* the target
+       before settling, so the mid-press size is smaller than the size it ends
+       on. `--motion-fast` (120ms) is the shortest token the app has. */
+    transition-duration:
+      var(--motion-fast), var(--motion-fast), var(--motion-fast),
+      var(--motion-fast), var(--motion-fast), var(--motion-fast),
+      var(--motion-fast);
     transition-timing-function:
       ease-out, ease-out, ease-out, ease-out, ease-out,
-      var(--ease-spring-snappy), var(--ease-spring-snappy);
+      ease-out, ease-out;
   }
 }
 
@@ -111,7 +121,11 @@
 @media (prefers-reduced-motion: no-preference) {
   .row-motion:active:not(:disabled) {
     scale: 0.99;
-    transition-timing-function: var(--ease-spring-snappy);
+    /* Short and monotonic for the same reason as .icon-motion: a long eased
+       press looks like the row keeps shrinking while the finger is down, and an
+       overshooting curve would dip past the target. See the note there. */
+    transition-duration: var(--motion-fast);
+    transition-timing-function: ease-out;
   }
 }
 
@@ -1130,7 +1144,16 @@ html[data-mini-peek="true"] .app-shell > * {
   animation: navIn 180ms ease-out;
 }
 
-/* Hot-search cloud: staggered entrance (transform only — opacity comes from tiers) */
+/* Hot-search cloud: staggered entrance (transform only — opacity comes from tiers)
+ *
+ * `animation-fill-mode: backwards` (not `both`). With `both`, the animation's
+ * `to` frame keeps applying `transform` after it finishes, and an animation's
+ * transform beats any `transition`/utility transform from a later state — so
+ * every keyword sat permanently at `translateY(0) scale(1)` and the `hover:
+ * scale-110` / `active:scale-95` classes on the element had no effect at all.
+ * `backwards` still holds the `from` frame during the stagger delay (so nothing
+ * flashes at full size before its turn) but releases the transform afterwards,
+ * which is what lets the hover and press feedback work. */
 @keyframes hotCloudIn {
   from {
     transform: translateY(8px) scale(0.96);
@@ -1142,7 +1165,7 @@ html[data-mini-peek="true"] .app-shell > * {
   }
 }
 .hot-cloud-word {
-  animation: hotCloudIn 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: hotCloudIn 420ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 
 /* ── Icon micro-animations ─────────────────────────────────────────
