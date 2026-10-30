@@ -57,7 +57,7 @@ export function LastfmLovedPanel({
         return (
           <div
             key={key}
-            className="row-motion group flex items-center gap-3 rounded-xl px-3 py-2 transition-[background-color] duration-200 ease-out hover:bg-accent/55"
+            className="group flex items-center gap-3 rounded-xl px-3 py-2 transition-[background-color] duration-200 ease-out hover:bg-accent/55"
             onDoubleClick={() => onPlay(track)}
           >
             <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-muted shadow-[var(--shadow-border)]">

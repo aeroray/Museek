@@ -134,7 +134,7 @@ function StatRow({
       title={url ? t("lastfm.stats.openOnLastfm") : undefined}
       className={cn(
         "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-[background-color,transform] duration-200 ease-out",
-        url && "row-motion hover:bg-accent/55",
+        url && "hover:bg-accent/55",
       )}
     >
       {rank !== undefined && (

@@ -7,56 +7,33 @@
   /* ── The one icon-button motion ──────────────────────────────────
      Every clickable icon control in the app uses this and nothing else.
 
-     Two orthogonal dimensions, deliberately kept on different elements so they
-     cannot compound:
+     HOVER ONLY. There is no press animation: clicking does not scale, nudge or
+     otherwise move the control. A hover effect tells you what is clickable; a
+     press effect on top of it was the thing that read as "it shrinks and keeps
+     shrinking while I hold" and is deliberately gone.
 
-       hover  -> the <svg> glyph lifts 1px and grows 4%
-       press  -> the button box shrinks to 96%
+       hover -> the <svg> glyph lifts 1px and grows 4%
+       press -> nothing (only the colour/background state changes)
 
-     Before this there were five mechanisms (a per-action `icon-hover-*` pose
-     table, a container `scale` on the button, a bare `active:scale` on text
-     buttons, a motion/react `whileHover` on the play button, and nothing at all
-     on the ~80 buttons that never got a class). They disagreed about how much a
-     control should grow: the container scaled 1.04 while the glyph scaled 1.06,
-     so the visible enlargement ranged from 1.04x to 1.12x depending on which
-     classes a button happened to carry.
-
-     The rule is therefore: only the glyph moves on hover, only the box moves on
-     press. A control can carry `icon-motion` without any other class and look
-     exactly like every other control.
-
-     Colour and background stay fast so hover reads as instant feedback; the
-     spatial properties get the longer spring so sweeping a toolbar feels fluid.
-     The two duration lists line up positionally with their property lists — keep
-     them the same length and order when editing. */
+     Colour still transitions quickly so hover feels instant; the glyph's
+     transform gets the longer spring so sweeping a toolbar feels fluid. The
+     duration lists line up positionally with the property list — keep them the
+     same length and order when editing. */
   .icon-motion {
-    scale: 1;
     transition-property:
-      color, background-color, border-color, opacity, box-shadow, transform, scale;
+      color, background-color, border-color, opacity, box-shadow;
     transition-duration:
       var(--motion-fast), var(--motion-fast), var(--motion-fast),
-      var(--motion-fast), var(--motion-fast), var(--motion-base),
-      var(--motion-base);
+      var(--motion-fast), var(--motion-fast);
     transition-timing-function:
-      ease-out, ease-out, ease-out, ease-out, ease-out,
-      var(--ease-spring-soft), var(--ease-spring-soft);
+      ease-out, ease-out, ease-out, ease-out, ease-out;
   }
 
-  /* The glyph carries the hover pose. Declared here rather than per-action so a
+  /* The glyph carries the hover lift. Declared here rather than per-action so a
      control never needs to know which "direction" it belongs to. */
   .icon-motion svg {
     transform-origin: center;
     transition: transform var(--motion-base) var(--ease-spring-soft);
-  }
-
-  /* Row press feedback. Same shape as .icon-motion but without the glyph pose:
-     rows have no icon to lift, and their colour transitions are declared by each
-     call site. Only `scale` is owned here. */
-  .row-motion {
-    scale: 1;
-    transition-property: scale;
-    transition-duration: var(--motion-base);
-    transition-timing-function: var(--ease-spring-soft);
   }
 
   .duration-drawer-swipe {
@@ -67,9 +44,10 @@
   }
 }
 
-/* Hover lifts the glyph; press shrinks the box. Both live behind a
-   reduced-motion guard: the static cues (color, background, the glyph itself)
-   still change, only the travel is removed.
+/* Hover lifts the glyph. It is the only movement the control makes, so it lives
+   behind both a hover-capability and a reduced-motion guard: the static cues
+   (colour, background, the glyph itself) still change, only the travel is
+   removed.
  *
  * Travel is deliberately small: 1px and 4%. At 1.5px/6% the lift read as the
  * control moving rather than responding, which is the same complaint the
@@ -77,55 +55,6 @@
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .icon-motion:hover:not(:disabled) svg {
     transform: translateY(-1px) scale(1.04);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  /* A keyboard or touch press gets the same lift, so the affordance is not
-     pointer-only. `:active` also sets the box scale, matching the old press
-     pose but without the container growing on hover. */
-  .icon-motion:active:not(:disabled) svg {
-    transform: translateY(-1px) scale(1.04);
-  }
-  .icon-motion:active:not(:disabled) {
-    scale: 0.96;
-    /* Press must land immediately, not ease in over a fifth of a second.
-       The complaint was "the longer I hold, the smaller it gets" — which is
-       exactly what a 240ms eased transition looks like if you watch it: the size
-       is still travelling toward its target while the pointer is down, so the
-       control appears to keep shrinking. A press should read as an instant
-       answer, so it gets a short duration and a monotonic curve.
-
-       An overshooting spring was also wrong here: it dips *past* the target
-       before settling, so the mid-press size is smaller than the size it ends
-       on. `--motion-fast` (120ms) is the shortest token the app has. */
-    transition-duration:
-      var(--motion-fast), var(--motion-fast), var(--motion-fast),
-      var(--motion-fast), var(--motion-fast), var(--motion-fast),
-      var(--motion-fast);
-    transition-timing-function:
-      ease-out, ease-out, ease-out, ease-out, ease-out,
-      ease-out, ease-out;
-  }
-}
-
-/* ── Row press: the second and last motion ───────────────────────────
-   For whole rows and chips — a track in a list, a saved-loved row, a platform
-   tab, a hot keyword. They are much larger than an icon button, so the same 4%
-   travels several times further and reads as the row wobbling. This is a milder
-   1% with the same curve and the same property, so there is still exactly one
-   press mechanism per size class and no element carries both.
-
-   Anything clickable that is neither an icon button nor a row should pick one of
-   these two; it must not invent a third value. */
-@media (prefers-reduced-motion: no-preference) {
-  .row-motion:active:not(:disabled) {
-    scale: 0.99;
-    /* Short and monotonic for the same reason as .icon-motion: a long eased
-       press looks like the row keeps shrinking while the finger is down, and an
-       overshooting curve would dip past the target. See the note there. */
-    transition-duration: var(--motion-fast);
-    transition-timing-function: ease-out;
   }
 }
 

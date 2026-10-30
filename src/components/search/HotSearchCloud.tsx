@@ -125,7 +125,6 @@ export function HotSearchCloud({
                     "hot-cloud-word leading-none tracking-tight will-change-transform transform-gpu",
                     "transition-[transform,filter,opacity] duration-200 ease-out",
                     "hover:scale-110 hover:brightness-110 hover:opacity-100",
-                    "active:scale-95",
                     tier.size,
                     tier.weight,
                     tier.opacity,

@@ -81,7 +81,7 @@ export const TrackRow = memo(function TrackRow({
   return (
     <div
       className={cn(
-        "row-motion flex items-center gap-3 px-3 py-2 rounded-xl group group/row cursor-pointer transition-[background-color] duration-200 ease-out hover:bg-accent/55",
+        "flex items-center gap-3 px-3 py-2 rounded-xl group group/row cursor-pointer transition-[background-color] duration-200 ease-out hover:bg-accent/55",
         className,
         selectable && selected && "bg-primary/10",
       )}

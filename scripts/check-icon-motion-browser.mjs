@@ -269,9 +269,14 @@ const compiled = css + "\n" + appCss
     !boxRule || !/scale:\s*[\d.]/.test(boxRule.body),
     boxRule ? boxRule.body.trim() : "only the glyph rule exists",
   )
+  // Hover is the only motion: there must be no press rule that resizes or moves
+  // the control.
+  const pressRules = [...compiled.matchAll(/(\.icon-motion:active[^{]*)\{([^}]*)\}/g)]
+  const pressMotion = pressRules.filter((m) => /scale\s*:|transform\s*:/.test(m[2]))
   check(
-    "the press rule shrinks the box to 0.96",
-    /\.icon-motion:active[^{]*\{[^}]*scale:\s*0\.96/.test(compiled),
+    "no press rule scales or transforms the box",
+    pressMotion.length === 0,
+    pressMotion.map((m) => m[1].trim()).join(" | "),
   )
 
   // Every button must carry the class (or be an explicit exception).

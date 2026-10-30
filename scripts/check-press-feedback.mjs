@@ -1,18 +1,16 @@
-// Two reported regressions, measured in a real browser.
+// Icon controls have a hover effect and NOTHING on press.
 //
-// 1. Hot-keyword cloud: hovering does nothing and clicking does nothing.
-//    Cause: `.hot-cloud-word` used `animation-fill-mode: both`, so the entrance
-//    animation's `to { transform: translateY(0) scale(1) }` kept applying after
-//    the animation finished. A running/filling animation's transform wins over
-//    any transition/utility transform from another state, so `hover:scale-110`
-//    and `active:scale-95` were dead. Fill mode is now `backwards`.
+// The app settled on exactly one motion: hovering a control lifts its glyph 1px
+// and grows it 4%. Clicking does not scale, nudge or animate the control at all —
+// a press effect was what produced the "it keeps shrinking while I hold" report
+// and was removed entirely.
 //
-// 2. Sidebar nav link shrinks further the longer it is held.
-//    Cause: the press transition used `--ease-spring-snappy`, whose curve peaks
-//    at 1.114 — above 1. On a shrink from 1 to 0.96 the overshoot renders
-//    ~0.96 x (2 - 1.114) = 0.92 partway through, smaller than the target.
-//    Sampling during that window reads as "the longer I press, the smaller it
-//    gets". The press curve is now `ease-out`, which is monotonic.
+// This drives real pointer events through CDP and asserts both halves:
+//
+//   1. hot keyword: grows on hover (regression: `animation-fill-mode: both` left
+//      every word pinned at scale(1) and killed both hover and press)
+//   2. a control's size on press equals its size at rest — no press scaling
+//   3. the size while held does not drift, because nothing is animating
 //
 //   node scripts/check-press-feedback.mjs
 import { spawn, execFileSync } from "node:child_process"
@@ -45,11 +43,18 @@ writeFileSync(
   entry,
   `import { createRoot } from "react-dom/client"
 import { Search } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
-// Reproduce both call sites with their real classes.
+// Real components and real classes, so the check measures what ships.
 function Harness() {
   return (
     <div style={{ padding: 40, background: "#fff", display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* A plain icon button: icon-motion comes from the Button component. */}
+      <Button id="btn" variant="ghost" size="icon" className="h-9 w-9">
+        <Search size={16} />
+      </Button>
+
+      {/* Sidebar nav link: icon-motion is on the shared class string. */}
       <a
         id="nav"
         href="#"
@@ -59,10 +64,10 @@ function Harness() {
         <span>Search</span>
       </a>
 
+      {/* Hot keyword: hover grows the word, press does nothing. */}
       <button
         id="word"
-        className="hot-cloud-word leading-none tracking-tight will-change-transform transform-gpu transition-[transform,filter,opacity] duration-200 ease-out hover:scale-110 hover:brightness-110 active:scale-95 text-2xl font-semibold"
-        style={{ animationDelay: "0ms" }}
+        className="hot-cloud-word leading-none tracking-tight will-change-transform transform-gpu transition-[transform,filter,opacity] duration-200 ease-out hover:scale-110 text-2xl font-semibold"
       >
         keyword
       </button>
@@ -209,7 +214,7 @@ async function evaluate(expression) {
 
 await send("Page.enable")
 await send("Runtime.enable")
-await send("Emulation.setDeviceMetricsOverride", { width: 700, height: 300, deviceScaleFactor: 1, mobile: false })
+await send("Emulation.setDeviceMetricsOverride", { width: 700, height: 400, deviceScaleFactor: 1, mobile: false })
 
 const appCss = readFileSync(join(root, "src/index.css"), "utf8").replace(/@tailwind[^;]+;/g, "")
 const css = readFileSync(join(work, "probe.out.css"), "utf8")
@@ -238,54 +243,6 @@ writeFileSync(htmlPath, html)
 await send("Page.navigate", { url: "file:///" + htmlPath.replace(/\\/g, "/") })
 await sleep(1500)
 
-/**
- * Drive a real hover through CDP so `:hover` and `:active` actually apply, then
- * read the composited scale.
- *
- * Both readings parse `transform`, not the CSS `scale` property: `.icon-motion`
- * writes `scale`, but Tailwind's `scale-*` utilities write `transform: matrix()`,
- * so reading `.scale` alone would report 1 for every Tailwind-styled element and
- * make a working press look dead.
- */
-async function hoverAndRead(selector) {
-  const box = await evaluate(`(() => {
-    const el = document.querySelector(${JSON.stringify(selector)})
-    const r = el.getBoundingClientRect()
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
-  })()`)
-  const read = () =>
-    evaluate(`(() => {
-      const el = document.querySelector(${JSON.stringify(selector)})
-      const cs = getComputedStyle(el)
-      return { transform: cs.transform, scale: cs.scale, filter: cs.filter }
-    })()`)
-
-  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y })
-  await sleep(350)
-  const hovered = await read()
-  // Press, then sample densely across the transition. An overshooting easing
-  // curve dips *below* its target partway through and comes back, so comparing
-  // only the settled value would miss it — the complaint is about what the user
-  // sees while holding, which is exactly the transit.
-  await send("Input.dispatchMouseEvent", {
-    type: "mousePressed", x: box.x, y: box.y, button: "left", clickCount: 1,
-  })
-  const trail = []
-  for (let i = 0; i < 14; i++) {
-    await sleep(45)
-    trail.push(await read())
-  }
-  const held = trail[trail.length - 1]
-  await sleep(600)
-  const stillHeld = await read()
-  await send("Input.dispatchMouseEvent", {
-    type: "mouseReleased", x: box.x, y: box.y, button: "left", clickCount: 1,
-  })
-  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 })
-  await sleep(500)
-  return { hovered, held, stillHeld, trail }
-}
-
 /** Effective scale of a computed `transform`, whatever wrote it. */
 const parseScale = (t) => {
   if (!t || t === "none") return 1
@@ -295,50 +252,103 @@ const parseScale = (t) => {
   return Math.sqrt(parts[0] * parts[0] + parts[1] * parts[1])
 }
 
-/** The CSS `scale` property (used by .icon-motion), falling back to transform. */
-const effectiveScale = (reading) => {
-  const s = Number(reading.scale)
-  if (Number.isFinite(s) && s !== 1 && s > 0) return s
-  return parseScale(reading.transform)
+/**
+ * Hover, then press and hold, sampling throughout.
+ *
+ * Both `transform` and the CSS `scale` property are read: `.icon-motion` lifts the
+ * glyph via `transform`, while Tailwind's scale utilities also write `transform`.
+ * Reading only one of them would report 1 and make a working effect look dead.
+ */
+async function probe(selector) {
+  const box = await evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(selector)})
+    const r = el.getBoundingClientRect()
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+  })()`)
+  const read = () =>
+    evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)})
+      // The glyph is what moves on hover; the box is what would move on press.
+      const glyph = el.querySelector("svg") ?? el
+      const boxCs = getComputedStyle(el)
+      const glyphCs = getComputedStyle(glyph)
+      return {
+        boxTransform: boxCs.transform,
+        boxScale: boxCs.scale,
+        glyphTransform: glyphCs.transform,
+      }
+    })()`)
+
+  const rest = await read()
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box.x, y: box.y })
+  await sleep(400)
+  const hovered = await read()
+
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: box.x, y: box.y, button: "left", clickCount: 1 })
+  const trail = []
+  for (let i = 0; i < 10; i++) {
+    await sleep(45)
+    trail.push(await read())
+  }
+  const held = trail[trail.length - 1]
+  await sleep(500)
+  const stillHeld = await read()
+
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: box.x, y: box.y, button: "left", clickCount: 1 })
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 })
+  await sleep(500)
+  return { rest, hovered, held, stillHeld, trail }
 }
 
 let failures = 0
 const check = (name, cond, detail = "") => {
   if (!cond) failures++
-  console.log(`${cond ? "OK  " : "FAIL"}  ${name.padEnd(56)}${detail ? "  " + detail : ""}`)
+  console.log(`${cond ? "OK  " : "FAIL"}  ${name.padEnd(58)}${detail ? "  " + detail : ""}`)
 }
 
-// --- 1. hot keyword -------------------------------------------------------
-console.log("hot keyword: hover grows it, press shrinks it")
+// --- 1. hover works at all -------------------------------------------------
+console.log("1. hover produces a visible effect")
 {
-  const word = await hoverAndRead("#word")
-  const hoverScale = parseScale(word.hovered.transform)
-  console.log(`  hover  scale ${hoverScale.toFixed(3)}   (${word.hovered.transform})`)
-  check("hover scales the keyword up", hoverScale > 1.05, hoverScale.toFixed(3))
-  const pressScale = parseScale(word.held.transform)
-  console.log(`  press  scale ${pressScale.toFixed(3)}   (${word.held.transform})`)
-  check("press scales the keyword down", pressScale < 0.97, pressScale.toFixed(3))
+  const word = await probe("#word")
+  const hoverScale = parseScale(word.hovered.boxTransform)
+  console.log(`   hot keyword hover scale: ${hoverScale.toFixed(3)}`)
+  check("hot keyword grows on hover", hoverScale > 1.05, hoverScale.toFixed(3))
+
+  const btn = await probe("#btn")
+  const btnHoverScale = parseScale(btn.hovered.glyphTransform)
+  console.log(`   icon button glyph hover scale: ${btnHoverScale.toFixed(3)}`)
+  check("icon button glyph lifts on hover", btnHoverScale > 1.02, btnHoverScale.toFixed(3))
+
+  const nav = await probe("#nav")
+  const navHoverScale = parseScale(nav.hovered.glyphTransform)
+  console.log(`   nav link glyph hover scale: ${navHoverScale.toFixed(3)}`)
+  check("nav link glyph lifts on hover", navHoverScale > 1.02, navHoverScale.toFixed(3))
 }
 
-// --- 2. sidebar press stability -------------------------------------------
-console.log("\nnav link: the pressed size is stable while held")
+// --- 2. press does nothing -------------------------------------------------
+console.log("\n2. pressing does not scale anything")
+for (const [selector, label] of [
+  ["#btn", "icon button"],
+  ["#nav", "nav link"],
+  ["#word", "hot keyword"],
+]) {
+  const r = await probe(selector)
+  const restBox = parseScale(r.rest.boxTransform) * (Number(r.rest.boxScale) || 1)
+  const heldBox = parseScale(r.held.boxTransform) * (Number(r.held.boxScale) || 1)
+  const hoverBox = parseScale(r.hovered.boxTransform) * (Number(r.hovered.boxScale) || 1)
+  console.log(`   ${label.padEnd(14)} box: rest ${restBox.toFixed(3)} hover ${hoverBox.toFixed(3)} held ${heldBox.toFixed(3)}`)
+  check(`${label}: box does not shrink on press`, Math.abs(heldBox - hoverBox) < 0.005)
+  check(`${label}: box is not smaller than at rest`, heldBox >= restBox - 0.005)
+}
+
+// --- 3. nothing animates while held ---------------------------------------
+console.log("\n3. the size is constant while the pointer is held down")
 {
-  const nav = await hoverAndRead("#nav")
-  const scales = nav.trail.map(effectiveScale)
-  const settled = effectiveScale(nav.stillHeld)
-  const lowest = Math.min(...scales)
-  console.log(`  transit: ${scales.map((s) => s.toFixed(3)).join(" ")}`)
-  console.log(`  settled: ${settled.toFixed(4)}   lowest during transit: ${lowest.toFixed(4)}`)
-  check("pressed scale settles at 0.96", Math.abs(settled - 0.96) < 0.005, settled.toFixed(4))
-  check(
-    "it never undershoots the target while held",
-    lowest >= 0.955,
-    `dipped to ${lowest.toFixed(4)} (an overshooting curve on a shrink)` ,
-  )
-  check(
-    "the settled size does not depend on hold time",
-    Math.abs(settled - scales[scales.length - 1]) < 0.005,
-  )
+  const r = await probe("#btn")
+  const scales = r.trail.map((t) => parseScale(t.boxTransform) * (Number(t.boxScale) || 1))
+  const spread = Math.max(...scales) - Math.min(...scales)
+  console.log(`   box scale while held: ${scales.map((s) => s.toFixed(3)).join(" ")}`)
+  check("no drift during the hold", spread < 0.002, `spread ${spread.toFixed(4)}`)
 }
 
 ws.close()

@@ -82,15 +82,19 @@ console.log("the single mechanism exists and is the only one")
     !/\.icon-button-motion\s*(?::|\{)/.test(stripComments(css)),
   )
 
-  // The hover pose and the press pose must live on different elements, or the
-  // two scales compound (1.04 * 1.06 = 1.10) and controls stop matching.
+  // Hover is the only motion. A press rule must not scale anything.
   check(
     "hover pose is applied to the glyph, not the box",
     /\.icon-motion:hover[^{]*\bsvg\s*\{/.test(css),
   )
   check(
-    "press shrink is applied to the box, not the glyph",
-    /\.icon-motion:active[^{]*\{\s*scale:\s*0\.96/.test(css),
+    "there is no press scale at all",
+    !/\.icon-motion:active[^{]*\{\s*scale:/.test(stripComments(css)),
+    "pressing must not resize the control",
+  )
+  check(
+    "there is no press transform either",
+    !/\.icon-motion:active[^{]*\{[^}]*transform:/.test(stripComments(css)),
   )
   // Scan EVERY hover rule: a second one that scales the box would compound with
   // the glyph's 1.04 and make this control larger than its neighbours.
@@ -138,72 +142,45 @@ console.log("\nno pose moves a glyph horizontally")
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nrow and chip presses use the shared row-motion")
+console.log("\nno control scales on press")
 {
-  check("index.css defines .row-motion", /\.row-motion\s*\{/.test(css))
+  // The app has exactly one motion: the hover lift. Pressing a control must not
+  // resize or move it — that press-shrink was what produced the "it keeps
+  // shrinking while I hold" report, and it was removed along with the
+  // `.row-motion` class that used to provide a milder version for rows.
   check(
-    "row-motion shrinks to 0.99 (milder than an icon button)",
-    /\.row-motion:active[^{]*\{\s*scale:\s*0\.99/.test(css),
-  )
-  check(
-    "row-motion sets no glyph transform (rows have no icon)",
-    !/\.row-motion[^{]*svg[^{]*\{/.test(css),
+    "index.css has no .row-motion class any more",
+    !/\.row-motion\s*\{/.test(stripComments(css)),
   )
 
-  // No element may invent its own press scale. The two sanctioned mechanisms are
-  // `icon-motion` (icon buttons) and `row-motion` (rows and chips); a bare
-  // `active:scale-*` is a third one.
-  //
-  // Exempt: the hot-keyword cloud, whose resting size is a visual tier and whose
-  // hover grows the word — its press feedback necessarily rides `transform` next
-  // to that hover scale, so a `scale` property would multiply instead of replace.
-  const ROW_SCALE_EXEMPT = new Set(["src/components/search/HotSearchCloud.tsx"])
+  const scaleRules = [...stripComments(css).matchAll(/([^{}]*:active[^{}]*)\{([^}]*)\}/g)]
+    .filter((m) => /scale\s*:/.test(m[2]))
+    .map((m) => m[1].trim())
+  check(
+    "no :active rule sets a scale",
+    scaleRules.length === 0,
+    scaleRules.slice(0, 3).join(" | "),
+  )
+
+  // No element may declare its own press transform either.
   const rogue = []
   for (const file of sources) {
     if (!file.endsWith(".tsx")) continue
     const rel = relative(root, file).replace(/\\/g, "/")
-    if (ROW_SCALE_EXEMPT.has(rel)) continue
     const text = stripComments(readFileSync(file, "utf8"))
-    for (const m of text.matchAll(/\bactive:scale-[^\s"'`]+/g)) {
+    for (const m of text.matchAll(/\bactive:(scale|translate|rotate)[^\s"'`]*/g)) {
       rogue.push(`${rel}: ${m[0]}`)
     }
   }
   check(
-    "no element declares its own press scale",
+    "no element declares a press transform",
     rogue.length === 0,
     rogue.slice(0, 4).join("; "),
   )
 }
 
 // ---------------------------------------------------------------------------
-console.log("\nnothing compounds with the shared press scale")
-{
-  // `.icon-motion` writes the CSS `scale` property; Tailwind's `scale-*`
-  // utilities write `transform: scaleX() scaleY()`. Because they are different
-  // properties they MULTIPLY. The sidebar had `active:scale-[0.98]` alongside
-  // `icon-motion`, so it rendered 0.96 * 0.98 = 0.94 and shrank visibly harder
-  // than every icon button. Any co-located scale utility is a bug.
-  const offenders = []
-  for (const file of sources) {
-    if (!file.endsWith(".tsx")) continue
-    const rel = relative(root, file).replace(/\\/g, "/")
-    const lines = stripComments(readFileSync(file, "utf8")).split("\n")
-    for (let i = 0; i < lines.length; i++) {
-      if (!lines[i].includes("icon-motion")) continue
-      // className strings can span lines; inspect a small window around the hit.
-      const window = lines.slice(Math.max(0, i - 2), i + 6).join(" ")
-      const m = /(?:^|[\s"'])((?:active|group-active):scale-[\d.[\]-]+)/.exec(window)
-      if (m) offenders.push(`${rel}:${i + 1} ${m[1]}`)
-    }
-  }
-  check(
-    "no element applies icon-motion and its own scale",
-    offenders.length === 0,
-    offenders.slice(0, 4).join("; "),
-  )
-}
 
-// ---------------------------------------------------------------------------
 console.log("\nthe play/pause button switches its glyph without moving")
 {
   const src = readFileSync(
