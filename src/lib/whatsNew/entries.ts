@@ -17,6 +17,58 @@ export type WhatsNewRelease = {
 
 /** Built-in bilingual release notes keyed by package.json version (no leading v). */
 const ENTRIES: Record<string, Record<Lang, WhatsNewCopy>> = {
+  "3.14.2": {
+    zh: {
+      sections: [
+        {
+          title: "🖱️ 按钮动效统一",
+          bullets: [
+            "所有按钮的图标动效统一成一套：悬停时图标轻轻上抬 1 像素并放大 4%，全应用一致",
+            "修复：点击按钮时图标会往左偏一下（播放、收藏、播放模式等按钮都有）",
+            "修复：按住按钮时它会越缩越小，按的时间越长缩得越厉害",
+            "设置页左侧的导航标签现在也有悬停动效了，之前只有颜色变化",
+          ],
+        },
+        {
+          title: "🔥 热搜词云",
+          bullets: [
+            "修复：热搜关键词悬停和点击时都不会放大，完全没有反应",
+          ],
+        },
+        {
+          title: "🎧 播放",
+          bullets: [
+            "播放/暂停按钮点击时只切换图标，不再有额外的移动效果",
+          ],
+        },
+      ],
+    },
+    en: {
+      sections: [
+        {
+          title: "🖱️ Consistent button motion",
+          bullets: [
+            "Every button's icon now shares one motion: a 1px lift and 4% growth on hover, the same everywhere",
+            "Fix: clicking a button nudged its icon sideways (play, favourite, play-mode and others)",
+            "Fix: holding a button down kept shrinking it — the longer you pressed, the smaller it got",
+            "The settings rail's tabs now respond to hover too; before they only changed colour",
+          ],
+        },
+        {
+          title: "🔥 Hot keywords",
+          bullets: [
+            "Fix: hot keywords did not grow on hover or on click — they had no reaction at all",
+          ],
+        },
+        {
+          title: "🎧 Playback",
+          bullets: [
+            "The play/pause button now only swaps its icon when clicked, with no extra movement",
+          ],
+        },
+      ],
+    },
+  },
   "3.14.1": {
     zh: {
       sections: [
