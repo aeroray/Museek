@@ -216,6 +216,42 @@ await send("Page.enable")
 await send("Runtime.enable")
 await send("Emulation.setDeviceMetricsOverride", { width: 700, height: 400, deviceScaleFactor: 1, mobile: false })
 
+/*
+ * Force the two media features the hover rule depends on.
+ *
+ * `.icon-motion:hover svg` lives inside
+ *   @media (hover: hover) and (prefers-reduced-motion: no-preference)
+ * so it only applies when the browser reports a hover-capable pointer and no
+ * reduced-motion preference. A headless CI runner reports neither reliably —
+ * GitHub Actions' Windows image in particular exposes no hover-capable pointer,
+ * so `hover: hover` evaluates false and the rule never applies. The check then
+ * failed with hover scale 1.000 while the hot-keyword hover (a plain Tailwind
+ * utility, not behind a media query) still passed, which is exactly how the
+ * environment difference showed up.
+ *
+ * Emulating both features makes the measurement independent of the runner. This
+ * is declaring the intended environment, not papering over a code defect: real
+ * desktop users have a hovering pointer and (usually) no reduced-motion setting.
+ */
+await send("Emulation.setEmulatedMedia", {
+  features: [
+    { name: "hover", value: "hover" },
+    { name: "any-hover", value: "hover" },
+    { name: "pointer", value: "fine" },
+    { name: "any-pointer", value: "fine" },
+    { name: "prefers-reduced-motion", value: "no-preference" },
+  ],
+})
+{
+  const capability = await evaluate(`({
+    hover: matchMedia("(hover: hover)").matches,
+    reduced: matchMedia("(prefers-reduced-motion: no-preference)").matches,
+  })`)
+  console.log(
+    `   media: hover=${capability.hover} no-preference=${capability.reduced}`,
+  )
+}
+
 const appCss = readFileSync(join(root, "src/index.css"), "utf8").replace(/@tailwind[^;]+;/g, "")
 const css = readFileSync(join(work, "probe.out.css"), "utf8")
 const html = `<!doctype html><html><body style="margin:0;background:#fff">
