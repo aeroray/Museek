@@ -2,6 +2,22 @@
 
 Memory here applies only when touched files or task scope match this area.
 
+## MC-AREA-20261102-f338d31a — Queue list and Clear placement
+
+Status: active
+Scope: area:playback
+Entry-Type: decision
+Subject: MC-SUBJ-20261021-96c635c5
+Facet: interface
+Evidence:
+- repo:src/components/queue/PlayQueue.tsx
+
+Decision:
+The queue list uses the shared `ScrollArea`, never a hand-styled native scroller, and Clear is a drawer-header action, not a footer button.
+
+Reason:
+The drawer opens from the bottom-right, so a footer Clear sat under the pointer that opened it.
+
 ## MC-AREA-20261021-00000001 — A forced play request is never redundant
 
 Status: active

@@ -5,10 +5,10 @@ import {
   DrawerClose,
   DrawerContent,
   DrawerDescription,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +77,30 @@ export function PlayQueue() {
               <X size={16} />
               <span className="sr-only">{t("common.cancel")}</span>
             </DrawerClose>
+
+            {/*
+              "Clear" lives in the HEADER, not in a footer.
+
+              It used to be a full-width footer button pinned just above the
+              bottom of the window, directly above the player bar's queue
+              toggle that opens this drawer. The pointer is therefore already
+              over Clear the moment the drawer finishes sliding in, so a second
+              click — or a double-click on the toggle — lands on Clear without
+              the user having aimed at anything. Up here it is far from both the
+              pointer and the close button, and it reads as a list-header action
+              rather than a primary one.
+            */}
+            {queue.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-2 mt-1 h-7 self-start px-2 text-xs text-muted-foreground hover:text-destructive"
+                onClick={() => setConfirmClear(true)}
+              >
+                <Trash2 size={13} className="mr-1.5" />
+                {t("queue.clear")}
+              </Button>
+            )}
           </DrawerHeader>
 
           {queue.length === 0 ? (
@@ -89,8 +113,21 @@ export function PlayQueue() {
             </div>
           ) : (
             <div className="relative flex min-h-0 flex-1 flex-col">
-              <div className="flex-1 overflow-y-auto overscroll-contain p-2 pb-8 [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground)/0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/25 [&::-webkit-scrollbar-track]:bg-transparent">
-                <div className="flex flex-col gap-0.5">
+              {/*
+                The shared ScrollArea, not a hand-styled native scroller.
+
+                This list used to be `overflow-y-auto` with its own
+                `[scrollbar-width:thin]` + `[&::-webkit-scrollbar]:w-1.5` rules.
+                That made it the only list in the app drawing a raw native bar:
+                everywhere else the app renders Radix's ScrollArea thumb
+                (`w-2.5`, `bg-border`, hover-revealed). So the queue looked and
+                behaved differently — a thin permanent native bar instead of the
+                app's wider auto-hiding one. Moving it onto the shared component
+                fixes the appearance and gives it the same overlay behaviour as
+                the mini player's queue, which already used ScrollArea.
+              */}
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="flex flex-col gap-0.5 p-2">
                   {queue.map((item, i) => {
                     const active = i === queueIndex;
                     return (
@@ -179,27 +216,10 @@ export function PlayQueue() {
                     );
                   })}
                 </div>
-              </div>
-              {/* Soft fade into the footer so the list doesn't clip hard above 清空 */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-14 bg-gradient-to-t from-popover via-popover/75 to-transparent"
-              />
+              </ScrollArea>
             </div>
           )}
 
-          {queue.length > 0 && (
-            <DrawerFooter className="relative z-[2] pt-0">
-              <Button
-                variant="outline"
-                className="w-full text-muted-foreground hover:border-destructive/40 hover:text-destructive"
-                onClick={() => setConfirmClear(true)}
-              >
-                <Trash2 size={15} className="mr-2" />
-                {t("queue.clear")}
-              </Button>
-            </DrawerFooter>
-          )}
         </DrawerContent>
       </Drawer>
 

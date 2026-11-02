@@ -4,6 +4,10 @@ Entries are newest first.
 
 ## 2026-11-02
 
+- Added a `playback` decision: the queue list uses the shared `ScrollArea`, and Clear is a drawer-header action, not a footer under the opening pointer. Pinned by `scripts/check-queue-ui.mjs`.
+
+## 2026-11-02
+
 - Added a `ui-system` decision recording that `default`, `destructive` and `secondary` border their own top edge: on a half-pixel y the hover transition re-resolved the antialiased row and the top of dialog buttons flickered. Pinned by `scripts/check-button-edge-flicker.mjs`.
 
 - Added a `ui-system` decision recording why native scrollbars must be hidden from the app's own stylesheet, not by Radix's runtime `<style>`: the Tauri CSP nonce voids `'unsafe-inline'`, so the packaged app drops Radix's rule. Pinned by `scripts/check-scrollbar-gutter.mjs`.
