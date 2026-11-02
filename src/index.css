@@ -1035,6 +1035,36 @@ html[data-mini-peek="true"] .app-shell > * {
   @apply bg-muted-foreground/45;
 }
 
+/*
+  Radix ScrollArea / Select draw their own bars and hide the native one with a
+  <style> element they render at runtime. That element carries no CSP nonce, and
+  the Tauri build stamps a nonce onto the stylesheets in index.html — which
+  makes `'unsafe-inline'` ineffective for `style-src` (CSP3 §6.7.3.2: a
+  nonce-source suppresses it). So the packaged app DROPS Radix's rule while the
+  viewport keeps the `overflow-y: scroll` Radix sets deliberately, and the
+  app-wide `::-webkit-scrollbar` rule above then paints a native bar on top of
+  Radix's own.
+
+  That is the "second scrollbar" bug: in the changelog dialog the ScrollArea
+  reveals its thumb only while the pointer is inside, so entering it looked
+  like a new bar appearing, when in fact the native one had been there all
+  along. `pnpm tauri dev` and the browser preview enforce no CSP, so neither
+  reproduces it.
+
+  The rules below do the same job from the app's own (nonce'd) stylesheet, so
+  they survive packaging and cover every Radix viewport at once. Keep the
+  selectors in sync with what Radix would inject. */
+[data-radix-scroll-area-viewport],
+[data-radix-select-viewport] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar,
+[data-radix-select-viewport]::-webkit-scrollbar {
+  display: none;
+}
+
 .no-select {
   user-select: none;
 }

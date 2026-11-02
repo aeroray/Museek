@@ -2,6 +2,10 @@
 
 Entries are newest first.
 
+## 2026-11-02
+
+- Added a `ui-system` decision recording why native scrollbars must be hidden from the app's own stylesheet rather than by Radix's runtime `<style>`: the Tauri build's CSP nonce makes `'unsafe-inline'` ineffective for `style-src`, so the packaged app silently drops Radix's rule. Pinned by `scripts/check-scrollbar-gutter.mjs`, which serves the built app under a nonce-bearing CSP because neither `pnpm tauri dev` nor the browser preview enforces one.
+
 ## 2026-10-21
 
 - Removed five `docs/release-notes-v3.11.*.md` files. Every bullet was word-for-word duplicated in `src/lib/whatsNew/entries.ts` (34/34 verified), the download footer is already permanent in `release.yml`'s `releaseBody`, and `generateReleaseNotes: true` writes the body on every release. Nothing referenced them.

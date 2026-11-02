@@ -2,6 +2,22 @@
 
 Memory here applies only when touched files or task scope match this area.
 
+## MC-AREA-20261102-dfaf0752 — Hide native bars in the app stylesheet, not via Radix's runtime style
+
+Status: active
+Scope: area:ui-system
+Entry-Type: decision
+Subject: MC-SUBJ-20261021-74863a9e
+Facet: compatibility
+Evidence:
+- repo:src/index.css
+
+Decision:
+Hide native scrollbars in `src/index.css` for `[data-radix-scroll-area-viewport]` and `[data-radix-select-viewport]`; never rely on the `<style>` Radix injects at runtime.
+
+Reason:
+Tauri's build-time CSP nonce makes `'unsafe-inline'` ineffective for `style-src`, so the packaged app drops Radix's rule and paints a native bar under the custom one.
+
 ## MC-AREA-20261021-00000701 — Motion reads from shared tokens, never literals
 
 Status: active
@@ -76,4 +92,4 @@ Evidence:
 - repo:docs/memory/manifest.md
 
 Rejected:
-Raising a manifest budget to make `status` pass — the CLI enforces its own limits. Likewise, never offer a bulk action (reorder, clear, disable-all) on incomplete data: a partial ranking reads as an unrequested verdict, so gate it on complete results and keep it from flipping state flags.
+Raising a manifest budget to make `status` pass — the CLI enforces its own limits. Never offer a bulk action (reorder, clear, disable-all) on incomplete data: a partial ranking reads as an unrequested verdict, so gate it on complete results.
