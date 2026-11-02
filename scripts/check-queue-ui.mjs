@@ -286,6 +286,16 @@ try {
       hasFooter: !!popup.querySelector('[data-slot="drawer-footer"]'),
       rows: popup.querySelectorAll('[class*="cursor-pointer"]').length,
       clearY: cr ? cr.y : null,
+      clearRight: cr ? cr.right : null,
+      closeRect: (() => {
+        const c = popup.querySelector('[data-slot="drawer-close"]')
+          || [...popup.querySelectorAll('button')].find((b) => (b.getAttribute('aria-label') || b.querySelector('.sr-only')?.textContent || '').trim() && !/清空|Clear/.test(b.textContent || ''))
+        if (!c) return null
+        const r = c.getBoundingClientRect()
+        return { right: r.right, bottom: r.bottom }
+      })(),
+      headerHeight: document.querySelector('[data-slot="drawer-header"]')?.getBoundingClientRect().height ?? null,
+      titleBottom: popup.querySelector('[data-slot="drawer-title"]')?.getBoundingClientRect().bottom ?? null,
       popupTop: pr.top,
       popupBottom: pr.bottom,
     }
@@ -315,6 +325,29 @@ try {
       "Clear sits in the upper part of the drawer, not at the pointer",
       report.clearY != null && report.clearY - report.popupTop < 120,
       report.clearY == null ? "Clear not found" : `Clear y-offset = ${Math.round(report.clearY - report.popupTop)}px`,
+    )
+    // Layout contract for the header: two lines, nothing stacked a third row
+    // deep. Clear sharing the count row with the close button is what keeps it
+    // short; a third row pushed the header to 113px and left the space under the
+    // close button blank.
+    check(
+      "the header stays a compact two-line block",
+      report.headerHeight != null && report.headerHeight <= 96,
+      `header = ${report.headerHeight == null ? "?" : Math.round(report.headerHeight)}px`,
+    )
+    check(
+      "Clear is on the right, aligned under the close button",
+      report.clearRight != null &&
+        report.closeRect != null &&
+        Math.abs(report.clearRight - report.closeRect.right) <= 6,
+      `Clear right=${report.clearRight == null ? "?" : Math.round(report.clearRight)} close right=${report.closeRect?.right == null ? "?" : Math.round(report.closeRect.right)}`,
+    )
+    check(
+      "Clear sits below the close button, not beside it",
+      report.clearY != null &&
+        report.closeRect != null &&
+        report.clearY >= report.closeRect.bottom - 4,
+      `Clear y=${report.clearY == null ? "?" : Math.round(report.clearY)} close bottom=${report.closeRect?.bottom == null ? "?" : Math.round(report.closeRect.bottom)}`,
     )
   }
   ws.close()

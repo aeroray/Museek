@@ -60,47 +60,54 @@ export function PlayQueue() {
         swipeDirection="right"
       >
         <DrawerContent className="data-[swipe-axis=x]:[--drawer-content-width:min(100%,22.5rem)]">
-          <DrawerHeader className="border-b border-border/60 relative pr-12">
-            <DrawerTitle>{t("queue.title")}</DrawerTitle>
-            <DrawerDescription>
-              {t("queue.count", { count: queue.length })}
-            </DrawerDescription>
-            <DrawerClose
-              render={
+          <DrawerHeader className="border-b border-border/60">
+            {/*
+              Close in the title row, Clear at the right of the count row — a
+              two-line header instead of three.
+
+              Clear used to get a full-width row of its own ("Trash2 清空" on its
+              own line), which pushed the header to 113px and left the whole area
+              under the close button empty. It is a quiet secondary action, so it
+              now sits at the right end of the count row, directly under the close
+              button: the header is shorter and its right side is used rather than
+              blank.
+
+              It must stay up here rather than in a footer, though. The drawer
+              opens from the player bar's bottom-right toggle, so a footer Clear
+              lands right under the pointer that just opened the drawer and gets
+              clicked by accident (measured: that pointer sits ~727px down).
+            */}
+            <div className="flex items-start justify-between gap-2">
+              <DrawerTitle>{t("queue.title")}</DrawerTitle>
+              <DrawerClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="-mr-1 -mt-1 h-8 w-8 shrink-0 text-muted-foreground"
+                  />
+                }
+              >
+                <X size={16} />
+                <span className="sr-only">{t("common.cancel")}</span>
+              </DrawerClose>
+            </div>
+            <div className="-mr-1 flex items-center justify-between gap-2">
+              <DrawerDescription>
+                {t("queue.count", { count: queue.length })}
+              </DrawerDescription>
+              {queue.length > 0 && (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="absolute right-3 top-3 h-8 w-8 text-muted-foreground"
-                />
-              }
-            >
-              <X size={16} />
-              <span className="sr-only">{t("common.cancel")}</span>
-            </DrawerClose>
-
-            {/*
-              "Clear" lives in the HEADER, not in a footer.
-
-              It used to be a full-width footer button pinned just above the
-              bottom of the window, directly above the player bar's queue
-              toggle that opens this drawer. The pointer is therefore already
-              over Clear the moment the drawer finishes sliding in, so a second
-              click — or a double-click on the toggle — lands on Clear without
-              the user having aimed at anything. Up here it is far from both the
-              pointer and the close button, and it reads as a list-header action
-              rather than a primary one.
-            */}
-            {queue.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-ml-2 mt-1 h-7 self-start px-2 text-xs text-muted-foreground hover:text-destructive"
-                onClick={() => setConfirmClear(true)}
-              >
-                <Trash2 size={13} className="mr-1.5" />
-                {t("queue.clear")}
-              </Button>
-            )}
+                  size="sm"
+                  className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={() => setConfirmClear(true)}
+                >
+                  <Trash2 size={13} className="mr-1.5" />
+                  {t("queue.clear")}
+                </Button>
+              )}
+            </div>
           </DrawerHeader>
 
           {queue.length === 0 ? (
