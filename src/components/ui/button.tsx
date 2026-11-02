@@ -8,11 +8,25 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+        default:
+          // The border is not decoration. A flat fill has an antialiased edge
+          // row wherever the button lands on a fractional y — and DialogContent
+          // centres with `top:50% + translateY(-50%)`, so dialog footer buttons
+          // routinely sit on x.5. When the fill itself paints that row, a
+          // background-color transition re-resolves it and the top edge snaps
+          // for a frame while the rest of the fill ramps: a visible flicker
+          // along the top of the button.
+          //
+          // `outline` never showed it because `border-input` owns that row. The
+          // saturated fill variants get the same guarantee here: a border in the
+          // fill colour. Only the vertical sides are bordered — a left/right
+          // border would add 2px to an auto-width button, and it is the
+          // horizontal edges that sit on a fractional y.
+          "bg-primary text-primary-foreground border-y border-primary hover:bg-primary/90 shadow-sm",
         destructive:
-          "bg-destructive text-destructive-foreground hover:[background-color:color-mix(in_srgb,hsl(var(--destructive))_86%,black)]",
+          "bg-destructive text-destructive-foreground border-y border-destructive hover:[background-color:color-mix(in_srgb,hsl(var(--destructive))_86%,black)]",
         outline: "border border-input bg-background/60 hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        secondary: "bg-secondary text-secondary-foreground border-y border-secondary hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },

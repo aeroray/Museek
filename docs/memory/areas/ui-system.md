@@ -2,6 +2,22 @@
 
 Memory here applies only when touched files or task scope match this area.
 
+## MC-AREA-20261102-c624188b — Saturated-fill buttons border their own top edge
+
+Status: active
+Scope: area:ui-system
+Entry-Type: decision
+Subject: MC-SUBJ-20261021-74863a9e
+Facet: behavior
+Evidence:
+- repo:src/components/ui/button.tsx
+
+Decision:
+`default`, `destructive` and `secondary` carry `border-y border-<fill>`. On a half-pixel y (dialog footers) the antialiased top row is then a constant opaque colour instead of the transitioning background.
+
+Reason:
+A background-only edge re-resolves mid-transition and the top of the button flickers.
+
 ## MC-AREA-20261102-dfaf0752 — Hide native bars in the app stylesheet, not via Radix's runtime style
 
 Status: active
